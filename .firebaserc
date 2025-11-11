@@ -1,0 +1,12 @@
+// FILE: .firebaserc
+{
+  "projects": { "default": "gangtalk-b8eb8" },
+  "targets": {
+    "gangtalk-b8eb8": {
+      "hosting": {
+        "prod": ["gangtalk-b8eb8"],
+        "staging": ["gangtalk-b8eb8-staging"]
+      }
+    }
+  }
+}

@@ -1,0 +1,18 @@
+<!doctype html>
+<html>
+<meta charset="utf-8" />
+<title>PASS 완료</title>
+<body style="font-family:sans-serif">
+<p>인증이 완료되었습니다. 창을 닫아주세요.</p>
+<script>
+    const qs = new URLSearchParams(location.search);
+    const txId = qs.get('txId');
+    try {
+      if (window.opener) {
+        window.opener.postMessage({ type: 'passResult', txId }, location.origin);
+      }
+    } catch(e) {}
+    setTimeout(()=> window.close(), 300);
+</script>
+</body>
+</html>

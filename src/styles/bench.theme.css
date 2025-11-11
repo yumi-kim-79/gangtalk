@@ -1,0 +1,148 @@
+/* ─────────────────────────────────────────────────────────
+   Bench Theme v2
+   - 미니멀 + 핑크 액센트
+   - 폰트 스케일 변수
+   - 다크 모드(data-theme="dark") 지원
+   ───────────────────────────────────────────────────────── */
+
+@font-face{
+  font-family: 'Pretendard Variable';
+  font-style: normal;
+  font-weight: 45 920;
+  src: local('Pretendard Variable'),
+       url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
+}
+
+/* ===== Light (default) ===== */
+:root{
+  /* Colors */
+  --bg: #ffffff;
+  --bg-subtle: #fafafb;
+  --surface: #ffffff;
+  --line: #ececef;
+  --shadow: rgba(5, 15, 35, .06);
+
+  --fg: #17181a;
+  --muted: #8b8f98;
+
+  --accent: #ff3b80;            /* 메인 핑크 */
+  --accent-weak: #ffe0ec;       /* 연핑크 배경 */
+  --accent-hover: #ff5a98;
+
+  --green: #22c58b;
+  --orange: #ffb020;
+  --red: #ff5a5f;
+
+  /* Radii & Layout */
+  --radius-lg: 16px;
+  --radius-md: 12px;
+  --radius-sm: 8px;
+  --container: 980px;
+
+  /* Typography scale */
+  --fs-lg: clamp(18px, 2.3vw, 20px);
+  --fs-md: 15px;
+  --fs-sm: 13px;
+}
+
+/* ===== Dark ===== */
+:root[data-theme="dark"]{
+  --bg: #0b0c10;
+  --bg-subtle: #0f1216;
+  --surface: #111318;
+  --line: #22252d;
+  --shadow: rgba(0,0,0,.35);
+
+  --fg: #e9ecf1;
+  --muted: #a2a8b3;
+
+  --accent: #ff4a8c;
+  --accent-weak: #361421;       /* 진한 연핑크 배경(다크용) */
+  --accent-hover: #ff6aa2;
+}
+
+/* ===== Reset-lite ===== */
+*{ box-sizing:border-box }
+html,body,#app{ height:100% }
+html{ -webkit-tap-highlight-color: transparent }
+body{
+  margin:0;
+  font-family: 'Pretendard Variable', system-ui, -apple-system, Segoe UI, Roboto, Noto Sans, Apple SD Gothic Neo, '맑은 고딕', sans-serif;
+  color:var(--fg);
+  background:var(--bg);
+  font-size: var(--fs-md);
+}
+
+/* ===== Common Layout ===== */
+.container{ max-width:var(--container); margin:0 auto; padding:0 16px; }
+.row{ display:flex; gap:8px; }
+.muted{ color:var(--muted) }
+h1,h2,h3{ margin:0; font-weight:800 }
+h2{ font-size: var(--fs-lg); }
+small{ font-size: var(--fs-sm); }
+
+/* ===== Buttons ===== */
+.btn{
+  display:inline-flex; align-items:center; justify-content:center;
+  height:40px; padding:0 14px; border-radius:999px;
+  border:1px solid var(--line); background:var(--surface); color:var(--fg); font-weight:700;
+}
+.btn.primary{ background:var(--accent); border-color:var(--accent); color:#fff; }
+.btn.ghost{ background:transparent; }
+.btn.tiny{ height:30px; padding:0 10px; font-size:var(--fs-sm); }
+
+/* Icon-only (TopBar 등) */
+.btn.icon{
+  width:40px; height:40px; padding:0; border-radius:999px;
+  border:1px solid var(--accent-weak); background:transparent; color:var(--accent);
+  box-shadow:0 6px 18px var(--shadow);
+  transition: transform .06s ease, background .15s ease, border-color .15s ease;
+}
+.btn.icon:hover{ background:var(--accent-weak); }
+.btn.icon:active{ transform:scale(.98) }
+.btn.icon.is-active{ outline:2px solid var(--accent-weak) }
+
+/* ===== Inputs ===== */
+.input{
+  width:100%; height:48px; padding:0 14px; border-radius:999px;
+  border:1px solid var(--line); background:var(--surface); color:var(--fg);
+  font-size: var(--fs-md);
+}
+.input::placeholder{ color:#b6bac2; opacity:.9 }
+
+/* ===== Chips ===== */
+.chips{ display:flex; gap:8px; overflow-x:auto; padding-bottom:2px; }
+.chip{
+  height:36px; padding:0 12px; border-radius:999px;
+  border:1px solid var(--line); background:var(--surface); color:var(--fg); font-weight:700; white-space:nowrap;
+  transition: border-color .15s ease, background .15s ease, color .15s ease, transform .05s ease;
+}
+.chip:active{ transform: scale(.98); }
+.chip.active{ background:var(--accent); border-color:var(--accent); color:#fff; }
+
+/* ===== Cards ===== */
+.card{
+  border:1px solid var(--line);
+  background:var(--surface);
+  border-radius:var(--radius-lg);
+  box-shadow:0 12px 30px var(--shadow);
+}
+
+/* ===== Top bar / Bottom separator ===== */
+.topbar{
+  position:sticky; top:0; z-index:20; background:var(--surface);
+  border-bottom:1px solid var(--line);
+  backdrop-filter:saturate(120%) blur(8px);
+}
+.bottom-sep{ border-top:1px solid var(--line) }
+
+/* ===== Status icon colors ===== */
+.wifi{ font-size:18px }
+.wifi.busy{ color:var(--red) }
+.wifi.mid{ color:var(--orange) }
+.wifi.free{ color:var(--green) }
+
+/* ===== Transitions (list/grid 전환) ===== */
+.sw-enter-active, .sw-leave-active { transition: opacity .1s ease, transform .1s ease; }
+.sw-enter-from,  .sw-leave-to      { opacity:0; transform: scale(.98); }
+.sw-move { transition: transform .1s ease; } /* 위치 변화 애니메이션 */

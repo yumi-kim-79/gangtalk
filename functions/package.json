@@ -1,0 +1,20 @@
+{
+  "name": "gangtalk-functions",
+  "private": true,
+  "type": "commonjs",
+  "main": "index.js",
+  "engines": { "node": "20" },
+  "scripts": {
+    "deploy": "firebase deploy --only functions",
+    "serve": "firebase emulators:start --only functions",
+    "start": "npm run serve"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.19.2",
+    "firebase-admin": "^12.5.0",
+    "firebase-functions": "^4.7.0",
+    "nodemailer": "^6.9.13",
+    "uuid": "^9.0.1"
+  }
+}

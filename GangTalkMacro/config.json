@@ -1,0 +1,103 @@
+{
+  "windows": ["유앤미", "레이블", "드라마", "라이징", "퍼펙트"],
+  "poll_interval_ms": 2500,
+  "copy_interval_sec": 300,
+
+  "tesseract_path": "C:\\\\Program Files\\\\Tesseract-OCR\\\\tesseract.exe",
+  "tessdata_dir": "C:\\\\GangTalkMacro\\\\tessdata",
+  "ocr_lang": "kor+eng",
+  "ocr_psm": 6,
+  "ocr_oem": 3,
+  "ocr_dpi": 300,
+  "capture_margin": 16,
+
+  "firestore": {
+    "biz_collection": "rooms_biz",
+    "status_collection": "status_board",
+    "rooms_subcollection": "rooms",
+    "message_subcollection": "messages",
+    "autoCreateBizRoom": true
+  },
+
+  "post_to": { "chat": true, "status_board": true },
+
+  "filters": { "must_include_any": [], "min_chars": 3 },
+
+  "uploader": {
+    "email": "gangtalk815@gmail.com",
+    "uid": "serviceAccount"
+  },
+
+  "stores": [
+    {
+      "name": "유앤미",
+      "aliases": ["유앤미", "유.앤.미", "YOU&ME"],
+      "vendorId": "youandme",
+      "room_biz_id": "Lk41SVrxNVLnen46mbH2"
+    },
+    {
+      "name": "레이블",
+      "aliases": ["레이블", "레.이.블", "LABELS"],
+      "vendorId": "labels",
+      "room_biz_id": "lqCZVyTY9fbZC0Tg0wU"
+    },
+    {
+      "name": "드라마",
+      "aliases": ["드라마", "DRAMA"],
+      "vendorId": "drama",
+      "room_biz_id": null
+    },
+    {
+      "name": "라이징",
+      "aliases": ["라이징", "RISING"],
+      "vendorId": "rising",
+      "room_biz_id": null
+    },
+    {
+      "name": "퍼펙트",
+      "aliases": ["퍼펙트", "PERFECT"],
+      "vendorId": "perfect",
+      "room_biz_id": null
+    }
+  ],
+
+  "chat_capture": {
+    "mode": "clipboard_prefer",
+    "padding": { "left": 8, "top": 40, "right": 8, "bottom": 12 },
+    "ocr": { "psm": 4, "oem": 1, "scale": 2, "binary": true }
+  },
+
+  "allow_ocr_fallback": true,
+  "debug": true,
+  "smoke_test": false,
+
+  "auto_bring_to_front": true,
+  "auto_arrange_windows": true,
+  "arrange": { "cols": 5, "margin": 6, "height_ratio": 0.88 },
+
+  "kakao": {
+    "process_name": "KakaoTalk.exe",
+    "exclude_titles": [
+      "카카오톡",
+      "KakaoTalk",
+      "Windows PowerShell",
+      "PowerShell",
+      "알림",
+      "이모티콘",
+      "환경설정"
+    ]
+  },
+
+  "block_from_header": true,
+  "read_full_message": true,
+  "ocr_bottom_only": false,
+
+  "header_rule": {
+    "emoji": "💰",
+    "min_header_len": 4,
+    "max_header_len": 80,
+    "regex": "^\\s*💰+\\s*.+?\\s*💰+\\s*$"
+  },
+
+  "strict_vendor_match": true
+}

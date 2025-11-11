@@ -1,0 +1,16 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "board_posts",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "category", "order": "ASCENDING" },
+        { "fieldPath": "isSeed", "order": "ASCENDING" },
+        { "fieldPath": "createdAtMs", "order": "ASCENDING" },
+        { "fieldPath": "updatedAt", "order": "DESCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

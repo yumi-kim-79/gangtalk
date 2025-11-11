@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+
+  <!-- =========================================
+       🔒 App Check 디버그 토큰 차단 스니펫
+       - 운영 도메인에서 debug token 파라미터/스토리지/전역변수 제거
+       - 반드시 main.js 보다 "위"에서 실행
+     ========================================= -->
+  <script>
+    (function () {
+      var host = location.hostname;
+      var isLocal = (host === 'localhost' || host === '127.0.0.1');
+
+      try {
+        // 운영에서는 URL의 디버그 파라미터 제거
+        if (!isLocal) {
+          var usp = new URLSearchParams(location.search);
+          var touched = false;
+          ['appCheckDebug', 'firebaseAppCheckDebugToken'].forEach(function (k) {
+            if (usp.has(k)) { usp.delete(k); touched = true; }
+          });
+          if (touched) {
+            var clean = location.pathname + (usp.toString() ? '?' + usp.toString() : '') + location.hash;
+            history.replaceState(null, '', clean);
+          }
+        }
+      } catch (e) {}
+
+      // 운영에서는 전역/스토리지에 남은 디버그 토큰 완전 제거
+      try {
+        if (!isLocal) {
+          delete window.FIREBASE_APPCHECK_DEBUG_TOKEN;
+          window.FIREBASE_APPCHECK_DEBUG_TOKEN = undefined;
+          ['firebase:appCheckDebugToken', 'FIREBASE_APPCHECK_DEBUG_TOKEN'].forEach(function (k) {
+            try { localStorage.removeItem(k); } catch (e) {}
+            try { sessionStorage.removeItem(k); } catch (e) {}
+          });
+        }
+      } catch (e) {}
+    })();
+  </script>
+
+  <!-- 단일 viewport: 노치-safe + 전체화면 -->
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+
+  <!-- PWA manifest (캐시 무력화용 쿼리 버전) -->
+  <link rel="manifest" href="/manifest.webmanifest?v=20250911" />
+
+  <!-- 테마/색상 -->
+  <meta name="theme-color" content="#ff2e87" />
+  <meta name="color-scheme" content="light dark" />
+
+  <!-- Android 힌트 -->
+  <meta name="application-name" content="강남톡방" />
+  <meta name="mobile-web-app-capable" content="yes" />
+
+  <!-- iOS: 전체화면 + 상태바 + 아이콘 -->
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="강남톡방" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/icons/icon-180.png" />
+
+  <!-- 브라우저 탭 파비콘 -->
+  <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="/icons/favicon-16.png" />
+
+  <title>GangTalk</title>
+
+  <!-- 초기 테마 FOUC 방지 -->
+  <script>
+    (function () {
+      try {
+        var t = (localStorage.getItem('theme') || 'white').toLowerCase();
+        if (t !== 'black' && t !== 'white') t = 'white';
+        document.documentElement.setAttribute('data-theme', t);
+      } catch (e) {
+        document.documentElement.setAttribute('data-theme', 'white');
+      }
+    })();
+  </script>
+
+  <!-- ❌ (중요) 예전 코드: 디버그 토큰 강제 ON 스니펫은 완전히 삭제합니다.
+  <script>
+    self.FIREBASE_APPCHECK_DEBUG_TOKEN = true;   // ← 이 줄이 문제의 원인
+  </script>
+  -->
+</head>
+<body>
+<div id="app"></div>
+
+<!-- 앱 엔트리 -->
+<script type="module" src="/src/main.js"></script>
+</body>
+</html>

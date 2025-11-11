@@ -1,0 +1,7 @@
+pywinauto==0.6.8
+mss==9.0.1
+pillow==10.4.0
+pytesseract==0.3.13
+firebase-admin==6.6.0
+regex==2024.9.11
+pystray==0.19.5

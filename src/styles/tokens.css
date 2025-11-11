@@ -1,0 +1,125 @@
+/* ──────────────────────────────────────────────
+   Design Tokens (Light / Dark)
+   ────────────────────────────────────────────── */
+:root{
+  /* palette */
+  --bg:        #ffffff;
+  --surface:   #ffffff;
+  --fg:        #111318;
+  --muted:     #6b7380;
+  --line:      #e7e9ee;
+  --accent:    #ff3f8a; /* 포인트 핑크 */
+  --accent-weak: #ffd2e6;
+
+  /* component tokens */
+  --chip-bg:        color-mix(in oklab, var(--fg), transparent 94%);
+  --chip-border:    color-mix(in oklab, var(--fg), transparent 85%);
+  --chip-fg:        var(--fg);
+  --chip-active-bg: var(--accent);
+  --chip-active-fg: #fff;
+
+  /* shadows (사용 컴포넌트에서 재사용) */
+  --shadow: rgba(17, 19, 24, .06);
+  --ring-accent: 0 0 0 3px color-mix(in oklab, var(--accent), transparent 70%);
+
+  /* radius */
+  --rounded:    16px;
+  --rounded-sm: 10px;
+  --rounded-pill: 999px;
+
+  /* typography scale */
+  --fs-xxl: 22px;
+  --fs-xl:  20px;
+  --fs-lg:  16px;
+  --fs-md:  14px;
+  --fs-sm:  12px;
+  --lh:     1.5;
+}
+
+/* ──────────────────────────────────────────────
+   Dark theme
+   ────────────────────────────────────────────── */
+:root[data-theme="dark"]{
+  --bg:        #0f1114;
+  --surface:   #15181d;
+  --fg:        #e8ecf2;
+  --muted:     #9aa3b2;
+  --line:      #29303a;
+  --accent:    #ff4b94;
+  --accent-weak: #3a1e2b;
+
+  --chip-bg:     color-mix(in oklab, var(--fg), transparent 90%);
+  --chip-border: color-mix(in oklab, var(--fg), transparent 75%);
+
+  --shadow: rgba(0,0,0,.35);
+  --ring-accent: 0 0 0 3px color-mix(in oklab, var(--accent), transparent 55%);
+}
+
+/* ──────────────────────────────────────────────
+   Base (적용: 본문/링크/입력 기본값)
+   ────────────────────────────────────────────── */
+html, body{
+  background: var(--bg);
+  color: var(--fg);
+  font-size: 16px;
+  line-height: var(--lh);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+small { font-size: var(--fs-sm); }
+h1{ font-size: var(--fs-xxl); margin:0; }
+h2{ font-size: var(--fs-xl);  margin:0; }
+h3{ font-size: var(--fs-lg);  margin:0; }
+
+/* 유틸 */
+.row{ display:flex; gap:8px; }
+.muted{ color: var(--muted); }
+.ellip{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+
+/* ──────────────────────────────────────────────
+   현황판(한줄보기) — 이름 하단 가로선 완전 차단
+   원인: 전역의 형제 간 상단보더 규칙(* + *)/의사요소 구분선 등
+   → .row-card 내부 두 번째 블록(.r-right)에 선이 생김
+   아래 규칙으로 카드 내부의 의도치 않은 보더/헤어라인을 무효화
+   ────────────────────────────────────────────── */
+
+/* 카드 내부 자식에 붙는 상단 보더/헤어라인 일괄 제거 */
+.row-card > *,
+.store-card > * {
+  border-top: 0 !important;
+  background-image: none !important; /* gradient hairline 방지 */
+}
+
+/* 의사요소로 그려지는 얇은 선까지 제거 */
+.row-card > *::before,
+.row-card > *::after,
+.store-card > *::before,
+.store-card > *::after {
+  content: none !important;
+  display: none !important;
+}
+
+/* 이름/서브메타 영역의 보더를 명시적으로 0 처리 */
+.row-card .name-row,
+.row-card .r-right,
+.row-card .r-name,
+.row-card .r-meta {
+  border: 0 !important;
+}
+
+/* 혹시 들어오는 divider/hr 유틸도 무력화 */
+.row-card hr,
+.store-card hr,
+.row-card .divider,
+.store-card .divider,
+.row-card .hairline,
+.store-card .hairline {
+  display: none !important;
+  border: 0 !important;
+  height: 0 !important;
+  margin: 0 !important;
+}
+/* 현황판 카드 내부 상단 구분선 전역 차단(마지막 방어선) */
+.row-card * { border-top: 0 !important; background-image: none !important; }
+.grid-card .ad-excerpt { border-top: 0 !important; }

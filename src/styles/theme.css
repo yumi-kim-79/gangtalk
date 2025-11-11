@@ -1,0 +1,251 @@
+/* =========================================
+   Global Theme Tokens
+   - white/light  ↔  black/dark 동의어 지원
+   - 기본은 라이트(white)
+   ========================================= */
+
+/* 기본(라이트) – :root에도 넣고, data-theme="light|white"에도 동일값 바인딩 */
+:root,
+[data-theme="light"],
+[data-theme="white"] {
+  /* surfaces */
+  --bg: #ffffff;
+  --surface: #ffffff;
+  --elevated: #ffffff;
+
+  /* text */
+  --fg: #222222;
+  --muted: #666666;
+
+  /* lines & shadows */
+  --line: #eaeaea;
+  --shadow: rgba(0, 0, 0, 0.10);
+
+  /* brand */
+  --accent: #ff2d8d;
+  --accent-weak: #ffd1e6;
+
+  /* banner text color */
+  --banner-fg: #111111;
+}
+
+/* 앱 전체 기본색 */
+html, body {
+  background: var(--bg);
+  color: var(--fg);
+}
+
+/* 다크(블랙) – data-theme="dark|black" 에서 작동 */
+[data-theme="dark"],
+[data-theme="black"] {
+  --bg: #0f1013;
+  --surface: #15161a;
+  --elevated: #1b1c22;
+
+  --fg: #f5f6f9;
+  --muted: #b7bac4;
+
+  --line: #2a2d35;
+  --shadow: rgba(0, 0, 0, 0.5);
+
+  --accent: #ff4da3;
+  --accent-weak: #4d2234;
+
+  --banner-fg: #f5f6f9;
+}
+
+/* -----------------------------------------
+   공통 컴포넌트 기본(라이트) 스타일
+   ----------------------------------------- */
+.badge-chip,
+.pill,
+.act,
+.banner .chip {
+  background: #fff;
+  color: var(--fg);
+  border: 1px solid var(--line);
+  box-shadow: 0 2px 8px var(--shadow);
+}
+
+/* 다크에서만 반전 */
+[data-theme="dark"] .badge-chip,
+[data-theme="black"] .badge-chip,
+[data-theme="dark"] .pill,
+[data-theme="black"] .pill,
+[data-theme="dark"] .act,
+[data-theme="black"] .act,
+[data-theme="dark"] .banner .chip,
+[data-theme="black"] .banner .chip {
+  background: var(--surface);
+  color: var(--fg);
+  border-color: var(--line);
+  box-shadow: none;
+}
+
+/* 카드/리스트 공통 */
+.card, .store-card, .grid-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  box-shadow: 0 6px 16px var(--shadow);
+}
+
+/* 보조 텍스트 */
+.muted { color: var(--muted); }
+
+/* 상단 우측 라운드 아이콘 버튼 */
+.btn.icon {
+  background: var(--surface);
+  color: var(--fg);
+  border: 1px solid var(--line);
+  box-shadow: 0 6px 18px var(--shadow);
+}
+.btn.icon.is-active { outline: 2px solid var(--accent); }
+
+/* 검색창/툴 버튼 */
+.search, .tool {
+  background: var(--surface);
+  color: var(--fg);
+  border: 1px solid var(--line);
+}
+
+/* 탭/하단 내비 */
+.bottom-nav, nav.bottom {
+  background: var(--surface);
+  border-top: 1px solid var(--line);
+}
+.bottom-nav .item, nav.bottom .item {
+  color: var(--muted);
+}
+.bottom-nav .item.active, nav.bottom .item.active {
+  color: var(--accent);
+}
+
+/* === Theme fix: chips, pills, category tiles, tools === */
+.chip,
+.rank-chip,
+.quick-chip,
+.filter-chip,
+.category-chip,
+.cat,
+.cat .lbl,
+.region-btn,
+.search,
+.search-btn,
+.pill,
+.act,
+.metric,
+.tag,
+.tool {
+  background: var(--surface) !important;
+  color: var(--fg) !important;
+  border-color: var(--line) !important;
+}
+
+/* 검색창 placeholder도 테마 컬러 사용 */
+.search input::placeholder { color: var(--muted) !important; }
+
+/* 배너 텍스트 색을 테마 변수로 통일 */
+.banner { color: var(--banner-fg) !important; }
+
+/* 숫자/배지 컬러 */
+.rank-chip .no,
+.rs-no { background: var(--accent) !important; color: #fff !important; }
+
+/* 카테고리 원형 배지 테두리도 테마 색 */
+.badge { border-color: var(--fg) !important; }
+
+/* =========================================
+   Finder(한줄보기) 업체명 하단 ‘가로선’ 완전 차단
+   - 글로벌 룰(> * + *, hairline, divider 등)로 생기는
+     모든 상단 보더/의사요소 라인을 .row-card 범위에서 제거
+   ========================================= */
+
+/* 1) r-right 내부 형제 간 상단 경계선 제거 */
+.row-card .r-right > * + * {
+  border-top: 0 !important;
+  box-shadow: none !important;
+  background-image: none !important;
+}
+
+/* 2) 명시적으로 네임/메타 블록의 보더 제거 */
+.row-card .name-row,
+.row-card .r-name,
+.row-card .r-meta {
+  border: 0 !important;
+}
+
+/* 3) 의사요소로 그린 선도 차단 */
+.row-card .r-right > *::before,
+.row-card .r-right > *::after,
+.row-card .name-row::before,
+.row-card .name-row::after,
+.row-card .r-name::before,
+.row-card .r-name::after,
+.row-card .r-meta::before,
+.row-card .r-meta::after {
+  content: none !important;
+  display: none !important;
+}
+
+/* 4) hairline/divider 같은 전역 클래스가 들어와도 무력화 */
+.row-card .hairline,
+.row-card .divider {
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+/* =========================================
+   ✨ 폼 입력(인풋/텍스트에어리어) 라이트 모드 가독성 강제
+   - 편집 시 흰 글씨로 변하는 문제를 전역에서 차단
+   - iOS/Safari 호환: -webkit-text-fill-color 필수
+   ========================================= */
+
+/* 기본 폼 요소 공통값 (테마 기반) */
+input, textarea, select {
+  color: var(--fg);
+  background: var(--surface);
+  border: 1px solid var(--line);
+}
+
+/* 라이트/화이트 테마에서 ‘항상’ 진한 글자색을 강제 */
+:where(:root, [data-theme="light"], [data-theme="white"]) input,
+:where(:root, [data-theme="light"], [data-theme="white"]) textarea,
+:where(:root, [data-theme="light"], [data-theme="white"]) .inline-input,
+:where(:root, [data-theme="light"], [data-theme="white"]) .intro-input {
+  color: #111 !important;
+  -webkit-text-fill-color: #111 !important; /* iOS/Safari 실제 렌더 색 */
+  caret-color: #111 !important;
+}
+
+/* 라이트/화이트 테마 placeholder도 어둡게 */
+:where(:root, [data-theme="light"], [data-theme="white"]) input::placeholder,
+:where(:root, [data-theme="light"], [data-theme="white"]) textarea::placeholder,
+:where(:root, [data-theme="light"], [data-theme="white"]) .intro-input::placeholder {
+  color: #111 !important;
+  opacity: .45 !important;
+}
+
+/* 다크/블랙 테마에서의 폼(가독성 유지) */
+[data-theme="dark"] input,
+[data-theme="black"] input,
+[data-theme="dark"] textarea,
+[data-theme="black"] textarea,
+[data-theme="dark"] .inline-input,
+[data-theme="black"] .inline-input,
+[data-theme="dark"] .intro-input,
+[data-theme="black"] .intro-input {
+  color: var(--fg) !important;
+  -webkit-text-fill-color: var(--fg) !important;
+  caret-color: var(--fg) !important;
+}
+
+[data-theme="dark"] input::placeholder,
+[data-theme="black"] input::placeholder,
+[data-theme="dark"] textarea::placeholder,
+[data-theme="black"] textarea::placeholder,
+[data-theme="dark"] .intro-input::placeholder,
+[data-theme="black"] .intro-input::placeholder {
+  color: var(--fg) !important;
+  opacity: .45 !important;
+}

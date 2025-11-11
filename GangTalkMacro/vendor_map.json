@@ -1,0 +1,38 @@
+{
+  "youandme": {
+    "vendorId": "youandme",
+    "aliases": ["유앤미", "유.앤.미", "YOU&ME"],
+    "windowTitles": ["유앤미"],
+    "bizDocId": "youandme",
+    "roomId": "youandme_room_01"
+  },
+  "labels": {
+    "vendorId": "labels",
+    "aliases": ["레이블", "레.이.블", "LABELS"],
+    "windowTitles": ["레이블"],
+    "bizDocId": "lqCZVyTY9fbZC0Tg0wU",
+    "roomId": "labels_room_01"
+  },
+  "drama": {
+    "vendorId": "drama",
+    "aliases": ["드라마", "DRAMA"],
+    "windowTitles": ["드라마"],
+    "bizDocId": "drama",
+    "roomId": "drama_room_01"
+  },
+  "rising": {
+    "vendorId": "rising",
+    "aliases": ["라이징", "RISING"],
+    "windowTitles": ["라이징"],
+    "bizDocId": "rising",
+    "roomId": "rising_room_01"
+  },
+  "perfect": {
+    "vendorId": "perfect",
+    "aliases": ["퍼펙트", "PERFECT"],
+    "windowTitles": ["퍼펙트"],
+    "bizDocId": "perfect",
+    "roomId": "perfect_room_01"
+  }
+}
+

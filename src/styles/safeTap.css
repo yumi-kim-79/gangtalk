@@ -1,0 +1,6 @@
+/* 손가락을 올리고 있을 때(pressed) 시각 피드백 + 약간의 감쇠 */
+.safe-tap-pressed {
+  filter: brightness(0.92);
+  transform: translateZ(0);
+  transition: filter 80ms ease;
+}

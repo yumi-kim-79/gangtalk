@@ -1,0 +1,194 @@
+/* MyPage 공통 스타일 (scoped 아님: 자식 컴포넌트에도 적용) */
+.page-flat{ padding:12px 16px 96px; }
+.section{ padding:12px 0; border-bottom:1px solid var(--line); }
+.section.center{ text-align:center; }
+.title{ margin:0 0 6px; font-size:20px; }
+.sub{ margin:16px 0 8px; font-size:16px; }
+.muted{ color:var(--muted); }
+.ellip{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.headbar{ display:flex; justify-content:space-between; align-items:center; }
+.panel{ display:flex; align-items:center; gap:12px; }
+.avatar{ width:56px; height:56px; border-radius:16px; background: color-mix(in oklab, var(--muted), transparent 80%); background-size: cover; background-position: center; display:flex; align-items:center; justify-content:center; overflow:hidden; }
+.avatar.lg{ width:88px; height:88px; border-radius:22px; }
+.avatar-fallback{ font-weight:900; font-size:18px; }
+.info{ display:flex; flex-direction:column; }
+.name{ font-size:18px }
+.list{ margin-top:12px; }
+.item{ display:flex; justify-content:space-between; align-items:center; padding:12px 0; border-top:1px solid var(--line); }
+.item:first-child{ border-top:0 }
+.code{ background: color-mix(in oklab, var(--muted), transparent 85%); padding:2px 6px; border-radius:6px; user-select: all; }
+.grid.actions{ display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:8px; }
+.act{ padding:12px; border:1px solid var(--line); border-radius:12px; background:var(--surface); color:var(--fg); font-weight:700; }
+.act.primary{ border-color: var(--accent); background: color-mix(in oklab, var(--accent), white 85%); }
+.empty{ text-align:center; border:1px dashed var(--line); border-radius:12px; padding:16px }
+.banner{ border:1px dashed var(--line); border-radius:12px; padding:12px; display:flex; flex-direction:column; gap:6px; }
+.btn{ border:1px solid var(--line); background:var(--surface); color:var(--fg); border-radius:10px; padding:8px 12px; font-weight:700; }
+.btn.primary{ background:var(--accent); border-color:var(--accent); color:#fff; }
+.btn.ghost{ background:transparent; }
+.btn.tiny{ padding:4px 8px; font-size:12px }
+.btn.danger{ color:#ff6a6a; border-color:#ff6a6a; background:color-mix(in oklab, #ff6a6a, white 92%) }
+.row{ display:flex; align-items:center; }
+.file-row{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.spacer{ flex:1 }
+.pro-card{ border:1px solid var(--line); border-radius:16px; background:var(--surface); color:var(--fg); padding:12px; box-shadow:0 8px 18px var(--shadow); display:flex; flex-direction:column; gap:10px; }
+.pro-top{ display:flex; gap:12px; }
+.pro-thumb{ width:140px; height:140px; border-radius:12px; flex:0 0 auto; background:#f3f4f6; background-size:cover; background-position:center; box-shadow:inset 0 0 0 1px rgba(0,0,0,.05); }
+@media (max-width:420px){ .pro-thumb{ width:120px; height:120px; } }
+.pro-meta{ flex:1; min-width:0; display:flex; flex-direction:column; gap:6px }
+.pro-name{ font-size:18px; font-weight:900 }
+.pro-sub{ color:var(--muted); font-size:13px }
+.pro-chips{ display:flex; gap:8px; flex-wrap:wrap; margin-top:4px }
+.pro-chips + .pro-chips{ margin-top:4px }
+.chip{ border:1px solid var(--line); border-radius:999px; padding:6px 10px; font-size:12px; font-weight:800; }
+.chip.strong{ background:color-mix(in oklab, var(--accent), white 92%); border-color:color-mix(in oklab, var(--accent), white 40%); }
+.chip.pill{ border-radius:999px; padding:4px 8px; font-size:11px; }
+.chip.wage{ background: color-mix(in oklab, #ff4b9a, white 88%); border-color: color-mix(in oklab, #ff4b9a, white 35%); color:#ff2c8a; font-weight:900; }
+.apply{ display:flex; gap:6px; align-items:center }
+.badge{ border:1px solid var(--line); border-radius:999px; padding:2px 8px; font-size:12px; font-weight:900 }
+.badge.pending{ background:#fff7ed; border-color:#fed7aa; color:#a16207 }
+.badge.approved{ background:#dcfce7; border-color:#bbf7d0; color:#166534 }
+.badge.rejected{ background:#fee2e2; border-color:#fecaca; color:#b91c1c }
+.pro-actions{ display:flex; gap:8px; flex-wrap:wrap; padding-top:4px; border-top:1px dashed var(--line); }
+.pro-period{ display:flex; justify-content:center; align-items:center; gap:8px; color:var(--muted); font-size:13px; padding-top:4px; }
+.pro-period strong{ color:var(--fg); font-weight:900 }
+.admin-box{ border:1px dashed var(--line); border-radius:12px; padding:12px; margin-top:10px; background: color-mix(in oklab, var(--accent), white 94%); }
+.admin-head{ display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
+.card-grid{ display:grid; grid-template-columns:repeat(1, minmax(0,1fr)); gap:12px; }
+.edit-card{ border:1px solid var(--line); border-radius:14px; background:var(--surface); padding:10px; display:flex; flex-direction:column; gap:10px; }
+.ad-preview{ position:relative; border-radius:14px; padding:14px; min-height:140px; box-shadow:0 6px 18px var(--shadow); display:flex; flex-direction:column; gap:8px; overflow:hidden; background-size:cover; background-position:center; }
+.ad-shade{ position:absolute; left:0; top:0; bottom:0; width:62%; background: linear-gradient(90deg, rgba(255,255,255,0.96) 0%, rgba(255,255,255,0.82) 55%, rgba(255,255,255,0.0) 100%); pointer-events:none; z-index:1; }
+.ad-preview > :not(.ad-shade){ position:relative; z-index:2; }
+.ad-tt{ font-size:18px; font-weight:900; color:#111; }
+.ad-desc{ margin-top:2px; font-weight:700; color:#111; }
+.partner-preview{ display:flex; gap:10px; align-items:center; border:1px solid var(--line); background:var(--bg); border-radius:12px; padding:10px; }
+.pt-left{ width:120px; height:80px; border-radius:10px; background:#f2f2f4; background-size:cover; background-position:center; }
+.pt-right{ flex:1; min-width:0; }
+.pt-name{ font-weight:900; font-size:18px; }
+.pt-sub{ color:var(--muted); margin:2px 0 6px; }
+.form{ display:flex; flex-direction:column; gap:10px; }
+.form.tiny{ gap:8px; }
+.form-row{ display:flex; gap:8px; flex-wrap:wrap; }
+.field{ display:flex; flex-direction:column; gap:6px; }
+.field span{ font-size:13px; color:var(--muted); }
+.field input{ height:40px; border:1px solid var(--line); border-radius:10px; padding:0 12px; background:transparent; color:var(--fg); }
+.field.grow{ flex:1 }
+.news-list{ display:flex; flex-direction:column; gap:10px; }
+.news-item{ border:1px solid var(--line); border-radius:12px; padding:10px; background:var(--surface); }
+.news-input{ flex:1; height:40px; border:1px solid var(--line); border-radius:10px; padding:0 12px; background:transparent; color:var(--fg); }
+.chk{ display:inline-flex; align-items:center; gap:6px; font-size:12px; color:var(--muted) }
+.req-list{ display:flex; flex-direction:column; gap:10px }
+.req-item{ border:1px solid var(--line); border-radius:12px; padding:10px; background:var(--surface) }
+.req-clickable{ cursor:pointer }
+.req-detail{ margin-top:8px; border-top:1px dashed var(--line); padding-top:8px; display:flex; flex-direction:column; gap:6px }
+.kv{ display:flex; gap:8px; align-items:flex-start }
+.kv .k{ flex:0 0 84px; color:var(--muted) }
+.kv .v{ flex:1; min-width:0 }
+.badge.approved{ background:#dcfce7; border-color:#bbf7d0; color:#166534 }
+.badge.rejected{ background:#fee2e2; border-color:#fecaca; color:#b91c1c }
+.rej{ margin-top:6px; color:#b91c1c; font-weight:700 }
+.note{ background:#f8fafc; border:1px dashed var(--line); border-radius:10px; padding:8px; font-size:13px }
+.field .ta{ min-height:84px; border:1px solid var(--line); border-radius:10px; padding:8px 12px; background:transparent; color:var(--fg); resize:vertical; }
+.bill-mini{
+  margin-top:4px;
+  border:1px dashed var(--line);
+  border-radius:10px;
+  padding:6px 8px;
+  font-weight:700;
+  font-size:12px;
+  background:color-mix(in oklab, var(--accent), white 96%);
+  text-align:center;
+}
+.bill-mini.final{ text-align:right; }
+.bill-mini.final b{ font-size:14px; font-weight:800; }
+
+.sheet-backdrop{ position:fixed; inset:0; background:rgba(0,0,0,.45); display:flex; align-items:flex-end; z-index:10000; }
+.sheet{ width:100%; background:var(--bg); color:var(--fg); border-radius:18px 18px 0 0; box-shadow:0 -10px 30px rgba(0,0,0,.25); padding:16px; padding-bottom:max(16px, env(safe-area-inset-bottom)); animation:slideUp .16s ease-out; }
+@keyframes slideUp{ from{ transform:translateY(16px); opacity:.7 } to{ transform:none; opacity:1 } }
+.sheet-head{ display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
+.sheet-head .x{ width:32px; height:32px; border-radius:50%; border:1px solid var(--line); background:var(--surface); display:flex; align-items:center; justify-content:center; }
+.clickable{ cursor: pointer; }
+@media (min-width: 680px){ .card-grid{ grid-template-columns:repeat(2, minmax(0,1fr)); } }
+@media (max-width: 360px){ .pt-left{ width:100px; height:70px; } }
+
+/* ====== WHITE THEME: 로그인 화면 고정색 ====== */
+:root[data-theme="white"] .page-flat{
+  --auth-pink:#ff2c8a;      /* 진한 핑크 */
+  --auth-pink-soft:#ff6aa8; /* 연한 핑크 (비선택) */
+}
+
+/* 회원유형 토글(여성회원/기업회원) ─ 비선택 상태를 연한 핑크 글씨로 */
+:root[data-theme="white"] .page-flat
+  :is(.btn,.chip,.seg-btn,.tab-btn,.toggle,.tag)
+  :is(.tiny,.pill,.sm):not(.primary):not(.on),
+:root[data-theme="white"] .page-flat button[role="tab"][aria-selected="false"],
+:root[data-theme="white"] .page-flat button[aria-pressed="false"]{
+  color:var(--auth-pink-soft) !important;
+  border-color:color-mix(in oklab, var(--auth-pink-soft), white 35%) !important;
+  background:transparent !important;
+}
+
+/* 회원유형 토글 ─ 선택 상태는 진한 핑크 배경/흰 글씨 */
+:root[data-theme="white"] .page-flat
+  :is(.btn,.chip,.seg-btn,.tab-btn,.toggle,.tag)
+  :is(.primary,.on),
+:root[data-theme="white"] .page-flat button[role="tab"][aria-selected="true"],
+:root[data-theme="white"] .page-flat button[aria-pressed="true"]{
+  background:var(--auth-pink) !important;
+  border-color:var(--auth-pink) !important;
+  color:#fff !important;
+}
+
+/* 하단 로그인 버튼(제출 버튼) ─ 항상 진한 핑크 배경 */
+:root[data-theme="white"] .page-flat form button[type="submit"],
+:root[data-theme="white"] .page-flat button.login,
+:root[data-theme="white"] .page-flat .btn.primary{
+  background:var(--auth-pink) !important;
+  border-color:var(--auth-pink) !important;
+  color:#fff !important;
+}
+:root[data-theme="white"] .page-flat form button[type="submit"][disabled],
+:root[data-theme="white"] .page-flat .btn.primary[disabled]{
+  opacity:1 !important; filter:none !important; /* 비활성이라도 흐려지지 않게 */
+}
+
+/* 버튼 안 아이콘이 색 안 따라갈 때 대비 */
+:root[data-theme="white"] .page-flat .btn svg{
+  fill:currentColor !important; stroke:currentColor !important;
+}
+
+/* =========================================================
+   🔧 추가: 요청사항 반영 (화이트/다크 테마 가독성/색상 고정)
+   ========================================================= */
+
+/* 1) 화이트 모드: '채용공고 보기 / 제휴 혜택 / 내 글/댓글 관리' 타일 텍스트를 항상 검정으로 */
+:root[data-theme="white"] .page-flat .tile .title{ color:#111 !important; }
+:root[data-theme="white"] .page-flat .tile .hint{ color:#333 !important; }
+
+/* 2) 다크 모드: 회원 등급 배지(HIGH-END, CHLOÉ) 글씨를 '검은색'으로 고정 */
+:root[data-theme="black"] .page-flat :where(.tier-badge, .sub-badge){
+  color:#111 !important;  /* ← 검은색 고정 */
+  border-color:color-mix(in oklab, #ffffff, black 60%) !important; /* 그대로 사용 */
+}
+
+/* 3) 다크 모드: '내 추천코드' 영역의 복사/공유 버튼 텍스트 흰색 고정 */
+:root[data-theme="black"] .page-flat .val.code .btn.xs{
+  color:#fff !important;
+  border-color:color-mix(in oklab, #ffffff, black 70%) !important;
+  background:transparent !important;
+}
+
+/* 4) 다크 모드: '내 코드 공유하기' 버튼 배경 회색으로 */
+:root[data-theme="black"] .page-flat .promo .btn.primary{
+  background:#4a4a4a !important;
+  border-color:#5a5a5a !important;
+  color:#fff !important;
+}
+
+/* (선택) 다크 모드에서 .tile 강조 시에도 타이틀/힌트가 떠보이지 않도록 보정 */
+:root[data-theme="black"] .page-flat .tile .title{ color:#fff !important; }
+:root[data-theme="black"] .page-flat .tile .hint{ color:color-mix(in oklab, #ffffff, black 30%) !important; }
+
+/* ✅ 추가: 화이트 모드에서 ‘내 글/댓글 관리’ 패널의 ‘수정(.mini)’ 버튼 글자색 검정 고정 */
+:root[data-theme="white"] .page-flat .mypanel .actions .mini:not(.danger){
+  color:#111 !important;
+}

@@ -1,0 +1,18 @@
+{
+  "enabled": true,
+  "timezone": "Asia/Seoul",
+  "categories": {
+    "daily":  { "dailyCap": 10, "minGapSec": 1200, "maxGapSec": 3600 },
+    "suggest":{ "dailyCap": 3,  "minGapSec": 2400, "maxGapSec": 7200 },
+    "pledge": { "dailyCap": 5,  "minGapSec": 2400, "maxGapSec": 7200 },
+    "travel": { "dailyCap": 4,  "minGapSec": 1800, "maxGapSec": 5400 },
+    "health": { "dailyCap": 4,  "minGapSec": 1800, "maxGapSec": 5400 },
+    "quote":  { "dailyCap": 6,  "minGapSec": 1200, "maxGapSec": 3600 },
+    "vote":   { "dailyCap": 2,  "minGapSec": 3600, "maxGapSec": 10800 },
+    "quiz":   { "dailyCap": 2,  "minGapSec": 3600, "maxGapSec": 10800 },
+    "event":  { "dailyCap": 1,  "minGapSec": 10800,"maxGapSec": 21600 }
+  },
+  "comments": { "initialMin": 0, "initialMax": 2, "laterMin": 0, "laterMax": 3, "replyChance": 0.5 },
+  "scheduleDocPath": "simulator/schedule",
+  "jobsColPath": "simulator_jobs"
+}

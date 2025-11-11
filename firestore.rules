@@ -1,0 +1,269 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    /* ───────── 공통 함수 ───────── */
+    function signedIn() { return request.auth != null; }
+    function isOwner(uid) { return signedIn() && request.auth.uid == uid; }
+
+    // 운영자: admins/{uid} 문서가 존재하면 운영자
+    function isAdmin() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+
+    // stores/{storeId}의 소유자 판별
+    function isStoreOwner(storeId) {
+      return signedIn()
+        && exists(/databases/$(database)/documents/stores/$(storeId))
+        && get(/databases/$(database)/documents/stores/$(storeId)).data.ownerId == request.auth.uid;
+    }
+
+    // 문자열 존재 체크
+    function strExists(x) { return x is string && x.size() > 0; }
+
+    /* 변경된 키가 허용 집합에만 속하는지 */
+    function changesAreOnly(allowed) {
+      return request.resource.data.diff(resource.data).changedKeys().hasOnly(allowed);
+    }
+
+    /* ===== 설정/마케팅 ===== */
+
+    // ✅ config 루트 문서들 (예: /config/pricing, /config/marketing, /config/news)
+    match /config/{docId} {
+      allow read: if true;       // 공개 읽기 (원하면 signedIn() 또는 isAdmin()으로 조정)
+      allow write: if isAdmin(); // 운영자만 쓰기
+    }
+
+    // ✅ config 하위 모든 중첩 컬렉션/문서까지 (예: /config/marketing/partnerCards/* 등)
+    match /config/{docId}/{document=**} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // 🔐 config/marketing 문서 자체 읽기/쓰기 (관리자)
+    match /config/marketing {
+      allow read, write: if isAdmin();
+    }
+
+    // 🔐 config/pricing 문서 읽기/쓰기 (관리자)
+    match /config/pricing {
+      allow read, write: if isAdmin();
+    }
+
+    // (명시) partnerCards 서브컬렉션 – 읽기 공개, 쓰기 관리자
+    match /config/marketing/partnerCards/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    /* ===== 사용자 ===== */
+    match /users/{uid} {
+      allow read, create, update, delete: if isOwner(uid);
+      // 필요 시: allow update: if isOwner(uid) || isAdmin();
+    }
+
+    /* ===== 가게(stores) ===== */
+    match /stores/{id} {
+      allow read: if true;
+
+      allow create: if signedIn()
+                 && request.resource.data.ownerId == request.auth.uid;
+
+      allow update, delete: if signedIn()
+                 && (
+                      resource.data.ownerId == request.auth.uid
+                      || isAdmin()
+                      || (!('ownerId' in resource.data) && request.resource.data.ownerId == request.auth.uid)
+                      || (resource.data.ownerId == null && request.resource.data.ownerId == request.auth.uid)
+                    );
+    }
+
+    /* ===== 등록신청(connectRequests) ===== */
+    match /connectRequests/{rid} {
+      allow create: if signedIn()
+        && request.resource.data.ownerId == request.auth.uid
+        && strExists(request.resource.data.storeId)
+        && request.resource.data.status == 'pending';
+
+      allow read: if signedIn()
+        && (
+              resource.data.ownerId == request.auth.uid
+              || isStoreOwner(resource.data.storeId)
+              || isAdmin()
+           );
+
+      allow update, delete: if isAdmin();
+    }
+
+    /* ===== 제휴업체 등록신청(partnerRequests) ===== */
+    match /partnerRequests/{reqId} {
+      allow create: if signedIn()
+        && request.resource.data.ownerId == request.auth.uid
+        && request.resource.data.status == 'pending';
+
+      allow read: if signedIn()
+        && (resource.data.ownerId == request.auth.uid || isAdmin());
+
+      allow update: if signedIn() && (
+        isAdmin() ||
+        (
+          resource.data.ownerId == request.auth.uid &&
+          request.resource.data.ownerId == resource.data.ownerId &&
+          request.resource.data.status == resource.data.status
+        )
+      );
+
+      allow delete: if isAdmin() ||
+        (signedIn() && resource.data.ownerId == request.auth.uid && resource.data.status == 'pending');
+    }
+
+    /* ===== 광고 연장신청(extendRequests) ===== */
+    match /extendRequests/{rid} {
+      allow create: if signedIn()
+        && request.resource.data.ownerId == request.auth.uid
+        && request.resource.data.status == 'pending'
+        && (
+             (request.resource.data.targetType == 'store'
+               && strExists(request.resource.data.targetId))
+             ||
+             (request.resource.data.targetType == 'partner'
+               && (
+                    strExists(request.resource.data.targetId)
+                    || strExists(request.resource.data.partnerRequestId)
+                    || strExists(request.resource.data.requestId)
+                  ))
+           );
+
+      allow read: if signedIn()
+        && (
+             resource.data.ownerId == request.auth.uid
+             || isAdmin()
+             || (resource.data.targetType == 'store'
+                 && strExists(resource.data.targetId)
+                 && isStoreOwner(resource.data.targetId))
+           );
+
+      allow update: if isAdmin();
+
+      allow delete: if isAdmin()
+        || (signedIn() && resource.data.ownerId == request.auth.uid && resource.data.status == 'pending');
+    }
+
+    /* ===== 제휴/뉴스(탑 레벨) ===== */
+    match /partners/{id}  { allow read: if true;  allow write: if isAdmin(); }
+    match /news/{docId}   { allow read: if true;  allow write: if isAdmin(); }
+
+    /* ===== 운영자 인박스(알림) ===== */
+    match /adminInbox/{id} {
+      allow create: if signedIn();
+      allow read, update, delete: if isAdmin();
+    }
+
+    /* ===== 운영자 목록 ===== */
+    match /admins/{uid} {
+      // 본인 문서는 누구나 읽기 가능(존재 여부 확인용). 운영자는 전부 가능.
+      allow read: if isOwner(uid) || isAdmin();
+      allow create, update, delete: if isAdmin();
+    }
+
+    /* ===== 야호 게시판(board_posts) ===== */
+    match /board_posts/{postId} {
+      allow read: if true;
+
+      allow create: if signedIn()
+        && request.resource.data.authorUid == request.auth.uid;
+
+      allow update: if signedIn() && (
+        isAdmin() ||
+        isOwner(resource.data.authorUid) ||
+        changesAreOnly(['views', 'likes', 'votesA', 'votesB', 'updatedAt'])
+      );
+
+      allow delete: if signedIn() && (isAdmin() || isOwner(resource.data.authorUid));
+
+      /* ---------- 댓글 ---------- */
+      match /comments/{commentId} {
+        allow read: if true;
+
+        allow create: if signedIn()
+          && request.resource.data.authorUid == request.auth.uid;
+
+        allow update: if signedIn() && (
+          isAdmin() ||
+          isOwner(resource.data.authorUid) ||
+          changesAreOnly(['likes', 'updatedAt'])
+        );
+
+        allow delete: if signedIn() && (isAdmin() || isOwner(resource.data.authorUid));
+
+        /* ---------- 대댓글(답글) ---------- */
+        match /replies/{replyId} {
+          allow read: if true;
+
+          allow create: if signedIn()
+            && request.resource.data.authorUid == request.auth.uid;
+
+          allow update: if signedIn() && (
+            isAdmin() ||
+            isOwner(resource.data.authorUid) ||
+            changesAreOnly(['likes', 'updatedAt'])
+          );
+
+          allow delete: if signedIn() && (isAdmin() || isOwner(resource.data.authorUid));
+        }
+      }
+    }
+
+    /* ===== 채팅 ===== */
+    match /chats/{roomId} {
+      allow read: if signedIn();
+      allow create, update: if isAdmin();
+
+      match /messages/{msgId} {
+        allow read: if signedIn();
+        allow create: if signedIn();
+        allow update, delete: if isAdmin();
+      }
+    }
+
+    match /chat_rooms/{roomId} {
+      allow read: if signedIn();
+      allow create, update: if isAdmin();
+
+      match /messages/{msgId} {
+        allow read: if signedIn();
+        allow create: if signedIn();
+        allow update, delete: if isAdmin();
+      }
+    }
+
+    match /rooms/{roomId} {
+      allow read: if signedIn();
+      allow create, update: if isAdmin();
+
+      match /messages/{msgId} {
+        allow read: if signedIn();
+        allow create: if signedIn();
+        allow update, delete: if isAdmin();
+      }
+    }
+
+    /* ===== 전역 카운터(meta/counters) : 가입순번 ===== */
+    match /meta/counters {
+      // 읽기: 로그인 사용자
+      allow read: if signedIn();
+
+      // 최초 1회 생성만 허용 (문서가 없을 때만) — userSeq는 0 또는 1로 시작 가능
+      allow create: if signedIn()
+        && !exists(/databases/$(database)/documents/meta/counters)
+        && (request.resource.data.userSeq == 0 || request.resource.data.userSeq == 1)
+        && request.resource.data.keys().hasOnly(['userSeq', 'updatedAt']);
+
+      // 이후 갱신은 정확히 +1 증가만 허용, 변경 필드는 userSeq/updatedAt만
+      allow update: if signedIn()
+        && request.resource.data.userSeq == resource.data.userSeq + 1
+        && request.resource.data.diff(resource.data).changedKeys().hasOnly(['userSeq', 'updatedAt']);
+    }
+  }
+}
