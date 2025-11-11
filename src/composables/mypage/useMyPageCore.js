@@ -4,7 +4,7 @@ import { tierByPoints } from '@/lib/tiers.js'   // ✅ 등급 계산 유틸
 import { getAuth, onAuthStateChanged } from 'firebase/auth'
 import { me } from '@/store/user.js'
 import { useUserNick } from '@/store/userNick.js'
-import { fbDb, fbStorage, ensureSignedIn } from '@/firebase.js'
+import { fbDb, fbStorage, ensureSignedIn } from '@/firebase'
 import {
   doc, setDoc, getDoc, serverTimestamp,
   collection, getDocs, query, where, onSnapshot, deleteDoc, deleteField

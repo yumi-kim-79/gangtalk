@@ -108,7 +108,7 @@ let FB = null
 async function ensureFirebase() {
   if (FB !== null) return FB // 이미 시도한 적 있음(성공/실패)
   try {
-    const mod = await import(/* @vite-ignore */ '@/firebase.js')
+    const mod = await import(/* @vite-ignore */ '@/firebase')
     const fbAuth = mod.auth
     const fbDb   = mod.db
     const fx     = mod.fx || {}

@@ -57,7 +57,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { getAuth, onAuthStateChanged } from 'firebase/auth'
-import { fbDb } from '@/firebase.js'
+import { db as fbDb } from '@/firebase'
 import {
   collection, addDoc, serverTimestamp, doc, getDoc, getDocs, limit
 } from 'firebase/firestore'

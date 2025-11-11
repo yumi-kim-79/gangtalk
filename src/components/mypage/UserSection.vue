@@ -195,7 +195,7 @@
 import { ref, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { getAuth, onAuthStateChanged } from 'firebase/auth'
-import { fbDb } from '@/firebase.js'
+import { db as fbDb } from '@/firebase'
 import {
   collection, collectionGroup, query, where, getDocs,
   doc, updateDoc, deleteDoc, serverTimestamp

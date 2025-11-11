@@ -371,7 +371,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { Auth, Db, Storage } from '@/firebase.js'
+import { auth as fbAuth, db as fbDb, storage as fbStorage } from '@/firebase'
 import { doc, getDoc, setDoc, updateDoc, serverTimestamp, collection, deleteDoc, onSnapshot } from 'firebase/firestore'
 import { ref as sRef, uploadBytes, getDownloadURL } from 'firebase/storage'
 

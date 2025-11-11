@@ -595,7 +595,7 @@
 <script setup>
 import { ref, computed, onMounted, onBeforeMount, watch, nextTick, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { fbDb } from '@/firebase.js'
+import { db as fbDb } from '@/firebase'
 import { getApp } from 'firebase/app'
 
 try {

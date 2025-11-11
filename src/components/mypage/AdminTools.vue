@@ -231,7 +231,7 @@
 
 <script setup>
 import { ref, reactive, computed, nextTick, onMounted, onBeforeUnmount } from 'vue'
-import { fbDb, fbStorage, ensureSignedIn } from '@/firebase.js'
+import { fbDb, fbStorage, ensureSignedIn } from '@/firebase'
 import { collection, doc, serverTimestamp, writeBatch, getDocs } from 'firebase/firestore'
 import { ref as sRef, getDownloadURL, uploadBytes } from 'firebase/storage'
 

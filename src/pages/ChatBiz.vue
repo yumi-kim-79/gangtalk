@@ -60,7 +60,7 @@
  */
 import { ref, onMounted, onBeforeUnmount, nextTick, computed } from 'vue'
 import { useRoute } from 'vue-router'
-import { fbDb, ensureSignedIn } from '@/firebase.js'
+import { fbDb, ensureSignedIn } from '@/firebase'
 import {
   collection, doc, onSnapshot, getDoc, getDocs, setDoc, serverTimestamp,
   orderBy, query, deleteDoc

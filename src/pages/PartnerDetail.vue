@@ -126,7 +126,7 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { db } from '@/firebase.js'
+import { db } from '@/firebase'
 import {
   doc, getDoc, setDoc, deleteDoc, getDoc as readDoc,
   updateDoc, runTransaction, serverTimestamp, increment

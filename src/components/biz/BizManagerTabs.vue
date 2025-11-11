@@ -113,7 +113,7 @@
 /* src/components/biz/BizManagerTabs.vue */
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { getAuth, onAuthStateChanged } from 'firebase/auth'
-import { fbDb } from '@/firebase.js'
+import { db as fbDb } from '@/firebase'
 import {
   collection, doc, getDoc, getDocs, query, where, orderBy, limit,
   addDoc, serverTimestamp, deleteDoc

@@ -15,7 +15,7 @@
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
-import { fbAuth, fbDb } from '@/firebase.js'
+import { auth as fbAuth, db as fbDb } from '@/firebase'
 import { collection, query, where, onSnapshot, updateDoc, doc, serverTimestamp, limit, orderBy } from 'firebase/firestore'
 
 const router = useRouter()

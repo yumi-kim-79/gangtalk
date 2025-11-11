@@ -53,7 +53,7 @@
 <script setup>
 import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { getAuth } from 'firebase/auth'
-import { fbDb } from '@/firebase.js'
+import { db as fbDb } from '@/firebase'
 import {
   collection, query, where, orderBy, onSnapshot, deleteDoc, doc
 } from 'firebase/firestore'
