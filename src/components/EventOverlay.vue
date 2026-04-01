@@ -15,11 +15,14 @@
 
     <!-- 하단 액션 -->
     <div class="evt-actions">
+      <!-- ✅ 7일 동안 보지 않기 -->
       <button class="evt-btn ghost" type="button" @click="$emit('dismiss-day')">
-        하루종일 열지 않기
+        7일 동안 보지 않기
       </button>
+
+      <!-- ✅ 이벤트 상세 페이지로 이동 (부모에서 @close 처리) -->
       <button class="evt-btn primary" type="button" @click="$emit('close')">
-        닫기
+        이벤트 자세히 보기
       </button>
     </div>
   </div>
@@ -29,7 +32,7 @@
 const props = defineProps({
   imageUrl: {
     type: String,
-    default: '/event/gangtox-open.png', // ← /public 기준 경로
+    default: '/event/event-open-main.jpeg', // ← /public 기준 경로
   },
 })
 </script>

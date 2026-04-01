@@ -28,8 +28,9 @@
           <div class="row" style="gap:6px; margin-top:6px;">
             <small class="muted">{{ timeAgo(n.createdAt) }} 작성</small>
             <span class="spacer"></span>
-            <button class="btn tiny" :disabled="idx===0" @click="move(news.list, idx, -1)">위로</button>
-            <button class="btn tiny" :disabled="idx===news.list.length-1" @click="move(news.list, idx, +1)">아래로</button>
+            <!-- ✅ 내부 유틸 호출로 교체 -->
+            <button class="btn tiny" :disabled="idx===0" @click="moveItem(news.list, idx, -1)">위로</button>
+            <button class="btn tiny" :disabled="idx===news.list.length-1" @click="moveItem(news.list, idx, +1)">아래로</button>
             <button class="btn tiny" @click="removeNews(idx)">삭제</button>
           </div>
         </div>
@@ -118,8 +119,8 @@
           </div>
 
           <div class="row" v-show="adOpen('P', ad)" style="gap:6px;">
-            <button class="btn tiny" :disabled="idx===0" @click="move(adsPBox.list, idx, -1)">위로</button>
-            <button class="btn tiny" :disabled="idx===adsPBox.list.length-1" @click="move(adsPBox.list, idx, +1)">아래로</button>
+            <button class="btn tiny" :disabled="idx===0" @click="moveItem(adsPBox.list, idx, -1)">위로</button>
+            <button class="btn tiny" :disabled="idx===adsPBox.list.length-1" @click="moveItem(adsPBox.list, idx, +1)">아래로</button>
             <button class="btn tiny" @click="dup(adsPBox.list, idx)">복제</button>
             <button class="btn tiny danger" @click="onRemoveAd('P', idx)">삭제</button>
             <span class="spacer"></span>
@@ -213,8 +214,8 @@
           </div>
 
           <div class="row" v-show="adOpen('F', ad)" style="gap:6px;">
-            <button class="btn tiny" :disabled="idx===0" @click="move(adsFBox.list, idx, -1)">위로</button>
-            <button class="btn tiny" :disabled="idx===adsFBox.list.length-1" @click="move(adsFBox.list, idx, +1)">아래로</button>
+            <button class="btn tiny" :disabled="idx===0" @click="moveItem(adsFBox.list, idx, -1)">위로</button>
+            <button class="btn tiny" :disabled="idx===adsFBox.list.length-1" @click="moveItem(adsFBox.list, idx, +1)">아래로</button>
             <button class="btn tiny" @click="dup(adsFBox.list, idx)">복제</button>
             <button class="btn tiny danger" @click="onRemoveAd('F', idx)">삭제</button>
             <span class="spacer"></span>
@@ -254,7 +255,7 @@ const props = defineProps({
 
   // helpers
   timeAgo: { type: Function, required: true },
-  move: { type: Function, required: true },
+  /* 👇 기존 move 프롭 제거 (내부 유틸 사용) */
   dup: { type: Function, required: true },
   syncTags: { type: Function, required: true },
   bgStyle: { type: Function, required: true },
@@ -296,6 +297,19 @@ const props = defineProps({
   nextAdImage: { type: Function, default: null },
   prevAdImage: { type: Function, default: null },
 })
+
+/* ===== 로컬 이동 유틸 (뉴스/배너 공통) ===== */
+function moveItem(list, fromIndex, delta){
+  try{
+    if (!Array.isArray(list)) return
+    const toIndex = fromIndex + delta
+    if (toIndex < 0 || toIndex >= list.length) return
+    const it = list.splice(fromIndex, 1)[0]
+    list.splice(toIndex, 0, it)
+  }catch(e){
+    console.warn('[AdminTools] moveItem 실패', e)
+  }
+}
 
 /* ===== 로컬 박스 ===== */
 const LS_KEYS = { P: '__admin_adsP', F: '__admin_adsF' }

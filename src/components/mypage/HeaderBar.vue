@@ -1,3 +1,4 @@
+<!-- src/components/mypage/HeaderBar.vue -->
 <template>
   <header class="mypage-header">
     <div class="left">
@@ -20,18 +21,46 @@ const props = defineProps({
 })
 defineEmits(['edit', 'logout'])
 
-const title = computed(() => (props.type === 'company' ? '기업회원' : '여성회원'))
+const title = computed(() =>
+  props.type === 'company' ? '기업회원' : '여성회원'
+)
 </script>
 
 <style scoped>
-.mypage-header{
-  display:flex; justify-content:space-between; align-items:center;
-  padding:8px 4px;
+.mypage-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 4px;
+  width: 100%;
 }
-h2{ font-size:18px; font-weight:800; }
-.btn{
-  height:36px; padding:0 12px; border-radius:10px;
-  border:1px solid var(--line); background:var(--surface);
+
+.left {
+  flex: 0 0 auto;
 }
-.btn + .btn{ margin-left:8px }
+
+.right {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+}
+
+h2 {
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.btn {
+  height: 36px;
+  padding: 0 12px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.btn + .btn {
+  margin-left: 8px;
+}
 </style>

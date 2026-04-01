@@ -659,11 +659,14 @@ export function useMyPageCore(){
   }
 
   // 내부 공용: 주어진 박스(adsP/adsF)의 리스트를 해당 컬렉션에 저장
-  async function persistAdsTo(box, colRef, indexKey, legacyAlso=false){
+  // legacyMode: 'none' | 'all' | 'finder'
+  //  - 'all'    : 제휴관(P) 하위호환 키(adBanners/banners/ads) 동시 갱신
+  //  - 'finder' : 가게찾기(F) 하위호환 키(finderBanners/finderAds) 동시 갱신
+  async function persistAdsTo(box, colRef, indexKey, legacyMode='none'){
     if (!isAdmin.value || !marketingDocRef.value || !colRef?.value) return
 
-    const index = []       // 가벼운 인덱스(id,img)
-    const legacySlim = []  // 레거시 키(ads/banners/adBanners) 호환
+    const index = []
+    const legacySlim = []
 
     for (const ad of box.list){
       const imgs = Array.isArray(ad.images) && ad.images.length ? ad.images : (ad.img ? [ad.img] : [])
@@ -687,22 +690,35 @@ export function useMyPageCore(){
     }
 
     const patch = { [indexKey]: legacySlim }
-    if (legacyAlso){
+
+    if (legacyMode === 'all'){
       Object.assign(patch, { adBanners: legacySlim, banners: legacySlim, ads: legacySlim })
     }
+    if (legacyMode === 'finder'){
+      Object.assign(patch, { finderBanners: legacySlim, finderAds: legacySlim, adBannersFinder: legacySlim })
+    }
+
     await safeSetMarketingDoc(patch)
   }
 
   // 실제 저장 버튼에서 호출: 제휴관(#1) / 가게찾기(#2)
   async function saveAdsP(){        // 제휴관
-    try{ savingAds.value = true; await persistAdsTo(adsP, adBannersPColRef, 'adBannersP', true); alert('제휴관 배너가 저장되었습니다.') }
-    catch(e){ console.warn('saveAdsP 실패:', e); alert('저장 중 오류가 발생했습니다.') }
-    finally{ savingAds.value = false }
+    try{
+      savingAds.value = true
+      await persistAdsTo(adsP, adBannersPColRef, 'adBannersP', 'all')   // 레거시 키(adBanners/banners/ads) 동시 갱신
+      alert('제휴관 배너가 저장되었습니다.')
+    }catch(e){
+      console.warn('saveAdsP 실패:', e); alert('저장 중 오류가 발생했습니다.')
+    }finally{ savingAds.value = false }
   }
   async function saveAdsF(){        // 가게찾기
-    try{ savingAds.value = true; await persistAdsTo(adsF, adBannersFinderColRef, 'adBannersFinder'); alert('가게찾기 배너가 저장되었습니다.') }
-    catch(e){ console.warn('saveAdsF 실패:', e); alert('저장 중 오류가 발생했습니다.') }
-    finally{ savingAds.value = false }
+    try{
+      savingAds.value = true
+      await persistAdsTo(adsF, adBannersFinderColRef, 'adBannersFinder', 'finder') // 레거시 키(finderBanners/finderAds) 동시 갱신
+      alert('가게찾기 배너가 저장되었습니다.')
+    }catch(e){
+      console.warn('saveAdsF 실패:', e); alert('저장 중 오류가 발생했습니다.')
+    }finally{ savingAds.value = false }
   }
 
   // 삭제도 P/F에서 호출
@@ -750,6 +766,23 @@ export function useMyPageCore(){
     const ni = idx + dir; if (ni < 0 || ni >= arr.length) return
     const [it] = arr.splice(idx,1); arr.splice(ni,0,it); if (arr === news.list) onNewsChange()
   }
+  // === 공용 배열 이동 ===
+  function arrayMove(arr, from, to){
+    if (!Array.isArray(arr)) return
+    if (from === to) return
+    if (to < 0 || to >= arr.length) return
+    const [x] = arr.splice(from, 1)
+    arr.splice(to, 0, x)
+  }
+
+  // === 기사한줄 전용 이동 (컴포넌트에서 :move 로 바로 넘겨 쓰기) ===
+  function moveNews(idx, dir){
+    if (!Array.isArray(news.list)) return
+    const to = idx + Number(dir || 0)
+    arrayMove(news.list, idx, to)
+    onNewsChange() // ← 저장 디바운스 트리거
+  }
+
   function dup(arr, idx){
     const it = JSON.parse(JSON.stringify(arr[idx] || {}))
     it.id = `${(it.id || 'item')}_${Math.random().toString(36).slice(2,7)}`
@@ -780,11 +813,12 @@ export function useMyPageCore(){
   async function saveAds(){
     try{
       savingAds.value = true
-      await persistAdsTo(adsP, adBannersPColRef, 'adBannersP', true)
-      await persistAdsTo(adsF, adBannersFinderColRef, 'adBannersFinder')
+      await persistAdsTo(adsP, adBannersPColRef, 'adBannersP', 'all')       // 제휴관 레거시 키
+      await persistAdsTo(adsF, adBannersFinderColRef, 'adBannersFinder', 'finder') // 가게찾기 레거시 키
       alert('광고배너가 저장되었습니다.')
-    }catch(e){ console.warn('saveAds 실패:', e); alert('저장 중 오류가 발생했습니다.') }
-    finally{ savingAds.value = false }
+    }catch(e){
+      console.warn('saveAds 실패:', e); alert('저장 중 오류가 발생했습니다.')
+    }finally{ savingAds.value = false }
   }
 
   function addPartner(){
@@ -1380,11 +1414,8 @@ export function useMyPageCore(){
       adsP.list = mkUiList(rawAdsP)  // 제휴관
       adsF.list = mkUiList(rawAdsF)  // 가게찾기
 
-      // (구 하위호환: 기존 코드가 ads.list를 그릴 수도 있어 첫 번째 세트만 복사)
-      ads.list = mkUiList(rawAdsP)
-      // 이미 위에서 adsP.list / adsF.list를 만들었고,
-      // 하위호환만 유지하면 됩니다.
-      ads.list = adsP.list.slice()
+      // (하위호환) ads.list 를 P+F 합쳐서 노출 → 기존 화면이 ads.list만 보더라도 “아무것도 안 보이는” 상황 방지
+      ads.list = [...adsP.list, ...adsF.list]
 
       // 2) 제휴업체 카드
       const indexList = Array.isArray(data.partnerCardIndex) ? data.partnerCardIndex : []
@@ -1554,17 +1585,38 @@ export function useMyPageCore(){
   }
 
   /* 복사/문자 유틸 */
-  const copy = async (v) => {
+  const copy = async (v, msg = '복사되었습니다.') => {
     if (!v) return
     if (window.isSecureContext && navigator.clipboard?.writeText) {
-      try { await navigator.clipboard.writeText(v); alert('복사되었습니다.'); return } catch {}
+      try { await navigator.clipboard.writeText(v); alert(msg); return } catch {}
     }
     try {
       const ta = document.createElement('textarea'); ta.value = v; ta.setAttribute('readonly',''); ta.style.position='fixed'; ta.style.top='-9999px'
       document.body.appendChild(ta); ta.select(); const ok = document.execCommand('copy'); document.body.removeChild(ta)
-      if (ok) alert('복사되었습니다.'); else throw new Error()
-    } catch { alert('복사에 실패했어요. 텍스트를 길게 눌러 직접 복사해 주세요.') }
+      if (ok) alert(msg); else throw new Error()
+    } catch {
+      alert('복사에 실패했어요. 텍스트를 길게 눌러 직접 복사해 주세요.')
+    }
   }
+
+  // ✅ 내 코드 공유용: 추천코드가 들어간 가입 유도 링크 복사
+  async function copyMyInviteLink () {
+    const code = (myCode.value || '').trim()
+    if (!code || code === '-') {
+      alert('추천코드가 아직 없습니다. 잠시 후 다시 시도해 주세요.')
+      return
+    }
+
+    const origin = window.location.origin || location.origin
+    // AuthPage 라우트가 /auth 에 있다고 가정
+    const inviteUrl = `${origin}/auth?mode=signup&ref=${encodeURIComponent(code)}`
+
+    await copy(
+      inviteUrl,
+      '가입 초대 링크가 복사되었습니다.\n카톡이나 문자에 붙여넣어 보내 주세요.'
+    )
+  }
+
   async function confirmTwice(msg='삭제하시겠습니까?'){
     if (!confirm(msg)) return false
     return confirm('정말로 삭제할까요? 삭제 후에는 복구할 수 없습니다.')
@@ -1579,15 +1631,31 @@ export function useMyPageCore(){
   function getNickFromStorage(){ const key = nickKey.value || 'user:nick'; return localStorage.getItem(key) || localStorage.getItem('user:nick') || '' }
   function setNickToStorage(v){ if (!v) return; const key = nickKey.value || 'user:nick'; localStorage.setItem(key, v); localStorage.setItem('user:nick', v) }
 
+  // ✅ 닉네임 표시: 항상 state.profile 기준으로 계산
   const displayNick = computed(() => {
-    const a = me?.auth?.value ?? me?.auth ?? {}
-    const p = a.profile ?? me?.profile?.value ?? me?.profile ?? {}
-    const c = a.company ?? me?.company?.value ?? me?.company ?? {}
+    const s = state.value || {}
+    const p = s.profile || {}
+    const c = s.company || {}
+
     const fromLocal = getNickFromStorage() || localStorage.getItem('nickname')
-    const email = p?.email || a?.email || ''
-    const emailId = email && String(email).includes('@') ? String(email).split('@')[0] : ''
-    return (p?.nickname || p?.nick || p?.name || a?.nickname || a?.nick || a?.name || c?.nickname || c?.manager || fromLocal || emailId || '게스트')
+    const email = s.email || ''
+    const emailId =
+      email && String(email).includes('@')
+        ? String(email).split('@')[0]
+        : ''
+
+    return (
+      p.nickname ||          // 1순위: Firestore profile.nickname
+      p.nick ||              // 2순위: profile.nick
+      p.name ||              // 3순위: profile.name
+      c.nickname ||          // 기업회원 닉네임
+      c.manager ||           // 회사 담당자 이름
+      fromLocal ||           // 로컬 저장된 닉네임
+      emailId ||             // 이메일 아이디 부분
+      '게스트'
+    )
   })
+
   const myCode = computed(() => {
     const a = me?.auth?.value ?? me?.auth ?? {}
     const p = a.profile ?? me?.profile?.value ?? me?.profile ?? {}
@@ -1595,7 +1663,28 @@ export function useMyPageCore(){
     return (ref?.myCode || p?.referralCode || a?.myCode || localStorage.getItem('ref:my') || '-')
   })
 
-  const hasAvatarImage = computed(()=> !!(state.value.type === 'company' ? state.value.company?.logo : state.value.profile?.photoUrl))
+  // ✅ 수정 후: 기본 SVG 아바타(data:image/svg+xml…)는 "사진 없음"으로 처리
+  const hasAvatarImage = computed(() => {
+    const s = state.value || {}
+
+    // 회사/개인에 따라 원본 이미지 경로 가져오기
+    const raw =
+      s.type === 'company'
+        ? s.company?.logo
+        : s.profile?.photoUrl
+
+    // 값이 없으면 당연히 사진 없음
+    if (!raw) return false
+
+    // 기본 플레이스홀더(우리 여성 캐릭터 SVG)는 텍스트를 보여주기 위해 "사진 없음"으로 취급
+    if (typeof raw === 'string' && raw.startsWith('data:image/svg+xml')) {
+      return false
+    }
+
+    // 그 외에는 실제 업로드된 이미지라고 보고 true
+    return true
+  })
+
   const avatarUrl = computed(()=>{
     const fromStore = state.value.type === 'company' ? (state.value.company?.logo || '') : (state.value.profile?.photoUrl || '')
     if (fromStore) return fromStore
@@ -1618,7 +1707,23 @@ export function useMyPageCore(){
     return url ? ({ backgroundImage:`url(${url})` }) : ({})
   }
 
-  const initials = (name) => (name || '').trim().slice(0, 2)
+  // 닉네임 길이에 따라 앞 글자 2~4글자까지 표시
+  const initials = (name) => {
+    const s = (name || '').trim()
+    if (!s) return ''
+    if (s.length <= 2) return s      // 1~2글자는 그대로
+    if (s.length <= 4) return s      // 3~4글자도 전체 표시
+    return s.slice(0, 4)             // 그 이상은 앞 4글자까지만
+  }
+
+
+  // ★ 추가: 아바타 안에 표시할 텍스트 (메인 / 수정모달용)
+  const avatarTextMain = computed(() =>
+    (displayNick.value || '').trim().slice(0, 2) || '닉'
+  )
+  const avatarTextEdit = computed(() =>
+    (edit.nickname || displayNick.value || '').trim().slice(0, 2) || '닉'
+  )
 
   /* 파일 → DataURL */
   async function fileToDataUrl(file, maxW = 1280, quality = 0.8){
@@ -1873,8 +1978,11 @@ export function useMyPageCore(){
     showExtendApply,
 
     // 표시/유틸
-    displayNick, myCode, hasAvatarImage, avatarUrl, avatarStyle, initials,
-    previewAvatarStyle, copy, bgStyle, timeAgo, fmtDate, formatWon, adDaysOf, adCostOf,
+    displayNick, myCode, hasAvatarImage, avatarUrl, avatarStyle,
+    initials,            // (혹시 다른 곳에서 쓰고 있을 수 있으니 그대로 둠)
+    avatarTextMain,      // ★ 메인 프로필 카드용 텍스트
+    avatarTextEdit,      // ★ 프로필 수정 모달용 텍스트
+    previewAvatarStyle, copy, copyMyInviteLink, bgStyle, timeAgo, fmtDate, formatWon, adDaysOf, adCostOf,
     normalizeCat, catLabel, partnerCategoryOptions, hourlyOf, unitOf, totalOf, previewAfterApprove,
 
     // 로딩/액션(관리자)
@@ -1896,7 +2004,11 @@ export function useMyPageCore(){
     saveAdsF,                      // 가게찾기(#2) 저장
     addPartner, removePartner, onPickPartnerImage, onPickPartnerImages, clearPartnerImage, togglePartner, savePartnerOne, savePartners,
     addNewsTop, removeNews, onNewsChange, reloadConfig, saveNewsline,
-    move, dup, syncTags, adPreviewStyle,
+    // 순서 이동(공용 + 기사한줄)
+    move,           // (기존) 임의 배열 이동: move(arr, idx, dir)
+    arrayMove,      // (신규) 공용 순서이동 유틸
+    moveNews,       // (신규) 기사한줄 전용: moveNews(index, dir)
+    dup, syncTags, adPreviewStyle,
 
     // 날짜 문자열 보조
     dateStrOf, parseDateStr,

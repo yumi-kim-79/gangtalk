@@ -17,14 +17,12 @@
               <span class="cat">{{ catLabel }}</span>
             </p>
 
-            <!-- 담당자(이름 · 전화) -->
-            <p v-if="dispMgr" class="mgr-line ellip">
-              <span class="mgr-name">{{ dispMgr.name }}</span>
-              <span class="dot">·</span>
-              <a class="mgr-phone" :href="dispMgr.phone ? `tel:${normalizeTel(dispMgr.phone)}` : undefined">
-                {{ dispMgr.phone || '번호 미등록' }}
-              </a>
+            <!-- 목록용 짧은 소개 (StoreEditPage의 16자 소개) -->
+            <p v-if="listIntro" class="right-intro ellip">
+              {{ listIntro }}
             </p>
+
+            <!-- 담당자 정보는 상세 상단에서는 노출하지 않음 (안심문자/안심전화용 데이터만 내부 사용) -->
 
             <!-- 평점 + 별점 입력 + 찜 -->
             <div class="rate-row">
@@ -74,6 +72,33 @@
                 </svg>
               </button>
             </div>
+            <!-- ✅ 선택된 담당자 인라인 표시 (찜 왼쪽 아래) -->
+            <div v-if="activeManager" class="mgr-inline-bar">
+              <!-- 1줄째: 이름만 -->
+              <div class="mgr-inline-row mgr-inline-row-name">
+                <span class="mgr-inline-name">
+                  {{ activeManager.name || '담당자' }}
+                </span>
+              </div>
+
+              <!-- 2줄째: 번호 + 연결 버튼 -->
+              <div class="mgr-inline-row mgr-inline-row-phone">
+                <span v-if="activeManager.phone" class="mgr-inline-phone-num">
+                  {{ activeManager.phone }}
+                </span>
+
+                <button
+                  v-if="activeManager.phone"
+                  type="button"
+                  class="mgr-inline-phone-btn"
+                  @click="dialInlineManager"
+                >
+                  연결
+                </button>
+
+                <span v-else class="mgr-inline-phone muted">연락처 미등록</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -89,13 +114,34 @@
       </div>
       <!-- ▲ 연락 버튼 ▲ -->
 
-      <h2 class="sec">소개</h2>
-      <p class="para" v-if="biz.desc">{{ biz.desc }}</p>
+      <!-- 소개 + 편집 버튼 -->
+      <div class="sec-row">
+        <h2 class="sec">소개</h2>
+        <button
+          v-if="isBiz"
+          class="sec-edit"
+          type="button"
+          @click="goEditSection('intro')"
+        >
+          편집
+        </button>
+      </div>
+      <p class="para" v-if="fullDesc">{{ fullDesc }}</p>
       <p class="para muted" v-else>소개가 아직 등록되지 않았어요.</p>
 
       <!-- 이벤트 -->
       <template v-if="hasAnyEvent">
-        <h2 class="sec">이벤트</h2>
+        <div class="sec-row">
+          <h2 class="sec">이벤트</h2>
+          <button
+            v-if="isBiz"
+            class="sec-edit"
+            type="button"
+            @click="goEditSection('event')"
+          >
+            편집
+          </button>
+        </div>
         <div class="card">
           <div v-if="store.eventMain" class="ev-main">• {{ store.eventMain }}</div>
           <ul v-if="(store.events||[]).length" class="ev-list">
@@ -105,7 +151,18 @@
         </div>
       </template>
 
-      <h2 class="sec">시급</h2>
+      <!-- 시급 -->
+      <div class="sec-row">
+        <h2 class="sec">시급</h2>
+        <button
+          v-if="isBiz"
+          class="sec-edit"
+          type="button"
+          @click="goEditSection('pay')"
+        >
+          편집
+        </button>
+      </div>
       <div class="card pay-card">
         <div class="pay-line">
           <span class="k">시급</span>
@@ -115,13 +172,35 @@
         <p v-if="store.payNote" class="muted tiny mt4">{{ store.payNote }}</p>
       </div>
 
-      <h2 class="sec">영업 정보</h2>
+      <!-- 영업 정보 -->
+      <div class="sec-row">
+        <h2 class="sec">영업 정보</h2>
+        <button
+          v-if="isBiz"
+          class="sec-edit"
+          type="button"
+          @click="goEditSection('biz')"
+        >
+          편집
+        </button>
+      </div>
       <div class="card">
         <div class="row"><span class="k">운영시간</span><span class="v">{{ biz.hours || '미등록' }}</span></div>
         <div class="row"><span class="k">휴무</span><span class="v">{{ biz.closed || '미등록' }}</span></div>
       </div>
 
-      <h2 class="sec">위치</h2>
+      <!-- 위치 -->
+      <div class="sec-row">
+        <h2 class="sec">위치</h2>
+        <button
+          v-if="isBiz"
+          class="sec-edit"
+          type="button"
+          @click="goEditSection('location')"
+        >
+          편집
+        </button>
+      </div>
       <div class="card">
         <div class="row">
           <span class="k">주소</span>
@@ -140,9 +219,9 @@
       </div>
 
       <div class="manage">
-        <button v-if="isBiz" class="btn-edit" @click="goEdit">정보 수정</button>
+        <button v-if="isBiz" class="btn-edit" @click="goEdit">정보 전체 수정</button>
         <div v-else class="muted tiny">
-          * 이 정보는 <strong>기업회원</strong>만 수정할 수 있어요.
+          * 이 정보는 <strong>기업회원</strong> 또는 매장 소유자만 수정할 수 있어요.
           <a href="/mypage?upgrade=biz" @click.prevent="toMy">기업회원 전환</a>
         </div>
       </div>
@@ -245,6 +324,16 @@ const uid = computed(() =>
   user?.auth?.uid || user?.auth?.value?.uid || user?.auth?.user?.uid || null
 )
 
+/** 로그인 유저 이메일(소문자) – ownerEmail 비교용 */
+const userEmail = computed(() =>
+  (auth.currentUser?.email ||
+   user?.auth?.email ||
+   user?.auth?.value?.email ||
+   user?.profile?.email ||
+   ''
+  ).toLowerCase()
+)
+
 /* ───── 공통 유틸 ───── */
 const clamp0 = (n) => Math.max(0, Number(n || 0))
 const toPosInt = (x) => {
@@ -263,7 +352,10 @@ const emptyStore = {
   events:[], eventMain:'',
   rating: 0, ratingCount: 0, ratingSum: 0,
   likes: 0, // ← 찜 수(표준, 0 기준)
+  ownerId: null, // 🔹 소유자 UID (stores 문서 ownerId)
+  ownerEmail: '', // 🔹 소유자 이메일(관리자가 넣어둔 값)
 }
+
 const store = reactive({ ...emptyStore })
 
 let unsub = null
@@ -295,7 +387,15 @@ onUnmounted(() => { if (typeof unsub==='function') unsub() })
 /* ───── 표시/계산 값 ───── */
 const CAT_MAP = { hopper:'하퍼', point5:'쩜오', ten:'텐카페', tenpro:'텐프로', onep:'1%', nrb:'노래방', kara:'가라오케', bar:'바', lounge:'라운지' }
 const catLabel = computed(() => CAT_MAP[store.category] ?? store.category)
+/* 목록용 짧은 소개 (16자 intro, 한 줄) */
+const listIntro = computed(() => (store.desc || '').trim())
 
+/* 상세페이지용 전체 소개
+   - detailDesc/longDesc/fullDesc 필드가 있으면 우선 사용
+   - 없으면 기존 desc 를 fallback 으로 사용 */
+const fullDesc = computed(() =>
+  (store.detailDesc || store.longDesc || store.fullDesc || store.desc || '').trim()
+)
 const heroStyle = computed(() => {
   const img = store.hero || store.thumb || 'https://images.unsplash.com/photo-1519671482749-fd09be7ccebf?q=80&w=1600&auto=format&fit=crop'
   return { backgroundImage: `linear-gradient(180deg,rgba(0,0,0,.18),rgba(0,0,0,.38)), url(${img})` }
@@ -339,6 +439,21 @@ const managers = computed(() => {
 const dispMgr = computed(() => {
   const m = managers.value[0]
   return m ? { name: m.name || '담당', phone: m.phone || '' } : null
+})
+
+/* ✅ 메인 현황판에서 넘어온 담당자 인덱스 (?mgr=0,1,2...) */
+const managerIndex = computed(() => {
+  const v = route.query.mgr
+  const n = Number(v)
+  return Number.isFinite(n) && n >= 0 ? n : null
+})
+
+/* ✅ 선택된 담당자 (없으면 null) */
+const activeManager = computed(() => {
+  const list = managers.value || []
+  const idx = managerIndex.value
+  if (idx == null || idx >= list.length) return null
+  return list[idx]
 })
 
 /* ===== 내 별점/찜 로드 ===== */
@@ -502,13 +617,29 @@ async function copyPhone(){
   try{ await navigator.clipboard.writeText(phone) } catch {}
 }
 
+/* ✅ 상단 인라인 담당자 연결 버튼용 */
+function dialInlineManager(){
+  const m = activeManager.value
+  if (!m?.phone) return
+  const phone = normalizeTel(m.phone)
+  if (phone) window.location.href = `tel:${phone}`
+}
+
 /* ───── 하단 연락바(안심문자/안심전화/오픈카톡) ───── */
-/* 안심번호: 우선순위 (store.safePhone → store.safe → store.phoneSafe → 담당자번호) */
-const safePhone = computed(() =>
-  normalizeTel(
-    store.safePhone || store.safe || store.phoneSafe || (dispMgr.value?.phone || '')
-  )
-)
+/* 안심번호: 우선순위
+   1) store.safePhone / store.safe / store.phoneSafe
+   2) 선택된 담당자(activeManager.phone)
+   3) 기본 담당자(dispMgr.phone) */
+const safePhone = computed(() => {
+  const candidate =
+    store.safePhone ||
+    store.safe ||
+    store.phoneSafe ||
+    activeManager.value?.phone ||
+    dispMgr.value?.phone ||
+    ''
+  return normalizeTel(candidate)
+})
 const hasSafePhone = computed(() => !!safePhone.value)
 
 /* 오픈채팅: 우선순위 (store.openChatUrl → store.kakaoOpenChat → store.kakao) */
@@ -551,7 +682,47 @@ function openKakaoChat(){
 }
 
 /* 권한 */
-const isBiz = computed(() => !!(user?.auth?.isBiz || user?.auth?.role === 'biz'))
+/**
+ * - 가게찾기용: company + accountKind === 'storeOwner' 만 가게 수정 가능
+ * - store.ownerId / ownerEmail 이 현재 로그인 계정과 매칭될 때만 true
+ * - 기존 데이터에서 ownerId/ownerEmail 이 비어 있으면 (noOwnerBound) 일단 허용
+ */
+const authDoc = computed(() => (user?.auth?.value || user?.auth || {}))
+
+const isBiz = computed(() => {
+  const u = uid.value
+
+  // 1) 이 매장의 ownerId 가 내 uid 인가?
+  const ownedById =
+    u &&
+    store.ownerId &&
+    String(store.ownerId) === String(u)
+
+  // 2) 이 매장의 ownerEmail 이 내 이메일과 같은가?
+  const storeEmailRaw =
+    store.ownerEmail ||
+    store.email ||
+    ''
+  const ownedByEmail =
+    userEmail.value &&
+    String(storeEmailRaw || '').toLowerCase() === userEmail.value
+
+  // 3) 내 계정이 "가게찾기용 사장님 계정"인지 (company + storeOwner)
+  const auth = authDoc.value || {}
+  const type = String(auth.type || '').toLowerCase()
+  const kind = String(auth.accountKind || '').toLowerCase()
+  const isStoreOwnerAccount =
+    type === 'company' && kind === 'storeowner'
+
+  // 4) 아직 ownerId / ownerEmail 이 안 묶인 예전 가게 데이터
+  const noOwnerBound =
+    !store.ownerId && !store.ownerEmail
+
+  // ▶ 최종: 가게찾기용 사장님 계정이면서,
+  //   ① 이 매장이 내 소유이거나(UID/이메일 매칭)
+  //   ② 과거 데이터라 아직 소유자 정보가 비어 있는 경우
+  return isStoreOwnerAccount && (noOwnerBound || ownedById || ownedByEmail)
+})
 
 /* 상세정보 */
 const biz = computed(() => ({
@@ -570,7 +741,15 @@ const mapEmbedUrl = computed(() => {
 })
 
 /* 수정/마이 */
-const goEdit = () => router.push({ name: 'storeEdit', params: { id: store.id } })
+/** 전체 수정 버튼 */
+const goEdit = () => goEditSection('all')
+/** 섹션별 수정: StoreEdit 로 이동하면서 ?section= 값 전달 */
+function goEditSection(section){
+  if (!store.id) return
+  const query = section ? { section } : {}
+  router.push({ name:'storeEdit', params:{ id: store.id }, query })
+}
+
 const toMy = () => router.push('/mypage')
 
 /* 쿼리로 담당자 자동 오픈(유지) */
@@ -595,10 +774,15 @@ watch(() => route.query, () => tryOpenMgrFromQuery(), { deep:true })
 
 <style scoped>
 .detail{
-  /* 하단 고정바 제거했으므로 기본 패딩으로 복귀 */
+  /* 🔻 상단 고정 TopBar(강남톡방 로고) 높이만큼 아래로 내리기 */
+  padding-top: calc(var(--appbar-height, 56px) + env(safe-area-inset-top));
+
+  /* 🔻 하단 탭바(92px) + 안전영역만큼 여유 */
   padding-bottom: calc(92px + env(safe-area-inset-bottom));
+
   color:var(--fg);
 }
+
 .container{ padding: 10px 14px }
 .muted{ color:var(--muted) }
 .tiny{ font-size:12px }
@@ -643,8 +827,13 @@ watch(() => route.query, () => tryOpenMgrFromQuery(), { deep:true })
 .right-name{ margin:0 0 2px; font-size:18px; font-weight:900; line-height:1.15 }
 .right-meta{ margin:0; font-size:12.5px; color:var(--muted) }
 .right-meta .dot{ margin:0 4px }
-.mgr-line{ margin:4px 0 0; font-size:13px; font-weight:800 }
-.mgr-phone{ color:var(--fg); text-decoration:none }
+
+/* 목록용 짧은 소개 한 줄 */
+.right-intro{
+  margin:3px 0 0;
+  font-size:13px;
+  font-weight:800;
+}
 
 /* 평점/별점/찜 */
 .rate-row{
@@ -692,8 +881,33 @@ watch(() => route.query, () => tryOpenMgrFromQuery(), { deep:true })
   stroke: none;
 }
 
-/* ===== 본문 ===== */
-.sec{ margin:12px 0 6px; font-size:14px; font-weight:900 }
+/* ===== 섹션 헤더 + 편집 버튼 ===== */
+.sec-row{
+  margin:12px 0 6px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:8px;
+}
+.sec{
+  margin:0;
+  font-size:14px;
+  font-weight:900;
+}
+.sec-edit{
+  padding:4px 8px;
+  border-radius:999px;
+  border:0;
+  font-size:12px;
+  font-weight:800;
+  color:var(--accent);
+  background:color-mix(in oklab, var(--accent), white 92%);
+  cursor:pointer;
+}
+.sec-edit:hover{
+  background:color-mix(in oklab, var(--accent), white 88%);
+}
+
 .para{ line-height:1.45; font-size:13px }
 
 .card{
@@ -809,6 +1023,67 @@ watch(() => route.query, () => tryOpenMgrFromQuery(), { deep:true })
 .cbtn:disabled{
   opacity: .45;
   cursor: not-allowed;
+}
+/* ===== 상단 담당자 인라인 배지 ===== */
+.mgr-inline-bar{
+  margin-top:4px;
+  display:flex;
+  align-items:center;
+  gap:8px;
+  font-size:12px;
+}
+
+.mgr-inline-name{
+  font-weight:800;
+}
+
+.mgr-inline-phone{
+  border:0;
+  background:transparent;
+  font-size:12px;
+  font-weight:800;
+  color:var(--accent);
+  cursor:pointer;
+  padding:0;
+}
+/* ===== 상단 담당자 인라인 배지 ===== */
+.mgr-inline-bar{
+  margin-top:6px;
+  display:flex;
+  flex-direction:column;   /* ← 세로로 두 줄 */
+  align-items:flex-start;
+  gap:2px;
+  font-size:12px;
+}
+
+.mgr-inline-row{
+  display:flex;
+  align-items:center;
+  gap:6px;
+}
+
+.mgr-inline-name{
+  font-weight:800;
+}
+
+.mgr-inline-phone-num{
+  font-weight:800;
+  color:var(--accent);
+}
+
+/* "연결" 버튼을 진짜 버튼처럼 보이게 */
+.mgr-inline-phone-btn{
+  border:1px solid var(--accent);
+  background: color-mix(in oklab, var(--accent), white 88%);
+  color:#111;
+  font-size:12px;
+  font-weight:800;
+  padding:3px 10px;
+  border-radius:999px;
+  cursor:pointer;
+}
+.mgr-inline-phone-btn:active{
+  transform:translateY(1px);
 }
 
 </style>

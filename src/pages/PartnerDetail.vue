@@ -133,6 +133,9 @@ import {
 } from 'firebase/firestore'
 import { getAuth, onAuthStateChanged } from 'firebase/auth'
 
+/* ✅ 여기 한 줄 추가: fbDb 별칭 */
+const fbDb = db
+
 const route = useRoute()
 const router = useRouter()
 

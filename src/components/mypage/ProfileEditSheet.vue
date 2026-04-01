@@ -1,3 +1,4 @@
+<!-- src/components/mypage/ProfileEditSheet.vue -->
 <template>
   <div v-if="open" class="sheet-backdrop" @click.self="$emit('close')">
     <section class="sheet">
@@ -14,9 +15,13 @@
             :style="compAvatarStyle('user')"
             @click="onNext()"
           >
-            <!-- 이니셜 폴백 -->
-            <span v-if="!currentSrc && !state.profile?.photoUrl" class="avatar-fallback">
-              {{ initials(displayNick) }}
+            <!-- 닉네임 텍스트 폴백 -->
+            <span
+              v-if="!currentSrc && !hasRealPhoto"
+              class="avatar-fallback"
+              :style="{ color: effectiveTextColor || '#ffffff' }"
+            >
+              {{ displayName || initials(displayNick) }}
             </span>
 
             <!-- 좌/우 네비 -->
@@ -69,6 +74,46 @@
 
           <div v-if="galleryCount" class="gallery-info">
             보관함: {{ galleryCount }}장 (삭제 전까지 유지)
+          </div>
+        </div>
+
+        <!-- 배경색상 선택(기본 9색) -->
+        <div class="color-row">
+          <div class="color-row-header">
+            <span class="color-label">배경 색상</span>
+            <small class="muted">기본 색상 9개 중 선택</small>
+          </div>
+          <div class="color-options">
+            <button
+              v-for="c in COLOR_PRESETS"
+              :key="c"
+              type="button"
+              class="color-dot"
+              :class="{ 'is-active': c === effectiveBgColor }"
+              :style="{ backgroundColor: c }"
+              @click="edit.bgColor = c"
+              :aria-label="`배경색 ${c} 선택`"
+            />
+          </div>
+        </div>
+
+        <!-- ✅ 텍스트 색상 선택(8색) -->
+        <div class="color-row">
+          <div class="color-row-header">
+            <span class="color-label">텍스트 색상</span>
+            <small class="muted">글자 색상 8개 중 선택</small>
+          </div>
+          <div class="color-options">
+            <button
+              v-for="c in TEXT_COLOR_PRESETS"
+              :key="c"
+              type="button"
+              class="color-dot text-dot"
+              :class="{ 'is-active': c === effectiveTextColor }"
+              :style="{ backgroundColor: c }"
+              @click="edit.textColor = c"
+              :aria-label="`텍스트 색 ${c} 선택`"
+            />
           </div>
         </div>
 
@@ -193,6 +238,30 @@ import { doc, updateDoc, serverTimestamp } from 'firebase/firestore'
 import { ref as sref, uploadString, getDownloadURL } from 'firebase/storage'
 import { db, storage } from '@/firebase' // ← 프로젝트 경로에 맞게 조정
 
+const COLOR_PRESETS = [
+  '#FF6B9C',
+  '#FF9F1C',
+  '#FFC94F',
+  '#5AD2FF',
+  '#40C057',
+  '#845EF7',
+  '#FF8787',
+  '#FFB5E8',
+  '#A5D8FF',
+]
+
+/* ✅ 텍스트 색상 프리셋 8개 */
+const TEXT_COLOR_PRESETS = [
+  '#000000', // 검정
+  '#FFFFFF', // 흰색
+  '#FF0000', // 빨강
+  '#FF2C8A', // 핑크
+  '#007BFF', // 파랑
+  '#00A86B', // 녹색
+  '#8E44AD', // 보라
+  '#001F54', // 남색
+]
+
 const props = defineProps({
   open: { type: Boolean, required: true },
   type: { type: String, required: true }, // 'user' | 'company'
@@ -214,10 +283,13 @@ const props = defineProps({
   nextProfilePhoto: { type: Function, required: true },
   prevProfilePhoto: { type: Function, required: true },
 })
-const emit = defineEmits(['save','close'])
+const emit = defineEmits(['save', 'close'])
 
 /* 내부 저장 플래그 */
 const savingInner = ref(false)
+
+/* 닉네임(가입 단계에서도 바로 보이게) */
+const displayName = computed(() => props.edit.nickname || props.displayNick || '')
 
 /* ===== 보관함 키 ===== */
 const galleryKey = computed(() => {
@@ -225,62 +297,157 @@ const galleryKey = computed(() => {
   return `profile:gallery:${props.type}:${uid}`
 })
 
+/* ✅ 실제 사진 여부(기본 SVG 아바타는 제외) */
+const hasRealPhoto = computed(() => {
+  const src = props.state?.profile?.photoUrl || ''
+  if (!src) return false
+  if (src.startsWith('data:image/svg+xml')) return false
+  return true
+})
+
 /* ===== 현재 src/표시용 ===== */
 const currentSrc = computed(() => {
   const arr = props.edit.photos || []
   const i = Math.min(Math.max(props.edit.photoIndex || 0, 0), Math.max(arr.length - 1, 0))
   const item = arr[i]
-  return typeof item === 'string' ? item : (item?.src || '')
+  const src = typeof item === 'string' ? item : (item?.src || '')
+  // 기본 SVG 아바타는 "실제 사진"으로 보지 않는다
+  if (src && src.startsWith('data:image/svg+xml')) return ''
+  return src
 })
+
 const labelPicked = computed(() =>
   props.edit._photoName
     ? props.edit._photoName
-    : (props.edit.photos?.length ? `${props.edit.photos.length}장 보관됨` : '선택된 파일 없음')
+    : (props.edit.photos?.length ? `${props.edit.photos.length}장 보관됨` : '선택된 파일 없음'),
 )
 const galleryCount = computed(() => props.edit.photos?.length || 0)
 
+/* 선택된(또는 기존) 배경색 */
+const effectiveBgColor = computed(() => {
+  if (props.type !== 'user') return null
+  return (
+    props.edit.bgColor ||
+    props.state?.profile?.bgColor ||
+    COLOR_PRESETS[0]
+  )
+})
+
+/* ✅ 선택된(또는 기존) 텍스트 색상 */
+const effectiveTextColor = computed(() => {
+  if (props.type !== 'user') return null
+  return (
+    props.edit.textColor ||
+    props.state?.profile?.textColor ||
+    '#FF2C8A' // 기본 핑크
+  )
+})
+
 /* ===== 프리뷰 스타일: currentSrc 우선 ===== */
-function compAvatarStyle(kind){
-  if (currentSrc.value) {
-    return { backgroundImage: `url("${currentSrc.value}")`, backgroundSize:'cover', backgroundPosition:'center' }
+function compAvatarStyle(kind) {
+  const base = typeof props.previewAvatarStyle === 'function'
+    ? props.previewAvatarStyle(kind)
+    : {}
+
+  // 회사는 기존 스타일 유지
+  if (kind === 'company') {
+    if (currentSrc.value) {
+      return {
+        ...base,
+        backgroundImage: `url("${currentSrc.value}")`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+      }
+    }
+    return base
   }
-  // 부모 기본
-  return props.previewAvatarStyle(kind)
+
+  // 개인 회원
+  if (currentSrc.value) {
+    return {
+      ...base,
+      backgroundImage: `url("${currentSrc.value}")`,
+      backgroundSize: 'cover',
+      backgroundPosition: 'center',
+      color: effectiveTextColor.value || base.color,
+    }
+  }
+
+  return {
+    ...base,
+    backgroundImage: 'none',
+    backgroundColor: effectiveBgColor.value || base.backgroundColor || '#f2f2f4',
+    color: effectiveTextColor.value || base.color,
+  }
 }
 
 /* ===== 보관함 I/O ===== */
-function readGallery(){
-  try{
+function readGallery() {
+  try {
     const raw = localStorage.getItem(galleryKey.value) || '[]'
     const arr = JSON.parse(raw)
-    return Array.isArray(arr) ? arr.map(x => (typeof x==='string'? {src:x, ts:Date.now()} : x)).filter(x=>x?.src) : []
-  }catch{ return [] }
+    return Array.isArray(arr)
+      ? arr
+        .map(x => (typeof x === 'string' ? { src: x, ts: Date.now() } : x))
+        .filter(x => x?.src && !x.src.startsWith('data:image/svg+xml'))
+      : []
+  } catch {
+    return []
+  }
 }
-function writeGallery(list){
-  try{
-    localStorage.setItem(galleryKey.value, JSON.stringify(list.map(x => (typeof x==='string'? x : x.src)).filter(Boolean)))
-  }catch(e){
+function writeGallery(list) {
+  try {
+    localStorage.setItem(
+      galleryKey.value,
+      JSON.stringify(
+        list
+          .map(x => (typeof x === 'string' ? x : x.src))
+          .filter(Boolean),
+      ),
+    )
+  } catch (e) {
     console.warn('profile gallery 저장 실패:', e)
     alert('이미지 보관함 저장공간이 부족해요. 일부 이미지를 삭제해 주세요.')
   }
 }
 
-/* ===== 시트 열릴 때: 보관함 → edit.photos ===== */
-watch(() => props.open, async (v) => {
-  if (!v) return
-  await nextTick()
-  const g = readGallery()
-  const seed = (props.type === 'company'
-    ? (props.state?.company?.logo || '')
-    : (props.state?.profile?.photoUrl || '')) || ''
-  const seeded = seed && !g.some(x => x.src === seed) ? [{ src:seed, ts:Date.now() }, ...g] : g
-  props.edit.photos = seeded.slice()
-  props.edit.photoIndex = Math.min(props.edit.photoIndex || 0, Math.max(seeded.length - 1, 0))
-  props.edit._photoName = ''
-}, { immediate:true })
+/* ===== 시트 열릴 때: 보관함 → edit.photos + 배경/텍스트 색 초기화 ===== */
+watch(
+  () => props.open,
+  async (v) => {
+    if (!v) return
+    await nextTick()
+    const g = readGallery()
+    const rawSeed = (props.type === 'company'
+      ? (props.state?.company?.logo || '')
+      : (props.state?.profile?.photoUrl || '')) || ''
+    const seed = rawSeed && rawSeed.startsWith('data:image/svg+xml') ? '' : rawSeed
+    const seeded = seed && !g.some(x => x.src === seed)
+      ? [{ src: seed, ts: Date.now() }, ...g]
+      : g
+    props.edit.photos = seeded.slice()
+    props.edit.photoIndex = Math.min(props.edit.photoIndex || 0, Math.max(seeded.length - 1, 0))
+    props.edit._photoName = ''
+
+    // 배경색 기본값
+    if (props.type === 'user') {
+      props.edit.bgColor =
+        props.state?.profile?.bgColor ||
+        props.edit.bgColor ||
+        COLOR_PRESETS[0]
+
+      // ✅ 텍스트 색상 기본값
+      props.edit.textColor =
+        props.state?.profile?.textColor ||
+        props.edit.textColor ||
+        '#FF2C8A'
+    }
+  },
+  { immediate: true },
+)
 
 /* ===== 파일 → DataURL ===== */
-function fileToDataUrl(file, maxW=800, quality=0.78){
+function fileToDataUrl(file, maxW = 800, quality = 0.78) {
   return new Promise((resolve, reject) => {
     const fr = new FileReader()
     fr.onerror = reject
@@ -288,10 +455,10 @@ function fileToDataUrl(file, maxW=800, quality=0.78){
       const img = new Image()
       img.onload = () => {
         const s = Math.min(1, maxW / img.width)
-        const w = Math.max(1, Math.round(img.width*s))
-        const h = Math.max(1, Math.round(img.height*s))
-        const c = document.createElement('canvas'); c.width=w; c.height=h
-        const ctx = c.getContext('2d'); ctx.drawImage(img,0,0,w,h)
+        const w = Math.max(1, Math.round(img.width * s))
+        const h = Math.max(1, Math.round(img.height * s))
+        const c = document.createElement('canvas'); c.width = w; c.height = h
+        const ctx = c.getContext('2d'); ctx.drawImage(img, 0, 0, w, h)
         resolve(c.toDataURL('image/jpeg', quality))
       }
       img.src = fr.result
@@ -301,15 +468,21 @@ function fileToDataUrl(file, maxW=800, quality=0.78){
 }
 
 /* ===== 여러 장 선택 + 누적 보관 ===== */
-async function handlePickAndRemember(e){
+async function handlePickAndRemember(e) {
   const files = Array.from(e?.target?.files || [])
   if (!files.length) return
   const urls = []
-  for (const f of files){ try{ urls.push(await fileToDataUrl(f)) }catch{} }
+  for (const f of files) {
+    try {
+      urls.push(await fileToDataUrl(f))
+    } catch { /* skip */ }
+  }
   if (!urls.length) return
   const g = readGallery()
   const has = new Set(g.map(x => x.src))
-  for (const u of urls){ if (!has.has(u)) g.push({ src:u, ts:Date.now() }) }
+  for (const u of urls) {
+    if (!has.has(u)) g.push({ src: u, ts: Date.now() })
+  }
   writeGallery(g)
   props.edit.photos = g.slice()
   props.edit.photoIndex = Math.max(0, g.length - urls.length)
@@ -317,17 +490,17 @@ async function handlePickAndRemember(e){
 }
 
 /* ===== 삭제 ===== */
-function removeCurrentFromGallery(){
+function removeCurrentFromGallery() {
   const arr = props.edit.photos || []
   const i = Math.min(Math.max(props.edit.photoIndex || 0, 0), Math.max(arr.length - 1, 0))
   if (i < 0 || i >= arr.length) return
-  const next = arr.slice(0,i).concat(arr.slice(i+1))
+  const next = arr.slice(0, i).concat(arr.slice(i + 1))
   writeGallery(next)
   props.edit.photos = next
   props.edit.photoIndex = Math.min(i, Math.max(next.length - 1, 0))
   if (!next.length) props.clearProfilePhoto()
 }
-function clearAllPhotos(){
+function clearAllPhotos() {
   if (!confirm('보관된 모든 이미지를 삭제할까요?')) return
   writeGallery([])
   props.edit.photos = []
@@ -337,7 +510,7 @@ function clearAllPhotos(){
 }
 
 /* ===== 좌/우 네비 (부모 있으면 호출, 없으면 로컬) ===== */
-function onNext(){
+function onNext() {
   if (typeof props.nextProfilePhoto === 'function') props.nextProfilePhoto()
   else {
     const n = props.edit.photos?.length || 0
@@ -345,7 +518,7 @@ function onNext(){
     props.edit.photoIndex = (props.edit.photoIndex + 1) % n
   }
 }
-function onPrev(){
+function onPrev() {
   if (typeof props.prevProfilePhoto === 'function') props.prevProfilePhoto()
   else {
     const n = props.edit.photos?.length || 0
@@ -355,20 +528,20 @@ function onPrev(){
 }
 
 /* 파일 선택 후 처리 + 같은 파일 재선택 가능하도록 value 리셋 */
-async function onFileChange(e){
-  await handlePickAndRemember(e);
-  try { e.target.value = null } catch(_) {}
+async function onFileChange(e) {
+  await handlePickAndRemember(e)
+  try { e.target.value = null } catch (_) { /* ignore */ }
 }
 
 /* ====== Storage 업로드 & Firestore 업데이트 ====== */
-function nowStamp(){
+function nowStamp() {
   const d = new Date()
   const pad = n => String(n).padStart(2, '0')
-  return `${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`
+  return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`
 }
 
 /** DataURL을 Storage에 업로드하고 {url, path} 반환 */
-async function uploadDataUrlToStorage(uid, dataUrl){
+async function uploadDataUrlToStorage(uid, dataUrl) {
   const path = `profiles/${uid}/avatar_${nowStamp()}.jpg`
   const r = sref(storage, path)
   await uploadString(r, dataUrl, 'data_url', { contentType: 'image/jpeg' })
@@ -376,25 +549,36 @@ async function uploadDataUrlToStorage(uid, dataUrl){
   return { url, path }
 }
 
-async function onSave(){
+async function onSave() {
   if (savingInner.value) return
   const uid = props.state?.uid
-  if (!uid){ alert('로그인이 필요합니다.'); return }
+  if (!uid) { alert('로그인이 필요합니다.'); return }
 
-  try{
+  try {
     savingInner.value = true
 
     // 현재 선택된 이미지
-    let photoUrl = currentSrc.value || (props.type === 'company' ? props.state.company?.logo : props.state.profile?.photoUrl) || ''
-    let photoPath = props.type === 'company' ? (props.state.company?.logoPath || '') : (props.state.profile?.photoPath || '')
+    let photoUrl = ''
+    let photoPath = ''
+
+    if (props.type === 'company') {
+      photoUrl = currentSrc.value || props.state.company?.logo || ''
+      photoPath = props.state.company?.logoPath || ''
+    } else {
+      const existing = props.state.profile?.photoUrl || ''
+      const isPlaceholder = existing.startsWith('data:image/svg+xml')
+      // 기본 SVG 아바타는 "사진 없음"으로 처리
+      photoUrl = currentSrc.value || (isPlaceholder ? '' : existing)
+      photoPath = props.state.profile?.photoPath || ''
+    }
 
     // base64이면 Storage 업로드 → URL/경로 교체
-    if (photoUrl && photoUrl.startsWith('data:image')){
+    if (photoUrl && photoUrl.startsWith('data:image')) {
       const { url, path } = await uploadDataUrlToStorage(uid, photoUrl)
       photoUrl = url
       photoPath = path
       // 로컬 갤러리도 URL로 치환(선택 사항)
-      const g = readGallery().map(x => (x.src?.startsWith('data:image') ? { ...x, src:url } : x))
+      const g = readGallery().map(x => (x.src?.startsWith('data:image') ? { ...x, src: url } : x))
       writeGallery(g)
       props.edit.photos = g
     }
@@ -406,7 +590,7 @@ async function onSave(){
       type: props.type === 'company' ? 'company' : 'user',
     }
 
-    if (props.type === 'company'){
+    if (props.type === 'company') {
       payload.company = {
         ...(props.state.company || {}),
         logo: photoUrl || null,
@@ -418,14 +602,16 @@ async function onSave(){
         phone: props.edit.phone ?? props.state.company?.phone ?? '',
         address: props.edit.address ?? props.state.company?.address ?? '',
       }
-    }else{
+    } else {
       payload.profile = {
         ...(props.state.profile || {}),
         nickname: props.edit.nickname ?? props.state.profile?.nickname ?? '',
         nick: props.edit.nickname ?? props.state.profile?.nick ?? '',
         phone: props.edit.phone ?? props.state.profile?.phone ?? null,
         photoUrl: photoUrl || null,   // 🔹 긴 base64 대신 짧은 URL
-        photoPath: photoPath || null, // 🔹 아주 짧은 Storage 경로(원하면 이것만 저장해도 됨)
+        photoPath: photoPath || null, // 🔹 Storage 경로
+        bgColor: effectiveBgColor.value || null,   // 🔹 선택한 배경색 저장
+        textColor: effectiveTextColor.value || null, // 🔹 선택한 텍스트 색상 저장
         uid,
         email: props.state.profile?.email || '',
       }
@@ -435,10 +621,10 @@ async function onSave(){
 
     emit('save') // 기존 부모 연동 유지
     alert('프로필을 저장했어요!')
-  }catch(err){
+  } catch (err) {
     console.error(err)
     alert('프로필 저장 중 오류가 발생했어요.')
-  }finally{
+  } finally {
     savingInner.value = false
   }
 }
@@ -523,8 +709,10 @@ async function onSave(){
 .avatar.lg{ width:140px; height:140px }
 .avatar-fallback{
   position:absolute; inset:0; display:grid; place-items:center;
-  font-size:42px; font-weight:900; color:#fff;
-  background:linear-gradient(135deg, #f06, #f89);
+  font-size:28px; font-weight:900;
+  text-align:center;
+  padding:0 8px;
+  color:inherit; /* ✅ 색상은 상위 또는 인라인 스타일에서 제어 */
 }
 
 /* 좌/우 네비 */
@@ -561,6 +749,51 @@ async function onSave(){
 
 .gallery-info{
   font-size:12px; color:var(--muted);
+}
+
+/* 배경/텍스트 색상 선택 */
+.color-row{
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+  margin-bottom:4px;
+}
+.color-row-header{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+}
+.color-label{
+  font-size:12px;
+  font-weight:800;
+  color:var(--muted);
+}
+.color-options{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+}
+.color-dot{
+  width:26px;
+  height:26px;
+  border-radius:999px;
+  border:2px solid transparent;
+  padding:0;
+  cursor:pointer;
+}
+.color-dot.is-active{
+  border-color:#000;
+  box-shadow:0 0 0 2px rgba(0,0,0,.12);
+}
+:root[data-theme="dark"] .color-dot.is-active,
+:root[data-theme="black"] .color-dot.is-active{
+  border-color:#fff;
+  box-shadow:0 0 0 2px rgba(255,255,255,.18);
+}
+
+/* 텍스트 색상용: 흰색 등 보이게 테두리 */
+.text-dot{
+  box-shadow:0 0 0 1px rgba(0,0,0,.12);
 }
 
 /* 다크 테마 대비 */

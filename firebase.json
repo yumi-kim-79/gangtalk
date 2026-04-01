@@ -15,6 +15,13 @@
       ],
       "headers": [
         {
+          "source": "**",
+          "headers": [
+            { "key": "Alt-Svc", "value": "clear" },
+            { "key": "Strict-Transport-Security", "value": "max-age=31536000" }
+          ]
+        },
+        {
           "source": "**/*.html",
           "headers": [{ "key": "Cache-Control", "value": "no-cache" }]
         },
@@ -60,6 +67,13 @@
         "**/node_modules/**"
       ],
       "headers": [
+        {
+          "source": "**",
+          "headers": [
+            { "key": "Alt-Svc", "value": "clear" },
+            { "key": "Strict-Transport-Security", "value": "max-age=31536000" }
+          ]
+        },
         {
           "source": "**/*.html",
           "headers": [{ "key": "Cache-Control", "value": "no-cache" }]

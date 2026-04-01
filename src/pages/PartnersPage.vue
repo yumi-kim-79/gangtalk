@@ -42,20 +42,32 @@
       </div>
     </section>
 
-    <!-- 프로모션 배너 -->
-    <section class="banners" v-if="bannersReady && bannersToShow.length">
-      <!-- ⬇️ 좌상단 고정: '광고신청'(기업회원만 보임) -->
+    <!-- 🔸 배너 등록 버튼 (실시간 순위 아래, 배너 위) -->
+    <section v-if="isEnterprise || canEdit" class="banner-cta">
       <button
-        v-if="isEnterprise"
-        class="ad-btn pill-btn"
+        class="ad-btn pink-cta"
         type="button"
         @click.stop="toggleAdCreate($event)"
       >
-        <span v-if="!bizPanel.open || bizPanel.kind!=='ad'">광고신청</span>
+        <!-- 배너 등록 상태 -->
+        <template v-if="!bizPanel.open || bizPanel.kind!=='ad'">
+          <span class="arrow-3">▼▼▼</span>
+          <span>배너 등록</span>
+        </template>
+
+        <!-- 패널 열려 있을 때 -->
         <span v-else>닫기</span>
       </button>
+    </section>
 
-      <article v-for="b in bannersToShow" :key="b.id" class="banner" @click="onBannerClick">
+    <!-- 프로모션 배너 -->
+    <section class="banners" v-if="bannersReady && bannersToShow.length">
+      <article
+        v-for="b in bannersToShow"
+        :key="b.id"
+        class="banner"
+        @click="onBannerClick"
+      >
         <img v-if="bannerImage(b)" :src="bannerImage(b)" alt="" class="banner-img" />
         <span
           v-for="(t, tIdx) in (b.tags||[])"
@@ -68,7 +80,8 @@
 
     <!-- 카테고리 -->
     <section class="cats">
-      <h3 class="sec-ttl">카테고리로 찾기</h3>
+      <!-- 텍스트만 제거, 여백/레이아웃 유지를 위해 h3는 남겨둠 -->
+      <h3 class="sec-ttl"></h3>
       <div class="cat-grid">
         <!-- 지역 드롭다운 트리거 -->
         <button
@@ -105,28 +118,26 @@
           </li>
         </ul>
 
-        <!-- 카테고리 버튼들 (전체 버튼 제거됨) -->
-            <button
-              v-for="c in categories"
-              :key="c.key"
-              class="cat"
-              :class="{ active: cat===c.key }"
-              @click="toggleCat(c.key)"
-              type="button"
-            >
-              <div class="ico">{{ c.emoji }}</div>
-              <div class="lbl">{{ c.label }}</div>
-            </button>
-          </div>
-        </section>
+        <!-- 카테고리 버튼들 (PNG 이미지 아이콘 버전) -->
+        <button
+          v-for="c in categories"
+          :key="c.key"
+          class="cat"
+          :class="{ active: cat===c.key }"
+          @click="toggleCat(c.key)"
+          type="button"
+        >
+          <!-- 아이콘: data-type 에 맞는 PNG를 background-image로 표시 -->
+          <div class="cat-icon" :data-type="c.key"></div>
 
-    <!-- 🔸 카테고리 아래 단일 CTA: 업체등록 (기업회원만 노출) -->
-    <section v-if="isEnterprise" class="partner-cta">
-      <button class="reg-btn pill-btn" type="button" @click="toggleBizCreate($event)">
-        <span v-if="!bizPanel.open || bizPanel.kind!=='store'">업체등록</span>
-        <span v-else>닫기</span>
-      </button>
+          <!-- 아래 라벨 텍스트 -->
+          <div class="lbl">{{ c.label }}</div>
+        </button>
+      </div>
     </section>
+
+    <!-- (가게찾기와 동일하게: 카테고리 아래 별도 CTA 제거) -->
+    <!-- partner-cta 섹션 삭제 -->
 
     <!-- ✅ 운영자 전용 툴바 -->
     <section v-if="canEdit" class="orders-head">
@@ -151,10 +162,23 @@
 
     <!-- 카테고리 인기 (배너 카드형) -->
     <section class="rank-sections">
-      <h3 class="sec-ttl">카테고리 인기</h3>
+      <!-- 텍스트만 제거 -->
+      <h3 class="sec-ttl"></h3>
 
       <div v-for="sec in visibleCategories" :key="sec.key" class="rank-sec">
-        <div class="rs-head"><strong>{{ sec.label }} Top 5</strong></div>
+        <div class="rs-head">
+          <strong>{{ sec.label }} Top 5</strong>
+
+          <!-- ✅ Top5 등록 버튼: 제목 오른쪽 (기업회원 + 관리자) -->
+          <button
+            v-if="isEnterprise || canEdit"
+            class="pink-cta top5-btn"
+            type="button"
+            @click="toggleBizCreate($event)"
+          >
+            Top5 등록
+          </button>
+        </div>
 
         <div class="rs-scroller">
           <article
@@ -186,7 +210,20 @@
 
     <!-- 목록 헤드 -->
     <section class="list-head" id="list">
-      <div class="count">총 {{ filtered.length }}개</div>
+      <div class="count-row">
+        <div class="count">총 {{ filtered.length }}개</div>
+
+        <!-- ✅ 일반등록 버튼: 개수 오른쪽 (기업회원 + 관리자) -->
+        <button
+          v-if="isEnterprise || canEdit"
+          class="pink-cta list-reg-btn"
+          type="button"
+          @click="toggleBizCreate($event)"
+        >
+          일반등록
+        </button>
+      </div>
+
       <div class="view-tools" @click.stop>
         <!-- 🌗 다크/화이트 -->
         <button
@@ -212,30 +249,18 @@
           <span class="ico-svg" v-html="Icons.nearme"></span>
         </button>
 
-        <!-- 📋 리스트 보기 -->
+        <!-- 📋/🗂 한줄/두칸 토글 (단일 버튼) -->
         <button
           class="tool"
-          :class="{ on: view==='list' }"
-          title="한줄보기"
-          aria-label="한줄보기"
+          :class="{ on: isListView }"
+          :title="isListView ? '두칸보기' : '한줄보기'"
+          :aria-label="isListView ? '두칸보기로 전환' : '한줄보기로 전환'"
           type="button"
-          @click.stop.prevent="setView('list')"
-          @touchstart.stop.prevent="setView('list')"
+          @click.stop.prevent="toggleView"
+          @touchstart.stop.prevent="toggleView"
         >
-          <span class="ico-svg" v-html="Icons.list"></span>
-        </button>
-
-        <!-- 🗂 그리드 보기 -->
-        <button
-          class="tool"
-          :class="{ on: view==='grid' }"
-          title="두칸보기"
-          aria-label="두칸보기"
-          type="button"
-          @click.stop.prevent="setView('grid')"
-          @touchstart.stop.prevent="setView('grid')"
-        >
-          <span class="ico-svg" v-html="Icons.grid"></span>
+          <!-- 현재 상태에 따라 아이콘 변경 -->
+          <span class="ico-svg" v-html="isListView ? Icons.list : Icons.grid"></span>
         </button>
 
         <!-- 🔄 새로고침 -->
@@ -349,7 +374,6 @@ import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import SearchBar from '@/components/SearchBar.vue'
 import BizManagerTabs from '@/components/biz/BizManagerTabs.vue'
-import { useNearby } from '@/composables/useNearby'
 import { db } from '@/firebase'
 
 /* ====== ⬇⬇⬇ 추가: 근처 보기 공통 상수/유틸(가게찾기와 동일 동작) ⬇⬇⬇ ====== */
@@ -597,26 +621,34 @@ function setLocalRating(id, rating){
 
 /* ---------- 검색 ---------- */
 const q = ref('')
-const searchPH = '업체명을 입력해 보세요'
+
+// 제휴관 상단 검색창 안내 문구
+// → 시술명 / 시술부위 / 이벤트 중심이지만, 실제로는 업체명·담당자명도 함께 검색됨
+const searchPH = '시술명, 시술부위, 이벤트를 입력해 보세요.'
+
 function doSearch(){
   router.replace({ query: { ...route.query, q: q.value || undefined } })
   scrollToList()
 }
+
 onMounted(() => { if (route.query.q) q.value = String(route.query.q) })
 watch(() => route.query.q, v => { q.value = String(v || '') })
 
 /* ---------- 카테고리 ---------- */
 const categories = [
-  { key:'ps',     label:'성형',     emoji:'🏥' },
-  { key:'skin',   label:'피부',     emoji:'🧴' },
-  { key:'beauty', label:'미용',     emoji:'💇‍♀️' },
-  { key:'nail',   label:'네일',     emoji:'💅' },
-  { key:'real',   label:'부동산',   emoji:'🏠' },
-  { key:'fit',    label:'피트니스', emoji:'🏋️' },
-  { key:'deal',   label:'공동구매', emoji:'🛒' },
-  { key:'shop',   label:'상품관',   emoji:'🧺' },
-  { key:'etc',    label:'기타',     emoji:'📌' },
+  { key:'ps',     label:'성형'     },
+  { key:'skin',   label:'피부'     },
+  { key:'beauty', label:'미용'     },
+  { key:'nail',   label:'네일'     },
+  { key:'real',   label:'부동산'   },
+  { key:'fit',    label:'피트니스' },
+  { key:'deal',   label:'공동구매' },
+  { key:'shop',   label:'상품관'   },
+  // ETC 카테고리는 아이콘 안에 영어 텍스트 표시
+  { key:'etc',    label:'기타', short:'ETC' },
 ]
+
+
 const mapCat = Object.fromEntries(categories.map(c=>[c.key,c.label]))
 const cat = ref('all')
 const toggleCat = (k)=>{ cat.value = (cat.value===k ? 'all' : k) }
@@ -689,6 +721,28 @@ function normRegion(raw=''){
   if (hit('경기','gyeonggi', '경기도','용인','수원','성남','고양','부천','안산','평택','안양','의정부','김포','광명','하남','군포','과천','광주(경기)','양주','구리','오산','시흥','파주','양평','남양주','동두천','포천','여주','이천','화성')) return 'gyeonggi'
   return 'non_gangnam'
 }
+
+/* ───────── 파트너 승인 여부: active + applyStatus/approved 기준 ───────── */
+function isPartnerApproved(x = {}) {
+  const active = x.active !== false           // active가 false면 무조건 숨김
+
+  const approvedFlag = x.approved === true    // approved: true → 승인
+  const apply = String(x.applyStatus || '').trim().toLowerCase()
+  const applyApproved =
+    ['approved', '승인', '승인완료'].includes(apply)
+
+  // 🔹 승인 관련 필드가 하나도 없는 예전 데이터는 "기본 승인"으로 간주
+  const hasExplicit = (
+    typeof x.approved === 'boolean' ||
+    typeof x.active === 'boolean' ||
+    !!apply
+  )
+  if (!hasExplicit) return true
+
+  // 🔹 active 이면서 (approved === true 또는 applyStatus가 승인 계열) 인 경우만 노출
+  return active && (approvedFlag || applyApproved)
+}
+
 /* ───────── 내 주변 모달 연동(반경/거리계산/목록) ───────── */
 const NEAR_KM = 10
 
@@ -735,8 +789,12 @@ async function loadPartners(){
     const base = []
     const missingIds = []
 
-    pSnap.forEach(d=>{
+    pSnap.forEach(d => {
       const x = d.data() || {}
+
+      // 🔹 승인되지 않은 제휴업체는 목록에서 제외
+      if (!isPartnerApproved(x)) return
+
       const myLocal = getLocalRating(d.id)
       const thumbCand = pickThumb(x)
 
@@ -745,22 +803,37 @@ async function loadPartners(){
       base.push({
         id: d.id,
         name: x.name || '',
+        // 🔹 담당자명(있는 경우) → 나중에 필요하면 검색에 사용
+        manager: x.manager || x.managerName || '',
+
         region: x.region || '',
+        address: x.address || '',          // ✅ 주소도 같이 보관(선택)
+
         category: normCat(x.category || x.categoryRaw || ''),
         categoryRaw: x.category || x.categoryRaw || '',
+
         rating: clamp0(x.rating ?? myLocal ?? 4.5),
         userRating: (myLocal ?? undefined),
+
         thumb: thumbCand || '',
         link: x.link || '',
+
+        // ✅ 해시태그/키워드(대표서비스, 이벤트 키워드 등)
         tags: Array.isArray(x.tags) ? x.tags : [],
+
+        // ✅ 소개 페이지 텍스트(desc 등이 여기로 들어옴)
         intro: (x.intro || x.desc || x.about || x.bio || '').toString().trim(),
+
+        // ✅ 혜택/이벤트 문구
+        benefits: x.benefits || '',
+
         favs: toPosInt(x.favs ?? x.likes ?? x.hearts ?? x.bookmarks ?? 0),
 
-        // ✅ 지도용 좌표(파이어스토어에 lat/lng가 숫자로 들어있다고 가정)
+        // ✅ 지도용 좌표
         lat: Number(x.lat),
         lng: Number(x.lng),
       })
-    })
+    }) // 🔹 forEach 닫기
 
     if (missingIds.length){
       const fills = await Promise.all(
@@ -784,7 +857,9 @@ async function loadPartners(){
       }
     }
 
-    partners.value = await Promise.all(base.map(async p => ({ ...p, thumb: await resolveImg(p.thumb) })))
+    partners.value = await Promise.all(
+      base.map(async p => ({ ...p, thumb: await resolveImg(p.thumb) }))
+    )
   }catch(e){
     console.warn('partners load failed:', e)
   }
@@ -913,13 +988,76 @@ function openHotDetail(name){
 }
 
 /* ===================== 정렬/필터 ===================== */
+
+// 검색용 문자열 전처리
+function norm(s){ return String(s || '').toLowerCase().trim() }
+function tokens(s){ return norm(s).split(/\s+/).filter(Boolean) }
+
+/**
+ * 검색 대상 텍스트 묶기
+ *
+ * 🔍 포함되는 것:
+ *  - 업체명(name)
+ *  - 담당자명(manager)
+ *  - 소개 페이지 텍스트(intro = desc 등)
+ *  - 혜택/이벤트 문구(benefits)
+ *  - 해시태그/키워드(tags[])
+ *  - (선택) 주소(address)까지
+ */
+function searchTextOf(p){
+  const tags = Array.isArray(p?.tags) ? p.tags.join(' ') : ''
+
+  return [
+    p?.name,        // 업체명
+    p?.manager,     // 담당자명
+    p?.intro,       // 소개/소개 페이지 텍스트(desc)
+    p?.benefits,    // 이벤트/혜택 문구
+    tags,           // 태그/해시태그
+    p?.address,     // 주소로 검색하고 싶을 때
+  ]
+    .map(norm)
+    .filter(Boolean)
+    .join(' ')
+}
+
+/**
+ * 검색 매칭 여부
+ * - 입력한 단어들(공백 분리)이 searchTextOf 안에 모두 포함되면 true
+ */
+function matchesQuery(p, query){
+  const text = searchTextOf(p)
+  if (!text) return false
+  const qs = tokens(query)
+  if (!qs.length) return true
+  return qs.every(tok => text.includes(tok))
+}
+
 const view = ref(route.query.view || localStorage.getItem('partners:view') || 'list')
-function setView(v){ view.value = v; localStorage.setItem('partners:view', v) }
+const isListView = computed(() => view.value === 'list')
+
+function setView(v){
+  const next = v === 'grid' ? 'grid' : 'list'
+  view.value = next
+  localStorage.setItem('partners:view', next)
+}
+
+function toggleView(){
+  setView(isListView.value ? 'grid' : 'list')
+}
+
 function baseFiltered(){
   return partners.value.filter(p=>{
-    const okCat = (cat.value==='all') || (p.category===cat.value)
-    const okQ   = !q.value || p.name.toLowerCase().includes(q.value.toLowerCase())
-    const okRegion = (region.value==='all') || (normRegion(p.region)===region.value)
+    const okCat    = (cat.value === 'all') || (p.category === cat.value)
+
+    // 🔍 검색어가 있을 때:
+    //  - 업체명(name)
+    //  - 담당자명(manager)
+    //  - 소개/본문(intro)
+    //  - 태그(시술명/시술부위/이벤트 텍스트)
+    //   를 모두 합친 searchTextOf 기준으로 매칭
+    const okQ      = !q.value || matchesQuery(p, q.value)
+
+    const okRegion = (region.value === 'all') || (normRegion(p.region) === region.value)
     return okCat && okQ && okRegion
   })
 }
@@ -973,18 +1111,38 @@ onMounted(() => {
 onUnmounted(() => { if (_adminUnsub) _adminUnsub() })
 const canEdit = isAdmin
 
-/* ───────────────────────── 기업회원 여부 ───────────────────────── */
+/* ───────────────────────── 기업회원 여부(제휴관용 관리자 계정) ─────────────────────────
+ * - type === 'company' 이면서
+ * - accountKind === 'partnerOwner' 인 계정만 제휴관 업체등록/광고 버튼 노출
+ * - 가게찾기 사장님(storeOwner)은 여기서는 false 처리
+ */
 const isEnterprise = ref(false)
+
 async function resolveEnterprise(u){
-  if(!u){ isEnterprise.value = false; return }
-  try{
+  if (!u) {
+    isEnterprise.value = false
+    return
+  }
+  try {
     const snap = await getDoc(doc(db, 'users', u.uid))
-    const t = snap.exists() ? (snap.data()?.type || snap.data()?.profile?.type) : ''
-    const s = String(t||'').toLowerCase()
-    isEnterprise.value = (s === 'company' || s === 'enterprise')
-  }catch{ isEnterprise.value = false }
+    if (!snap.exists()) {
+      isEnterprise.value = false
+      return
+    }
+
+    const data = snap.data() || {}
+    const type = String(data.type || data.profile?.type || '').toLowerCase()
+    const kind = String(data.accountKind || '').toLowerCase()
+
+    // 🔹 제휴관 담당자 = company + partnerOwner
+    isEnterprise.value = (type === 'company' && kind === 'partnerowner')
+  } catch (e) {
+    console.warn('[Partners] resolveEnterprise failed:', e)
+    isEnterprise.value = false
+  }
 }
-onMounted(()=>{
+
+onMounted(() => {
   resolveEnterprise(auth.currentUser)
   onAuthStateChanged(auth, resolveEnterprise)
 })
@@ -1026,10 +1184,28 @@ function closeBiz(){
   window.removeEventListener('resize', onReposition)
 }
 
-// 제휴관에서는 'partner' 타입으로 신청
+// 제휴관 업체등록 버튼 → (관리자회원 전용) 신규 등록 페이지로
 async function toggleBizCreate(evt){
-  if (!bizPanel.value.open || bizPanel.value.kind !== 'partner') await openBiz('partner', evt)
-  else closeBiz()
+  // 관리자회원(제휴관 담당자)이 아닌 경우 로그인/회원가입으로 보냄
+  if (!auth.currentUser) {
+    alert('관리자회원(제휴관 담당자)으로 로그인 후 이용해 주세요.')
+    router.push({
+      name: 'auth',
+      query: {
+        next: route.fullPath || '/partners',
+        mode: 'login',
+        who: 'admin',   // 🔹 관리자회원 탭으로 이동
+      },
+    })
+    return
+  }
+
+  // (현재 구조 유지) 제휴관에서도 동일하게 새 업체 등록 폼으로 이동
+  router.push({
+    name: 'storeEdit',
+    params: { id: 'new' },          // 새 업체 등록용 id
+    query:  { from: route.name || 'partners' },
+  }).catch(()=>{})
 }
 
 async function toggleAdCreate(evt){
@@ -1201,18 +1377,48 @@ function refresh(){ loadPartners() }
 .ellip1{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 
 /* 배너 */
-.banners{ display:flex; flex-direction:column; gap:10px; margin:6px 0 12px; position:relative; }
-.banner{ position:relative; overflow:hidden; display:block; padding:0; background:transparent; box-shadow:none; border-radius:0; aspect-ratio:auto; min-height:0; }
-.banner-img{ display:block; width:100%; height:auto; object-fit:contain }
+.banners{
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+  margin:4px 0 12px;
+}
 
-/* 좌상단 광고신청 버튼(기업회원 전용) */
+/* 배너 한 장 */
+.banner{
+  position:relative;
+  overflow:hidden;
+  display:block;
+  padding:0;
+  background:transparent;
+  box-shadow:none;
+  border-radius:0;
+  aspect-ratio:auto;
+  min-height:0;
+}
+.banner-img{
+  display:block;
+  width:100%;
+  height:auto;
+  object-fit:contain;
+}
+
+/* 🔸 배너 등록 버튼 영역: 실시간 순위 아래, 배너 위 */
+.banner-cta{
+  margin:4px 0 4px;             /* 가게찾기와 동일 마진 */
+  display:flex;
+  justify-content:flex-start;
+}
+
+/* 배너 등록 버튼 공통 스타일 (가게찾기와 동일) */
 .ad-btn{
-  position:absolute;
-  left:10px; top:10px; z-index:5;
-  padding:8px 14px; border-radius:999px;
+  font-weight:900;
+  font-size:12px;
+  padding:8px 14px;
+  border-radius:999px;
   border:1px solid var(--line);
-  background:#fff; color:#111;
-  font-weight:900; font-size:12px;
+  background:#fff;
+  color:#111;
   box-shadow:0 4px 10px var(--shadow);
 }
 
@@ -1235,17 +1441,101 @@ function refresh(){ loadPartners() }
 .sec-ttl{ margin:0 0 6px; font-size:14px; color:var(--fg) }
 .cat-grid{ display:grid; grid-template-columns:repeat(5, minmax(0,1fr)); gap:6px }
 .cat{
-  height:56px; border:1px solid var(--line); border-radius:12px; background:var(--surface);
-  display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; transition:transform .08s ease; color:var(--fg);
+  height:56px;
+  border:1px solid var(--line);
+  border-radius:12px;
+  background:var(--surface);
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:4px;
+  transition:transform .08s ease;
+  color:var(--fg);
   position:relative;
 }
-.cat:active{ transform:scale(.985) } .cat.active{ outline:2px solid var(--accent) }
+.cat:active{ transform:scale(.985) }
+.cat.active{ outline:2px solid var(--accent) }
+
+/* 기존 .ico 는 지역 선택(📍)에서만 사용 */
 .ico{ font-size:16px; line-height:1 }
-.lbl{ font-weight:800; font-size:11px }
+
+/* 라벨 텍스트 */
+.lbl{
+  font-weight:800;
+  font-size:11px;
+}
 
 /* 지역 트리거의 화살표 위치 */
 .region-cat .chev{
   position:absolute; right:6px; top:6px; font-size:12px; line-height:1;
+}
+
+/* ===================== 카테고리 PNG 아이콘 ===================== */
+.cat-icon{
+  width:36px;          /* 아이콘 박스 살짝 키우기 */
+  height:36px;
+  background-repeat:no-repeat;
+  background-position:center;
+  /* 박스 기준 80% 정도를 채우도록 → 원본 크기가 달라도 균일하게 보임 */
+  background-size:80% auto;
+}
+
+/* 🔽 파일 이름은 예시야. 실제 만든 파일명에 맞게 수정하면 됨 */
+/* 성형(ps) */
+.cat-icon[data-type="ps"]{
+  background-image:url('/img/partners/cat-ps.png');
+  background-size:35px auto;  /* 기존 22px보다 크게 */
+}
+
+/* 피부(skin) */
+.cat-icon[data-type="skin"]{
+  background-image:url('/img/partners/cat-skin.png');
+  background-size:50px auto;
+}
+
+/* 미용(beauty) */
+.cat-icon[data-type="beauty"]{
+  background-image:url('/img/partners/cat-beauty.png');
+}
+
+/* 네일(nail) */
+.cat-icon[data-type="nail"]{
+  background-image:url('/img/partners/cat-nail.png');
+}
+
+/* 부동산(real) */
+.cat-icon[data-type="real"]{
+  background-image:url('/img/partners/cat-real.png');
+}
+
+/* 피트니스(fit) */
+.cat-icon[data-type="fit"]{
+  background-image:url('/img/partners/cat-fit.png');
+  background-size:40px auto;
+}
+
+/* 공동구매(deal) */
+.cat-icon[data-type="deal"]{
+  background-image:url('/img/partners/cat-deal.png');
+  background-size:50px auto;
+}
+
+/* 상품관(shop) */
+.cat-icon[data-type="shop"]{
+  background-image:url('/img/partners/cat-shop.png');
+}
+
+/* 기타(etc) */
+.cat-icon[data-type="etc"]{
+  background-image:url('/img/partners/cat-etc.png');
+}
+
+/* 다크/블랙 테마에서 선 색만 밝게 */
+:root[data-theme="dark"] .cat-icon,
+:root[data-theme="black"] .cat-icon{
+  border-color:#ddd;
+  color:#ddd;
 }
 
 /* 드롭다운 팝업 */
@@ -1540,12 +1830,6 @@ function refresh(){ loadPartners() }
   box-shadow:0 4px 10px var(--shadow);
 }
 
-/* 광고 배너 위 좌상단 고정(위치만 담당) */
-.ad-btn{
-  position:absolute;
-  left:10px; top:10px; z-index:5;
-}
-
 /* 카테고리 아래 ‘업체등록’ 섹션 레이아웃 */
 .partner-cta{
   margin:6px 0 12px;
@@ -1557,6 +1841,52 @@ function refresh(){ loadPartners() }
 /* 아이콘 컨테이너: StoreFinder와 동일 사이즈(18px)로 고정 */
 .ico-svg :where(svg){
   width:18px; height:18px; display:block;
+}
+/* ============================
+   공통 CTA 버튼(연핑크)
+   - 배너 등록 / Top5 등록 / 일반등록
+============================ */
+.pink-cta{
+  background:#FFE6EF;          /* 연핑크 배경 */
+  border-color:#FFC7D8;        /* 핑크 테두리 */
+  color:#8A2241;               /* 진한 핑크 글자 */
+  font-weight:800;
+}
+
+.pink-cta:active{
+  transform:translateY(1px);
+  box-shadow:0 2px 6px rgba(0,0,0,.18);
+}
+
+/* 배너 등록 버튼 앞쪽 화살표 3개 */
+.arrow-3{
+  margin-right:4px;
+  font-size:11px;
+  letter-spacing:1px;
+}
+
+/* Top5 제목 오른쪽에 붙는 Top5 등록 버튼 */
+.top5-btn{
+  margin-left:auto;            /* 오른쪽 정렬 */
+  height:26px;
+  padding:0 10px;
+  border-radius:999px;
+  font-size:12px;
+}
+
+/* “총 N개” 옆 일반등록 버튼 정렬용 래퍼 */
+.count-row{
+  display:flex;
+  align-items:center;
+  gap:6px;
+}
+
+/* 목록 헤드의 일반등록 버튼 */
+.list-reg-btn{
+  height:30px;
+  padding:0 10px;
+  border-radius:999px;
+  font-size:12px;
 }
 
 </style>

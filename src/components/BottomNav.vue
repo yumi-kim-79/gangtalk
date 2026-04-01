@@ -31,14 +31,14 @@ const svg = {
 
 /* 탭 정의 (홈을 /dashboard 로, 가게찾기는 한줄보기+화이트 모드로 이동) */
 const tabs = [
-  { key: 'home',     to: { path: '/dashboard' },                                     label:'현황판',   svg: svg.home },
-  { key: 'find',     to: { path: '/find', query: { view: 'list', theme: 'light' } }, label:'가게찾기', svg: svg.find },
-  { key: 'chat',     to: { path: '/chat' },                                          label:'강톡',     svg: svg.chat },
-  { key: 'partners', to: { path: '/partners' },                                      label:'제휴관',   svg: svg.deal },
+  { key: 'home',     to: { path: '/dashboard' },                                     label:'현황판',    svg: svg.home },
+  { key: 'find',     to: { path: '/find',     query: { view: 'list', theme: 'light' } }, label:'가게찾기',  svg: svg.find },
+  { key: 'chat',     to: { path: '/chat' },                                          label:'강톡',      svg: svg.chat },
+  { key: 'partners', to: { path: '/partners' },                                      label:'제휴관',    svg: svg.deal },
   { key: 'my',       to: { path: '/mypage' },                                        label:'마이페이지', svg: svg.my },
 ]
 
-/* 라우트 → 탭 매핑 */
+/* 라우트 → 탭 매핑 (path 기준 그룹) */
 const groups = {
   home:      ['/dashboard', '/'],   // 홈은 /dashboard(우선), 과거 루트도 케어
   find:      ['/find', '/store'],
@@ -47,9 +47,25 @@ const groups = {
   my:        ['/mypage', '/auth'],
 }
 
-const inGroup = (prefixes) => prefixes.some(p => (p === '/' ? route.path === '/' : route.path.startsWith(p)))
+const inGroup = (prefixes) =>
+  prefixes.some(p => (p === '/' ? route.path === '/' : route.path.startsWith(p)))
 
+/* ✅ 활성 탭 계산 */
 const activeKey = computed(() => {
+  const name = route.name
+  const from = route.query?.from
+
+  // 1) 업체 등록 폼에서 온 경우: from 값으로 탭 결정
+  if (name === 'storeEdit') {
+    if (from === 'partners') {
+      // 제휴관 → 업체등록 폼
+      return 'partners'
+    }
+    // 기본은 가게찾기 탭으로 유지
+    return 'find'
+  }
+
+  // 2) 나머지는 기존 path 그룹 규칙 그대로
   if (inGroup(groups.find))     return 'find'
   if (inGroup(groups.chat))     return 'chat'
   if (inGroup(groups.partners)) return 'partners'

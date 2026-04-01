@@ -141,6 +141,19 @@
             <span class="star-chip">★ {{ ratingText }} ({{ wishCount }})</span>
           </div>
         </div>
+
+        <!-- 🔹 업체 계정 이메일 입력 -->
+        <div class="meta-row owner-row">
+          <div class="meta-l owner-l">
+            <span class="mgr-text">업체 이메일</span>
+            <input
+              v-model.trim="f.ownerEmail"
+              class="inline-input owner-email"
+              type="email"
+              placeholder="예: sample@store.com"
+            />
+          </div>
+        </div>
       </div>
 
       <!-- ===== 이미지 아래: 좌(이벤트) | 우(급여) ===== -->
@@ -187,6 +200,17 @@
 
     <!-- ================= 본문(영업/담당자 리스트) ================= -->
     <section class="dv-card">
+      <!-- 상세페이지에 표시될 긴 소개 -->
+      <section class="dv-sec">
+        <h4>상세 소개</h4>
+        <textarea
+          v-model.trim="f.detailDesc"
+          class="detail-textarea"
+          rows="3"
+          placeholder="상세페이지에 노출될 소개를 입력해 주세요."
+        ></textarea>
+      </section>
+
       <section class="dv-sec">
         <h4>영업 정보</h4>
         <div class="info-table">
@@ -327,13 +351,19 @@
         <div class="bill compact">
           <div class="li">
             <span>기본 광고비</span>
-            <span class="li-right"><em class="calc">{{ adDays }}일 × {{ won(BASE_PRICE_PER_DAY) }} =</em><b class="amt">{{ won(baseCost) }}</b></span>
+            <span class="li-right">
+              <em class="calc">{{ adDays }}일 × {{ won(BASE_PRICE_PER_DAY) }} =</em>
+              <b class="amt">{{ won(baseCost) }}</b>
+            </span>
           </div>
 
           <!-- ⛔ 숨김: 등급 추가요금 -->
           <div class="li" v-if="false">
             <span>등급 추가요금 <small>({{ tierLabel }})</small></span>
-            <span class="li-right"><em class="calc">{{ adDays }}일 × {{ won(planUnit) }} =</em><b class="amt">{{ won(planCost) }}</b></span>
+            <span class="li-right">
+              <em class="calc">{{ adDays }}일 × {{ won(planUnit) }} =</em>
+              <b class="amt">{{ won(planCost) }}</b>
+            </span>
           </div>
 
           <!-- ⛔ 숨김: 포인트/폰트 등 유료 옵션 전체 -->
@@ -355,11 +385,18 @@
 
           <div class="li total">
             <span>총 결제금액</span>
-            <span class="li-right"><b class="amt">{{ won(totalCost) }}</b></span>
+            <span class="li-right">
+              <b class="amt">{{ won(totalCost) }}</b>
+            </span>
           </div>
         </div>
+
+        <!-- ✅ 안내 문구: 광고 신청/업체 등록 공통으로 보이게 -->
+        <p class="pay-note">
+          입금자는 <b>상호명</b>으로 입금해 주세요. 입금 확인 후 등록이 완료됩니다.
+        </p>
       </section>
-    </section>
+    </section> <!-- ← panels-row(관리자 광고 패널) 닫기 -->
 
     <section class="actions">
       <button class="btn primary" @click="save">저장</button>
@@ -426,15 +463,23 @@ const f = ref({
   totalRooms:0, match:0,
   maxPersons:0, persons:0,
   adStart: 0, adEnd: 0,
-  desc:'', wage:0,
+  desc:'',              // 목록/카드용 짧은 소개 (16자)
+  detailDesc:'',        // 상세페이지용 긴 소개
+  wage:0,
   eventMain:'',                // 메인 이벤트 문구
   hours:'', closed:'', address:'',
   thumb:'',
   managers:[],
   manager:'', phone:'', talkId:'',
   invites:[], events:[],
-  ownerId:null
+  ownerId:null,
+  ownerEmail:'',        // 🔹 신청한 업체 로그인 이메일
+  displayOrder: 0,
+  // ✅ 새 구조: 신청 상태
+  applyStatus: 'pending', // pending | approved | rejected
+  approved: false,
 })
+
 const edit = ref({
   name:false, region:false, category:false,
   desc:false, wage:false, hours:false, closed:false, address:false,
@@ -518,6 +563,7 @@ onMounted(async ()=>{
         adStart: toMs(data.adStart) || 0,
         adEnd: toMs(data.adEnd) || 0,
         desc: data.desc || '',
+        detailDesc: data.detailDesc || data.longDesc || data.fullDesc || '',
         wage: Number(data.wage||0),
         eventMain: (Array.isArray(data.events) && data.events[0]) ? String(data.events[0]) : (data.eventMain || ''),
         hours: data.hours || '',
@@ -528,12 +574,18 @@ onMounted(async ()=>{
         manager: data.manager||'', phone: data.phone||'', talkId: data.talkId||'',
         invites: data.invites||[], events: Array.isArray(data.events) ? data.events.slice(0) : [],
         ownerId: data.ownerId||null,
+        ownerEmail: data.ownerEmail || '',   // 🔹 저장된 업체 이메일 불러오기
         rating: Number(data.rating ?? 0),
         wish: Number(data.wish ?? data.wishCount ?? 0),
+        displayOrder: Number(data.displayOrder ?? 0),
+        // ✅ 기존 문서에도 상태 필드 폴백
+        applyStatus: data.applyStatus || 'pending',
+        approved: typeof data.approved === 'boolean' ? data.approved : false,
       }
       wageType.value = String(data.wageType || 'hourly')
       duration.value = guessDuration(f.value.adStart, f.value.adEnd)
     }
+
     gallery.value = readGallery()
     if (f.value.thumb && !gallery.value.includes(f.value.thumb)) gallery.value.unshift(f.value.thumb)
     photoIndex.value = Math.max(0, gallery.value.findIndex(u => u === f.value.thumb))
@@ -800,6 +852,7 @@ async function save(){
 
   const now = serverTimestamp()
   const id = draftId.value
+  const userEmail = fbAuth.currentUser?.email || ''
 
   const payload = {
     id,
@@ -814,6 +867,7 @@ async function save(){
     adStart: Number(f.value.adStart||0),
     adEnd: Number(f.value.adEnd||0),
     desc: f.value.desc || '',
+    detailDesc: f.value.detailDesc || '',
     wage: Number(f.value.wage||0),
     wageType: wageType.value,
     eventMain: f.value.eventMain || '',
@@ -823,6 +877,7 @@ async function save(){
     address: f.value.address || '',
     thumb: f.value.thumb || '',
     thumbVer: Date.now(),
+    displayOrder: Number(f.value.displayOrder ?? 0),
 
     /* ↓ 광고/결제 미리보기 필드(UI 숨김) */
     adPlan: { tier: adTier.value, unitPerDay: planUnit.value },
@@ -843,16 +898,39 @@ async function save(){
     talkId: f.value.talkId || '',
     invites: f.value.invites || [],
 
+    // 🔹 소유자 정보
+    //    - ownerId: 기존 값이 있으면 유지, 없으면 현재 로그인 UID 사용
+    //    - ownerEmail: 폼 입력값이 우선, 없으면 로그인 이메일로 채움
+    ownerId: f.value.ownerId || uid || null,
+    ownerEmail: (f.value.ownerEmail || userEmail || '').trim(),
+
+    // ✅ 상태 필드(폼에 없으면 기본값)
+    applyStatus: f.value.applyStatus || 'pending',
+    approved: typeof f.value.approved === 'boolean' ? f.value.approved : false,
+
     updatedAt: now,
   }
 
   if (isNew.value){
-    await setDoc(doc(fbDb,'stores', id), { ...payload, ownerId: uid, createdAt: now }, { merge: true })
-  }else{
-    const extra = {}
-    if (!f.value.ownerId) extra.ownerId = uid
-    await updateDoc(doc(fbDb,'stores', id), { ...payload, ...extra })
+    // 🔹 새 업체 등록 시, 자동으로 승인대기 상태로 저장
+    await setDoc(
+      doc(fbDb, 'stores', id),
+      {
+        ...payload,
+        applyStatus: 'pending',    // ✅ 신규 등록은 승인대기 상태로
+        approved: false,           // ✅ 승인 전 기본값
+        createdAt: now,
+      },
+      { merge: true }
+    )
+  } else {
+    // 🔹 기존 업체 수정 시, 상태 유지 (applyStatus는 덮어쓰지 않음)
+    await updateDoc(doc(fbDb, 'stores', id), {
+      ...payload,
+      updatedAt: now,
+    })
   }
+
   try{ localStorage.setItem('stores:changed', String(Date.now())) }catch{}
   alert('저장되었습니다.')
   router.push({ name:'myStores' })
@@ -1015,6 +1093,20 @@ function bgImage(url){
 .dv-sec{ padding:10px 12px 12px }
 .dv-sec + .dv-sec{ border-top:1px solid var(--line) }
 .dv-sec h4, .h4{ margin:0 0 6px; font-size:14px; color:var(--fg) }
+
+/* 상세 소개 입력 */
+.detail-textarea{
+  width:100%;
+  min-height:80px;
+  border:1px solid var(--line);
+  border-radius:12px;
+  padding:8px 10px;
+  background:var(--surface);
+  color:var(--fg);
+  font-size:13px;
+  font-weight:800;
+  resize:vertical;
+}
 
 .info-table{ border:1px solid var(--line); border-radius:12px; overflow:hidden }
 .tr{ display:flex; border-top:1px solid var(--line); }
@@ -1213,4 +1305,30 @@ function bgImage(url){
 :where(:root,[data-theme="light"],[data-theme="white"]) .intro-input::placeholder{
   color:#111 !important; opacity:.45 !important;
 }
+.owner-row{
+  margin-top: 2px;
+}
+.owner-l{
+  display:flex;
+  align-items:center;
+  gap:6px;
+  flex-wrap:wrap;
+}
+.owner-email{
+  flex:1;
+  min-width:160px;
+}
+/* 광고 결제 안내 문구 */
+.pay-note{
+  margin-top:6px;
+  font-size:11px;
+  color:#666;
+}
+
+/* 다크/블랙 테마에서도 읽기 쉬운 색상 */
+:global([data-theme="dark"] .pay-note),
+:global([data-theme="black"] .pay-note){
+  color:var(--muted, #aeb4bb);
+}
+
 </style>

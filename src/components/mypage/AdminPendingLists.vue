@@ -26,14 +26,24 @@
           </div>
         </div>
 
-        <!-- 액션: 삭제만 남김 -->
+        <!-- 액션: 보기/승인/거절/삭제 -->
         <div class="pro-actions">
+          <button class="btn" @click.stop="openStore(s)">보기/편집</button>
+          <span class="spacer"></span>
+          <button class="btn primary" @click.stop="approveStoreLocal(s)">승인</button>
+          <button class="btn" @click.stop="rejectStoreLocal(s)">거절</button>
           <button class="btn danger" @click.stop="removeStoreReq(s)">삭제</button>
         </div>
 
         <div class="pro-period" v-if="s.adStart || s.adEnd">
           <span>광고기간</span>
           <strong>{{ fmtDate(s.adStart) }} ~ {{ fmtDate(s.adEnd) }}</strong>
+        </div>
+
+        <!-- ✅ 등록신청 시 계산된 광고비 요약 (있을 때만 표시) -->
+        <div class="bill-mini" v-if="adDaysOf(s) > 0">
+          <b>{{ adDaysOf(s) }}</b>일 × <b>5,000</b>원 =
+          <b>{{ formatWon(adCostOf(s)) }}</b>
         </div>
       </article>
     </div>
@@ -60,8 +70,12 @@
           </div>
         </div>
 
-        <!-- 액션: 삭제만 남김 -->
+        <!-- 액션: 보기/승인/거절/삭제 -->
         <div class="pro-actions">
+          <button class="btn" @click.stop="openPartner(p)">보기/편집</button>
+          <span class="spacer"></span>
+          <button class="btn primary" @click.stop="approvePartnerLocal(p)">승인</button>
+          <button class="btn" @click.stop="rejectPartnerLocal(p)">거절</button>
           <button class="btn danger" @click.stop="removePartnerReq(p)">삭제</button>
         </div>
 
@@ -113,8 +127,12 @@
           </div>
         </div>
 
-        <!-- 액션: 삭제만 남김 -->
+        <!-- 액션: 보기/승인/거절/삭제 -->
         <div class="pro-actions">
+          <button class="btn" @click.stop="openExtend(r)">보기/편집</button>
+          <span class="spacer"></span>
+          <button class="btn primary" @click.stop="approveExtendLocal(r)">승인</button>
+          <button class="btn" @click.stop="rejectExtendLocal(r)">거절</button>
           <button class="btn danger" @click.stop="removeExtendReq(r)">삭제</button>
         </div>
 
@@ -159,6 +177,18 @@ const props = defineProps({
   deleteStoreReq:   { type: Function, default: null },
   deletePartnerReq: { type: Function, default: null },
   deleteExtendReq:  { type: Function, default: null },
+  // 🔸 승인/거절/상세 콜백(있으면 우선 사용)
+  approveStore:       { type: Function, default: null },
+  rejectStore:        { type: Function, default: null },
+  openStoreDetail:    { type: Function, default: null },
+
+  approvePartnerReq:  { type: Function, default: null },
+  rejectPartnerReq:   { type: Function, default: null },
+  openPartnerDetail:  { type: Function, default: null },
+
+  approveExtendReq:   { type: Function, default: null },
+  rejectExtendReq:    { type: Function, default: null },
+  openExtendDetail:   { type: Function, default: null },
 })
 
 function confirmDelete(name = '이 항목') {
@@ -221,4 +251,142 @@ async function removeExtendReq(r) {
     alert(`삭제 실패: ${e?.message || e}`)
   }
 }
+/** 업체 신청 상세 열기 (폼으로 이동 등) */
+function openStore(s) {
+  if (!s) return
+  if (typeof props.openStoreDetail === 'function') {
+    // 부모에서 라우터 처리 (예: StoreEditPage 로 이동)
+    props.openStoreDetail(s)
+  }
+}
+
+/** 제휴 신청 상세 열기 */
+function openPartner(p) {
+  if (!p) return
+  if (typeof props.openPartnerDetail === 'function') {
+    props.openPartnerDetail(p)
+  }
+}
+
+/** 연장 신청 상세 열기 */
+function openExtend(r) {
+  if (!r) return
+  if (typeof props.openExtendDetail === 'function') {
+    props.openExtendDetail(r)
+  }
+}
+
+/** 업체 신청 승인 */
+async function approveStoreLocal(s) {
+  const name = s?.name || s?.id || '등록신청'
+  if (!window.confirm(`"${name}" 신청을 승인할까요?`)) return
+  try {
+    if (typeof props.approveStore === 'function') {
+      await props.approveStore(s)
+    }
+    // 승인 후 목록에서 제거
+    removeById(props.admin.pending, s.id)
+    await nextTick()
+    alert('승인 처리되었습니다.')
+  } catch (e) {
+    console.error('[AdminPendingLists] approveStoreLocal fail:', e)
+    alert(`승인 실패: ${e?.message || e}`)
+  }
+}
+
+/** 업체 신청 거절 */
+async function rejectStoreLocal(s) {
+  const name = s?.name || s?.id || '등록신청'
+  const reason = window.prompt(
+    `"${name}" 신청을 거절하는 사유를 입력해 주세요.`,
+    s?.lastRejectReason || ''
+  )
+  if (reason === null) return
+  try {
+    if (typeof props.rejectStore === 'function') {
+      await props.rejectStore({ ...s, reason })
+    }
+    removeById(props.admin.pending, s.id)
+    await nextTick()
+    alert('거절 처리되었습니다.')
+  } catch (e) {
+    console.error('[AdminPendingLists] rejectStoreLocal fail:', e)
+    alert(`거절 실패: ${e?.message || e}`)
+  }
+}
+
+/** 제휴 신청 승인 */
+async function approvePartnerLocal(p) {
+  const name = p?.name || p?.id || '제휴신청'
+  if (!window.confirm(`"${name}" 제휴신청을 승인할까요?`)) return
+  try {
+    if (typeof props.approvePartnerReq === 'function') {
+      await props.approvePartnerReq(p)
+    }
+    removeById(props.admin.partnerPending, p.id)
+    await nextTick()
+    alert('승인 처리되었습니다.')
+  } catch (e) {
+    console.error('[AdminPendingLists] approvePartnerLocal fail:', e)
+    alert(`승인 실패: ${e?.message || e}`)
+  }
+}
+
+/** 제휴 신청 거절 */
+async function rejectPartnerLocal(p) {
+  const name = p?.name || p?.id || '제휴신청'
+  const reason = window.prompt(
+    `"${name}" 제휴신청을 거절하는 사유를 입력해 주세요.`,
+    p?.reason || ''
+  )
+  if (reason === null) return
+  try {
+    if (typeof props.rejectPartnerReq === 'function') {
+      await props.rejectPartnerReq({ ...p, reason })
+    }
+    removeById(props.admin.partnerPending, p.id)
+    await nextTick()
+    alert('거절 처리되었습니다.')
+  } catch (e) {
+    console.error('[AdminPendingLists] rejectPartnerLocal fail:', e)
+    alert(`거절 실패: ${e?.message || e}`)
+  }
+}
+
+/** 연장 신청 승인 */
+async function approveExtendLocal(r) {
+  if (!window.confirm('이 연장신청을 승인할까요?')) return
+  try {
+    if (typeof props.approveExtendReq === 'function') {
+      await props.approveExtendReq(r)
+    }
+    removeById(props.admin.extendPending, r.id)
+    await nextTick()
+    alert('승인 처리되었습니다.')
+  } catch (e) {
+    console.error('[AdminPendingLists] approveExtendLocal fail:', e)
+    alert(`승인 실패: ${e?.message || e}`)
+  }
+}
+
+/** 연장 신청 거절 */
+async function rejectExtendLocal(r) {
+  const reason = window.prompt(
+    '연장신청을 거절하는 사유를 입력해 주세요.',
+    r?.reason || ''
+  )
+  if (reason === null) return
+  try {
+    if (typeof props.rejectExtendReq === 'function') {
+      await props.rejectExtendReq({ ...r, reason })
+    }
+    removeById(props.admin.extendPending, r.id)
+    await nextTick()
+    alert('거절 처리되었습니다.')
+  } catch (e) {
+    console.error('[AdminPendingLists] rejectExtendLocal fail:', e)
+    alert(`거절 실패: ${e?.message || e}`)
+  }
+}
+
 </script>

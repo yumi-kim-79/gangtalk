@@ -198,9 +198,20 @@ for k, v in (VENDOR_RAW or {}).items():
 
 # ---------- 텍스트 블록 추출 ----------
 def _normalize_for_match(s: str) -> str:
-    if not s: return ""
+    """
+    헤더/별칭 비교용 정규화:
+    - 공백/점/괄호/이모지/장식문자 제거
+    - 아이콘 개수(💰, $, ♥ 등)와 상관없이 '업체 이름'만 남게
+    """
+    if not s:
+        return ""
+    # 💰, 🥃, ⭐, ✨ + $, ₩, ¥, ￦, 각종 장식 기호 제거
     s = s.replace("&", "AND")
-    s = re.sub(r"[\s\.\-\_\[\]\(\)💰🥃⭐✨·•—\-~]+", "", s)
+    s = re.sub(
+        r"[\s\.\-\_\[\]\(\)💰🥃⭐✨·•—\-~$₩¥￦♥♡★☆※!?,]+",
+        "",
+        s
+    )
     return s.upper()
 
 def crop_from_last_vendor_header(full_text: str) -> str:

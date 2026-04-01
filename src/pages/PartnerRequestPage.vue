@@ -240,11 +240,48 @@ import { useRouter, useRoute } from 'vue-router'
 import { auth as fbAuth, db as fbDb, storage as fbStorage } from '@/firebase'
 import { collection, doc, serverTimestamp, setDoc, getDoc } from 'firebase/firestore'
 import { ref as sRef, uploadBytes, getDownloadURL } from 'firebase/storage'
+import { onAuthStateChanged } from 'firebase/auth'   // ✅ 추가
 
 const router = useRouter()
 const route  = useRoute()
 const goBack = () => router.push({ name:'myStores' })
 const submitting = ref(false)
+
+/* ===== 관리자회원(제휴관 담당자) 여부 =====
+ * - users/{uid}.type === 'company'
+ * - users/{uid}.accountKind === 'partnerOwner'
+ */
+const isPartnerOwner = ref(false)
+
+async function resolvePartnerOwner(user){
+  if (!user) {
+    isPartnerOwner.value = false
+    return
+  }
+  try {
+    const snap = await getDoc(doc(fbDb, 'users', user.uid))
+    if (!snap.exists()) {
+      isPartnerOwner.value = false
+      return
+    }
+    const data = snap.data() || {}
+    const type = String(data.type || data.profile?.type || '').toLowerCase()
+    const kind = String(data.accountKind || '').toLowerCase()
+
+    // 🔹 제휴관 담당자 = company + partnerOwner
+    isPartnerOwner.value = (type === 'company' && kind === 'partnerowner')
+  } catch (e) {
+    console.warn('[PartnerRequest] resolvePartnerOwner failed:', e)
+    isPartnerOwner.value = false
+  }
+}
+
+onMounted(() => {
+  // 초기 로그인 상태
+  resolvePartnerOwner(fbAuth.currentUser)
+  // 로그인/로그아웃 변화 감지
+  onAuthStateChanged(fbAuth, resolvePartnerOwner)
+})
 
 /* ===== 광고 단가 ===== */
 const EXTEND_UNIT = 5000
@@ -520,10 +557,29 @@ async function onPick(e){
 /* ===== 임시 저장 ===== */
 async function saveDraft(){
   const user = fbAuth.currentUser
-  if (!user){ alert('로그인이 필요합니다.'); return }
-  if (!f.value.name.trim()){ alert('업체명을 입력해 주세요.'); return }
+  if (!user){
+    alert('로그인이 필요합니다.')
+    return
+  }
 
-  const currentId = editingId.value || requestId.value
+  // 🔹 관리자회원(제휴관 담당자)인지 확인
+  if (!isPartnerOwner.value) {
+    alert('관리자회원(제휴관 담당자)만 제휴업체 등록신청을 임시저장할 수 있습니다.')
+    router.push({
+      name: 'auth',
+      query: {
+        next: route.fullPath || '/partners',
+        mode: 'login',
+        who: 'admin',   // 관리자 탭으로 유도
+      },
+    })
+    return
+  }
+
+  if (!f.value.name.trim()){
+    alert('업체명을 입력해 주세요.')
+    return
+  }
   const categoryNorm = normalizeCat(f.value.category)
   try{
     await setDoc(
@@ -560,8 +616,29 @@ async function saveDraft(){
 /* ===== 최종 제출 ===== */
 async function submit(){
   const user = fbAuth.currentUser
-  if (!user){ alert('로그인이 필요합니다.'); return }
-  if (!f.value.name.trim()){ alert('업체명을 입력해 주세요.'); return }
+  if (!user){
+    alert('로그인이 필요합니다.')
+    return
+  }
+
+  // 🔹 관리자회원(제휴관 담당자)인지 확인
+  if (!isPartnerOwner.value) {
+    alert('관리자회원(제휴관 담당자)만 제휴업체 등록신청을 할 수 있습니다.')
+    router.push({
+      name: 'auth',
+      query: {
+        next: route.fullPath || '/partners',
+        mode: 'login',
+        who: 'admin',   // 관리자 탭으로 유도
+      },
+    })
+    return
+  }
+
+  if (!f.value.name.trim()){
+    alert('업체명을 입력해 주세요.')
+    return
+  }
   if (submitting.value) return
   submitting.value = true
 
@@ -573,16 +650,17 @@ async function submit(){
     id: currentId,
     ownerId: user.uid,
     ownerEmail: user.email || '',
-    status: 'pending',
+    status: 'pending',          // ✅ 승인대기 상태로 저장
     reason: '',
+    approved: false,            // ✅ 승인 여부 기본 false
     decidedAt: null,
 
     name: f.value.name.trim(),
     region: f.value.region.trim(),
     category: categoryNorm,
 
-    adStart: Number(f.value.adStart||0),
-    adEnd: Number(f.value.adEnd||0),
+    adStart: Number(f.value.adStart || 0),
+    adEnd: Number(f.value.adEnd || 0),
 
     desc: f.value.desc || '',
     address: f.value.address || '',
@@ -593,6 +671,7 @@ async function submit(){
     thumb: f.value.thumb || '',
 
     createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
   }
 
   try{

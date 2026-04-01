@@ -16,9 +16,9 @@ import { ref, readonly, unref } from 'vue'
 const LS_AUTH      = 'app:user:auth'
 const LS_ACCOUNTS  = 'app:user:accounts'    // 이메일별 계정(데모용)
 const LS_LEDGER    = 'app:referral:ledger'  // 추천 포인트 장부(데모용)
-const LS_SEQ       = 'app:referral:seq'     // 로컬 가입순번
+const LS_SEQ       = 'app:referral:seq'     // 추천/가입 순번 (로컬 데모용)
 
-// ===== 추천 포인트 정책 =====
+/* ===== 추천 포인트 정책 ===== */
 const BONUS_NEW_USER = 1000   // 추천코드 넣고 가입한 "신규" 회원
 const BONUS_REFERRER = 1000   // (주의) 보안규칙상 클라에서 직접 반영 X → Functions 권장
 
@@ -35,9 +35,34 @@ function emailLocalPart(email = '') {
   return local.replace(/[^a-zA-Z0-9._-]/g, '')
 }
 
-/** 내 추천코드 생성: 이메일아이디 + '+' + 가입순번 */
-function makeMyCode(email = '', seq = 0) {
+/**
+ * V1: 기존 추천코드 포맷
+ *  - 이메일아이디 + '+' + 가입 순번
+ *  - 예) asdf+1
+ *  - 이미 가입된 계정 보정/로그인용으로만 사용
+ */
+function makeMyCodeV1(email = '', seq = 0) {
   return `${emailLocalPart(email)}+${Number(seq || 0)}`
+}
+
+/**
+ * V2: 신규 추천코드 포맷 (신규 가입자용)
+ *  - 앞글자 + 숫자 (앞글자 + 00001)
+ *  - 숫자는 최소 5자리로 0 패딩, 5자리 초과면 그대로 사용
+ *  - 예) email=asdf@naver.com, seq=1 → 'a00001'
+ */
+function makeMyCodeV2(email = '', seq = 1) {
+  const local = emailLocalPart(email)
+  const prefix = (local[0] || 'x').toLowerCase()
+  const n = Math.max(1, Number(seq) || 1)
+  const numStr = String(n)
+  const padded = numStr.length >= 5 ? numStr : numStr.padStart(5, '0')
+  return `${prefix}${padded}`
+}
+
+/** 기본 makeMyCode (옛 코드 호환용: V1 사용) */
+function makeMyCode(email = '', seq = 0) {
+  return makeMyCodeV1(email, seq)
 }
 
 /* ---------------- 로컬 데모 DB ---------------- */
@@ -127,8 +152,8 @@ class RoleMismatchError extends Error {
     super('role-mismatch')
     this.name = 'RoleMismatchError'
     this.code = 'role-mismatch'
-    this.actual = actual        // 실제 문서의 타입: 'user' | 'company'
-    this.expected = expected    // 로그인 시도 타입
+    this.actual = actual        // 실제 값(type/accountKind 등)
+    this.expected = expected    // 기대 값
   }
 }
 
@@ -149,24 +174,26 @@ let _unsubUserDoc = null
 
 /** Firestore users/{uid} 문서 실시간 구독 → points 반영 */
 function _listenUserDoc(FBOK, uid){
-  // 이전 구독 정리
   if (typeof _unsubUserDoc === 'function') { _unsubUserDoc(); _unsubUserDoc = null }
   _points.value = 0
   if (!FBOK || !uid) return
 
   const { db, doc, onSnapshot } = FBOK
   const userRef = doc(db, 'users', uid)
-  _unsubUserDoc = onSnapshot(userRef, (snap)=>{
-    const data = snap.data() || {}
-    const p = Number(data.points || 0)
-    _points.value = p
+  _unsubUserDoc = onSnapshot(
+    userRef,
+    (snap)=>{
+      const data = snap.data() || {}
+      const p = Number(data.points || 0)
+      _points.value = p
 
-    // 세션에도 동기화(화면 전반 동일 값 사용)
-    if (me.auth.value?.loggedIn) {
-      me.auth.value = { ...(me.auth.value || {}), points: p }
-      me.save()
-    }
-  }, ()=>{/* noop: 오류 발생 시 기존 값 유지 */})
+      if (me.auth.value?.loggedIn) {
+        me.auth.value = { ...(me.auth.value || {}), points: p }
+        me.save()
+      }
+    },
+    () => { /* no-op */ },
+  )
 }
 
 /** 외부에서 쓰기 쉽게 내보내는 헬퍼 */
@@ -188,67 +215,129 @@ export const me = {
     _inited = true
     const FBOK = await ensureFirebase()
     if (!FBOK) {
-      // 로컬 모드: LS에 있는 값 그대로 사용 + 포인트 동기화
       _points.value = Number(me.auth.value?.points || 0)
       _ready.value = true
       return
     }
 
-    const { auth, db, onAuthStateChanged, doc, getDoc, setDoc, updateDoc, deleteField, serverTimestamp } = FBOK
+    const {
+      auth, db,
+      onAuthStateChanged,
+      doc, getDoc, setDoc, updateDoc,
+      serverTimestamp,
+      deleteField,
+    } = FBOK
+
     onAuthStateChanged(auth, async (u) => {
       if (!u) {
         me.auth.value = { loggedIn: false }
         me.save()
         _uid.value = ''
-        _listenUserDoc(FBOK, '') // 구독 해제 & 0으로 리셋
+        _listenUserDoc(FBOK, '')
         _ready.value = true
         return
       }
 
-      // Firestore 사용자 문서 로드/보정
       const userRef = doc(db, 'users', u.uid)
       let data
       const snap = await getDoc(userRef)
+
       if (snap.exists()) {
-        data = snap.data()
+        data = snap.data() || {}
         if (!data.type) data.type = 'user'
-        // 여성회원이면 company 필드 정리(남아 있으면 UI가 기업회원으로 오인)
-        const actual = normalizeType(data.type)
-        if (actual === 'user' && 'company' in data) {
+
+        // ✅ 닉네임 LowerCase 자동 보정
+        const profile = data.profile || {}
+        const hasNickname = !!profile.nickname
+        const hasLower    = !!profile.nicknameLower
+        if (hasNickname && !hasLower) {
+          const lower = String(profile.nickname).toLowerCase()
+          data.profile = {
+            ...profile,
+            nick: profile.nick || profile.nickname,
+            nicknameLower: lower,
+          }
+          try {
+            await updateDoc(userRef, {
+              'profile.nicknameLower': lower,
+              'profile.nick': data.profile.nick,
+              updatedAt: serverTimestamp(),
+            })
+          } catch (_) {}
+        }
+
+        const actual0 = normalizeType(data.type)
+        if (actual0 === 'user' && 'company' in data) {
           try {
             await updateDoc(userRef, { company: deleteField(), updatedAt: serverTimestamp() })
             delete data.company
           } catch (_) {}
+          data.type = 'user'
         }
 
-        // 추천코드 자동 보정: myJoinSeq가 있고 referral.myCode가 다르면 정합화
+        // ✅ 추천코드 정합화 (버전별 포맷 유지)
         const seq = Number(data.myJoinSeq || 0)
-        const wantCode = makeMyCode(data?.profile?.email || u.email || '', seq)
-        if (seq > 0 && (!data.referral || data.referral.myCode !== wantCode)) {
-          try {
-            await updateDoc(userRef, { 'referral.myCode': wantCode, updatedAt: serverTimestamp() })
-            data.referral = { ...(data.referral || {}), myCode: wantCode }
-          } catch (_) {}
-        }
+        if (seq > 0) {
+          const baseEmail = data?.profile?.email || u.email || ''
+          const codeVersion = Number(data.referral?.codeVersion || 1)
+          const maker = codeVersion >= 2 ? makeMyCodeV2 : makeMyCodeV1
+          const wantCode = maker(baseEmail, seq)
 
+          if (!data.referral || data.referral.myCode !== wantCode || data.referral.codeVersion !== codeVersion) {
+            try {
+              await updateDoc(userRef, {
+                'referral.myCode': wantCode,
+                'referral.codeVersion': codeVersion,
+                updatedAt: serverTimestamp(),
+              })
+              data.referral = { ...(data.referral || {}), myCode: wantCode, codeVersion }
+            } catch (_) {}
+          }
+        }
       } else {
-        // (예외) 문서가 없을 때 최소 기본값만 생성 — 추천코드/순번은 가입 시에 이미 생성됨
+        // (예외) 문서가 없을 때 최소 생성 — 이 경우도 V2 포맷 사용
+        const seq = 1
+        const myCode = makeMyCodeV2(u.email || '', seq)
+        const nickname = u.displayName || ''
+        const hasNickname = !!nickname
+
         data = {
           type: 'user',
-          profile: { email: u.email || '', nickname: u.displayName || '', uid: u.uid },
+          profile: {
+            email: u.email || '',
+            nickname,
+            nick: nickname || '',
+            // ✅ 닉네임이 있을 때만 nicknameLower 필드를 추가
+            ...(hasNickname
+              ? { nicknameLower: nickname.toLowerCase() }
+              : {}),
+            uid: u.uid,
+          },
           points: 0,
-          referral: { myCode: makeMyCode(u.email || '', 0), refBy: null, refApplied: false },
+          referral: { myCode, codeVersion: 2, refBy: null, refApplied: false },
+          myJoinSeq: seq,
+          myRefCode: myCode,
+          myRefCreatedAt: serverTimestamp(),
           createdAt: Date.now(),
         }
-        await setDoc(userRef, data)
+        await setDoc(userRef, {
+          ...data,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        })
       }
 
-      const fixed = {
-        loggedIn: true,
-        ...data,
-        type: normalizeType(data.type),
+      // 🔹 company인데 accountKind 없으면 기본 storeOwner로 보정
+      const actualType = normalizeType(data.type)
+      if (actualType === 'company' && !data.accountKind) {
+        data.accountKind = 'storeOwner'
+        try {
+          await updateDoc(userRef, { accountKind: 'storeOwner', updatedAt: serverTimestamp() })
+        } catch (_) {}
       }
-      // 세션 객체에서도 company 제거(표시 일관성)
+
+      const fixed = { loggedIn: true, ...data, type: actualType }
+
       if (fixed.type === 'user' && 'company' in fixed) {
         const { company, ...rest } = fixed
         me.auth.value = rest
@@ -257,14 +346,12 @@ export const me = {
       }
       me.save()
 
-      // 닉네임 캐싱(채팅 등에서 사용)
       const nick = me.auth.value?.profile?.nickname
       if (nick) {
         localStorage.setItem('user:nick', nick)
         localStorage.setItem('nickname', nick)
       }
 
-      // ✅ 실시간 포인트 구독 시작
       _uid.value = u.uid
       _listenUserDoc(FBOK, u.uid)
 
@@ -282,70 +369,88 @@ export const me = {
     })
   },
 
-  /* ===== Firebase 모드 구현 ===== */
+  /* ===== Firebase 모드: 여성회원 가입 ===== */
   async _fbSignupUser({ email, password, nickname, refCode }) {
     const FBOK = await ensureFirebase()
     const {
       auth, db,
       createUserWithEmailAndPassword,
-      doc, setDoc, getDoc, runTransaction, serverTimestamp, deleteField
+      doc, setDoc, getDoc, runTransaction,
+      serverTimestamp,
+      deleteField,
     } = FBOK
 
-    // 1) 계정 생성
     const cred = await createUserWithEmailAndPassword(auth, email, password)
     const uid  = cred.user.uid
+    const userRef = doc(db, 'users', uid)
+    const countersRef = doc(db, 'meta', 'counters')
 
-    // 2) 트랜잭션으로 가입순번 확정 + 내 문서 기록
+    // 1) counters.userSeq를 사용해서 전역 가입순번 + V2 코드 생성
+    let seq = 0
+    let myCode = ''
+
     await runTransaction(db, async (tx) => {
-      const countersRef = doc(db, 'meta', 'counters')
-      const userRef     = doc(db, 'users', uid)
-
-      // 모든 읽기 먼저
       const cSnap = await tx.get(countersRef)
       const uSnap = await tx.get(userRef)
 
-      // 이미 순번 있으면 스킵(재시도 대비)
       const already = uSnap.exists() && Number(uSnap.get('myJoinSeq')) > 0
-      if (already) return
+      if (already) {
+        seq = Number(uSnap.get('myJoinSeq')) || 1
+        myCode = makeMyCodeV2(email, seq)
+        return
+      }
 
       const base = cSnap.exists() ? Number(cSnap.get('userSeq')) || 0 : 0
-      const next = base + 1
+      seq = base + 1
 
-      // counters: create 또는 update — 정확한 수치로 기록
       if (!cSnap.exists()) {
         tx.set(countersRef, { userSeq: 1, updatedAt: serverTimestamp() })
       } else {
-        tx.update(countersRef, { userSeq: next, updatedAt: serverTimestamp() })
+        tx.update(countersRef, { userSeq: seq, updatedAt: serverTimestamp() })
       }
 
-      // 내 추천코드/순번
-      const myCode = makeMyCode(email, next)
+      myCode = makeMyCodeV2(email, seq)
 
-      // 신규유저 보너스(추천코드 입력 시) — 내 포인트에만 반영
-      const myPoints = refCode ? BONUS_NEW_USER : 0
+      // ✨ 가입 시 포인트는 0으로 시작 (추천 보너스는 Functions에서 20,000P 지급)
+      const myPoints = 0
+      const hasNickname = !!nickname
 
-      // 사용자 문서 작성(또는 병합)
       tx.set(
         userRef,
         {
           type: 'user',
-          profile: { email, nickname, uid },
+          profile: {
+            email,
+            nickname,
+            nick: nickname || '',
+            // ✅ 닉네임이 있을 때만 nicknameLower 추가
+            ...(hasNickname
+              ? { nicknameLower: nickname.toLowerCase() }
+              : {}),
+            uid,
+          },
           points: myPoints,
-          referral: { myCode, refBy: refCode || null, refApplied: !!refCode },
-          myJoinSeq: next,
+          referral: {
+            myCode,
+            codeVersion: 2,
+            refBy: refCode || null,
+            // ✨ 처음에는 항상 false → Functions가 refBy 를 보고 한 번만 보너스 지급
+            refApplied: false,
+          },
+          myJoinSeq: seq,
           myRefCode: myCode,
           myRefCreatedAt: serverTimestamp(),
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
         },
-        { merge: true }
+        { merge: true },
       )
-      // 여성회원 문서에 남아있을 수 있는 company 필드 제거
+
       tx.update(userRef, { company: deleteField() })
     })
 
-    // 3) 세션 반영(세션 객체에서도 company 제거)
-    const userSnap = await getDoc(doc(db, 'users', uid))
+    // 2) 세션 반영
+    const userSnap = await getDoc(userRef)
     const raw = userSnap.exists() ? userSnap.data() : {}
     const data = { ...raw, type: 'user' }
     delete data.company
@@ -355,49 +460,253 @@ export const me = {
     localStorage.setItem('user:nick', nickname)
     localStorage.setItem('nickname', nickname)
 
-    // ✅ 포인트 실시간 구독 시작
     _uid.value = uid
     _listenUserDoc(FBOK, uid)
 
     _ready.value = true
   },
 
-  async _fbSignupBiz({ email, password, storeName, businessNo, address, phone, manager }) {
+  // 🔹 기업회원 = 가게찾기 업체 사장님 (storeOwner)
+  async _fbSignupBiz({
+    email,
+    password,
+    nick,
+    phone,
+    storeName,
+    businessNo,
+    address,
+    refCode,
+    accountKind = 'storeOwner',
+  }) {
     const FBOK = await ensureFirebase()
-    const { auth, db, createUserWithEmailAndPassword, doc, setDoc, getDoc, serverTimestamp } = FBOK
+    const {
+      auth, db,
+      createUserWithEmailAndPassword,
+      doc, setDoc, getDoc, runTransaction,
+      serverTimestamp,
+    } = FBOK
 
     const cred = await createUserWithEmailAndPassword(auth, email, password)
     const uid  = cred.user.uid
+    const userRef = doc(db, 'users', uid)
+    const countersRef = doc(db, 'meta', 'counters')
 
-    await setDoc(doc(db, 'users', uid), {
-      type: 'company',
-      profile: { email, uid },
-      company: {
-        name: storeName || '',
-        brn: businessNo || '',
-        address: address || '',
-        phone: phone || '',
-        manager: manager || '',
-      },
-      points: 0,
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    }, { merge: true })
+    let seq = 0
+    let myCode = ''
 
-    const snap = await getDoc(doc(db, 'users', uid))
-    me.auth.value = { loggedIn: true, ...(snap.exists() ? snap.data() : {}), type: 'company' }
+    await runTransaction(db, async (tx) => {
+      const cSnap = await tx.get(countersRef)
+      const uSnap = await tx.get(userRef)
+
+      const already = uSnap.exists() && Number(uSnap.get('myJoinSeq')) > 0
+      if (already) {
+        seq = Number(uSnap.get('myJoinSeq')) || 1
+        myCode = makeMyCodeV2(email, seq)
+      } else {
+        const base = cSnap.exists() ? Number(cSnap.get('userSeq')) || 0 : 0
+        seq = base + 1
+
+        if (!cSnap.exists()) {
+          tx.set(countersRef, { userSeq: 1, updatedAt: serverTimestamp() })
+        } else {
+          tx.update(countersRef, { userSeq: seq, updatedAt: serverTimestamp() })
+        }
+      }
+
+      myCode = makeMyCodeV2(email, seq)
+
+      // ✨ refCode 유무와 상관없이 refApplied 는 항상 false 로 시작
+      const referral = {
+        myCode,
+        codeVersion: 2,
+        refBy: refCode || null,
+        refApplied: false,
+      }
+
+      const nickname = nick || ''
+      const hasNickname = !!nickname
+
+      tx.set(
+        userRef,
+        {
+          type: 'company',
+          accountKind,
+          profile: {
+            email,
+            nickname,
+            nick: nickname,
+            // ✅ 닉네임이 있을 때만 nicknameLower 추가
+            ...(hasNickname
+              ? { nicknameLower: nickname.toLowerCase() }
+              : {}),
+            uid,
+          },
+          company: {
+            name: storeName || '',
+            brn: businessNo || '',
+            address: address || '',
+            phone: phone || '',
+            manager: nick || '',
+          },
+          points: 0,
+          referral,
+          myJoinSeq: seq,
+          myRefCode: myCode,
+          myRefCreatedAt: serverTimestamp(),
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true },
+      )
+    })
+
+    const snap = await getDoc(userRef)
+    const data = snap.exists() ? snap.data() : {}
+
+    me.auth.value = {
+      loggedIn: true,
+      ...data,
+      type: normalizeType(data.type),
+    }
     me.save()
 
-    // ✅ 포인트 실시간 구독 시작(기업도 동일)
+    const nickName = me.auth.value?.profile?.nickname
+    if (nickName) {
+      localStorage.setItem('user:nick', nickName)
+      localStorage.setItem('nickname', nickName)
+    }
+
     _uid.value = uid
     _listenUserDoc(FBOK, uid)
 
     _ready.value = true
   },
 
-  async _fbLoginWithRole({ email, password, expectedType }) {
+  // 🔹 관리자회원 = 제휴관 페이지 업체 담당자 (partnerOwner)
+  async _fbSignupAdmin({
+    email,
+    password,
+    nick,
+    phone,
+    storeName,
+    businessNo,
+    address,
+    refCode,
+    accountKind = 'partnerOwner',
+  }) {
     const FBOK = await ensureFirebase()
-    const { auth, db, signInWithEmailAndPassword, doc, getDoc, setDoc, updateDoc, deleteField, serverTimestamp } = FBOK
+    const {
+      auth, db,
+      createUserWithEmailAndPassword,
+      doc, setDoc, getDoc, runTransaction,
+      serverTimestamp,
+    } = FBOK
+
+    const cred = await createUserWithEmailAndPassword(auth, email, password)
+    const uid  = cred.user.uid
+    const userRef = doc(db, 'users', uid)
+    const countersRef = doc(db, 'meta', 'counters')
+
+    let seq = 0
+    let myCode = ''
+
+    await runTransaction(db, async (tx) => {
+      const cSnap = await tx.get(countersRef)
+      const uSnap = await tx.get(userRef)
+
+      const already = uSnap.exists() && Number(uSnap.get('myJoinSeq')) > 0
+      if (already) {
+        seq = Number(uSnap.get('myJoinSeq')) || 1
+        myCode = makeMyCodeV2(email, seq)
+      } else {
+        const base = cSnap.exists() ? Number(cSnap.get('userSeq')) || 0 : 0
+        seq = base + 1
+
+        if (!cSnap.exists()) {
+          tx.set(countersRef, { userSeq: 1, updatedAt: serverTimestamp() })
+        } else {
+          tx.update(countersRef, { userSeq: seq, updatedAt: serverTimestamp() })
+        }
+      }
+
+      myCode = makeMyCodeV2(email, seq)
+
+      // ✨ 관리자도 동일하게 refApplied 는 false 로 시작
+      const referral = {
+        myCode,
+        codeVersion: 2,
+        refBy: refCode || null,
+        refApplied: false,
+      }
+
+      const nickname = nick || ''
+      const hasNickname = !!nickname
+
+      tx.set(
+        userRef,
+        {
+          type: 'company',
+          accountKind,
+          profile: {
+            email,
+            nickname,
+            nick: nickname,
+            // ✅ 닉네임이 있을 때만 nicknameLower 추가
+            ...(hasNickname
+              ? { nicknameLower: nickname.toLowerCase() }
+              : {}),
+            uid,
+          },
+          company: {
+            name: storeName || '',
+            brn: businessNo || '',
+            address: address || '',
+            phone: phone || '',
+            manager: nick || '',
+          },
+          points: 0,
+          referral,
+          myJoinSeq: seq,
+          myRefCode: myCode,
+          myRefCreatedAt: serverTimestamp(),
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true },
+      )
+    })
+
+    const snap = await getDoc(userRef)
+    const data = snap.exists() ? snap.data() : {}
+
+    me.auth.value = {
+      loggedIn: true,
+      ...data,
+      type: normalizeType(data.type),
+    }
+    me.save()
+
+    const nickName = me.auth.value?.profile?.nickname
+    if (nickName) {
+      localStorage.setItem('user:nick', nickName)
+      localStorage.setItem('nickname', nickName)
+    }
+
+    _uid.value = uid
+    _listenUserDoc(FBOK, uid)
+
+    _ready.value = true
+  },
+
+  async _fbLoginWithRole({ email, password, expectedType, expectedAccountKind }) {
+    const FBOK = await ensureFirebase()
+    const {
+      auth, db,
+      signInWithEmailAndPassword,
+      doc, getDoc, setDoc, updateDoc,
+      serverTimestamp,
+      deleteField,
+    } = FBOK
 
     const cred = await signInWithEmailAndPassword(auth, email, password)
     const uid  = cred.user.uid
@@ -407,47 +716,110 @@ export const me = {
 
     let data
     if (snap.exists()) {
-      data = snap.data()
+      data = snap.data() || {}
       if (!data.type) data.type = 'user'
+
+      // ✅ 닉네임 LowerCase 자동 보정
+      const profile = data.profile || {}
+      const hasNickname = !!profile.nickname
+      const hasLower    = !!profile.nicknameLower
+      if (hasNickname && !hasLower) {
+        const lower = String(profile.nickname).toLowerCase()
+        data.profile = {
+          ...profile,
+          nick: profile.nick || profile.nickname,
+          nicknameLower: lower,
+        }
+        try {
+          await updateDoc(userDocRef, {
+            'profile.nicknameLower': lower,
+            'profile.nick': data.profile.nick,
+            updatedAt: serverTimestamp(),
+          })
+        } catch (_) {}
+      }
+
       const actual0 = normalizeType(data.type)
       if (actual0 === 'user' && 'company' in data) {
-        // 로그인 시에도 company 정리(예전 데이터 정돈)
         try {
           await updateDoc(userDocRef, { company: deleteField(), updatedAt: serverTimestamp() })
           delete data.company
         } catch (_) {}
       }
 
-      // 추천코드 정합화
+      // ✅ 추천코드 정합화 (버전 유지)
       const seq = Number(data.myJoinSeq || 0)
-      const wantCode = makeMyCode(data?.profile?.email || email, seq)
-      if (seq > 0 && (!data.referral || data.referral.myCode !== wantCode)) {
-        try {
-          await updateDoc(userDocRef, { 'referral.myCode': wantCode, updatedAt: serverTimestamp() })
-          data.referral = { ...(data.referral || {}), myCode: wantCode }
-        } catch (_) {}
+      if (seq > 0) {
+        const baseEmail = data?.profile?.email || email
+        const codeVersion = Number(data.referral?.codeVersion || 1)
+        const maker = codeVersion >= 2 ? makeMyCodeV2 : makeMyCodeV1
+        const wantCode = maker(baseEmail, seq)
+        if (!data.referral || data.referral.myCode !== wantCode || data.referral.codeVersion !== codeVersion) {
+          try {
+            await updateDoc(userDocRef, {
+              'referral.myCode': wantCode,
+              'referral.codeVersion': codeVersion,
+              updatedAt: serverTimestamp(),
+            })
+            data.referral = { ...(data.referral || {}), myCode: wantCode, codeVersion }
+          } catch (_) {}
+        }
       }
-
     } else {
-      // (예외) 문서 누락 시 최소 기본값 생성
+      // (예외) 문서 누락 시 최소 생성 — V2 포맷 사용
+      const seq = 1
+      const myCode = makeMyCodeV2(email, seq)
       data = {
         type: 'user',
-        profile: { email, nickname: '', uid },
+        profile: {
+          email,
+          nickname: '',
+          nick: '',
+          // nicknameLower 없음 (닉네임 없으므로)
+          uid,
+        },
         points: 0,
-        referral: { myCode: makeMyCode(email, 0), refBy: null, refApplied: false },
-        myJoinSeq: 0,
+        referral: { myCode, codeVersion: 2, refBy: null, refApplied: false },
+        myJoinSeq: seq,
+        myRefCode: myCode,
         createdAt: Date.now(),
       }
-      await setDoc(userDocRef, { ...data, createdAt: serverTimestamp(), updatedAt: serverTimestamp() })
+      await setDoc(userDocRef, {
+        ...data,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      })
     }
 
     const actual = normalizeType(data.type)
+
+    // company인데 accountKind 없으면 기본 storeOwner
+    let effectiveAccountKind = data.accountKind || null
+    if (actual === 'company' && !effectiveAccountKind) {
+      effectiveAccountKind = 'storeOwner'
+      data.accountKind = effectiveAccountKind
+      try {
+        await updateDoc(userDocRef, { accountKind: 'storeOwner', updatedAt: serverTimestamp() })
+      } catch (_) {}
+    }
+
     if (expectedType && actual !== expectedType) {
       throw new RoleMismatchError(actual, expectedType)
     }
+    if (expectedAccountKind) {
+      if (!effectiveAccountKind || effectiveAccountKind !== expectedAccountKind) {
+        throw new RoleMismatchError(effectiveAccountKind || 'unknown', expectedAccountKind)
+      }
+    }
 
-    // 세션 객체에서도 company 제거
-    const clean = (actual === 'user' && 'company' in data) ? (() => { const { company, ...rest } = data; return rest })() : data
+    const clean =
+      actual === 'user' && 'company' in data
+        ? (() => {
+            const { company, ...rest } = data
+            return rest
+          })()
+        : data
+
     me.auth.value = { loggedIn: true, ...clean, type: actual }
     me.save()
 
@@ -457,7 +829,6 @@ export const me = {
       localStorage.setItem('nickname', nick)
     }
 
-    // ✅ 포인트 실시간 구독 시작
     _uid.value = uid
     _listenUserDoc(FBOK, uid)
 
@@ -469,20 +840,24 @@ export const me = {
     if (getAccount(email)) throw new Error('이미 가입된 이메일입니다.')
 
     const seq    = nextLocalSeq()
-    const myCode = makeMyCode(email, seq)
-    const profile = { email, nickname }
+    const myCode = makeMyCodeV2(email, seq)   // 로컬도 V2 포맷 사용
+    const profile = {
+      email,
+      nickname,
+      nick: nickname,
+      nicknameLower: nickname.toLowerCase(),
+    }
     const auth = {
       loggedIn: true,
       type: 'user',
       profile,
       points: refCode ? BONUS_NEW_USER : 0,
-      referral: { myCode, refBy: refCode || null, refApplied: !!refCode },
+      referral: { myCode, codeVersion: 2, refBy: refCode || null, refApplied: !!refCode },
       myJoinSeq: seq,
       myRefCode: myCode,
       createdAt: Date.now(),
     }
     if (refCode) {
-      // 추천인 포인트는 장부에 적립 → 추천인 로그인 시 반영
       creditReferrerLocal(refCode, BONUS_REFERRER)
     }
 
@@ -490,7 +865,6 @@ export const me = {
     me.auth.value = auth
     me.save()
 
-    // 로컬도 userPoints 동기화
     _points.value = Number(auth.points || 0)
 
     localStorage.setItem('user:nick', nickname)
@@ -498,14 +872,41 @@ export const me = {
     _ready.value = true
   },
 
-  _localSignupBiz({ email, password, storeName, businessNo, address, phone, manager }) {
+  _localSignupBiz({
+    email,
+    password,
+    nick,
+    storeName,
+    businessNo,
+    address,
+    phone,
+    manager,
+    accountKind = 'storeOwner',
+  }) {
     if (getAccount(email)) throw new Error('이미 가입된 이메일입니다.')
+    const seq    = nextLocalSeq()
+    const myCode = makeMyCodeV2(email, seq)
     const authData = {
       loggedIn: true,
       type: 'company',
-      profile: { email },
-      company: { name: storeName || '', brn: businessNo || '', address: address || '', phone: phone || '', manager: manager || '' },
+      accountKind,
+      profile: {
+        email,
+        nickname: nick || '',
+        nick: nick || '',
+        nicknameLower: (nick || '').toLowerCase() || undefined,
+      },
+      company: {
+        name: storeName || '',
+        brn: businessNo || '',
+        address: address || '',
+        phone: phone || '',
+        manager: manager || nick || '',
+      },
       points: 0,
+      referral: { myCode, codeVersion: 2, refBy: null, refApplied: false },
+      myJoinSeq: seq,
+      myRefCode: myCode,
       createdAt: Date.now(),
     }
     putAccount(email, { password, ...authData })
@@ -517,20 +918,74 @@ export const me = {
     _ready.value = true
   },
 
-  _localLoginWithRole({ email, password, expectedType }) {
+  _localSignupAdmin({
+    email,
+    password,
+    nick,
+    storeName,
+    businessNo,
+    address,
+    phone,
+    manager,
+    accountKind = 'partnerOwner',
+  }) {
+    if (getAccount(email)) throw new Error('이미 가입된 이메일입니다.')
+    const seq    = nextLocalSeq()
+    const myCode = makeMyCodeV2(email, seq)
+    const authData = {
+      loggedIn: true,
+      type: 'company',
+      accountKind,
+      profile: {
+        email,
+        nickname: nick || '',
+        nick: nick || '',
+        nicknameLower: (nick || '').toLowerCase() || undefined,
+      },
+      company: {
+        name: storeName || '',
+        brn: businessNo || '',
+        address: address || '',
+        phone: phone || '',
+        manager: manager || nick || '',
+      },
+      points: 0,
+      referral: { myCode, codeVersion: 2, refBy: null, refApplied: false },
+      myJoinSeq: seq,
+      myRefCode: myCode,
+      createdAt: Date.now(),
+    }
+    putAccount(email, { password, ...authData })
+    me.auth.value = authData
+    me.save()
+
+    _points.value = 0
+
+    _ready.value = true
+  },
+
+  _localLoginWithRole({ email, password, expectedType, expectedAccountKind }) {
     const acc0 = getAccount(email)
     if (!acc0) throw new Error('가입 이력이 없습니다. 회원가입을 진행해 주세요.')
-    // if (acc0.password && acc0.password !== password) throw new Error('비밀번호가 일치하지 않습니다.')
 
     const actual = normalizeType(acc0.type)
+
+    if (actual === 'company' && !acc0.accountKind) {
+      acc0.accountKind = 'storeOwner'
+      putAccount(email, acc0)
+    }
+    const actualKind = acc0.accountKind || null
+
     if (expectedType && actual !== expectedType) {
       throw new RoleMismatchError(actual, expectedType)
+    }
+    if (expectedAccountKind && actualKind !== expectedAccountKind) {
+      throw new RoleMismatchError(actualKind || 'unknown', expectedAccountKind)
     }
 
     if (actual === 'user') {
       let acc = applyOneTimeNewUserBonusFix(acc0)
       acc = applyPendingLedgerLocal(acc)
-      // 세션에서도 company 제거
       const { company, ...rest } = acc
       me.auth.value = { ...rest, loggedIn: true, type: actual }
       _points.value = Number(rest.points || 0)
@@ -555,10 +1010,88 @@ export const me = {
     return me._localSignupUser({ email, password, nickname: nick, refCode })
   },
 
-  async signupBiz({ email, password, storeName, businessNo, address, phone, manager }) {
+  // 기업회원 = 가게찾기 업체 담당자
+  async signupBiz(payload) {
+    const {
+      email,
+      password,
+    } = payload
+
+    const nick       = (payload.nick || payload.manager || '') || ''
+    const phone      = payload.phone || ''
+    const storeName  = payload.storeName || ''
+    const businessNo = payload.businessNo || ''
+    const address    = payload.address || ''
+    const refCode    = payload.refCode
+    const accountKind = payload.accountKind || 'storeOwner'
+
     const FBOK = await ensureFirebase()
-    if (FBOK) return me._fbSignupBiz({ email, password, storeName, businessNo, address, phone, manager })
-    return me._localSignupBiz({ email, password, storeName, businessNo, address, phone, manager })
+    if (FBOK) {
+      return me._fbSignupBiz({
+        email,
+        password,
+        nick,
+        phone,
+        storeName,
+        businessNo,
+        address,
+        refCode,
+        accountKind,
+      })
+    }
+    return me._localSignupBiz({
+      email,
+      password,
+      nick,
+      storeName,
+      businessNo,
+      address,
+      phone,
+      manager: nick,
+      accountKind,
+    })
+  },
+
+  // 관리자회원 = 제휴관 업체 담당자
+  async signupAdmin(payload) {
+    const {
+      email,
+      password,
+    } = payload
+
+    const nick       = payload.nick || ''
+    const phone      = payload.phone || ''
+    const storeName  = payload.storeName || ''
+    const businessNo = payload.businessNo || ''
+    const address    = payload.address || ''
+    const refCode    = payload.refCode
+    const accountKind = payload.accountKind || 'partnerOwner'
+
+    const FBOK = await ensureFirebase()
+    if (FBOK) {
+      return me._fbSignupAdmin({
+        email,
+        password,
+        nick,
+        phone,
+        storeName,
+        businessNo,
+        address,
+        refCode,
+        accountKind,
+      })
+    }
+    return me._localSignupAdmin({
+      email,
+      password,
+      nick,
+      storeName,
+      businessNo,
+      address,
+      phone,
+      manager: nick,
+      accountKind,
+    })
   },
 
   async loginUser({ email, password }) {
@@ -567,10 +1100,42 @@ export const me = {
     return me._localLoginWithRole({ email, password, expectedType: 'user' })
   },
 
+  // 기업회원 로그인 = storeOwner
   async loginBiz({ email, password }) {
     const FBOK = await ensureFirebase()
-    if (FBOK) return me._fbLoginWithRole({ email, password, expectedType: 'company' })
-    return me._localLoginWithRole({ email, password, expectedType: 'company' })
+    if (FBOK) {
+      return me._fbLoginWithRole({
+        email,
+        password,
+        expectedType: 'company',
+        expectedAccountKind: 'storeOwner',
+      })
+    }
+    return me._localLoginWithRole({
+      email,
+      password,
+      expectedType: 'company',
+      expectedAccountKind: 'storeOwner',
+    })
+  },
+
+  // 관리자회원 로그인 = 제휴관 담당자
+  async loginAdmin({ email, password }) {
+    const FBOK = await ensureFirebase()
+    if (FBOK) {
+      return me._fbLoginWithRole({
+        email,
+        password,
+        expectedType: 'company',
+        expectedAccountKind: 'partnerOwner',
+      })
+    }
+    return me._localLoginWithRole({
+      email,
+      password,
+      expectedType: 'company',
+      expectedAccountKind: 'partnerOwner',
+    })
   },
 
   async logout() {
@@ -583,7 +1148,6 @@ export const me = {
     me.auth.value = { loggedIn: false }
     me.save()
 
-    // 구독 해제 + 포인트 리셋
     _uid.value = ''
     if (typeof _unsubUserDoc === 'function') { _unsubUserDoc(); _unsubUserDoc = null }
     _points.value = 0

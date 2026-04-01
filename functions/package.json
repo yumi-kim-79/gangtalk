@@ -3,13 +3,16 @@
   "private": true,
   "type": "commonjs",
   "main": "index.js",
-  "engines": { "node": "20" },
+  "engines": {
+    "node": "20"
+  },
   "scripts": {
     "deploy": "firebase deploy --only functions",
     "serve": "firebase emulators:start --only functions",
     "start": "npm run serve"
   },
   "dependencies": {
+    "coolsms-node-sdk": "^2.1.0",
     "cors": "^2.8.5",
     "express": "^4.19.2",
     "firebase-admin": "^12.5.0",

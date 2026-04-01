@@ -1,14 +1,14 @@
 <!-- src/pages/MainPage.vue -->
 <template>
   <main class="page">
-
     <!-- ▼▼ 이벤트 오버레이 (gangtox.com 접속 & 미해제 & 스위치 ON 일 때만) ▼▼ -->
     <EventOverlay
       v-if="showEvent"
-      :image-url="EVENT_IMAGE"
       @close="onCloseEvent"
       @dismiss-day="onDismissDay"
+      @open-detail="goEventDetail"
     />
+
     <!-- ▲▲ 이벤트 오버레이 끝 ▲▲ -->
 
     <!-- 상단: 검색 -->
@@ -20,10 +20,10 @@
         <div class="news-bar">
           <div class="news-left">
             <span class="news-ttl">기사한줄</span>
-            <span class="news-headline ellip" @click="openNews(latestNews)">
-              {{ latestNews.title }}
+            <!-- ✅ 자동 순환되는 currentNews 사용 + NEW 뱃지 제거 -->
+            <span class="news-headline ellip" @click="openNews(currentNews)">
+              {{ currentNews.title }}
             </span>
-            <span v-if="isLatestNew" class="news-badge" aria-label="새 글">NEW</span>
           </div>
 
           <!-- 오른쪽 소형 더보기 -->
@@ -44,7 +44,7 @@
           >
             <span class="dot">•</span>
             <span class="txt ellip">{{ n.title }}</span>
-            <span v-if="isNewsNew(n)" class="news-badge sm">NEW</span>
+            <!-- ✅ NEW 뱃지 제거 -->
           </li>
         </ul>
       </section>
@@ -156,7 +156,7 @@
           </svg>
         </button>
 
-        <!-- 📍 내 주변(10km) : 페이지 공통 이벤트 + 라우팅 -->
+        <!-- 📍 내 주변(10km) -->
         <button
           class="tool"
           :class="{ on: near.enabled }"
@@ -173,32 +173,22 @@
           </svg>
         </button>
 
-        <!-- 📋 리스트 보기 -->
+        <!-- 📋/🗂 한줄/두칸 토글 (단일 버튼) -->
         <button
           class="tool"
-          :class="{ on: view==='list' }"
-          title="한줄보기"
-          aria-label="한줄보기"
+          :class="{ on: isListView }"
+          :title="isListView ? '두칸보기' : '한줄보기'"
+          :aria-label="isListView ? '두칸보기로 전환' : '한줄보기로 전환'"
           type="button"
-          @click.stop.prevent="setView('list')"
-          @touchstart.stop.prevent="setView('list')"
+          @click.stop.prevent="toggleViewMode"
+          @touchstart.stop.prevent="toggleViewMode"
         >
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <!-- 현재 한줄보기일 때: 리스트 아이콘 -->
+          <svg v-if="isListView" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
             <path d="M4 7h16M4 12h16M4 17h16"/>
           </svg>
-        </button>
-
-        <!-- 🗂 그리드 보기 -->
-        <button
-          class="tool"
-          :class="{ on: view==='grid' }"
-          title="두칸보기"
-          aria-label="두칸보기"
-          type="button"
-          @click.stop.prevent="setView('grid')"
-          @touchstart.stop.prevent="setView('grid')"
-        >
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+          <!-- 현재 두칸보기일 때: 그리드 아이콘 -->
+          <svg v-else viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
             <rect x="4" y="4" width="7" height="7" rx="1"></rect>
             <rect x="13" y="4" width="7" height="7" rx="1"></rect>
             <rect x="4" y="13" width="7" height="7" rx="1"></rect>
@@ -249,7 +239,7 @@
     </section>
 
     <!-- ===== 한줄 보기 ===== -->
-    <section v-if="view==='list'" class="list">
+    <section v-if="isListView" class="list">
       <article v-for="s in filtered" :key="s.id" class="row-card">
         <div class="r-left">
           <!-- 왼쪽: 사진만 -->
@@ -293,7 +283,8 @@
                     type="button"
                     :class="{ editable: canEditStore(s) }"
                     @click="canEditStore(s) && openMetricEditor(s, 'rooms')">
-              <div class="num">{{ s.match }}</div>
+              <!-- 🔹 rooms_biz 준비 전에는 숫자 대신 대시(—) -->
+              <div class="num">{{ isRoomsBizReady ? s.match : '—' }}</div>
               <div class="lbl">맞출방</div>
             </button>
 
@@ -301,7 +292,7 @@
                     type="button"
                     :class="{ editable: canEditStore(s) }"
                     @click="canEditStore(s) && openMetricEditor(s, 'persons')">
-              <div class="num">{{ s.persons }}</div>
+              <div class="num">{{ isRoomsBizReady ? s.persons : '—' }}</div>
               <div class="lbl">필요인원</div>
             </button>
 
@@ -313,7 +304,8 @@
                   <path d="M12 20h.01"/>
                 </svg>
               </div>
-              <div class="lbl">{{ statusLabel(s) }}</div>
+              <!-- ✅ 혼잡도 텍스트도 준비 전에는 감춤 -->
+              <div class="lbl">{{ isRoomsBizReady ? statusLabel(s) : '—' }}</div>
             </div>
           </div>
         </div>
@@ -340,9 +332,10 @@
           </button>
 
           <!-- 담당 -->
+          <!-- (한줄 보기 r-actions 안) 담당 버튼 - 담당자 리스트 시트 열기 -->
           <button class="chip action" type="button"
-                  @click.stop="openManagerMenu($event, s)"
-                  @touchend.stop.prevent="openManagerMenu($event, s)">
+                  @click.stop="openManagerList(s)"
+                  @touchend.stop.prevent="openManagerList(s)">
             <i class="icon" aria-hidden="true">
               <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
                 <path d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5z"/>
@@ -440,14 +433,14 @@
                   type="button"
                   :class="{ editable: canEditStore(s) }"
                   @click="canEditStore(s) && openMetricEditor(s, 'rooms')">
-            <div class="num">{{ s.match }}</div>
+            <div class="num">{{ isRoomsBizReady ? s.match : '—' }}</div>
             <div class="lbl">맞출방</div>
           </button>
           <button class="mini"
                   type="button"
                   :class="{ editable: canEditStore(s) }"
                   @click="canEditStore(s) && openMetricEditor(s, 'persons')">
-            <div class="num">{{ s.persons }}</div>
+            <div class="num">{{ isRoomsBizReady ? s.persons : '—' }}</div>
             <div class="lbl">필요인원</div>
           </button>
         </div>
@@ -473,10 +466,11 @@
             <span class="txt">초톡</span>
           </button>
 
+          <!-- (두칸 보기 grid-card 안) 담당 버튼 - 담당자 리스트 시트 열기 -->
           <button class="chip action" type="button"
                   aria-label="담당"
-                  @click.stop="openManagerMenu($event, s)"
-                  @touchend.stop.prevent="openManagerMenu($event, s)">
+                  @click.stop="openManagerList(s)"
+                  @touchend.stop.prevent="openManagerList(s)">
             <i class="icon" aria-hidden="true">
               <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
                 <path d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5z"/>
@@ -570,6 +564,42 @@
           </div>
         </div>
 
+        <!-- ✅ 담당자 리스트 시트 -->
+        <div v-else-if="sheet.type==='managerList'" class="as-body">
+          <h4 class="as-title">담당자 선택</h4>
+
+          <ul class="mgr-list-sheet">
+            <li
+              v-for="(m,i) in managersOf(sheet.store)"
+              :key="i"
+              class="mgr-li-sheet"
+              @click="onSelectManagerFromList(m, i)"
+            >
+              <div class="mgr-li-left">
+                <div class="mgr-thumb" :style="bgStyle(thumbOf(sheet.store))"></div>
+              </div>
+
+              <div class="mgr-li-main">
+                <div class="mgr-li-name">
+                  {{ sheet.store?.name || '업체' }} · {{ m.name || '담당자' }}
+                </div>
+                <div class="mgr-li-sub">
+                  <span v-if="m.phone">{{ m.phone }}</span>
+                  <span v-else-if="m.talkId">@{{ m.talkId }}</span>
+                  <span v-else class="muted">연락처 미등록</span>
+                </div>
+              </div>
+
+              <div class="mgr-li-arrow">›</div>
+            </li>
+          </ul>
+
+          <div class="as-actions">
+            <button class="btn" type="button" @click="closeSheet">닫기</button>
+          </div>
+        </div>
+
+        <!-- 기존 단일 담당자 시트(다른 곳에서 사용할 수 있으니 그대로 유지) -->
         <div v-else-if="sheet.type==='manager'" class="as-body">
           <h4 class="as-title">담당자 연결</h4>
           <div class="kv"><span class="k">담당자</span><span class="v">{{ sheet.store?.manager || '미지정' }}</span></div>
@@ -631,10 +661,11 @@
 import { computed, ref, onMounted, onBeforeMount, onUnmounted, watch, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import SearchBar from '@/components/SearchBar.vue'
+import GuideOverlay from '@/components/GuideOverlay.vue'
 import { db, firebaseReady } from '@/firebase'
 import {
-  collection, collectionGroup, onSnapshot, query, orderBy, doc,
-  getDoc, setDoc, updateDoc, serverTimestamp, getDocs, limit   // ← limit, getDocs 포함
+  collection, onSnapshot, query, orderBy, doc,
+  getDoc, setDoc, updateDoc, serverTimestamp, getDocs, limit
 } from 'firebase/firestore'
 import { getStorage, ref as sRef, getDownloadURL } from 'firebase/storage'
 import { getAuth, onAuthStateChanged } from 'firebase/auth'
@@ -657,6 +688,10 @@ function isSecureOrigin(){
   if (protocol === 'http:' && (hostname === 'localhost' || hostname === '127.0.0.1')) return true
   return false
 }
+
+// 🔄 2025-11-16: rooms_biz 컬렉션이 권한/쿨다운 등으로 늦게 와도
+//               일단 stores.match / stores.persons 값은 바로 보여주기 위해 true 로 시작
+const isRoomsBizReady = ref(true)   // rooms_biz 최신값 도착 여부 (기본 true)
 
 // === [내 주변] 상태 및 거리 유틸 ===
 const near = ref({ enabled:false, lat:null, lng:null, radiusKm:NEAR_KM })
@@ -736,9 +771,15 @@ async function goNearMe(){
 }
 
 /* === 테마 & 뷰 전환 (통합/안전 버전) === */
-const view  = ref(route.query.view || localStorage.getItem('finder:view') || 'list')
-const theme = ref(String(route.query?.theme ?? localStorage.getItem('theme') ?? 'white'))
-const isDark = computed(() => theme.value === 'dark' || theme.value === 'black')
+const viewMode  = ref(route.query.view || localStorage.getItem('finder:view') || 'list')
+const theme     = ref(String(route.query?.theme ?? localStorage.getItem('theme') ?? 'white'))
+const isDark    = computed(() => theme.value === 'dark' || theme.value === 'black')
+
+/** 리스트 뷰 여부 (공통) */
+const isListView = computed(() => viewMode.value === 'list')
+
+/** 템플릿 호환용 별칭 (view === 'list' / 'grid') */
+const view = viewMode
 
 function applyTheme(v = theme.value){
   document.documentElement.setAttribute('data-theme', v)
@@ -749,19 +790,67 @@ watch(theme, v => applyTheme(v), { immediate: true })
 // 주소창의 ?theme= 변경되면 동기화
 watch(() => route.query.theme, (nv) => { if (nv) theme.value = String(nv) })
 
-// 뷰 전환 (list/grid)
-function setView(v){
-  view.value = v
-  localStorage.setItem('finder:view', v)
-  router.replace({ query: { ...route.query, view: v, theme: theme.value } }).catch(()=>{})
+// 주소창의 ?view= 변경되면 뷰 모드도 동기화
+watch(() => route.query.view, (nv) => {
+  if (nv === 'list' || nv === 'grid') {
+    viewMode.value = nv
+  }
+})
+
+/** 한줄/두칸 토글 (공통) */
+function toggleViewMode(){
+  // list → grid → list …
+  const next = isListView.value ? 'grid' : 'list'
+  viewMode.value = next
+  localStorage.setItem('finder:view', next)
+  router.replace({
+    query: { ...route.query, view: next, theme: theme.value }
+  }).catch(()=>{})
 }
 
-// 테마 토글: view가 항상 선언된 상태에서 안전하게 사용
+/** 명시적으로 목록/그리드 지정 (template 의 setView 호출용) */
+function setView(mode){
+  const next = mode === 'grid' ? 'grid' : 'list'
+  viewMode.value = next
+  localStorage.setItem('finder:view', next)
+  router.replace({
+    query: { ...route.query, view: next, theme: theme.value }
+  }).catch(()=>{})
+}
+
+// 테마 토글: 현재 viewMode를 그대로 보존
 function toggleTheme(){
   theme.value = (theme.value === 'white') ? 'dark' : 'white'
   router.replace({
-    query: { ...route.query, theme: theme.value, view: view.value }
+    query: { ...route.query, theme: theme.value, view: viewMode.value }
   }).catch(()=>{})
+}
+
+/* === 이름 정규화 & id 매핑 헬퍼 (먼저 선언) === */
+function _normName(s){
+  return String(s || '')
+    .toLowerCase()
+    .replace(/[.\s]/g, '')                // 점/공백 제거 (레.이.블 → 레이블)
+    .replace(/[\u200B-\u200D\uFEFF]/g, '') // zero-width 제거
+}
+const _storeIdByName   = ref(new Map()) // normName -> storeId
+const _storeIdByVendor = ref(new Map()) // vendorKey(lower) -> storeId
+function rebuildStoreIndexes(){
+  const byName = new Map()
+  const byVendor = new Map()
+  for (const s of (baseStores.value || [])) {
+    const id = String(s.id || '')
+    const nm = _normName(s.name || '')
+    const vk = String(s.vendorKey || '').toLowerCase()
+    if (id && nm) byName.set(nm, id)
+    if (id && vk) byVendor.set(vk, id)
+  }
+  _storeIdByName.value = byName
+  _storeIdByVendor.value = byVendor
+}
+function _hasStoreId(id){
+  if (!id) return false
+  return (baseStores.value || []).some(s => String(s.id) === String(id))
 }
 
 // === onSnapshot 실패(권한/네트워크) 시 1회 조회로 대체하는 헬퍼 ===
@@ -808,11 +897,20 @@ function onQuerySnap(qRef, onOk) {
 }
 
 const showEvent = ref(false)
+const showGuide = ref(false)
+const openGuide = () => {
+  showGuide.value = true
+}
+
+const closeGuide = () => {
+  showGuide.value = false
+}
 
 // ==== 이벤트 노출 스위치/키 ====
-const EVENT_ENABLED = true
-const EVENT_KEY     = 'event:open202510:hideUntil'
-const EVENT_IMAGE   = '/event/gangtox-open.png?v=20251016'
+const EVENT_ENABLED     = true
+const EVENT_KEY         = 'event:open202510:hideUntil'
+const EVENT_SESSION_KEY = 'event:open202510:seenSession'  // 👈 한 세션에서 한 번만 보기용
+const EVENT_IMAGE       = '/event/gangtox-open.png?v=20251016'
 const isAllowedHost = () => true
 const _wantEvent = ref(false)
 const _isMounted = ref(false)
@@ -838,16 +936,26 @@ async function openEventSafely(flag){
 }
 function isHiddenByUser() {
   try {
+    // ✅ 1) '오늘 하루 보지 않기' 로 7일 숨김
     const v = localStorage.getItem(EVENT_KEY)
     const until = Number(v || 0)
-    return Number.isFinite(until) && Date.now() < until
-  } catch { return false }
+    if (Number.isFinite(until) && Date.now() < until) return true
+
+    // ✅ 2) 이번 브라우저 탭(세션)에서 한 번 이미 닫았는지 체크
+    const seen = sessionStorage.getItem(EVENT_SESSION_KEY)
+    if (seen === '1') return true
+
+    return false
+  } catch {
+    return false
+  }
 }
 function onDismissDay() {
-  const ONE_DAY = 24 * 60 * 60 * 1000
-  try { localStorage.setItem(EVENT_KEY, String(Date.now() + ONE_DAY)) } catch {}
+  const SEVEN_DAYS = 7 * 24 * 60 * 60 * 1000  // 7일
+  try { localStorage.setItem(EVENT_KEY, String(Date.now() + SEVEN_DAYS)) } catch {}
   showEvent.value = false
 }
+
 function decideShowEvent(){
   const q = String(route?.query?.event || '').toLowerCase()
   const qOn  = q === 'on'
@@ -856,7 +964,19 @@ function decideShowEvent(){
   _wantEvent.value = flag
   if (_isMounted.value) openEventSafely(flag)
 }
-function onCloseEvent(){ showEvent.value = false }
+function onCloseEvent() {
+  showEvent.value = false
+
+  // 👇 이번 브라우저 탭에서는 다시 안 뜨도록 세션 플래그 저장
+  try {
+    sessionStorage.setItem(EVENT_SESSION_KEY, '1')
+  } catch {}
+
+  // 👉 라우터에 등록된 이름 'EventDetail' 로 이동
+  router.push({ name: 'EventDetail' })
+  // 또는 router.push({ path: '/event' }) 로 써도 됨
+}
+
 onBeforeMount(decideShowEvent)
 onMounted(async () => {
   _isMounted.value = true
@@ -892,6 +1012,20 @@ const newsItems = ref([])
 const newsOpen = ref(false)
 const newsState = { marketing: [], config: [], admin: [], dashboard: [], col: [] }
 const newsUnsubs = []
+// ✅ 기사한줄 자동 순환용 인덱스 & 보이는 리스트(최신 10개)
+const currentNewsIndex = ref(0)
+
+// 최신 뉴스 10개만 순환 대상
+const visibleNews = computed(() =>
+  (newsItems.value || []).slice(0, 10)
+)
+
+// 현재 화면에 보여줄 기사
+const currentNews = computed(() =>
+  visibleNews.value.length
+    ? visibleNews.value[currentNewsIndex.value]
+    : { id: '', title: '' }
+)
 
 function tsToMs(t){
   if (!t) return 0
@@ -909,38 +1043,56 @@ function normalizeItem(it, i, prefix='n'){
   }
 }
 function recomputeNews(){
-  const all = [
-    ...newsState.marketing,
+  // 1) 운영자 페이지에서 정한 newsline(마케팅) 순서를 그대로 최상단에 둔다.
+  const marketing = Array.isArray(newsState.marketing) ? newsState.marketing : []
+
+  // 2) 나머지 소스들을 합치되, 마케팅과 중복되는 항목은 제거.
+  const othersRaw = [
     ...newsState.config,
     ...newsState.admin,
     ...newsState.dashboard,
-    ...newsState.col
+    ...newsState.col,
   ]
-  const map = new Map()
-  for (const n of all){
-    const key = n.id || `${n.title}__${tsToMs(n.createdAt)}`
-    if (!map.has(key)) map.set(key, n)
+
+  const isDup = (a, b) => {
+    if (a.id && b.id) return String(a.id) === String(b.id)
+    return String(a.title||'').trim() === String(b.title||'').trim()
   }
-  const merged = Array.from(map.values())
-    .sort((a,b)=> tsToMs(b.createdAt) - tsToMs(a.createdAt))
+
+  const othersDedup = othersRaw.filter(o =>
+    !marketing.some(m => isDup(m, o))
+  )
+
+  // 3) 나머지는 최신순 정렬해서 뒤에 붙인다.
+  const othersSorted = othersDedup.sort((a,b)=> tsToMs(b.createdAt) - tsToMs(a.createdAt))
+
+  // 4) 최종 머지: [마케팅(운영자 지정 순서 유지)] + [기타(최신순)]
+  const merged = marketing.length ? [...marketing, ...othersSorted] : othersSorted
+
   newsItems.value = merged.length ? merged : [
     { id:'n1', title:'강톡 업데이트: 현황판 지표 카드형으로 개선!', createdAt: Date.now() - 1000*60*20, isNew:true },
     { id:'n0', title:'새 제휴점 등록 가이드 오픈', createdAt: Date.now() - 1000*60*60*30 },
   ]
 }
+
 function subNewsMarketing(){
   try{
     const ref = doc(db, 'config', 'marketing')
     const u = watchWithLabel('news:config/marketing', ref, (snap)=>{
       const data = snap.exists() ? (snap.data() || {}) : {}
       const list = Array.isArray(data.newsline) ? data.newsline : []
-      newsState.marketing = list.map((v,i)=> normalizeItem({
-        id: v.id,
-        text: v.text || v.title,
-        createdAt: v.createdAt || v.ts || v.updatedAt,
-        badge: v.badge,
-        isNew: v.badge === 'NEW'
-      }, i, 'mk'))
+      newsState.marketing = list.map((v,i)=> {
+        const it = normalizeItem({
+          id: v.id,
+          text: v.text || v.title,
+          createdAt: v.createdAt || v.ts || v.updatedAt,
+          badge: v.badge,
+          isNew: v.badge === 'NEW'
+        }, i, 'mk')
+        // id가 빠진 항목은 순서를 보존하는 보조 id를 부여(중복 제거/비교에 사용)
+        if (!it.id) it.id = `mk_${i}__${(it.title||'').slice(0,40)}`
+        return it
+      })
       recomputeNews()
     })
     newsUnsubs.push(u)
@@ -989,6 +1141,7 @@ function subNewsCollection(){
     console.error('[FS][news:collection(news)] subNewsCollection error:', e)
   }
 }
+
 onMounted(async () => {
   await firebaseReady
   subNewsMarketing()
@@ -998,12 +1151,42 @@ onMounted(async () => {
   subNewsCollection()
   recomputeNews()
 })
-// 뉴스 NEW 판단
+
+// ✅ 뉴스 목록이 바뀌면 인덱스 보정
+watch(visibleNews, (list) => {
+  if (!list.length) {
+    currentNewsIndex.value = 0
+    return
+  }
+  if (currentNewsIndex.value >= list.length) {
+    currentNewsIndex.value = 0
+  }
+})
+
+// ✅ 2~3초마다 자동으로 다음 뉴스로 순환 (여기선 2.5초)
+let newsRotateTimer = null
+onMounted(() => {
+  newsRotateTimer = setInterval(() => {
+    const len = visibleNews.value.length
+    if (!len) return
+    currentNewsIndex.value = (currentNewsIndex.value + 1) % len
+  }, 2500) // 2500ms = 2.5초
+})
+
+onUnmounted(() => {
+  if (newsRotateTimer) {
+    clearInterval(newsRotateTimer)
+    newsRotateTimer = null
+  }
+})
+
+// 뉴스 NEW 판단 (지금은 뱃지를 안 쓰지만 로직은 남겨둠)
 function isNewsNew(n){
   if(!n) return false
   const ms = tsToMs(n.createdAt)
   return (Date.now() - (ms || 0)) <= 1000*60*60*48 || Boolean(n.isNew)
 }
+
 const latestNews = computed(() =>
   (newsItems.value && newsItems.value.length)
     ? newsItems.value[0]
@@ -1073,12 +1256,14 @@ function updateMacroMenuPos(){
   }
 }
 
-// 1) 테마 토글: white ↔ dark
+// 1) 테마 토글: white ↔ dark  (※ 내부용, toggleTheme 와 동일 동작)
 function onThemeToggle(){
   const next = theme.value === 'white' ? 'dark' : 'white'
   theme.value = next
-  applyTheme()
-  router.replace({ query: { ...route.query, theme: next, view: view.value } }).catch(()=>{})
+  applyTheme(next)
+  router.replace({
+    query: { ...route.query, theme: next, view: viewMode.value }
+  }).catch(()=>{})
 }
 
 function openMacroMenu(){
@@ -1164,8 +1349,22 @@ function openStoreBoard(s){
 function watchWithLabel(label, refOrQuery, next) {
   return onSnapshot(
     refOrQuery,
-    (snap) => next(snap),
-    (err) => { console.error(`[FS][${label}] onSnapshot error:`, err) },
+    (snap) => {
+      const meta = snap.metadata || {}
+
+      // 👉 로컬 캐시에서만 온 스냅샷이면 화면에 반영하지 않고 건너뜀
+      //    (fromCache === true 이고, hasPendingWrites === false 인 경우)
+      if (meta.fromCache && !meta.hasPendingWrites) {
+        console.info(`[FS][${label}] skip cached snapshot`)
+        return
+      }
+
+      // ✅ 서버에서 받은 최신 스냅샷만 실제로 사용
+      next(snap)
+    },
+    (err) => {
+      console.error(`[FS][${label}] onSnapshot error:`, err)
+    },
   )
 }
 
@@ -1173,6 +1372,8 @@ function watchWithLabel(label, refOrQuery, next) {
 const baseStores = ref([])          // 'stores' 컬렉션 원본 목록
 const stores     = ref([])          // 화면에 쓰는 최종 목록(override 적용)
 const roomsBiz   = ref({})          // { [storeId]: { rooms, people, updatedAt } }
+/* rooms_biz 문서 id(=bizId) → 실제 stores 문서 id 매핑 */
+const bizToStore = ref({})
 
 // “내 주변”이 켜진 상태에서 stores 변경 시 거리 재계산
 watch(
@@ -1219,11 +1420,18 @@ async function subscribe(){
       })
     )
     baseStores.value = rows
+    // 이름/벤더키 인덱스 갱신
+    rebuildStoreIndexes()
+    // ✅ stores 로딩 후 rooms_biz 다시 구독/매핑 (이름·벤더키 기반 매칭 보장)
+    subscribeRoomsBiz()
     applyRoomsBiz()
   })
 }
 
-// ===== baseStores + rooms_biz + vendors 집계 합쳐서 화면 stores 생성 =====
+// ✅ 메인 합성 로직
+//    - rooms_biz 값이 있으면 그 값을 우선 사용
+//    - rooms_biz 가 없으면 기존 stores.match / stores.persons 를 폴백으로 그대로 사용
+//    - vendors 집계는 최대방수/최대인원, 혼잡도 보조용으로만 사용
 function applyRoomsBiz(){
   const bases = Array.isArray(baseStores.value) ? baseStores.value : []
   const rbMap = roomsBiz.value || {}
@@ -1234,27 +1442,44 @@ function applyRoomsBiz(){
     const byRb = rbMap[id] || null
     const byAg = agg[String(s.name || '')] || null
 
-    const match =
-      Number.isFinite(byRb?.rooms)  ? Number(byRb.rooms)  :
-      Number.isFinite(byAg?.match)  ? Number(byAg.match)  :
-      Number.isFinite(s?.match)     ? Number(s.match)     : 0
+    // ✅ 1) 맞출방 / 필요인원:
+    //    - rooms_biz 값이 있으면 그 값을 우선 사용
+    //    - rooms_biz 값이 없으면 기존 stores.match / stores.persons (또는 needRooms / needPeople) 를 폴백으로 사용
+    const legacyMatch   = Number(s?.match ?? s?.needRooms ?? 0)
+    const legacyPersons = Number(s?.persons ?? s?.needPeople ?? 0)
 
-    const persons =
-      Number.isFinite(byRb?.people) ? Number(byRb.people) :
-      Number.isFinite(byAg?.persons)? Number(byAg.persons):
-      Number.isFinite(s?.persons)   ? Number(s.persons)   : 0
+    const match = Number.isFinite(byRb?.rooms)
+      ? Number(byRb.rooms)
+      : (Number.isFinite(legacyMatch) ? legacyMatch : 0)
 
+    const persons = Number.isFinite(byRb?.people)
+      ? Number(byRb.people)
+      : (Number.isFinite(legacyPersons) ? legacyPersons : 0)
+
+    // ✅ 2) 최대방수/최대인원은 필요 시 vendors 집계를 참고하되,
+    //       없으면 stores 필드에서만 가져옴 (예전 match/persons 와는 독립)
     const totalRooms = Number(
-      s?.totalRooms ?? s?.total ?? s?.rooms ?? byAg?.totalRooms ?? 0
+      byAg?.totalRooms ?? s?.totalRooms ?? s?.total ?? s?.rooms ?? 0
     )
+
     const maxPersons = Number(
       s?.maxPersons ?? s?.capacity ?? s?.max ?? 0
     )
 
+    // ✅ 3) 혼잡도: rooms_biz → vendors → 자동계산
+    const rbCg = (byRb && byRb.congestion) ? String(byRb.congestion) : null
+    const agCg = (byAg && byAg.congestion) ? String(byAg.congestion) : null
+
     const status =
       s?.statusMode === 'manual'
         ? (s?.status || '보통')
-        : computeStatus({ match, persons, totalRooms, maxPersons, category: s.category })
+        : (rbCg || agCg || computeStatus({
+            match,
+            persons,
+            totalRooms,
+            maxPersons,
+            category: s.category
+          }))
 
     return {
       ...s,
@@ -1263,7 +1488,8 @@ function applyRoomsBiz(){
       totalRooms,
       maxPersons,
       status,
-      updatedAt: s.updatedAt || byRb?.updatedAt || byAg?.updatedAt || null,
+      // rooms_biz 가 있으면 그걸 최우선, 없으면 vendors 집계, 없으면 stores.updatedAt
+      updatedAt: byRb?.updatedAt || byAg?.updatedAt || s.updatedAt || null,
     }
   })
 
@@ -1274,8 +1500,19 @@ function applyRoomsBiz(){
 
 // (A) 붙여넣기 원문에서 방/인원 추출 (층 구간 기준, 기존 로직 유지)
 function parseNeedFromLastPastedText(txt = '') {
-  const rawAll = String(txt || '').replace(/\r/g, '')
-  if (!rawAll.trim()) return { rooms: 0, people: 0 }
+  // 0) 기본 정리
+  let rawAll = String(txt || '').replace(/\r/g, '').trim()
+  if (!rawAll) return { rooms: 0, people: 0 }
+
+  // 1) 한 줄로 들어온 경우를 위해 "— 1층 — / — 2층 —" 같은 패턴 앞뒤에 줄바꿈을 주입
+  //    (em dash, 하이픈, = 모두 허용)
+  rawAll = rawAll
+    .replace(/[-—=]{2,}\s*(\d+)\s*층\s*[-—=]{2,}/g, '\n$1층\n') //  —— 1층 —— → 줄바꿈
+    .replace(/(\d+)\s*층(?!\S)/g, '\n$1층\n')                    //  1층 (단독) → 줄바꿈
+    .replace(/\s{2,}/g, ' ')                                    // 과도한 공백 정규화
+
+  // 2) 1층~N층 라벨이 한 줄에 이어붙은 케이스: "… 1층 … 2층 …" → 강제 개행
+  rawAll = rawAll.replace(/(\d+\s*층)\s+/g, '$1\n')
 
   const floorRe = /^(?:\s*[-—=]{2,}\s*)?(\d+)층(?:\s*[-—=]{2,}\s*)?$/m
   const lines = rawAll.split('\n')
@@ -1385,15 +1622,41 @@ async function fetchLatestMessageText(bizId){
 // (C) rooms_biz 구독: 루트 원문 우선, 없으면 메시지 폴백 파싱
 function subscribeRoomsBiz(){
   if (unsubRooms) { unsubRooms(); unsubRooms = null }
+
+  // 🔹 이제는 이전 rooms_biz 값을 비우지 않는다.
+  //    직전에 받아둔 숫자를 그대로 보여주다가,
+  //    새 스냅샷이 오면 그때 최신값으로 덮어쓴다.
   const cRef = collection(db, 'rooms_biz')
 
   unsubRooms = watchWithLabel('rooms_biz', cRef, async (qs)=>{
     const entries = []
     qs.forEach(d => {
-      const x  = d.data() || {}
-      const id = String(x.storeId || d.id || '')
-      if (!id) return
-      entries.push({ id, x })
+      const x     = d.data() || {}
+      const bizId = String(d.id || '')
+      if (!bizId) return
+
+      // 1) rooms_biz.storeId
+      let storeId = String(x.storeId || '')
+
+      // 2) 이름 기반(rooms_biz.name 또는 bizId 자체를 이름으로 간주)
+      if (!storeId || !_hasStoreId(storeId)) {
+        const guessName = _normName(x.name || bizId)
+        const byName = _storeIdByName.value.get(guessName)
+        if (byName) storeId = String(byName)
+      }
+
+      // 3) vendorKey 기반(bizId == vendorKey 라는 전제)
+      if (!storeId || !_hasStoreId(storeId)) {
+        const byVendor = _storeIdByVendor.value.get(bizId.toLowerCase())
+        if (byVendor) storeId = String(byVendor)
+      }
+
+      // 4차: 마지막 폴백
+      if (!storeId) storeId = bizId
+
+      // 메인 합성용 입력
+      entries.push({ id: storeId, x })
+      bizToStore.value[bizId] = storeId
     })
 
     const map = {}
@@ -1407,38 +1670,58 @@ function subscribeRoomsBiz(){
       // 2) 없으면 최근 메시지 텍스트 1건 가져오기
       if (!pastedText) {
         try {
-          pastedText = (await fetchLatestMessageText(id)).trim()
+          const bizId = Object.keys(bizToStore.value).find(k => bizToStore.value[k] === id) || id
+          pastedText = (await fetchLatestMessageText(bizId)).trim()
         } catch {}
       }
 
-      // 3) 파싱 → 실패 시 수동 입력값으로 폴백
-      const inputRooms  = Number(x.needRooms  || 0)
-      const inputPeople = Number(x.needPeople || 0)
+      // 3) 파싱 + 폴백(needRooms/needPeople 우선 반영)
+      const inputRooms  = Number(x.needRooms  ?? 0)
+      const inputPeople = Number(x.needPeople ?? 0)
 
       let rooms = 0, people = 0
+
+      // (A) 붙여넣기 원문이 있으면 먼저 파싱
       if (pastedText) {
         const parsed = parseNeedFromLastPastedText(pastedText)
-        rooms  = Number(parsed.rooms  || 0)
-        people = Number(parsed.people || 0)
+        rooms  = Number(parsed.rooms  ?? 0)
+        people = Number(parsed.people ?? 0)
       }
-      if (rooms === 0 && people === 0) {
-        rooms  = inputRooms
-        people = inputPeople
+
+      // (B) 파싱이 0/0이거나 원문이 "줄바꿈 없는 한 줄"이면 시트/수동값을 우선 채택
+      const isOneLine = pastedText && !/\n/.test(pastedText)
+      if ((rooms === 0 && people === 0) || isOneLine) {
+        rooms  = Math.max(rooms,  inputRooms)
+        people = Math.max(people, inputPeople)
+      }
+
+      // (C) 마지막 안전망
+      rooms  = Math.max(0, Number(rooms  || 0))
+      people = Math.max(0, Number(people || 0))
+
+      const cgFromScore = (n) => {
+        const v = Number(n)
+        if (!Number.isFinite(v)) return null
+        return v >= 2 ? '여유' : v >= 1 ? '보통' : '혼잡'
       }
 
       map[id] = {
-        rooms: Math.max(0, Number(rooms || 0)),
-        people: Math.max(0, Number(people || 0)),
-        updatedAt: x.updatedAt || x.lastUpdated || x.lastPastedAt || null,
+        rooms    : Math.max(0, Number(rooms  || 0)),
+        people   : Math.max(0, Number(people || 0)),
+        congestion: (x.congestion && String(x.congestion)) || cgFromScore(x.congestionScore) || null,
+        updatedAt : x.updatedAt || x.lastUpdated || x.lastPastedAt || null,
       }
     }
 
     roomsBiz.value = map
     applyRoomsBiz()
+
+    // 🔹 서버 스냅샷까지 한 번 이상 처리한 뒤에만
+    //    실제 숫자를 노출하도록 플래그 ON
+    isRoomsBizReady.value = true
   })
 }
 
-// ✅ vendors 요약 + 이름 매핑 동시 반영
 function subscribeVendorsSummary(){
   if (unsubLabels) { unsubLabels(); unsubLabels = null }
 
@@ -1451,9 +1734,7 @@ function subscribeVendorsSummary(){
       const x = d.data() || {}
       const vendorId = d.id
       const name = String(x.name || '').trim()
-      if (!vendorId || !name) return
-
-      vMap[vendorId] = { name }
+      if (vendorId && name) vMap[vendorId] = { name }
 
       const totalRooms     = Number(x.totalRooms || 0)
       const totalNeeded    = Number(x.totalNeeded || 0)
@@ -1462,13 +1743,18 @@ function subscribeVendorsSummary(){
         x.totalRemaining ?? Math.max(totalNeeded - totalCurrent, 0)
       )
 
-      agg[name] = {
-        persons: totalRemaining,
-        totalRooms,
-        totalNeeded,
-        totalCurrent,
-        congestion: x.congestion || null,
-        updatedAt : x.updatedAt || x.ts || null,
+      if (name) {
+        agg[name] = {
+          // ✅ 웹 메인 현황판의 "필요인원" 은 출근자 수를 뺀 값이 아니라
+          //    시트에 적힌 필요인원(totalNeeded)의 합계를 그대로 사용
+          persons: totalNeeded,
+          totalRooms,
+          totalNeeded,
+          totalCurrent,
+          totalRemaining,
+          congestion: x.congestion || null,
+          updatedAt : x.updatedAt || x.ts || null,
+        }
       }
     })
 
@@ -1478,7 +1764,6 @@ function subscribeVendorsSummary(){
   })
 }
 
-// ✅ vendors/{vendorId}/status 집계 → labelsAgg 반영
 function subscribeVendorStatusPerVendor(){
   if (unsubStatus && typeof unsubStatus === 'function') { try{unsubStatus()}catch{} }
   unsubStatus = null
@@ -1492,23 +1777,40 @@ function subscribeVendorStatusPerVendor(){
     }
     const qRef = collection(db, 'vendors', vendorId, 'status')
     const u = watchWithLabel(`vendors/${vendorId}/status`, qRef, (qs)=>{
-      let totalRooms = 0, totalNeeded = 0, totalCurrent = 0
-      let remainingSum = 0, matchRooms = 0, latestMs = 0
+      let totalRooms   = 0
+      let totalNeeded  = 0
+      let totalCurrent = 0
+      let remainingSum = 0      // (needed - current) 합계 → 혼잡도 계산용으로 그대로 유지
+      let matchRooms   = 0      // 맞출방 개수
+      let personsSum   = 0      // ✅ 웹 메인 “필요인원” 표시용 합계(needed 그대로)
+      let latestMs     = 0
       const cgSet = new Set()
 
       qs.forEach(docSnap => {
         const v = docSnap.data() || {}
         totalRooms += 1
-        const needed  = Number(v.needed || 0)
+
+        const neededRaw  = Number(v.needed || 0)
         const current = (v.current != null)
           ? Number(v.current || 0)
           : (Array.isArray(v.staff) ? Number(v.staff.length) : 0)
-        const rem     = Math.max(0, needed - current)
 
-        totalNeeded  += needed
+        // 남은 인원(혼잡도 계산용)
+        const rem = Math.max(0, neededRaw - current)
+
+        totalNeeded  += neededRaw
         totalCurrent += current
         remainingSum += rem
-        if (rem > 0 || v.matchRoom === true) matchRooms += 1
+
+        // ✅ 필요인원 합계 및 맞출방 계산
+        //    - 출근자 수(current)는 여기서 사용하지 않고
+        //      needed 값만 그대로 사용
+        //    - 필요인원이 빈칸/0 인 방은 맞출방에서 제외
+        const effectiveNeeded = Number.isFinite(neededRaw) ? Math.max(0, neededRaw) : 0
+        if (effectiveNeeded > 0) {
+          personsSum += effectiveNeeded
+          matchRooms += 1
+        }
 
         const cg = String(v.congestion || '').trim()
         if (cg) cgSet.add(cg)
@@ -1535,8 +1837,10 @@ function subscribeVendorStatusPerVendor(){
         ...(labelsAgg.value || {}),
         [name]: {
           ...cur,
+          // ✅ 맞출방: 필요인원이 1명 이상인 방의 개수
           match:        matchRooms,
-          persons:      remainingSum,
+          // ✅ 필요인원: 출근자 수를 빼지 않고, 시트에 적힌 필요인원 합계
+          persons:      personsSum,
           totalRooms:   totalRooms || cur.totalRooms || 0,
           totalNeeded:  totalNeeded || cur.totalNeeded || 0,
           totalCurrent: totalCurrent || cur.totalCurrent || 0,
@@ -1576,7 +1880,7 @@ function subscribeVendorStatusPerVendor(){
 onMounted(async () => {
   await firebaseReady
   subscribe()
-  subscribeRoomsBiz()
+  // rooms_biz 는 stores 구독 후 subscribe() 안에서 재구독/매핑
   subscribeVendorsSummary()
   subscribeVendorStatusPerVendor()
 })
@@ -1584,10 +1888,16 @@ onMounted(async () => {
 async function refresh(){
   await firebaseReady
   subscribe()
-  subscribeRoomsBiz()
+  // rooms_biz 는 stores 구독 후 subscribe() 안에서 재구독/매핑
   subscribeVendorsSummary()
   subscribeVendorStatusPerVendor()
 }
+
+
+// (제거) collectionGroup('messages') 실시간 구독은 권한 이슈로 비활성화
+// let unsubRoomsMsg = null
+// function subscribeRoomsBizMessages(){ /* removed */ }
+
 
 /* ===== 운영자 권한 ===== */
 const ADMIN_EMAIL = 'gangtalk815@gmail.com'
@@ -1643,16 +1953,54 @@ const toMs = (v) => {
   if (v instanceof Date) return v.getTime()
   return 0
 }
-const isApproved = (s)=> (s?.approved === true) || (String(s?.applyStatus||'') === 'approved')
+
+// ✅ 승인된 업체만 현황판에 노출
+//    - 신청 시: applyStatus = 'pending', approved = false       → 미노출
+//    - 관리자 승인: applyStatus = 'approved', approved = true    → 노출
+//    - 옛날 데이터(둘 다 없는 경우)는 기존처럼 노출(호환용)
+const isApproved = (s)=>{
+  // 1) 강제로 숨기고 싶은 업체는 hidden: true 로 제어
+  if (s?.hidden === true) return false
+
+  const applyRaw = s?.applyStatus
+  const apply    = String(applyRaw || '').trim().toLowerCase()
+  const hasApply = applyRaw !== undefined
+
+  const approvedFlag    = s?.approved
+  const hasApprovedFlag = approvedFlag !== undefined
+
+  // 2) 예전 데이터: applyStatus / approved 둘 다 없으면 기본 승인 처리
+  if (!hasApply && !hasApprovedFlag) return true
+
+  // 3) 명시적으로 승인된 경우
+  if (
+    approvedFlag === true ||
+    ['approved', '승인', '완료'].includes(apply)
+  ) {
+    return true
+  }
+
+  // 4) 명시적으로 대기/거절/신청 상태인 경우 → 무조건 미승인 처리
+  if (
+    approvedFlag === false ||
+    [
+      'pending', '대기', 'waiting', '신청', '검토중',
+      'rejected', '거절', '반려'
+    ].includes(apply)
+  ) {
+    return false
+  }
+
+  // 5) 알 수 없는 값이 들어온 경우도 안전하게 미노출
+  return false
+}
+
+// 광고 기간(adStart/adEnd) 필터를 더 이상 사용하지 않는다.
+// 문서에 adStart/adEnd가 있어도, 메인 현황판에서는 무조건 통과.
 const isActiveAd = (s)=> {
-  const now = Date.now()
-  const start = toMs(s?.adStart) || 0
-  const end   = toMs(s?.adEnd)   || 0
-  if (!start && !end) return true
-  if (start && now < start) return false
-  if (end && now > end) return false
   return true
 }
+
 const exposedHere = (s)=> {
   const exp = s?.exposure || {}
   if (exp == null || typeof exp !== 'object') return true
@@ -1785,41 +2133,63 @@ function rangeByCategory(cat){
 }
 function computeStatus(s){
   const mode = String(s?.statusMode || 'auto')
+
+  // 수동 설정인 경우: 예전 라벨도 그대로 허용
   if (mode === 'manual'){
     const saved = String(s?.status || '')
-    if (['여유','보통','혼잡'].includes(saved)) return saved
+    if (['좋음','보통','나쁨','여유','혼잡'].includes(saved)) return saved
   }
+
   const cat = String(s?.category || 'etc')
   const { mMin, mMax, pMin, pMax } = rangeByCategory(cat)
   const match   = num(s?.match)
   const persons = num(s?.persons)
   const mN = normalize01(match,   mMin, mMax)
   const pN = normalize01(persons, pMin, pMax)
+
+  // ① 카테고리 기준 정규화 값 있는 경우
   if (mN != null && pN != null){
     const availability = (mN + pN) / 2
-    if (availability >= 0.60) return '여유'
+    if (availability >= 0.60) return '좋음'
     if (availability >= 0.30) return '보통'
-    return '혼잡'
+    return '나쁨'
   }
+
+  // ② 최대방수/최대인원 기반 비율 계산
   const totalRooms = num(s?.totalRooms ?? s?.total ?? s?.rooms)
   const maxPersons = num(s?.maxPersons ?? s?.capacity ?? s?.max)
   const rRooms  = (totalRooms > 0 && Number.isFinite(match))   ? (match   / totalRooms) : null
   const rPeople = (maxPersons > 0 && Number.isFinite(persons)) ? (persons / maxPersons) : null
+
   let availability
-  if (rPeople != null && rRooms != null) availability = (rPeople + rRooms) / 2
-  else if (rPeople != null)              availability = rPeople
-  else if (rRooms  != null)              availability = rRooms
-  else                                   availability = 1
-  if (availability >= 0.60) return '여유'
+  if (rPeople != null && rRooms != null)      availability = (rPeople + rRooms) / 2
+  else if (rPeople != null)                  availability = rPeople
+  else if (rRooms  != null)                  availability = rRooms
+  else                                       availability = 1
+
+  if (availability >= 0.60) return '좋음'
   if (availability >= 0.30) return '보통'
-  return '혼잡'
+  return '나쁨'
 }
+
 const wifiColor = (storeOrStatus)=>{
-  const st = typeof storeOrStatus === 'string' ? storeOrStatus : computeStatus(storeOrStatus || {})
-  if (st === '여유')  return 'ok'
-  if (st === '보통')  return 'mid'
-  return 'busy'
+  // ✅ rooms_biz가 아직 안 들어온 상태에서는 “중간(mid)” 로만 표시
+  if (!isRoomsBizReady.value) return 'mid'
+
+  const st = typeof storeOrStatus === 'string'
+    ? storeOrStatus
+    : computeStatus(storeOrStatus || {})
+
+  // 예전 라벨(여유/혼잡)도 그대로 해석
+  if (st === '좋음' || st === '여유')  return 'ok'
+  if (st === '보통')                    return 'mid'
+  if (st === '나쁨' || st === '혼잡')   return 'busy'
+
+  // 혹시 이상한 값이면 중간으로
+  return 'mid'
 }
+
+
 const demandStats = computed(() => {
   const acc = {}
   for (const s of stores.value) {
@@ -1831,10 +2201,26 @@ const demandStats = computed(() => {
   }
   return acc
 })
-function statusLabel(s){
+
+/* === 혼잡도 라벨 텍스트 === */
+const statusLabel = (s) => {
+  // ↑ 이제는 isRoomsBizReady와 상관없이
+  // 항상 computeStatus 결과를 바로 보여줍니다.
   const st = computeStatus(s)
-  return st === '여유' ? '좋음' : st === '보통' ? '보통' : '나쁨'
+
+  if (st === '좋음' || st === '여유') {
+    return '좋음'
+  } else if (st === '보통') {
+    return '보통'
+  } else if (st === '나쁨' || st === '혼잡') {
+    return '나쁨'
+  }
+
+  // 혹시 계산이 안 된 경우엔 그냥 빈 문자열(라벨 숨김)
+  return ''
 }
+
+
 
 /* 상세 */
 const openStore = (s)=> router.push({ name:'storeDetail', params:{ id:s.id } })
@@ -1888,8 +2274,25 @@ async function openChotok(s){
 async function openOpenChat(s){
   const storeId = String(s?.id || s?.storeId || '').trim()
   if (!storeId) return
-  const target = { name: 'openChat', params: { storeId }, query: { theme: theme.value } }
-  try{ await router.push(target) }catch{ router.replace({ ...target, query:{ ...target.query, ts: Date.now().toString() } }).catch(()=>{}) }
+
+  // ✅ ChatOpen 에 썸네일/이름을 같이 넘겨줌
+  const target = {
+    name: 'openChat',
+    params: { storeId },
+    query: {
+      theme: theme.value,
+      name : roomTitle(s),      // 상단 텍스트
+      thumb: thumbOf(s) || '',  // 현황판에서 이미 쓰고 있는 썸네일 URL
+    },
+  }
+
+  try {
+    await router.push(target)
+  } catch {
+    router
+      .replace({ ...target, query: { ...target.query, ts: Date.now().toString() } })
+      .catch(()=>{})
+  }
 }
 const openBizChat = openChotok
 function canWriteChatRooms(s){
@@ -1966,6 +2369,47 @@ function showSheet(type, s){
   sheet.value = { open:true, type, store:s }
 }
 function closeSheet(){ sheet.value.open = false }
+
+/* ✅ 담당자 리스트 시트 열기 */
+function openManagerList(s){
+  if (!s) return
+  const list = managersOf(s)
+  if (!list.length){
+    alert('등록된 담당자가 없습니다.')
+    return
+  }
+  // sheet.store 에 원본 store 객체를 넣어두고 type 으로 분기
+  sheet.value = { open:true, type:'managerList', store:s }
+}
+
+/* ✅ 담당 리스트에서 담당자 하나 선택했을 때:
+     1) 시트 닫기
+     2) 담당자 인덱스를 쿼리 파라미터로 넘겨서 업체 상세로 이동 */
+function onSelectManagerFromList(m, i){
+  const s = sheet.value.store
+  if (!s) return
+
+  // 1) 리스트 시트 닫기
+  closeSheet()
+
+  // 2) 안전한 인덱스 계산
+  const idx = Number.isFinite(Number(i)) ? Number(i) : 0
+
+  // 3) 기존 쿼리를 유지하면서 mgr 인덱스만 추가
+  const query = {
+    ...route.query,
+    mgr: String(idx),   // ← StoreDetail 에서 사용할 담당자 인덱스
+  }
+  // 예전에 쓰던 sheet/mi 는 제거 (하단 담당자 시트 안 뜨게)
+  delete query.sheet
+  delete query.mi
+
+  router.push({
+    name: 'storeDetail',
+    params: { id: s.id },
+    query,
+  }).catch(()=>{})
+}
 
 /* ✅ 기업회원 본인 글만 수정 허용 */
 function canEditStore(s){
@@ -2117,7 +2561,12 @@ onUnmounted(() => {
   const toUnsub = [unsubStores, unsubRooms, unsubLabels, unsubStatus, unsubOrder]
   for (const u of toUnsub) { try { if (typeof u === 'function') u() } catch {} }
   unsubStores = null; unsubRooms  = null; unsubLabels = null; unsubStatus = null; unsubOrder  = null
+
+  // ⛔ 여기서 isRoomsBizReady 를 false 로 초기화하지 않는다.
+  //    한 번이라도 rooms_biz를 받아온 이후에는,
+  //    같은 세션 안에서는 계속 숫자를 바로 보여주기 위함.
 })
+
 </script>
 
 <style scoped>
@@ -2129,7 +2578,8 @@ onUnmounted(() => {
 }
 
 .page{
-  padding-top: calc(8px + env(safe-area-inset-top));
+  /* ⬇️ 가게찾기 페이지와 상단 여백(검색창 높이) 맞추기 */
+  padding-top: 8px;
   padding-left:  max(12px, env(safe-area-inset-left));
   padding-right: max(12px, env(safe-area-inset-right));
   /* 하단 탭 + 홈인디케이터 만큼 여유 */
@@ -3005,4 +3455,68 @@ onUnmounted(() => {
   color:#444 !important;
   -webkit-text-fill-color:#444 !important;
 }
+
+/* ===== 담당자 리스트 시트 ===== */
+.mgr-list-sheet{
+  list-style:none;
+  margin:0;
+  padding:4px 0 0;
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+}
+
+.mgr-li-sheet{
+  display:grid;
+  grid-template-columns:48px 1fr auto;
+  align-items:center;
+  gap:10px;
+  padding:8px 10px;
+  border-radius:12px;
+  border:1px solid var(--line);
+  background:var(--surface);
+  box-shadow:0 2px 8px var(--shadow);
+  cursor:pointer;
+}
+
+.mgr-li-sheet:active{
+  transform:translateY(1px);
+  box-shadow:0 1px 4px var(--shadow);
+}
+
+.mgr-thumb{
+  width:48px;
+  height:48px;
+  border-radius:10px;
+  background-size:cover;
+  background-position:center;
+  background-color:#f2f2f4;
+}
+
+.mgr-li-main{
+  min-width:0;
+  display:flex;
+  flex-direction:column;
+  gap:2px;
+}
+
+.mgr-li-name{
+  font-size:14px;
+  font-weight:900;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+
+.mgr-li-sub{
+  font-size:12px;
+  color:var(--muted);
+}
+
+.mgr-li-arrow{
+  font-size:18px;
+  font-weight:700;
+  color:var(--muted);
+}
+
 </style>

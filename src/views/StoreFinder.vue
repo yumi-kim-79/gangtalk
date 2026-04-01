@@ -44,19 +44,26 @@
       </div>
     </section>
 
-    <!-- =================== 배너(실사) =================== -->
-    <section class="banners" v-if="oneBanner.length">
-      <!-- ⬇️ 좌상단 고정: '광고신청' (기업회원만 보임, 업체등록 토글과 동일 동작) -->
+    <!-- ✅ 배너 등록 버튼: 티커 아래, 배너 위 -->
+    <section v-if="isEnterprise" class="banner-cta">
       <button
-        v-if="isEnterprise"
-        class="ad-btn"
+        class="ad-btn pink-cta"
         type="button"
         @click.stop="toggleAdCreate($event)"
       >
-        <span v-if="!bizPanel.open || bizPanel.kind!=='ad'">광고신청</span>
+        <!-- 배너 등록일 때만 화살표 3개 + 텍스트 -->
+        <template v-if="!bizPanel.open || bizPanel.kind!=='ad'">
+          <span class="arrow-3">▼▼▼</span>
+          <span>배너 등록</span>
+        </template>
+
+        <!-- 패널이 열려 있을 때는 닫기 -->
         <span v-else>닫기</span>
       </button>
+    </section>
 
+    <!-- =================== 배너(실사) =================== -->
+    <section class="banners" v-if="oneBanner.length">
       <article
         v-for="b in oneBanner"
         :key="b.id || b._key || b.title"
@@ -130,14 +137,6 @@
       </ul>
     </section>
 
-    <!-- =================== 기업회원 빠른 등록신청 버튼(트리거만) =================== -->
-    <section v-if="isEnterprise" class="biz-quick-row">
-      <button class="sqc-btn" type="button" @click="toggleBizCreate($event)">
-        <span v-if="!bizPanel.open || bizPanel.kind!=='store'">업체등록</span>
-        <span v-else>닫기</span>
-      </button>
-    </section>
-
     <!-- ❌ 인라인 마운트 제거: BizManagerTabs는 아래 오버레이 안에서 렌더링 -->
 
         <!-- ▽ 운영자 전용: 순위 편집 툴바 (기준 페이지와 동일 UI) -->
@@ -176,11 +175,24 @@
         <!-- =================== 카테고리 인기 순위 =================== -->
         <section class="tops">
           <div class="tops-head">
-            <h3 class="sec-ttl">카테고리 인기 순위</h3>
+            <!-- 글씨만 제거, 레이아웃 유지 -->
+            <h3 class="sec-ttl"></h3>
           </div>
 
       <div v-for="sec in topLists" :key="sec.key" class="top-sec">
-        <div class="top-head"><span class="ttl">{{ sec.label }} Top 5</span></div>
+        <div class="top-head">
+          <span class="ttl">{{ sec.label }} Top 5</span>
+
+          <!-- ✅ Top5 등록 버튼: 제목 오른쪽 (기업회원만 보임) -->
+          <button
+            v-if="isEnterprise"
+            class="pink-cta top5-btn"
+            type="button"
+            @click="toggleBizCreate($event)"
+          >
+            Top5 등록
+          </button>
+        </div>
         <div class="top-row">
           <button
             v-for="(s,i) in sec.list"
@@ -249,6 +261,7 @@
    <section class="list-head" id="list">
      <!-- “총 N개” 제거하고 정렬만 좌측에 배치 -->
      <div class="filter-row only-sort">
+       <!-- 📌 정렬(티시 높은순 등) 버튼: 왼쪽 -->
        <div class="filter">
          <button class="drop" type="button" @click.stop="toggleSort">{{ sortLabel }} 🔽</button>
          <ul v-if="ui.sortOpen" class="menu right" @click.self="ui.sortOpen=false">
@@ -257,7 +270,18 @@
            </li>
          </ul>
        </div>
+
+       <!-- ✅ 일반등록 버튼: 정렬 오른쪽 -->
+       <button
+         v-if="isEnterprise"
+         class="pink-cta list-reg-btn"
+         type="button"
+         @click="toggleBizCreate($event)"
+       >
+         일반등록
+       </button>
      </div>
+
       <div class="view-tools" @click.stop>
         <!-- 🌗 다크/화이트 모드 -->
         <button
@@ -293,32 +317,37 @@
           </svg>
         </button>
 
-        <!-- 📋 리스트 보기 -->
+        <!-- 📋/🗂 한줄/두칸 토글 (단일 버튼) -->
         <button
           class="tool"
-          :class="{ on: view==='list' }"
-          title="한줄보기"
-          aria-label="한줄보기"
+          :class="{ on: isListView }"
+          :title="isListView ? '두칸보기' : '한줄보기'"
+          :aria-label="isListView ? '두칸보기로 전환' : '한줄보기로 전환'"
           type="button"
-          @click.stop.prevent="setView('list')"
-          @touchstart.stop.prevent="setView('list')"
+          @click.stop.prevent="toggleViewMode"
+          @touchstart.stop.prevent="toggleViewMode"
         >
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-            <path d="M4 7h16M4 12h16M4 17h16"/>
+          <!-- 현재 한줄보기일 때: 리스트 아이콘 -->
+          <svg
+            v-if="isListView"
+            viewBox="0 0 24 24"
+            width="18"
+            height="18"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+          >
+            <path d="M4 7h16M4 12h16M4 17h16" />
           </svg>
-        </button>
-
-        <!-- 🗂 그리드 보기 -->
-        <button
-          class="tool"
-          :class="{ on: view==='grid' }"
-          title="두칸보기"
-          aria-label="두칸보기"
-          type="button"
-          @click.stop.prevent="setView('grid')"
-          @touchstart.stop.prevent="setView('grid')"
-        >
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+          <!-- 현재 두칸보기일 때: 그리드 아이콘 -->
+          <svg
+            v-else
+            viewBox="0 0 24 24"
+            width="18"
+            height="18"
+            fill="currentColor"
+          >
             <rect x="4" y="4" width="7" height="7" rx="1"></rect>
             <rect x="13" y="4" width="7" height="7" rx="1"></rect>
             <rect x="4" y="13" width="7" height="7" rx="1"></rect>
@@ -347,7 +376,7 @@
     <!-- StoreFinder.vue (일부) -->
     <!-- ✅ likes-of 전달 -->
     <StoreListView
-      v-if="view==='list'"
+      v-if="isListView"
       :filtered="filtered"
       :map-cat="mapCat"
       :thumb-of="thumbOf"
@@ -581,9 +610,13 @@ function openStoreFromHot(item){
   hotSheet.value.open = false
 }
 
-/* ───────────────────────── 검색 ───────────────────────── */
+// ───────────────────────── 검색 ───────────────────────── */
 const q = ref((route.query.q || '').toString())
-const searchPlaceholder = '가게명을 입력해 보세요'
+
+// 현황판(가게찾기) 상단 검색창 문구
+// → 업체명, 담당자명 중심으로 안내
+const searchPlaceholder = '업체명, 담당자명을 입력해 보세요.'
+
 function scrollToList(){ document.getElementById('list')?.scrollIntoView({ behavior:'smooth', block:'start' }) }
 const doSearch = ()=>{
   router.replace({ query: { ...route.query, q: q.value || undefined } })
@@ -617,16 +650,21 @@ function onBannerClick(){ scrollToList() }
 
 /* ───────────────────────── 카테고리/정렬 ───────────────────────── */
 const categories = [
-  { key:'all',    label:'',      emoji:'' },     // 전체: 표시를 비움(현재 지역만 보이게)
-  { key:'hopper', label:'하퍼',   badge:'H' },
-  { key:'point5', label:'쩜오',   badge:'5' },
-  { key:'ten',    label:'텐카페', badge:'10' },
-  { key:'tenpro', label:'텐프로', badge:'TP' },
-  { key:'onep',   label:'1%',     badge:'1%' },
-  { key:'nrb',    label:'노래방', emoji:'🎤' },
-  { key:'kara',   label:'가라오케', emoji:'🎶' },
-  { key:'bar',    label:'바',     emoji:'🍸' },
-  { key:'lounge', label:'라운지', emoji:'🛋️' },
+  // 1줄: 전체, 하퍼, 쩜오, 텐카페, 텐프로, 1%
+  { key:'all',     label:'',       emoji:'' },     // 전체: 현재 지역만 표시
+  { key:'hopper',  label:'하퍼',    badge:'H' },
+  { key:'point5',  label:'쩜오',    badge:'5' },
+  { key:'ten',     label:'텐카페',  badge:'10' },
+  { key:'tenpro',  label:'텐프로',  badge:'TP' },
+  { key:'onep',    label:'1%',      badge:'1%' },
+
+  // 2줄: (비워두기용) + 노래방, 가라오케, 바, 라운지, 기타
+  { key:'spacer',  label:'',       emoji:'' },     // 두 번째 줄 첫 칸 비우기용
+  { key:'nrb',     label:'노래방',   emoji:'🎤' },
+  { key:'kara',    label:'가라오케', emoji:'🎶' },
+  { key:'bar',     label:'바',       emoji:'🍸' },
+  { key:'lounge',  label:'라운지',   emoji:'🛋️' },
+  { key:'etc',     label:'기타',     emoji:'📌' },
 ]
 const mapCat = Object.fromEntries(categories.map(c=>[c.key,c.label || c.key]))
 const validType  = (t)=> t === 'all' || categories.some(c=>c.key===String(t))
@@ -696,9 +734,30 @@ function closeBiz(){
   window.removeEventListener('resize', onReposition)
 }
 
+// ✅ 가게찾기 > 업체등록 버튼
+//  - 더 이상 플로팅 패널을 열지 않고
+//  - 기존 "업체 등록/편집" 화면(MyStoresPage)으로 바로 이동
 async function toggleBizCreate(evt){
-  if (!bizPanel.value.open || bizPanel.value.kind !== 'store') await openBiz('store', evt)
-  else closeBiz()
+  // 기업회원이 아닌 경우 로그인/회원가입으로 보냄
+  if (!auth.currentUser) {
+    alert('기업회원 로그인 후 이용해 주세요.')
+    router.push({
+      name: 'auth',
+      query: {
+        next: route.fullPath || '/find',
+        mode: 'login',
+        who: 'biz',
+      },
+    })
+    return
+  }
+
+  // 바로 새 업체 등록 폼으로 이동
+  router.push({
+    name: 'storeEdit',
+    params: { id: 'new' },          // 새 업체 등록용 id
+    query:  { from: route.name || 'finder' },
+  }).catch(()=>{})
 }
 
 async function toggleAdCreate(evt){
@@ -781,11 +840,56 @@ function firstManagerName(s){
   if (arr.length && arr[0]?.name) return arr[0].name
   return s?.manager || ''
 }
+
+/**
+ * 검색에 사용할 텍스트 전체 묶기
+ * - 업체명(name)
+ * - 담당자명(firstManagerName)
+ * - 광고/이벤트 제목(adTitle)
+ * - 설명/시술명/부위/이벤트 내용(desc, description)
+ * - 태그/서비스/이벤트 배열(tags, services, events)
+ */
+function searchTextOf(s){
+  const manager = firstManagerName(s)
+  const tags     = Array.isArray(s?.tags)     ? s.tags.join(' ')     : ''
+  const services = Array.isArray(s?.services) ? s.services.join(' ') : ''
+  const events   = Array.isArray(s?.events)   ? s.events.join(' ')   : ''
+
+  return [
+    s?.name,
+    manager,
+    s?.adTitle,
+    s?.desc,
+    s?.description,
+    tags,
+    services,
+    events,
+  ].map(norm).filter(Boolean).join(' ')
+}
+
+/**
+ * 검색어 매칭 여부
+ * - 입력된 단어(공백으로 분리)들이 searchTextOf 안에 모두 포함되면 true
+ */
+function matchesQuery(s, query){
+  const text = searchTextOf(s)
+  if (!text) return false
+  const qs = tokens(query)
+  if (!qs.length) return true
+  return qs.every(tok => text.includes(tok))
+}
+
 function relevanceScore(s, query){
   const qs = tokens(query)
   if (!qs.length) return 0
-  const hay = [s?.name, s?.adTitle || s?.desc, s?.region, categoryLabelOf(s), firstManagerName(s)]
-    .map(norm).filter(Boolean)
+
+  // 업체명/담당자/시술/이벤트 등을 모두 포함한 검색 텍스트
+  const hay = [
+    searchTextOf(s),
+    s?.region,
+    categoryLabelOf(s),
+  ].map(norm).filter(Boolean)
+
   let score = 0
   for (const qtok of qs){
     for (const h of hay){
@@ -794,6 +898,8 @@ function relevanceScore(s, query){
       else if (h.includes(qtok)) score += 4
     }
   }
+
+  // 업체명(name)에 조금 더 가중치
   const name = norm(s?.name)
   for (const qtok of qs){
     if (name === qtok) score += 10
@@ -804,8 +910,19 @@ function relevanceScore(s, query){
 }
 
 /* ───────────────────────── Firestore 목록 ───────────────────────── */
-const stores = ref([])
-let unsubs = null
+/**
+ * storesRaw  : Firestore 원본 stores
+ * stores     : rooms_biz 집계와 섞어서 화면에 쓰는 최종 데이터
+ * roomsBizMap: rooms_biz 전체를 메모리 맵으로 보관 (id / storeId / roomBizId 모두 키)
+ */
+const storesRaw   = ref([])
+const stores      = ref([])
+const roomsBizMap = ref(new Map())
+
+let unsubsStores   = null
+let unsubsRoomsBiz = null
+
+// 썸네일 공통
 const FALLBACK_THUMB = {
   lounge : 'https://images.unsplash.com/photo-1543007630-9710e4a00a20?q=80&w=1200&auto=format&fit=crop',
   bar    : 'https://images.unsplash.com/photo-1532634896-26909d0d4b6a?q=80&w=1200&auto=format&fit=crop',
@@ -817,11 +934,19 @@ const FALLBACK_THUMB = {
   onep   : 'https://images.unsplash.com/photo-1514361892636-7f05f1d2710f?q=80&w=1200&auto=format&fit=crop',
   default: 'https://images.unsplash.com/photo-1521017432531-fbd92d59d4b1?q=80&w=1200&auto=format&fit=crop',
 }
+
 async function resolveThumb(u){
   const url = String(u || '').trim()
   if (!url) return ''
   if (/^(data:|blob:|https?:\/\/|\/)/i.test(url)) return url
-  if (url.startsWith('gs://')){ try { return await getDownloadURL(sRef(storage, url)) } catch(e){ console.warn('getDownloadURL 실패:', e); return '' } }
+  if (url.startsWith('gs://')){
+    try{
+      return await getDownloadURL(sRef(storage, url))
+    }catch(e){
+      console.warn('getDownloadURL 실패:', e)
+      return ''
+    }
+  }
   return url
 }
 function thumbCandidate(s){
@@ -833,10 +958,61 @@ function thumbCandidate(s){
   return String(cand || '').trim()
 }
 const thumbOf = (s)=> (s._thumb || s.thumb || '')
+
+/** rooms_biz 값으로 stores 숫자 필드 보정 (초톡과 동일 기준) */
+function rebuildStores(){
+  const rbMap = roomsBizMap.value || new Map()
+
+  stores.value = storesRaw.value.map(raw => {
+    const s = { ...raw }
+
+    // rooms_biz 문서 키 후보들
+    const candidates = [
+      s.roomBizId,   // 최근에 맞춰둔 필드
+      s.rooms_biz,   // 예전 필드
+      s.storeKey,    // store_mf54rsfl 등
+      s.id,          // 혹시 id 자체가 동일한 경우
+    ]
+      .map(v => String(v || '').trim())
+      .filter(Boolean)
+
+    let rb = null
+    for (const key of candidates){
+      const baseKey = key.replace(/_room_.+$/i, '') // store_xxx_room_01 → store_xxx
+      rb = rbMap.get(baseKey) || rbMap.get(key)
+      if (rb) break
+    }
+
+    if (rb){
+      const totalRooms     = Number(rb.totalRooms ?? rb.total ?? 0)
+      const totalCurrent   = Number(rb.totalCurrent ?? 0)
+      const totalNeeded    = Number(rb.totalNeeded ?? 0)
+      const totalRemaining = Number(
+        rb.totalRemaining ??
+        (totalNeeded && totalCurrent ? (totalNeeded - totalCurrent) : 0)
+      )
+
+      // 🔴 여기서 “초톡 상단”과 완전히 동일하게 맞춤
+      //    맞출방  = totalRooms
+      //    필요인원 = totalRemaining
+      s.match          = totalRooms
+      s.persons        = totalRemaining
+      s.totalRooms     = totalRooms
+      s.totalNeeded    = totalNeeded
+      s.totalRemaining = totalRemaining
+      s._roomsBizId    = rb.id || rb.roomBizId || rb.storeId || null
+    }
+
+    return s
+  })
+}
+
+// Firestore 구독
 onMounted(() => {
+  // 1) stores 컬렉션
   try{
     const qRef = query(collection(db, 'stores'), orderBy('updatedAt','desc'))
-    unsubs = onSnapshot(qRef, async (snap)=>{
+    unsubsStores = onSnapshot(qRef, async (snap)=>{
       const rows = await Promise.all(
         snap.docs.map(async d => {
           const raw = { id:d.id, ...d.data() }
@@ -850,11 +1026,41 @@ onMounted(() => {
           return { ...raw, _thumb: resolved, adTitle }
         })
       )
-      stores.value = rows
+      storesRaw.value = rows
+      rebuildStores()   // rooms_biz 값과 합쳐서 최종 stores 구성
     })
-  }catch(e){ console.warn('stores 구독 실패', e) }
+  }catch(e){
+    console.warn('stores 구독 실패', e)
+  }
+
+  // 2) rooms_biz 컬렉션 (초톡과 같은 소스)
+  try{
+    const rRef = collection(db, 'rooms_biz')
+    unsubsRoomsBiz = onSnapshot(rRef, snap => {
+      const map = new Map()
+      snap.forEach(d => {
+        const data   = d.data() || {}
+        const docId  = String(d.id)
+        const roomId = String(data.roomBizId || '').trim()
+        const storeId= String(data.storeId   || '').trim()
+
+        const merged = { id: docId, ...data }
+        map.set(docId, merged)
+        if (roomId)  map.set(roomId, merged)
+        if (storeId) map.set(storeId, merged)
+      })
+      roomsBizMap.value = map
+      rebuildStores()   // rooms_biz 갱신 시에도 다시 머지
+    })
+  }catch(e){
+    console.warn('rooms_biz 구독 실패', e)
+  }
 })
-onUnmounted(() => { if (typeof unsubs === 'function') unsubs() })
+
+onUnmounted(() => {
+  if (typeof unsubsStores   === 'function') unsubsStores()
+  if (typeof unsubsRoomsBiz === 'function') unsubsRoomsBiz()
+})
 
 /* ───────────────────────── 새로고침(샘플 변동) ───────────────────────── */
 function refresh(){
@@ -929,6 +1135,7 @@ const wifiColor = (storeOrStatus)=>{
 }
 
 /* ───────────────────────── 지역 매핑/노출 필터 ───────────────────────── */
+/* ───────────────────────── 지역 매핑/노출 필터 ───────────────────────── */
 const macroOf = (s)=>{
   const r = String(s.region || '')
   if (['강남','서초','송파','신사','논현'].includes(r)) return 'gn'
@@ -936,24 +1143,49 @@ const macroOf = (s)=>{
   if (r === '인천') return 'ic'
   return 'bg'
 }
+
 const toMs = (v) => {
   if (!v) return 0
   if (typeof v === 'number') return v
   if (v?.toDate) return v.toDate().getTime()
-  if (typeof v.seconds === 'number') return v.seconds*1000 + Math.floor((v.nanoseconds||0)/1e6)
+  if (typeof v.seconds === 'number') {
+    return v.seconds * 1000 + Math.floor((v.nanoseconds || 0) / 1e6)
+  }
   if (v instanceof Date) return v.getTime()
   return 0
 }
-const isApproved = (s)=> (s?.approved === true) || (String(s?.applyStatus||'') === 'approved')
-const isActiveAd = (s)=> {
-  const now = Date.now()
-  const start = toMs(s?.adStart) || 0
-  const end   = toMs(s?.adEnd)   || 0
-  if (!start && !end) return true
-  if (start && now < start) return false
-  if (end && now > end) return false
+
+/**
+ * ✅ 승인 여부 판단 (현황판과 동일 정책)
+ *  - s.approved === true
+ *  - applyStatus = 'approved' / 'active'
+ *  - applyStatus 비어 있고 active === true 인 경우도 노출
+ */
+const isApproved = (s) => {
+  const status = String(s?.applyStatus || '').toLowerCase()
+
+  // 예전 필드: approved === true
+  if (s?.approved === true) return true
+
+  // 상태 문자열 기반
+  if (status === 'approved' || status === 'active') return true
+
+  // 새 구조: 신청 상태는 비어 있고, active 플래그만 true 인 업체
+  if (!status && s?.active === true) return true
+
+  // 그 외는 미승인으로 취급
+  return false
+}
+
+/**
+ * ✅ 광고 기간 필터 비활성화
+ *  - adStart / adEnd 값이 있어도 "가게찾기"에서는 무시하고 항상 true
+ *  - 실제 광고 과금/관리 로직은 다른 레벨에서 처리
+ */
+const isActiveAd = (s) => {
   return true
 }
+
 const EXPOSURE_KEY = 'gangtalk'
 const exposedHere = (s)=> {
   const exp = s?.exposure || {}
@@ -1015,20 +1247,39 @@ function openHotDetail(name){
 }
 
 /* ───────────────────────── 기업회원 여부 ───────────────────────── */
+/**
+ * 가게찾기 페이지용 기업회원 판별
+ *  - type === 'company'
+ *  - accountKind === 'storeOwner' 인 경우에만 true
+ *  - 제휴관 담당자(partnerOwner)는 false 처리
+ */
 const isEnterprise = ref(false)
 
 async function resolveEnterprise(u){
-  if(!u){ isEnterprise.value = false; return }
-  try{
+  if (!u) {
+    isEnterprise.value = false
+    return
+  }
+  try {
     const snap = await getDoc(doc(db, 'users', u.uid))
-    const t = snap.exists() ? (snap.data()?.type || snap.data()?.profile?.type) : ''
-    const s = String(t||'').toLowerCase()
-    isEnterprise.value = (s === 'company' || s === 'enterprise')
-  }catch{
+    if (!snap.exists()) {
+      isEnterprise.value = false
+      return
+    }
+
+    const data = snap.data() || {}
+    const type = String(data.type || data.profile?.type || '').toLowerCase()
+    const kind = String(data.accountKind || '').toLowerCase()
+
+    // 회사 + storeOwner 일 때만 가게찾기용 기업회원
+    isEnterprise.value = (type === 'company' && kind === 'storeowner')
+  } catch (e) {
+    console.warn('resolveEnterprise 실패:', e)
     isEnterprise.value = false
   }
 }
-onMounted(()=>{
+
+onMounted(() => {
   resolveEnterprise(auth.currentUser)
   onAuthStateChanged(auth, resolveEnterprise)
 })
@@ -1055,13 +1306,24 @@ onUnmounted(() => { if (_adminUnsub) _adminUnsub() })
 /* ───────────────────────── Top5 데이터 ───────────────────────── */
 const topByCat = (k)=> {
   const base = stores.value.filter(s =>
-    s.category===k &&
-    (selectedRegion.value==='all' ? true : macroOf(s)===selectedRegion.value)
+    s.category === k &&
+    isApproved(s) &&          // ✅ 승인된 업체만
+    isActiveAd(s) &&          // ✅ (현재는 항상 true지만 정책 일치)
+    exposedHere(s) &&         // ✅ 이 화면에 노출 허용된 곳만
+    (selectedRegion.value === 'all' ? true : macroOf(s) === selectedRegion.value)
   )
+
   const k2 = sortKey.value
-  const byKey = (s) => (k2==='rooms' ? roomsOf(s) : k2==='likes' ? likesOf(s) : tcOf(s))
-  return base.slice().sort((a,b)=> byKey(b)-byKey(a)).slice(0,5)
+  const byKey = (s) =>
+    (k2 === 'rooms'
+      ? roomsOf(s)
+      : k2 === 'likes'
+        ? likesOf(s)
+        : tcOf(s))
+
+  return base.slice().sort((a, b) => byKey(b) - byKey(a)).slice(0, 5)
 }
+
 const storeIndex = computed(()=> {
   const map = new Map()
   for (const s of stores.value) map.set(String(s.id), s)
@@ -1069,8 +1331,19 @@ const storeIndex = computed(()=> {
 })
 function topFromRanks(catKey){
   const ids = Array.isArray(topRanks.value?.[catKey]) ? topRanks.value[catKey] : []
-  const list = ids.map(id => storeIndex.value.get(String(id))).filter(Boolean)
-  return list.slice(0,5)
+
+  const list = ids
+    .map(id => storeIndex.value.get(String(id)))
+    .filter(s =>
+      !!s &&
+      isApproved(s) &&      // ✅ 승인된 업체만
+      isActiveAd(s) &&      // ✅ 광고 기간 필터(현재 항상 true지만 유지)
+      exposedHere(s) &&     // ✅ 이 화면 노출 허용
+      (selectedRegion.value === 'all' ? true : macroOf(s) === selectedRegion.value) &&
+      (type.value === 'all' ? true : s.category === catKey)
+    )
+
+  return list.slice(0, 5)
 }
 
 /* 표시용 Top 리스트: 수동 > 자동 */
@@ -1137,7 +1410,11 @@ function baseFiltered(){
     const okApproved = isApproved(s)
     const okPeriod   = isActiveAd(s)
     const okT = type.value==='all' || s.category===type.value
-    const okQ = !q.value || String(s.name || '').toLowerCase().includes(q.value.toLowerCase())
+
+    // 🔍 검색어가 있을 때:
+    //  - 업체명, 담당자명, 시술명/부위, 이벤트(광고 제목/태그 등)를 모두 포함한 searchTextOf 기준으로 매칭
+    const okQ = !q.value || matchesQuery(s, q.value)
+
     const okR = selectedRegion.value==='all' || macroOf(s)===selectedRegion.value
     return okExpose && okApproved && okPeriod && okT && okQ && okR
   })
@@ -1227,6 +1504,10 @@ async function saveTopRanksNow(){
 async function reloadTopRanks(){ topRanks.value = { ...topRanks.value }; listOrders.value = { ...listOrders.value } }
 
 const view = ref((route.query.view || localStorage.getItem('finder:view') || 'list').toString())
+
+// ▶ 현재 한줄 보기 여부 (단일 아이콘 토글용)
+const isListView = computed(() => view.value === 'list')
+
 async function setView(v){
   if (v !== 'list' && v !== 'grid') return
   const y = window.scrollY
@@ -1236,6 +1517,14 @@ async function setView(v){
   await nextTick()
   window.scrollTo({ top: y, left: 0, behavior: 'auto' })
 }
+
+// ▶ 다크/화이트 토글처럼 한 버튼으로 리스트/그리드 전환
+function toggleViewMode () {
+  const next = isListView.value ? 'grid' : 'list'
+  // 기존 setView 로직 재사용(스크롤 위치 유지 포함)
+  setView(next)
+}
+
 watch(() => route.query.view, (nv) => { if (nv && nv !== view.value) view.value = String(nv) })
 
 function applyThemeFromQuery(){
@@ -1443,14 +1732,14 @@ function toggleSort(){ ui.value.sortOpen = !ui.value.sortOpen; if(ui.value.sortO
 :root{
   --search-height: 32px;
   --hot-height:    32px;
-  --search-gap-top:    6px;
-  --search-gap-bottom: 10px;
+  --search-gap-top:    4px;
+  --search-gap-bottom: 6px;
 }
 
 .search-wrap{ display:flex; flex-direction:column; gap:6px; margin:0; }
 .search-lock{ padding-block: var(--search-gap-top) var(--search-gap-bottom); }
 .search-lock > :first-child{ min-height: var(--search-height); display:flex; align-items:center; }
-.banners, .cats, .tops, .list-head{ margin-top:12px; }
+.banners, .cats, .tops, .list-head{ margin-top:8px; }
 
 /* =============================
    HOT Ticker (상단: 세로 1줄)
@@ -1529,7 +1818,7 @@ function toggleSort(){ ui.value.sortOpen = !ui.value.sortOpen; if(ui.value.sortO
 /* =============================
    Banner
 ============================= */
-.banners{ display:flex; flex-direction:column; gap:10px; margin:6px 0 12px }
+.banners{ display:flex; flex-direction:column; gap:8px; margin:4px 0 6px }
 .banner{ position:relative; overflow:hidden; display:block; border-radius:16px; box-shadow:0 6px 16px var(--shadow); background:transparent; padding:0; }
 .banner-img{ display:block; width:100%; height:auto; object-fit:contain; }
 .banner-left, .banner-rt{ position:absolute; z-index:2 }
@@ -1545,7 +1834,7 @@ function toggleSort(){ ui.value.sortOpen = !ui.value.sortOpen; if(ui.value.sortO
 /* =============================
    Categories / Filters
 ============================= */
-.cats{ position:relative; margin:14px 0 16px }  /* ↑ 공간 확보 */
+.cats{ position:relative; margin:4px 0 4px }  /* ↑ 공간 확보 */
 .sec-ttl{ margin:0 0 6px; font-size:14px }
 .tops-head{ display:flex; align-items:center; justify-content:space-between; gap:8px; margin:0 0 6px; }
 
@@ -1578,33 +1867,60 @@ function toggleSort(){ ui.value.sortOpen = !ui.value.sortOpen; if(ui.value.sortO
 /* ▶ 카테고리 라벨을 한 단계 더 작게(가독 유지 범위) */
 /* 카테고리 변수 (간격/높이 조정) */
 :root{
-  /* ▶ 타일 높이를 늘려 아이콘/라벨이 겹치지 않게 */
-  --cat-h:        44px;   /* 32px → 44px */
-  --cat-gap:      10px;   /* 8px  → 10px (아이콘-텍스트 간격 조금 더) */
-  --cat-badge:     20px;  /* 원 배지 기준 크기 */
+  /* ▶ 라인 맞추기 + 높이/간격 최소화 */
+  --cat-h:        38px;   /* 행 높이 약간 낮춤 */
+  --cat-gap:       6px;   /* 아이콘-텍스트 간격 축소 */
+  --cat-badge:    20px;
   --cat-font:      8.6px;
   --cat-ico:      12px;
 }
 
-/* 카테고리 그리드: 타일 사이 간격 확대 */
+/* 카테고리 그리드: 위·아래 행 간격 줄이기 */
 .cat-grid{
-  display:grid; grid-template-columns:repeat(5, minmax(0,1fr));
-  gap:8px;                 /* 4 → 8 */
-  padding:2px 0;
+  display:grid;
+  grid-template-columns:repeat(6, minmax(0,1fr));
+  row-gap:4px;
+  column-gap:6px;
+  padding:0;
+}
+
+/* 두 번째 줄 첫 칸(빈 칸)용 spacer: 자리는 차지하지만 보이지 않고 클릭도 안 됨 */
+.cat[data-key="spacer"]{
+  visibility: hidden;
+  pointer-events: none;
 }
 
 /* 타일: 내부 세로 간격을 변수로 통일 */
+/* 각 카테고리를 둥근 사각형 박스로 */
 .cat{
   height:var(--cat-h);
-  border:0 !important;
-  background:transparent !important;
-  box-shadow:none !important;
+  padding:4px 2px;
+  border-radius:14px;
+  border:1px solid var(--line);
+  background:#fff;
+  box-shadow:0 2px 6px var(--shadow);
   display:flex; flex-direction:column; align-items:center; justify-content:center;
   gap:var(--cat-gap);
-  color:#111; transition:transform .08s ease; position:relative;
+  color:#111;
+  transition:
+    transform .08s ease,
+    box-shadow .08s ease,
+    border-color .08s ease,
+    background-color .08s ease;
+  position:relative;
 }
-.cat.active{ outline:0 !important; }     /* 활성 윤곽선 제거 */
-.cat:active{ transform:scale(.985) }
+
+/* 선택된 카테고리: 테두리·배경만 살짝 강조 */
+.cat.active{
+  outline:0;
+  border-color:color-mix(in oklab, var(--accent), #ffffff 60%);
+  background:color-mix(in oklab, var(--accent), #ffffff 90%);
+  box-shadow:0 3px 8px var(--shadow);
+}
+
+.cat:active{
+  transform:scale(.97);
+}
 
 /* 아이콘/텍스트는 그대로 노출 */
 .ico{
@@ -1641,8 +1957,8 @@ function toggleSort(){ ui.value.sortOpen = !ui.value.sortOpen; if(ui.value.sortO
 .cat .lbl{
   width:100%;
   display:flex; align-items:center; justify-content:center;
-  gap:4px; padding:0 6px; min-width:0;
-  margin-top: 2px;                  /* 아이콘과 라벨 사이 간격 보강 */
+  gap:3px; padding:0 4px; min-width:0;
+  margin-top: 0;                    /* 위아래 공간 최소화 */
 }
 
 /* 지역명(‘전체’ 타일) 스타일은 그대로 유지 */
@@ -1665,7 +1981,7 @@ function toggleSort(){ ui.value.sortOpen = !ui.value.sortOpen; if(ui.value.sortO
 /* =============================
    Top Sections & Cards
 ============================= */
-.tops{ margin:12px 0 6px }
+.tops{ margin:4px 0 4px }
 .rank-tools{ display:flex; align-items:center; gap:10px; }
 .toggle{ display:flex; align-items:center; gap:8px; font-weight:800; }
 .toggle input[type="checkbox"]{
@@ -1979,29 +2295,74 @@ function toggleSort(){ ui.value.sortOpen = !ui.value.sortOpen; if(ui.value.sortO
 /* 기업회원 빠른 버튼 섹션 여백 */
 .biz-quick-row{ margin: 8px 0 4px; }
 
-/* 페이지 안에서 쓰는 '업체등록/닫기' 토글 버튼 */
+/* 기업회원 빠른 버튼 섹션 여백 */
+.biz-quick-row{ margin: 8px 0 4px; }
+
+/* 페이지 안에서 쓰는 '업체등록/Top5 등록' 토글 버튼 */
 .sqc-btn{
   font-weight: 800; font-size: 12px;
   padding: 8px 14px; border-radius: 999px;
   border: 1px solid var(--line); background: #fff; color:#111;
   box-shadow: 0 4px 10px var(--shadow);
 }
-/* 배너 위 좌상단 고정 ‘광고신청’ 버튼 */
-.banners{ position: relative; } /* 버튼 기준이 되도록 섹션을 기준화 */
+
+/* ✅ 광고신청(→ 배너 등록) 버튼: 티커 아래, 배너 위 섹션 */
+.banner-cta{
+  margin: 4px 0 4px;
+  display:flex;
+  justify-content:flex-start;  /* 필요하면 center 로 바꿔도 됨 */
+}
+
+/* 광고신청/배너등록 버튼 공통 스타일 */
 .ad-btn{
-  position: absolute;
-  left: 10px;
-  top: 10px;
-  z-index: 5;
+  font-weight: 900;
+  font-size: 12px;
   padding: 8px 14px;
   border-radius: 999px;
   border: 1px solid var(--line);
   background: #fff;
   color: #111;
-  font-weight: 900;
-  font-size: 12px;
   box-shadow: 0 4px 10px var(--shadow);
 }
+
+/* ───────── 공통: 연핑크 CTA 버튼(배너등록 / Top5 등록 / 일반등록) ───────── */
+.pink-cta{
+  background: #FFE6EF;          /* 연핑크 배경 */
+  border-color: #FFC7D8;        /* 조금 진한 핑크 테두리 */
+  color: #8A2241;               /* 진한 핑크 텍스트 */
+  font-weight: 800;
+}
+
+.pink-cta:active{
+  transform: translateY(1px);
+  box-shadow: 0 2px 6px rgba(0,0,0,.18);
+}
+
+/* 배너 등록 버튼 앞쪽 화살표 3개 */
+.arrow-3{
+  margin-right: 4px;
+  font-size: 11px;
+  letter-spacing: 1px;          /* 화살표 사이 간격 살짝 띄우기 */
+}
+
+/* 리스트 상단에 들어간 '일반등록' 버튼 정렬용 */
+.list-reg-btn{
+  margin-left: 6px;        /* ▶ 이제 오른쪽에 있어서 왼쪽 여백 */
+  height: 30px;
+  padding-inline: 10px;
+  border-radius: 999px;
+  font-size: 12px;
+}
+
+/* Top5 제목 오른쪽에 붙는 Top5 등록 버튼 */
+.top5-btn{
+  margin-left: auto;       /* 제목과 자동 간격 → 오른쪽 정렬 */
+  height: 26px;
+  padding: 0 10px;
+  font-size: 12px;
+  border-radius: 999px;
+}
+
 /* ========= 등록 패널 오버레이 ========= */
 /* ========= 버튼 바로 밑에 붙는 플로팅 패널 ========= */
 .biz-fly{

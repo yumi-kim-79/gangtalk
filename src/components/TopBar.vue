@@ -33,6 +33,27 @@
       <nav class="actions" aria-label="상단 작업">
         <!-- 🔔 관리자 알림 버튼 제거됨 -->
 
+        <!-- ❓ 헬프 아이콘 추가 -->
+        <button
+          class="round-icon help"
+          title="도움말"
+          aria-label="도움말"
+          type="button"
+          @click="router.push('/help')"
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="1.8"/>
+            <path
+              d="M9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.9.4-1.5 1.1-1.5 2v1"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.8"
+              stroke-linecap="round"
+            />
+            <circle cx="12" cy="17" r="1" fill="currentColor"/>
+          </svg>
+        </button>
+
         <!-- 📒 마이 다이어리 -->
         <button
           class="round-icon diary"
@@ -145,6 +166,9 @@ function onToggle(){
 
 /* init & sync */
 onMounted(()=>{
+  // 🔒 고정 탑바 사용 플래그 (전역 padding-top 용)
+  document.body.classList.add('has-fixed-topbar')
+
   // 워드마크 이미지 존재 확인
   const img = new Image()
   img.onload  = () => { hasExternalWordmark.value = true }
@@ -168,12 +192,21 @@ window.addEventListener('storage',(e)=>{ if(e.key===THEME_KEY) applyThemeToDom(e
 .topbar{
   --btn-size: 36px;
   --emoji-size: 18px;
-  position: sticky; top: 0; z-index: 20;
-  background: var(--surface); color: var(--fg);
+
+  /* 🔒 화면 최상단에 항상 고정 */
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 200;
+
+  background: var(--surface);
+  color: var(--fg);
   border-bottom: 1px solid var(--line);
   backdrop-filter: saturate(120%) blur(8px);
   padding-top: env(safe-area-inset-top);
 }
+
 .bar-inner{ min-height: calc(52px + env(safe-area-inset-top)); display:flex; align-items:center; justify-content:space-between; }
 
 .brandWrap{ display:flex; align-items:center; gap:10px; }
@@ -189,6 +222,7 @@ window.addEventListener('storage',(e)=>{ if(e.key===THEME_KEY) applyThemeToDom(e
 .wordmark-svg text.fill{ fill:#ff2b8a; }
 
 .actions{ display:flex; gap:10px; align-items:center; }
+
 .round-icon{
   width:var(--btn-size); height:var(--btn-size); border-radius:999px;
   display:grid; place-items:center;
@@ -203,20 +237,24 @@ window.addEventListener('storage',(e)=>{ if(e.key===THEME_KEY) applyThemeToDom(e
 .round-icon.active{ outline: 2px solid var(--accent); }
 .round-icon svg{ width: var(--emoji-size); height: var(--emoji-size); display:block; }
 
-/* 알림 뱃지 스타일은 남겨도 무해하지만, 모두 미사용 상태 */
-.round-icon.alert{ color: var(--fg); }
-.round-icon.alert .badge{
-  position:absolute; top:-6px; right:-6px;
-  min-width: 18px; height: 18px; padding: 0 5px;
-  background:#ff2e87; color:#fff;
-  font-weight:700; font-size:11px; line-height:18px;
-  border-radius:999px; border:2px solid var(--surface);
-  text-align:center;
-}
-
-.round-icon.diary{ color: var(--fg); }
+/* 개별 아이콘 색상 */
 .round-icon.heart{ color: var(--accent); }
+.round-icon.help{ color: var(--fg); }
 
 .container{ width:100%; max-width:960px; margin:0 auto; padding:0 14px; }
+
 :root[data-theme="black"] .round-icon{ background:#0f0f12; border-color:#2a2a33; }
 </style>
+
+<!-- 🔓 전역(main) 에 적용되는 스타일은 scoped 없이 별도 블록으로 -->
+<style>
+/* 고정 탑바 높이만큼 상단 패딩을 전역 main에 부여 */
+body.has-fixed-topbar main.page,
+body.has-fixed-topbar main.page-flat,
+body.has-fixed-topbar main.wrap.auth-page{
+  /* 🔻 여유는 조금만 남기고, 탑바 바로 아래에 거의 붙도록 60px 로 조정 */
+  padding-top: calc(60px + env(safe-area-inset-top));
+}
+</style>
+
+

@@ -5,10 +5,20 @@
       "http://127.0.0.1:5174",
       "https://www.gangtalk815.com",
       "https://gangtalk815.com",
-      "https://gangtox.com" ,
-      "https://www.gangtox.com"
+      "https://gangtox.com",
+      "https://www.gangtox.com",
+      "https://gangtalk-beb8.web.app",
+      "https://gangtalk-beb8.firebaseapp.com"
     ],
-    "method": ["GET","HEAD","PUT","POST","PATCH","DELETE","OPTIONS"],
+    "method": [
+      "GET",
+      "HEAD",
+      "PUT",
+      "POST",
+      "PATCH",
+      "DELETE",
+      "OPTIONS"
+    ],
     "responseHeader": [
       "Content-Type",
       "Authorization",

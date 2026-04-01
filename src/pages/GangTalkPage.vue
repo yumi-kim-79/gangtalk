@@ -1,9 +1,22 @@
 <template>
   <section class="wrap compact">
+    <!-- ✅ 상단 탑바 바로 아래 한 줄 광고 영역 -->
+    <section class="gt-ad-bar">
+      <!-- 나중에 Firestore 등에서 받아온 한줄 광고 텍스트 -->
+      <div v-if="adLine && adLine.trim().length" class="gt-ad-inner">
+        {{ adLine }}
+      </div>
+
+      <!-- 한줄 광고가 없을 때: 좌→우로 흘러가는 안내 문구 -->
+      <div v-else class="gt-ad-inner gt-ad-marquee">
+        <div class="gt-ad-marquee-inner">
+          여기에 광고 신청을 받습니다.
+        </div>
+      </div>
+    </section>
+
     <!-- ===== 상단 헤더 ===== -->
     <header class="page-head">
-      <h2 class="title">강톡</h2>
-
       <!-- ① 힐링톡 히어로 -->
       <div
         class="healing-head hero"
@@ -13,23 +26,26 @@
         @click="openHealing"
       >
         <span class="yh-left">
-          <svg class="yh-logo" viewBox="0 0 48 48" aria-hidden="true">
-            <circle cx="24" cy="16" r="8" fill="currentColor" opacity=".15"/>
-            <path d="M24 2v4M24 26v4M10 16h-4M42 16h-4M14.3 6.3l-2.8 2.8M36.5 28.5l-2.8 2.8M14.3 25.7l-2.8-2.8M39.3 9.1l-2.8 2.8"
-                  stroke="currentColor" stroke-width="2" fill="none"/>
-          </svg>
           <b class="yh-title">힐링톡</b>
-          <span class="tagline"><span>여행 · 건강 · 명언</span></span>
+          <span class="tagline"><span>여행.맛집 · 건강.다이어트 · 명언.동기부여</span></span>
         </span>
+
+        <!-- ▶ 힐링톡 전체 버튼 -->
+        <button
+          type="button"
+          class="hero-all-btn"
+          @click.stop="openHealing"
+        >
+          전체
+        </button>
       </div>
 
-      <!-- ② 힐링 3줄 -->
-      <ul class="heal-quick">
+      <ul class="heal-quick" v-if="SHOW_INLINE_CATS">
         <li>
           <button class="pill-row" type="button" @click="openHealingCat('travel')">
             <span class="ico">🧭</span>
             <span class="txt">
-              <span class="lbl">여행</span>
+              <span class="lbl">여행.맛집</span>
               <span class="sub">{{ HEAL_SUBS.travel }}</span>
             </span>
           </button>
@@ -38,7 +54,7 @@
           <button class="pill-row" type="button" @click="openHealingCat('health')">
             <span class="ico">🩺</span>
             <span class="txt">
-              <span class="lbl">건강</span>
+              <span class="lbl">건강.다이어트</span>
               <span class="sub">{{ HEAL_SUBS.health }}</span>
             </span>
           </button>
@@ -47,14 +63,14 @@
           <button class="pill-row" type="button" @click="openHealingCat('quote')">
             <span class="ico">📝</span>
             <span class="txt">
-              <span class="lbl">명언</span>
+              <span class="lbl">명언.동기부여</span>
               <span class="sub">{{ HEAL_SUBS.quote }}</span>
             </span>
           </button>
         </li>
       </ul>
 
-      <!-- ③ 야호톡 히어로 -->
+      <!-- ③ 강톡 히어로 -->
       <div
         class="yaho-head hero"
         role="button"
@@ -63,12 +79,7 @@
         @click="openCategoryPage('all')"
       >
         <span class="yh-left">
-          <svg class="yh-logo" viewBox="0 0 48 48" aria-hidden="true">
-            <path d="M6 12a10 10 0 0 1 10-10h16a10 10 0 0 1 10 10v8a10 10 0 0 1-10 10H22l-8 6v-6H16A10 10 0 0 1 6 20v-8Z" fill="currentColor" opacity=".12"/>
-            <rect x="25" y="16" width="14" height="12" rx="3" stroke="currentColor" fill="none" stroke-width="2"/>
-            <path d="M32 16v-2a4 4 0 1 1 8 0v2" stroke="currentColor" fill="none" stroke-width="2"/>
-          </svg>
-          <b class="yh-title">야호톡</b>
+          <b class="yh-title">강톡</b>
           <span class="tagline">
             <svg class="tag-lock" viewBox="0 0 24 24" aria-hidden="true">
               <rect x="6" y="10" width="12" height="10" rx="2" stroke="currentColor" fill="none" stroke-width="2"/>
@@ -77,10 +88,29 @@
             <span><b>100% 비공개</b></span>
           </span>
         </span>
+
+        <!-- ▶ 오른쪽 버튼 영역: 이벤트 참여 + 전체 -->
+        <span class="hero-rt">
+          <button
+            type="button"
+            class="hero-event-btn"
+            @click.stop="openCategoryPage('event')"
+          >
+            이벤트 참여
+          </button>
+
+          <button
+            type="button"
+            class="hero-all-btn"
+            @click.stop="openCategoryPage('all')"
+          >
+            전체
+          </button>
+        </span>
       </div>
 
       <!-- ④ 야호톡 긴 바(카테고리) -->
-      <section class="yaho-quick">
+      <section class="yaho-quick" v-if="SHOW_INLINE_CATS">
         <ul class="yq-list">
           <li>
             <button class="pill-row" type="button" @click="openCategoryPage('hot')">
@@ -96,7 +126,7 @@
             <button class="pill-row" type="button" @click="openCategoryPage('daily')">
               <span class="ico">{{ catIcon('daily') }}</span>
               <span class="txt">
-                <span class="lbl">일상</span>
+                <span class="lbl">뉴스게시판</span>
                 <span class="sub">{{ YA_SUBS.daily }}</span>
               </span>
             </button>
@@ -155,10 +185,71 @@
       </section>
     </header>
 
-    <!-- ===== 가게전용 게시판: 한 줄 리스트 ===== -->
+    <!-- ===== 베스트 탭: 인기글 / 인기댓글 / 인기추천수 ===== -->
+    <div class="best-tabs" role="tablist" aria-label="인기 정렬">
+      <button
+        type="button"
+        class="chip sm"
+        :class="{ on: bestMode === 'views' }"
+        role="tab"
+        @click="bestMode = 'views'"
+      >
+        인기글
+      </button>
+      <button
+        type="button"
+        class="chip sm"
+        :class="{ on: bestMode === 'comments' }"
+        role="tab"
+        @click="bestMode = 'comments'"
+      >
+        인기댓글
+      </button>
+      <button
+        type="button"
+        class="chip sm"
+        :class="{ on: bestMode === 'likes' }"
+        role="tab"
+        @click="bestMode = 'likes'"
+      >
+        인기추천수
+      </button>
+    </div>
+
+    <!-- ===== 베스트 랭킹 ===== -->
+    <section class="best-sec">
+      <header class="sec-head">
+        <h3>인기 {{ bestLabel }}</h3>
+      </header>
+      <ul class="best-list">
+        <li
+          v-for="(p, idx) in bestTop3"
+          :key="p.id"
+          class="best-row"
+          @click="openPost(p)"
+        >
+          <span class="rank">#{{ idx + 1 }}</span>
+          <div class="b-main">
+            <div class="b-title ellip">{{ p.title }}</div>
+            <div class="b-meta">
+              <span class="m red">조회 {{ Number(p.views || 0).toLocaleString() }}</span>
+              <span class="sep">/</span>
+              <span class="m red">댓 {{ Number(p.cmtCount || 0).toLocaleString() }}</span>
+              <span class="sep">/</span>
+              <span class="m red">추천 {{ Number(p.likes || 0).toLocaleString() }}</span>
+            </div>
+          </div>
+        </li>
+        <li v-if="!bestTop3.length" class="best-empty">
+          아직 베스트 글이 없습니다.
+        </li>
+      </ul>
+    </section>
+
+    <!-- ===== 우리가게 게시판: 한 줄 리스트 ===== -->
     <section class="biz-one-line">
       <header class="sec-head">
-        <h3 role="button" tabindex="0" @click="openFirstBiz">가게전용 게시판</h3>
+        <h3 role="button" tabindex="0" @click="openFirstBiz">우리가게 게시판</h3>
       </header>
 
       <div class="biz-filters" @click.stop>
@@ -246,9 +337,23 @@
             {{ AUTO_SEED ? '자동글 OFF' : '자동글 ON' }}
           </button>
 
-
           <button class="btn-write" type="button" @click="openCreate">글쓰기</button>
         </header>
+
+        <!-- ✅ 강톡 카테고리 탭 (공지 바로 위) -->
+        <div class="cat-filter-tabs">
+          <button
+            v-for="t in yaTabsInPage"
+            :key="t.key"
+            type="button"
+            class="chip xs"
+            :class="{ on: catPage.filter === t.key }"
+            @click="onCatFilterClick(t.key)"
+          >
+            <span class="ico" v-if="t.icon">{{ t.icon }}</span>
+            <span>{{ t.label }}</span>
+          </button>
+        </div>
 
         <section class="notice-sec tight">
           <header class="notice-head">
@@ -262,9 +367,6 @@
             >
               {{ showAllNotices ? '접기' : `이전 공지 ${otherNotices.length}개` }}
             </button>
-            <template v-if="isAdmin">
-              <button class="btn-mini" type="button" @click="openNoticeCreate">글쓰기</button>
-            </template>
           </header>
 
           <ul class="notice-list">
@@ -274,7 +376,12 @@
                 @keydown.space.prevent="openDetail(recentNotice)">
               <span class="n-bullet">📌</span>
               <span class="n-title ellip">{{ recentNotice.title }}</span>
-              <span class="n-meta">익명 · {{ timeAgo(recentNotice.updatedAt || recentNotice.createdAt) }}</span>
+              <!-- ✅ authorName() 으로 닉네임/익명 표시 -->
+              <span class="n-meta">
+                <span class="n-author">{{ authorName(recentNotice) }}</span>
+                <span class="sep"> / </span>
+                <span class="n-time">{{ timeAgo(recentNotice.updatedAt || recentNotice.createdAt) }}</span>
+              </span>
               <template v-if="isAdmin">
                 <div class="n-admin" @click.stop>
                   <button class="btn-mini" type="button" @click="startNoticeEdit(recentNotice)">수정</button>
@@ -290,10 +397,18 @@
 
           <transition name="fade">
             <ul v-if="showAllNotices && otherNotices.length" class="notice-list older">
-              <li v-for="n in otherNotices" :key="n.id" class="notice-row" role="button" tabindex="0" @click="openDetail(n)" @keydown.enter.prevent="openDetail(n)" @keydown.space.prevent="openDetail(n)">
+              <li v-for="n in otherNotices" :key="n.id" class="notice-row" role="button" tabindex="0"
+                  @click="openDetail(n)"
+                  @keydown.enter.prevent="openDetail(n)"
+                  @keydown.space.prevent="openDetail(n)">
                 <span class="n-bullet">📌</span>
                 <span class="n-title ellip">{{ n.title }}</span>
-                <span class="n-meta">익명 · {{ timeAgo(n.updatedAt || n.createdAt) }}</span>
+                <!-- ✅ authorName() 사용 -->
+                <span class="n-meta">
+                  <span class="n-author">{{ authorName(n) }}</span>
+                  <span class="sep"> / </span>
+                  <span class="n-time">{{ timeAgo(n.updatedAt || n.createdAt) }}</span>
+                </span>
                 <template v-if="isAdmin">
                   <div class="n-admin" @click.stop>
                     <button class="btn-mini" type="button" @click="startNoticeEdit(n)">수정</button>
@@ -314,11 +429,27 @@
             <div class="ql-left">{{ /^\d+$/.test(String(p.id)) ? p.id : (catPosts.length - idx) }}</div>
             <div class="ql-body">
               <div class="ql-top">
-                <span class="ql-ico" :title="catLabelFor(p.category)" aria-hidden="true">{{ catIcon(p.category) }}</span>
+                <!-- 카테고리 아이콘 -->
+                <span class="ql-ico" :title="catLabelFor(p.category)" aria-hidden="true">
+                  {{ catIcon(p.category) }}
+                </span>
 
-                <!-- 제목(행 클릭으로 위임) -->
+                <!-- 제목: 일반 글씨 느낌 -->
                 <span class="ql-title ellip clickable" role="button" tabindex="0">
                   {{ p.title }}
+                </span>
+
+                <!-- 새글 N (최근 24시간 이내) -->
+                <span v-if="isNewPost(p)" class="badge-new">N</span>
+
+                <!-- 댓글 수 [2] -->
+                <span v-if="p.cmtCount" class="badge-cmt">
+                  [{{ Number(p.cmtCount || 0).toLocaleString() }}]
+                </span>
+
+                <!-- 모바일/웹 뱃지 -->
+                <span v-if="deviceLabel(p)" class="badge-device">
+                  {{ deviceLabel(p) }}
                 </span>
 
                 <!-- 화살표(행 클릭으로 위임) -->
@@ -334,8 +465,8 @@
 
               <div class="ql-meta">
                 <span class="m by">{{ authorName(p) }}</span><span class="sep">/</span>
-                <span class="m date">{{ ymd(p.updatedAt || p.createdAt) }}</span><span class="sep">/</span>
-                <span class="m">조회수 : <b>{{ Number(p.views||0).toLocaleString() }}</b></span><span class="sep">/</span>
+                <span class="m red date">{{ ymd(p.updatedAt || p.createdAt) }}</span><span class="sep">/</span>
+                <span class="m red">조회수 : <b>{{ Number(p.views||0).toLocaleString() }}</b></span><span class="sep">/</span>
                 <span class="m red">추천수 : <b>{{ Number(p.likes||0).toLocaleString() }}</b></span>
               </div>
 
@@ -370,19 +501,36 @@
           <button class="btn-write" type="button" @click="openCreate">글쓰기</button>
         </header>
 
-        <section class="notice-sec tight">
+        <!-- ✅ 힐링톡 카테고리 탭 (공지 바로 위) -->
+        <div class="cat-filter-tabs">
+          <button
+            v-for="t in healTabsInPage"
+            :key="t.key"
+            type="button"
+            class="chip xs"
+            :class="{ on: healingPage.filter === t.key }"
+            @click="onHealFilterClick(t.key)"
+          >
+            <span class="ico" v-if="t.icon">{{ t.icon }}</span>
+            <span>{{ t.label }}</span>
+          </button>
+        </div>
+
+        <!-- ✅ 힐링 공지는 있을 때만 표시 (없으면 섹션 자체를 숨김) -->
+        <section v-if="recentHealNotice" class="notice-sec tight">
           <header class="notice-head"><span>공지</span></header>
           <ul class="notice-list">
-            <li v-if="recentHealNotice" class="notice-row" role="button" tabindex="0"
+            <li class="notice-row" role="button" tabindex="0"
                 @click="openDetail(recentHealNotice)"
                 @keydown.enter.prevent="openDetail(recentHealNotice)"
                 @keydown.space.prevent="openDetail(recentHealNotice)">
               <span class="n-bullet">📌</span>
               <span class="n-title ellip">{{ recentHealNotice.title }}</span>
               <span class="n-meta">
-                {{ authorName(recentHealNotice) }} · {{ timeAgo(recentHealNotice.updatedAt || recentHealNotice.createdAt) }}
+                <span class="n-author">{{ authorName(recentHealNotice) }}</span>
+                <span class="sep"> / </span>
+                <span class="n-time">{{ timeAgo(recentHealNotice.updatedAt || recentHealNotice.createdAt) }}</span>
               </span>
-              <!-- ✅ 관리자만 보이는 수정/삭제 -->
               <template v-if="isAdmin">
                 <div class="n-admin" @click.stop>
                   <button class="btn-mini" type="button" @click="startNoticeEdit(recentHealNotice)">수정</button>
@@ -390,7 +538,6 @@
                 </div>
               </template>
             </li>
-            <li v-else class="notice-empty">등록된 공지가 없습니다.</li>
           </ul>
         </section>
 
@@ -403,9 +550,27 @@
             <div class="ql-left">{{ /^\d+$/.test(String(p.id)) ? p.id : (healPosts.length - idx) }}</div>
             <div class="ql-body">
               <div class="ql-top">
+                <!-- 힐링 카테고리 아이콘 -->
+                <span class="ql-ico" :title="healCatLabelFor(p.category)" aria-hidden="true">
+                  {{ healCatIcon(p.category) }}
+                </span>
+
                 <span class="ql-title ellip clickable" role="button" tabindex="0">
                   <small v-if="p.isSeed" class="muted" style="margin-right:6px">가이드</small>
                   {{ p.title }}
+                </span>
+
+                <!-- 새글 N -->
+                <span v-if="isNewPost(p)" class="badge-new">N</span>
+
+                <!-- 댓글 수 [2] -->
+                <span v-if="p.cmtCount" class="badge-cmt">
+                  [{{ Number(p.cmtCount || 0).toLocaleString() }}]
+                </span>
+
+                <!-- 모바일/웹 뱃지 -->
+                <span v-if="deviceLabel(p)" class="badge-device">
+                  {{ deviceLabel(p) }}
                 </span>
 
                 <svg class="ql-arr" viewBox="0 0 24 24" role="button" tabindex="0">
@@ -419,8 +584,8 @@
 
               <div class="ql-meta">
                 <span class="m by">{{ authorName(p) }}</span><span class="sep">/</span>
-                <span class="m date">{{ ymd(p.updatedAt || p.createdAt) }}</span><span class="sep">/</span>
-                <span class="m">조회수 : <b>{{ Number(p.views||0).toLocaleString() }}</b></span><span class="sep">/</span>
+                <span class="m red date">{{ ymd(p.updatedAt || p.createdAt) }}</span><span class="sep">/</span>
+                <span class="m red">조회수 : <b>{{ Number(p.views||0).toLocaleString() }}</b></span><span class="sep">/</span>
                 <span class="m red">추천수 : <b>{{ Number(p.likes||0).toLocaleString() }}</b></span>
               </div>
 
@@ -459,7 +624,19 @@
     <div v-if="showGenModal" class="sheet-backdrop" @click.self="showGenModal=false">
       <div class="sheet compose-sheet">
         <header class="sheet-head">
-          <strong class="sheet-title">{{ editTargetId ? '글 수정' : '글쓰기' }}</strong>
+          <div class="sheet-head-left">
+            <strong class="sheet-title">{{ editTargetId ? '글 수정' : '글쓰기' }}</strong>
+
+            <!-- ✅ 내 글/댓글 보기 버튼 -->
+            <button
+              class="btn-mini"
+              type="button"
+              @click="goMyPosts"
+            >
+              내 글/댓글 보기
+            </button>
+          </div>
+
           <button class="x" type="button" @click="showGenModal=false">✕</button>
         </header>
 
@@ -473,7 +650,7 @@
             <label class="muted small">카테고리</label>
             <div class="cat-tabs one-line" role="tablist" aria-label="글쓰기 카테고리">
               <button
-                v-for="c in [{key:'daily',label:'일상'},{key:'suggest',label:'건의'},{key:'pledge',label:'다짐'},{key:'vote',label:'투표'},{key:'quiz',label:'퀴즈'},{key:'event',label:'이벤트'},{key:'travel',label:'여행'},{key:'health',label:'건강'},{key:'quote',label:'명언'}]"
+                v-for="c in composeCats"
                 :key="c.key"
                 class="chip xs"
                 :class="{ on: composeCat === c.key }"
@@ -481,11 +658,20 @@
                 @click="composeCat = c.key"
               >{{ c.label }}</button>
             </div>
+
           </template>
         </div>
 
         <!-- 입력 폼 -->
         <form @submit.prevent="confirmCreate" class="compose-form">
+          <!-- 닉네임 (비우면 익명) -->
+          <input
+            class="field"
+            type="text"
+            v-model="composeNick"
+            placeholder="닉네임 (비우면 익명으로 표시됩니다)"
+          />
+
           <input class="field" type="text" v-model="composeTitle" placeholder="제목을 입력하세요" />
 
           <!-- 투표일 때 A/B 항목 -->
@@ -494,8 +680,7 @@
             <input class="field" type="text" v-model="composeB" placeholder="항목 B" />
           </div>
 
-          <!-- 일반 본문/부제 -->
-          <input class="field" type="text" v-model="composeSubtitle" placeholder="부제(선택)" v-if="composeCat!=='vote'"/>
+          <!-- 일반 본문 -->
           <textarea class="field ta" rows="7" v-model="composeBody" placeholder="내용을 입력하세요" v-if="composeCat!=='vote'"></textarea>
 
           <!-- 첨부 메뉴(간단) -->
@@ -505,13 +690,37 @@
             <button class="btn-cmt" type="submit">{{ editTargetId ? '수정 완료' : '등록' }}</button>
           </div>
 
-          <!-- 첨부 팝 -->
+          <!-- 첨부 팝 (사진만, 최대 3장) -->
           <div v-if="cAttach.open" class="attach-pop compose-attach" :style="cAttach.style" @click.stop>
-            <button class="attach-item" type="button" @click="cPickImage">사진 첨부</button>
-            <button class="attach-item" type="button" @click="cPickFile">파일 첨부</button>
+            <button class="attach-item" type="button" @click="cPickImage">
+              사진 첨부 (최대 3장)
+            </button>
+
+            <p class="attach-info">
+              선택된 사진: {{ composeImages.length }} / 3
+            </p>
+
+            <div v-if="composeImages.length" class="attach-preview">
+              <img
+                v-for="(img, idx) in composeImages"
+                :key="idx"
+                :src="img.preview"
+                class="attach-thumb"
+                alt="첨부 이미지 미리보기"
+              />
+            </div>
+
             <button class="attach-item" type="button" @click="cCloseAttach">닫기</button>
-            <input ref="cFileInput" type="file" class="hidden" @change="cOnFile" multiple />
-            <input ref="cImgInput"  type="file" accept="image/*" class="hidden" @change="cOnImage" multiple />
+
+            <!-- 사진 선택 input -->
+            <input
+              ref="cImgInput"
+              type="file"
+              accept="image/*"
+              class="hidden"
+              multiple
+              @change="cOnImage"
+            />
           </div>
         </form>
       </div>
@@ -533,6 +742,21 @@
 
         <!-- 본문 -->
         <section class="detail-body">
+          <!-- ✅ 첨부 이미지: 글 상단에 순서대로 표시 -->
+          <div v-if="detailImages.length" class="detail-images">
+            <div
+              v-for="(img, idx) in detailImages"
+              :key="idx"
+              class="detail-img-wrap"
+            >
+              <img
+                :src="img"
+                class="detail-img"
+                :alt="`첨부 이미지 ${idx + 1}`"
+              />
+            </div>
+          </div>
+
           <div class="d-meta muted">
             <span>{{ ymd(detail.post?.updatedAt || detail.post?.createdAt) }}</span>
           </div>
@@ -603,11 +827,13 @@ try {
   const cfg = app?.options || {}
   console.log('[gangtalk] projectId:', cfg.projectId, 'apiKey:', (cfg.apiKey||'').slice(0,8)+'***')
 } catch (_) {}
-
+const storage = getStorage()
 import {
   collection, query, orderBy, onSnapshot, getDocs,
   doc, serverTimestamp, increment, limit
 } from 'firebase/firestore'
+import { getStorage, ref as sRef, uploadBytes, getDownloadURL } from 'firebase/storage'
+
 import { sanitizeUserPayload } from '@/lib/author'
 import { safeAdd, safeUpdate, safeDelete } from '@/lib/firestoreSafe'
 
@@ -618,6 +844,11 @@ const AUTO_OPEN_CAT = false
 const EMOJIS = ['😀','😁','😂','🤣','😊','😍','😘','😎','🤔','😮','😢','😡','👍','👎','🙏','👏','🔥','✨','🎉','💯','🥹','🤝','🫶','💪','😴','🤩','😇','🙌']
 const emoji = ref({ open:false, target:'', style:{ right:'16px', bottom:'126px' } })
 
+// 👇 힐링톡/강톡 아래의 “여러 카테고리 버튼”을 보일지 여부
+const SHOW_INLINE_CATS = false
+
+// ✅ 상단 한 줄 광고 텍스트 (나중에 Firestore 연동 예정)
+const adLine = ref('')
 const composeBodyEl = ref(null)
 const noticeBodyEl  = ref(null)
 const bizPage = ref({ open:false, store:null })
@@ -661,8 +892,13 @@ function pickEmoji(ch){
 onBeforeUnmount(()=> document.removeEventListener('click', onDocClick, { capture:true }))
 
 import { useUserNick } from '@/store/userNick.js'
+import { useMyPageCore } from '@/composables/mypage/useMyPageCore.js'
+
 const route = useRoute()
 const router = useRouter()
+
+// ✅ 마이페이지 공용 훅에서 기사한줄(newsline) 가져오기
+const { news } = useMyPageCore()
 
 // 👉 1x/2x 준비(레티나에서도 또렷) — 원하시는 이미지 URL로 교체하셔도 됩니다.
 // 1x/2x 모두 같은 파일을 써도 되고, 필요하면 2x를 더 큰 파일로 교체하세요.
@@ -704,7 +940,7 @@ function pillStyle(key){
 
 /* 야호 카테고리: 아이콘/라벨/설명 교체 */
 const yaCats = [
-  { key:'daily',   label:'일상',   icon:'😉', desc:'오늘은 어땠어? 우리들의 소소한 이야기' },
+  { key:'daily',   label:'뉴스게시판',   icon:'😉', desc:'기사한줄의 뉴스를 모아서 보는 곳' },
   { key:'suggest', label:'건의',   icon:'📢', desc:'우리가게 업주에게 바란다' },
   { key:'pledge',  label:'다짐',   icon:'💊', desc:'타임캡슐!! 미래의 나의다짐' },
   { key:'vote',    label:'투표',   icon:'✌️', desc:'뭐가 좋을지 투표해줘' },
@@ -715,7 +951,7 @@ const yaCats = [
 /* 목록/배지에 쓰이는 부제 텍스트(상단 리스트) */
 const YA_SUBS = {
   hot:    '오늘의 인기글,댓글',
-  daily:  '오늘은 어땠어? 우리들의 소소한 이야기',
+  daily:  '기사한줄의 내용을 여기서 볼 수 있어요',
   suggest:'우리가게 업주에게 바란다',
   pledge: '타임캡슐!! 미래의 나의다짐',
   vote:   '뭐가 좋을지 투표해줘',
@@ -729,6 +965,16 @@ const HEAL_SUBS = {
   health: '건강이 나를 위한 최고의 선물',
   quote:  '나를 감동시킨 오늘의 명언은??',
 };
+
+/* ✅ 힐링톡 카테고리 메타 */
+const healCats = [
+  { key: 'travel', label: '여행.맛집',      icon: '🧭', desc: HEAL_SUBS.travel },
+  { key: 'health', label: '건강.다이어트',  icon: '🩺', desc: HEAL_SUBS.health },
+  { key: 'quote',  label: '명언.동기부여',  icon: '📝', desc: HEAL_SUBS.quote },
+];
+
+/* 힐링톡 상세 시트용 탭(전체 + 카테고리) */
+const healTabsInPage = [{ key: 'all', label: '전체', icon: '✨' }, ...healCats]
 
 /* 카테고리별 아이콘 */
 const CAT_ICON = {
@@ -792,7 +1038,11 @@ function healCatIcon(cat){ return HEAL_ICON[normalizeCategory(cat)] || '📌' }
 function healCatLabelFor(cat){ return healCats.find(c => c.key === normalizeCategory(cat))?.label || '힐링' }
 
 const healingPage = ref({ open:false, filter:'travel' })
-const healLabel = computed(() => healingPage.value.filter === 'all' ? '전체' : (healCats.find(x => x.key === healingPage.value.filter)?.label || '힐링'))
+const healLabel = computed(() =>
+  healingPage.value.filter === 'all'
+    ? '전체'
+    : (healCats.find(x => x.key === healingPage.value.filter)?.label || '힐링')
+)
 
 /* Firestore: 게시판 글 */
 const posts = ref([])
@@ -805,6 +1055,37 @@ const tsToMs = (v) => {
   if (v?.toDate) return v.toDate().getTime()
   return Date.now()
 }
+// ✅ 기사한줄 → 강톡 뉴스게시판용 가짜 게시글로 변환
+const newsPosts = computed(() => {
+  const list = Array.isArray(news?.list) ? news.list : []
+  return list.map((n, idx) => {
+    const text = String(n.text || n.title || '').trim()
+    const when = n.createdAt || n.ts || Date.now()
+    return {
+      id: n.id || `news_${idx}`,
+      category: 'daily',          // 뉴스게시판 카테고리로 고정
+      title: text || '(제목 없음)',
+      subtitle: '',
+      body: text,
+      content: text,
+      author: n.author || '운영팀',
+      authorUid: '',
+      views: 0,
+      likes: 0,
+      cmtCount: 0,
+      optA: '',
+      optB: '',
+      votesA: 0,
+      votesB: 0,
+      isNotice: false,
+      isSynthetic: false,
+      simScenario: '',
+      createdAt: tsToMs(when),
+      updatedAt: tsToMs(when),
+    }
+  })
+})
+
 async function subscribePosts () {
   try{
     const qRef = query(
@@ -864,6 +1145,12 @@ const normalizePost = (id, x={}) => ({
   isNotice: !!x.isNotice,
   isSynthetic: !!x.isSynthetic,
   simScenario: x.simScenario || '',
+  // ✅ 작성 환경(모바일/웹 표시용)
+  source: x.source || x.client || x.platform || x.from || '',
+  // ✅ 첨부 이미지 배열 (Storage URL)
+  images: Array.isArray(x.images)
+    ? x.images.map(u => String(u || '').trim()).filter(Boolean)
+    : [],
   createdAt: tsToMs(x.createdAt || x.createdAtMs || x.updatedAt),
   updatedAt: tsToMs(x.updatedAt || x.updatedAtMs || x.createdAt),
 })
@@ -874,9 +1161,39 @@ const filteredForHot = computed(() => {
   const tag = yaMap[tab] || 'daily'
   return posts.value.filter(p => p.category === tag)
 })
-const top3Views = computed(() => filteredForHot.value.slice().sort((a,b)=>Number(b.views||0)-Number(a.views||0)).slice(0,3))
-const top3Likes = computed(() => filteredForHot.value.slice().sort((a,b)=>Number(b.likes||0)-Number(a.likes||0)).slice(0,3))
-const top3Cmts  = computed(() => filteredForHot.value.slice().sort((a,b)=>Number(b.cmtCount||0)-Number(a.cmtCount||0)).slice(0,3))
+const top3Views = computed(() =>
+  filteredForHot.value
+    .slice()
+    .sort((a, b) => Number(b.views || 0) - Number(a.views || 0))
+    .slice(0, 3)
+)
+const top3Likes = computed(() =>
+  filteredForHot.value
+    .slice()
+    .sort((a, b) => Number(b.likes || 0) - Number(a.likes || 0))
+    .slice(0, 3)
+)
+const top3Cmts = computed(() =>
+  filteredForHot.value
+    .slice()
+    .sort((a, b) => Number(b.cmtCount || 0) - Number(a.cmtCount || 0))
+    .slice(0, 3)
+)
+
+/* ▼ 베스트 탭 상태 + 현재 선택된 베스트 리스트 */
+const bestMode = ref('views') // 'views' | 'comments' | 'likes'
+
+const bestLabel = computed(() => {
+  if (bestMode.value === 'comments') return '댓글'
+  if (bestMode.value === 'likes') return '추천수'
+  return '글'
+})
+
+const bestTop3 = computed(() => {
+  if (bestMode.value === 'comments') return top3Cmts.value
+  if (bestMode.value === 'likes') return top3Likes.value
+  return top3Views.value
+})
 
 /* Firestore: 업체 */
 const loading = ref(true)
@@ -898,6 +1215,20 @@ const catLabelFromStore = (code) => {
   if (passthrough.includes(String(code))) return String(code)
   return code || ''
 }
+
+// ✅ 매장 승인 여부: active + applyStatus/approved 기준
+function isStoreApproved(x = {}) {
+  const active = x.active !== false           // active가 false면 숨김
+  const approvedFlag = x.approved === true    // approved: true 면 승인
+
+  const apply = String(x.applyStatus || '').trim().toLowerCase()
+  const applyApproved =
+    ['approved', '승인', '승인완료'].includes(apply)
+
+  // 🔹 active 이면서 (approved === true 또는 applyStatus가 승인 계열) 인 경우만 승인으로 인정
+  return active && (approvedFlag || applyApproved)
+}
+
 async function subscribeStores () {
   loading.value = true
   try{
@@ -913,23 +1244,52 @@ async function subscribeStores () {
         manager: x.manager || '',
         logo: x.thumb || '',
         adTitle: x.adTitle || x.desc || '',
+        // 🔹 승인 여부/상태 저장
+        isApproved: isStoreApproved(x),
+        applyStatus: x.applyStatus || '',
+        active: x.active !== false,
+        // ✅ 작성글 수(필드명은 상황에 맞게 자동 사용)
+        postCount: Number(
+          x.postCount ||
+          x.postsCount ||
+          x.boardPostCount ||
+          x.boardPosts ||
+          0
+        ),
         createdAt: tsToMs(x.createdAt || x.updatedAt),
         updatedAt: tsToMs(x.updatedAt || x.createdAt),
       }
     })
+
     unsubStores = onSnapshot(
       qRef,
       (snap)=>{
-        bizRooms.value = snap.docs.map(d=>{
+        bizRooms.value = snap.docs.map(d => {
           const x = d.data() || {}
           return {
-            id: d.id, name: x.name || '(이름 없음)', region: x.region || '',
-            type: catLabelFromStore(x.category), manager: x.manager || '',
-            logo: x.thumb || '', adTitle: x.adTitle || x.desc || '',
+            id: d.id,
+            name: x.name || '(이름 없음)',
+            region: x.region || '',
+            type: catLabelFromStore(x.category),
+            manager: x.manager || '',
+            logo: x.thumb || '',
+            adTitle: x.adTitle || x.desc || '',
+            // 🔹 스냅샷에서도 승인/상태 반영
+            isApproved: isStoreApproved(x),
+            applyStatus: x.applyStatus || '',
+            active: x.active !== false,
+            postCount: Number(
+              x.postCount ||
+              x.postsCount ||
+              x.boardPostCount ||
+              x.boardPosts ||
+              0
+            ),
             createdAt: tsToMs(x.createdAt || x.updatedAt),
             updatedAt: tsToMs(x.updatedAt || x.createdAt),
           }
         })
+
         loading.value = false
       },
       (err)=>{
@@ -1093,7 +1453,11 @@ function closeRoom(){
 async function requireAuth(){
   const auth = getAuth()
   if (auth.currentUser) return auth.currentUser
-  router.replace({ path:'/auth', query:{ next: route.fullPath || route.path } })
+
+  // 비회원: 안내 후 로그인/회원가입 화면으로 이동
+  alert('회원가입 후 이용해 주세요.')
+  const next = route.fullPath || route.path
+  router.replace({ path:'/auth', query:{ next } })
   throw new Error('auth-required')
 }
 
@@ -1146,14 +1510,21 @@ function startDetailTicker(postId, opts = {}){
     try{
       const act = pickAction()
       if (act === 'view') {
-        await updateDoc(doc(fbDb, 'board_posts', String(postId)), { views: increment(1) })
+        // ▶ 조회수만 증가
+        await updateDoc(doc(fbDb, 'board_posts', String(postId)), {
+          views: increment(1)
+        })
       } else if (act === 'like') {
+        // ▶ 상세 화면에서도 추천이면 조회수도 같이 +1
         await updateDoc(doc(fbDb, 'board_posts', String(postId)), {
           likes: increment(1),
+          views: increment(1),
           updatedAt: serverTimestamp(),    // ← 같이 올려서 반영 빠르게
         })
       } else {
-        await updateDoc(doc(fbDb, 'board_posts', String(postId)), { cmtCount: increment(1) })
+        await updateDoc(doc(fbDb, 'board_posts', String(postId)), {
+          cmtCount: increment(1)
+        })
       }
     }catch(_){ /* 실패 무시 */ }
     detailTicker = setTimeout(tick, randDelay())
@@ -1228,8 +1599,16 @@ async function incViewStore(storeId, postId){
 async function incLikeStore(storeId, postId){
   try{
     await requireAuth()
-    await updateDoc(doc(fbDb, 'stores', String(storeId), 'posts', String(postId)), {
-      likes: increment(1), updatedAt: serverTimestamp()
+    await updateDoc(doc(
+      fbDb,
+      'stores',
+      String(storeId),
+      'posts',
+      String(postId)
+    ), {
+      likes: increment(1),
+      views: increment(1),           // ▶ 업체 게시판도 추천 = 조회수 +1
+      updatedAt: serverTimestamp()
     })
     return true
   }catch(_){
@@ -1337,6 +1716,7 @@ async function incLike(id){
     await requireAuth()
     await updateDoc(doc(fbDb, 'board_posts', id), {
       likes: increment(1),
+      views: increment(1),             // ▶ 실제 유저 추천 시에도 조회수 함께 +1
       updatedAt: serverTimestamp(),   // ← 함께 갱신(정렬 & 스냅 반영 빠르게)
     })
     return true
@@ -1377,6 +1757,7 @@ async function subscribeStorePosts (storeId) {
 /* 글쓰기 모달 상태 */
 const showGenModal = ref(false)
 const composeCat = ref('daily')
+const composeNick = ref('')        // ✅ 닉네임 입력값
 const composeTitle = ref('')
 const composeSubtitle = ref('')
 const composeBody = ref('')
@@ -1385,6 +1766,9 @@ const composeB = ref('')
 const composeBiz = ref(false)
 const composeBizStoreId = ref('')
 const composeBizStoreName = ref('')
+
+/** 글쓰기 이미지 첨부 (최대 3장) */
+const composeImages = ref([]) // [{ file, preview, url }]
 
 function openBizCreateFromTabs(){
   const target = filteredBizRooms.value[0] || bizRooms.value[0]
@@ -1495,14 +1879,49 @@ const openCreate = async () => {
   } else {
     composeCat.value = (catPage.value.filter && catPage.value.filter !== 'all') ? catPage.value.filter : yaTab.value
   }
+
+  // ✅ 닉네임 기본값: 계정 닉네임 (비워두면 익명)
+  composeNick.value = myNick.value || ''
+
   composeTitle.value = ''
   composeSubtitle.value = ''
   composeBody.value = ''
   composeA.value = ''
   composeB.value = ''
+
+  composeImages.value = []   // ✅ 이미지 초기화
+
   editTargetId.value = null
   showGenModal.value = true
 }
+
+/** 글쓰기에서 선택한 이미지들을 Firebase Storage에 업로드하고 URL 배열 반환 */
+async function uploadComposeImages(authorUid){
+  if (!composeImages.value.length) return []
+
+  const folder = `board_images/${authorUid || 'anon'}/${Date.now()}`
+  const urls = []
+
+  for (let i = 0; i < composeImages.value.length; i++){
+    const img = composeImages.value[i]
+    const file = img.file
+    if (!file) continue
+
+    const ext = (file.name && file.name.includes('.'))
+      ? file.name.split('.').pop()
+      : 'jpg'
+
+    const path = `${folder}/img_${i}.${ext}`
+    const fileRef = sRef(storage, path)
+    await uploadBytes(fileRef, file)
+    const url = await getDownloadURL(fileRef)
+    urls.push(url)
+    img.url = url
+  }
+
+  return urls
+}
+
 const confirmCreate = async () => {
   if (composeBiz.value) {
     const title = (composeTitle.value || '').trim()
@@ -1526,11 +1945,21 @@ const confirmCreate = async () => {
     }catch(e){ alert('업체 게시판 글 저장에 실패했습니다.') }
     return
   }
+
   const title = (composeTitle.value || '').trim()
   if (!title){ alert('제목을 입력해 주세요.'); return }
+
   let user
   try { user = await requireAuth() } catch(_) { return }
   const authorUid = user.uid
+
+  // ⬇ 닉네임(비우면 익명) 처리 – 이전에 추가해둔 부분
+  const nick = (composeNick.value || '').trim()
+  const authorNameForSave = nick || '익명'
+
+  // ✅ 이미지가 있으면 먼저 업로드
+  const imageUrls = await uploadComposeImages(authorUid)
+
   try{
     if (composeCat.value === 'vote'){
       if (!composeA.value.trim() || !composeB.value.trim()){ alert('투표 항목 A/B를 입력해 주세요.'); return }
@@ -1541,13 +1970,44 @@ const confirmCreate = async () => {
           title,
           subtitle: `${composeA.value} vs ${composeB.value}`,
           optA: composeA.value, optB: composeB.value,
-          views: 0, likes: 0, cmtCount: 0,              // ✅ 댓글 카운트 초기화
+          views: 0, likes: 0, cmtCount: 0,
           votesA: 0, votesB: 0,
+          images: imageUrls,
+          source: 'web',                    // ✅ 추가
+          author: authorNameForSave,
+          authorUid,
           createdAt: serverTimestamp(), updatedAt: serverTimestamp()
         }, authorUid),
         'createVotePost'
       )
-    }else{
+    }
+    // ✅ 관리자 전용 '공지' 카테고리
+    else if (composeCat.value === 'notice' && isAdmin.value){
+      const baseCat =
+        (catPage.value.filter && catPage.value.filter !== 'all')
+          ? (yaMap[catPage.value.filter] || 'daily')
+          : 'daily'
+
+      const text = (composeBody.value || '').trim()
+      await safeAdd(
+        collection(fbDb, 'board_posts'),
+        sanitizeUserPayload({
+          category: baseCat,
+          isNotice: true,
+          title,
+          body: text, content: text,
+          views: 0, likes: 0, cmtCount: 0,
+          images: imageUrls,
+          source: 'web',                    // ✅ 추가
+          author: authorNameForSave,
+          authorUid,
+          createdAt: serverTimestamp(), updatedAt: serverTimestamp()
+        }, authorUid),
+        'createNoticeByCompose'
+      )
+    }
+    // 일반 게시글
+    else{
       const mapped = yaMap[composeCat.value] || 'var'
       const text = (composeBody.value || '').trim()
       await safeAdd(
@@ -1556,15 +2016,45 @@ const confirmCreate = async () => {
           category: mapped,
           title,
           body: text, content: text,
-          views: 0, likes: 0, cmtCount: 0,              // ✅ 댓글 카운트 초기화
+          views: 0, likes: 0, cmtCount: 0,
+          images: imageUrls,
+          source: 'web',                    // ✅ 추가
+          author: authorNameForSave,
+          authorUid,
           createdAt: serverTimestamp(), updatedAt: serverTimestamp()
         }, authorUid),
         'createBoardPost'
       )
     }
+
+    // 저장 후 입력값/이미지 초기화
+    composeImages.value = []
+
     showGenModal.value = false
-  }catch(e){ alert('등록에 실패했습니다.') }
+  }catch(e){
+    alert('등록에 실패했습니다.')
+  }
 }
+
+async function goMyPosts(){
+  // 로그인 안 되어 있으면 먼저 로그인/회원가입으로 보내기
+  try{
+    await requireAuth()
+  }catch(_){
+    return
+  }
+
+  // 글쓰기 모달 닫고
+  showGenModal.value = false
+
+  // 마이페이지의 내 글/댓글 관리로 이동
+  // (section=posts 쿼리는 마이페이지에서 사용하도록 여유 있게 남겨둠)
+  router.push({
+    path: '/mypage',
+    query: { section: 'posts' }
+  }).catch(()=>{})
+}
+
 async function deletePost(p){
   const id = p?.id
   if (!id) return
@@ -1578,6 +2068,10 @@ async function deletePost(p){
 function startEdit(p){
   const post = posts.value.find(x => x.id === p.id) || p
   editTargetId.value = post.id
+
+  // ✅ 기존 글의 닉네임을 폼에 반영 (익명이면 빈칸)
+  composeNick.value = (post.author && post.author !== '익명') ? post.author : ''
+
   if (post.category === 'vote' || post.optA || post.optB || /vs/.test(post.subtitle||'')) {
     composeCat.value = 'vote'
     const parsed = parsePoll(post)
@@ -1595,6 +2089,10 @@ function startEdit(p){
     composeBody.value = existingBody || (post.subtitle || '')
     composeA.value = ''; composeB.value = ''
   }
+
+  // 편집 시에도 새로 선택하므로 기존 이미지 배열은 비워둠
+  composeImages.value = []
+
   showGenModal.value = true
 }
 
@@ -1637,12 +2135,27 @@ const closeVote = () => { votePostId.value = null }
 const healMap = { travel:'travel', health:'health', quote:'quote' }
 
 const catPage = ref({ open:false, filter:'all' })
-const catLabel = computed(() => catPage.value.filter === 'all' ? '야호 게시판' : (yaCats.find(x => x.key === catPage.value.filter)?.label || '야호 게시판'))
+const catLabel = computed(() =>
+  catPage.value.filter === 'all'
+    ? '강톡 게시판'
+    : (yaCats.find(x => x.key === catPage.value.filter)?.label || '강톡 게시판')
+)
+
 const catPosts = computed(() => {
   const f = catPage.value.filter
-  const list = posts.value.filter(p => !isNotice(p) && (f === 'all' ? true : p.category === (yaMap[f] || f)))
+
+  // ✅ 뉴스게시판(일상) 탭일 때는 board_posts 대신 기사한줄(newsPosts)만 사용
+  if (f === 'daily') {
+    return newsPosts.value
+  }
+
+  // 나머지 카테고리는 기존 board_posts 기준
+  const list = posts.value.filter(
+    p => !isNotice(p) && (f === 'all' ? true : p.category === (yaMap[f] || f))
+  )
   return list.slice().sort((a,b)=> (b.updatedAt || 0) - (a.updatedAt || 0))
 })
+
 // ⬇️ 파일 상단에 전역 핸들러
 let listTicker = null
 
@@ -1668,12 +2181,15 @@ function startListTicker(getVisiblePosts, opts = {}){
         const target = pool[Math.floor(Math.random()*pool.length)]
         const r = Math.random()
         if (r < VIEW){
+          // ▶ 조회수만 증가
           await updateDoc(doc(fbDb, 'board_posts', String(target.id)), {
             views: increment(1)
           })
         } else {
+          // ▶ 추천수가 오를 때 조회수도 같이 +1 (조회수 ≥ 추천수 보장)
           await updateDoc(doc(fbDb, 'board_posts', String(target.id)), {
             likes: increment(1),
+            views: increment(1),
             updatedAt: serverTimestamp(),
           })
         }
@@ -1683,6 +2199,18 @@ function startListTicker(getVisiblePosts, opts = {}){
   }
 
   listTicker = setTimeout(tick, randDelay())
+}
+
+// ✅ 강톡 상세 시트 상단 카테고리 탭 클릭
+function onCatFilterClick(key){
+  const f = key || 'all'
+  // 현재 열려있는 catPage 에 필터만 바꿔서 유지
+  catPage.value = { ...catPage.value, filter: f }
+
+  // 베스트 탭/설명과도 어느 정도 맞추기 위해 hot 제외하고 동기화
+  if (f !== 'all') {
+    yaTab.value = f
+  }
 }
 
 // ✅ 카테고리 풀스크린 열릴 때 시작, 닫을 때 중지
@@ -1706,8 +2234,22 @@ function closeHealingPage () {
   healingPage.value.open = false
 }
 
+// ✅ 힐링톡 상세 시트 상단 카테고리 탭 클릭
+function onHealFilterClick(key){
+  const f = key || 'all'
+  healingPage.value = { ...healingPage.value, filter: f }
+}
+
 /* 상세 보기 */
 const detail = ref({ open:false, post:{} })
+
+// ✅ 상세 글의 첨부 이미지들 (위에서부터 순서대로 표시)
+const detailImages = computed(() => {
+  const arr = detail.value?.post?.images
+  if (!Array.isArray(arr)) return []
+  return arr.map(u => String(u || '').trim()).filter(Boolean)
+})
+
 const detailBodyText = computed(() => {
   const p = detail.value?.post || {}
   const b = (p.body || p.content || '').trim()
@@ -1715,6 +2257,7 @@ const detailBodyText = computed(() => {
   if (p.category === 'vote' || p.optA || p.optB) return ''
   return (p.subtitle || '').trim()
 })
+
 const detailBodyHtml = computed(() => {
   const t = detailBodyText.value || ''
   if (!t) return ''
@@ -1905,13 +2448,19 @@ async function deleteComment(c){
 }
 
 /* 표시 유틸 */
-function authorName(_p){ return '익명' }
+/* 표시 유틸 */
+function authorName(p){
+  const name = p?.author || ''
+  return name.trim() || '익명'
+}
+
 function firstLine(p){
   const raw = (p?.body || p?.content || '').replace(/\r\n|\r/g, '\n')
   const line = raw.split('\n').find(s => s.trim().length > 0) || ''
   const trimmed = line.trim()
   return trimmed.length > 80 ? trimmed.slice(0,80) + '…' : trimmed
 }
+
 const timeAgo = (tsIn) => {
   const ts = tsToMs(tsIn)
   const sec = Math.floor((Date.now() - ts)/1000)
@@ -1919,6 +2468,22 @@ const timeAgo = (tsIn) => {
   const m = Math.floor(sec/60); if (m < 60) return `${m}분전`
   const h = Math.floor(m/60); if (h < 24) return `${h}시간전`
   const d = Math.floor(h/24); return `${d}일전`
+}
+
+/* ✅ 새 글 여부(24시간 이내) */
+function isNewPost(p){
+  const ms = tsToMs(p?.createdAt || p?.updatedAt)
+  const diff = Date.now() - ms
+  return diff <= 24 * 60 * 60 * 1000   // 필요하면 12시간 등으로 조정 가능
+}
+
+/* ✅ 모바일/웹 라벨 */
+function deviceLabel(p){
+  const raw = String(p?.source || '').toLowerCase()
+  if (!raw) return ''
+  if (['mobile','app','android','ios'].some(k => raw.includes(k))) return 'mobile'
+  if (['web','pc','desktop'].some(k => raw.includes(k))) return 'web'
+  return ''
 }
 
 /* 채팅 첨부 */
@@ -1949,14 +2514,40 @@ function cOpenSticker(target = 'compose'){ cCloseAttach(); showEmoji(target) }
 
 /* 글쓰기 모달 첨부 */
 const cAttach = ref({ open:false, style:{ right:'14px', bottom:'66px' } })
-const cFileInput = ref(null)
 const cImgInput  = ref(null)
-function cToggleAttach(){ cAttach.value.open = !cAttach.value.open; if (cAttach.value.open){ cAttach.value.style = { right:'16px', bottom:'70px' } } }
+const MAX_IMAGES = 3
+
+function cToggleAttach(){
+  cAttach.value.open = !cAttach.value.open
+  if (cAttach.value.open){
+    cAttach.value.style = { right:'16px', bottom:'70px' }
+  }
+}
 function cCloseAttach(){ cAttach.value.open = false }
 function cPickImage(){ cImgInput.value?.click() }
-function cPickFile(){ cFileInput.value?.click() }
-function cOnFile(e){ const files = Array.from(e.target.files || []); if (!files.length) return; alert(`파일 ${files.length}개 선택됨(업로드 연동 예정)`); cCloseAttach() }
-function cOnImage(e){ const files = Array.from(e.target.files || []); if (!files.length) return; alert(`사진 ${files.length}장 선택됨(업로드 연동 예정)`); cCloseAttach() }
+
+function cOnImage(e){
+  const files = Array.from(e.target.files || [])
+  if (!files.length) return
+
+  const remain = MAX_IMAGES - composeImages.value.length
+  if (remain <= 0){
+    alert(`사진은 최대 ${MAX_IMAGES}장까지 첨부할 수 있습니다.`)
+    e.target.value = ''
+    return
+  }
+
+  const slice = files.slice(0, remain)
+  for (const file of slice){
+    const preview = URL.createObjectURL(file)
+    composeImages.value.push({ file, preview, url: null })
+  }
+
+  if (files.length > slice.length){
+    alert(`사진은 최대 ${MAX_IMAGES}장까지만 선택됩니다.`)
+  }
+  e.target.value = ''
+}
 
 const hasImageIn = (t='') => /<img\b|!\[.*\]\(|data:image\/|https?:\/\/\S+\.(png|jpe?g|gif|webp|bmp|svg)(\?\S*)?/i.test(t)
 const hasFileIn = (t='') => /https?:\/\/\S+\.(pdf|docx?|xlsx?|pptx?|zip|7z|rar|hwp|txt|csv)(\?\S*)?/i.test(t)
@@ -1973,19 +2564,39 @@ function shouldShowSnippet(p){
 /* 관리자 감지 */
 const userEmail = ref('')
 const isAdmin = computed(() => (userEmail.value || '').toLowerCase() === 'gangtalk815@gmail.com')
+/* 글쓰기 모달 카테고리(관리자일 때만 '공지' 추가) */
+const composeCats = computed(() => {
+  const base = [
+    { key:'daily',  label:'뉴스게시판' },
+    { key:'suggest',label:'건의' },
+    { key:'pledge', label:'다짐' },
+    { key:'vote',   label:'투표' },
+    { key:'quiz',   label:'퀴즈' },
+    { key:'event',  label:'이벤트' },
+    { key:'travel', label:'여행.맛집' },
+    { key:'health', label:'건강.다이어트' },
+    { key:'quote',  label:'명언.동기부여' },
+  ]
+  // 강톡 관리자일 때만 '공지' 카테고리 맨 앞에 추가
+  if (isAdmin.value) {
+    return [{ key:'notice', label:'공지' }, ...base]
+  }
+  return base
+})
 
 /* 퍼시스턴스 + 인증 가드 */
 onBeforeMount(()=>{
   const auth = getAuth()
   setPersistence(auth, browserLocalPersistence).catch(()=>{})
+
   const u = auth.currentUser
-  if (!u) {
-    const next = route.fullPath || route.path
-    router.replace({ path:'/auth', query:{ next } })
-    return
+  // ✅ 비회원이어도 강톡 페이지 진입은 허용
+  if (u) {
+    // 로그인된 경우에만 쿼리로 넘어온 room 등 자동 오픈
+    openFromQueryFast()
   }
-  openFromQueryFast()
 })
+
 onMounted(()=>{
   try{
     const auth = getAuth()
@@ -2054,12 +2665,25 @@ const typeOptionsBiz = [
 const selectedTypeBiz = ref('all')
 const typeLabelBiz = (k)=> `업종: ${k==='all' ? '전체' : k}`
 function selectTypeBiz(k){ selectedTypeBiz.value = k; uiBiz.value.typeOpen = false }
-const filteredBizRooms = computed(()=> {
-  return bizRooms.value.filter(r =>
+const filteredBizRooms = computed(() => {
+  const filtered = bizRooms.value.filter(r =>
+    // 🔹 승인된 가게만 노출 (isApproved === true 인 것만)
+    r.isApproved === true &&
     (selectedRegionBiz.value === 'all' || macroBiz(r) === selectedRegionBiz.value) &&
-    (selectedTypeBiz.value   === 'all' || r.type === selectedTypeBiz.value)
+    (selectedTypeBiz.value === 'all' || r.type === selectedTypeBiz.value)
   )
+
+  // ✅ 작성글 많은 순 정렬 → 같으면 최근 업데이트순
+  return filtered
+    .slice()
+    .sort((a, b) => {
+      const ac = Number(a.postCount || 0)
+      const bc = Number(b.postCount || 0)
+      if (bc !== ac) return bc - ac
+      return (b.updatedAt || 0) - (a.updatedAt || 0)
+    })
 })
+
 const FALLBACK_BIZ_IMG = 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?q=80&w=1200&auto=format&fit=crop'
 
 /* ================== 자동 시더(랜덤 글/댓글/대댓글) ================== */
@@ -2280,6 +2904,134 @@ console.log('[sim-templates] loaded v2025-09-30-01')
 /* 페이지 여백 */
 .wrap{ padding:14px }
 
+/* 이 페이지에서만 사용할 레이아웃 변수 (TopBar/광고 높이) */
+.wrap.compact{
+  --gt-topbar-h: 56px;    /* TopBar 대략 높이 */
+  --gt-ad-h: 65px;        /* 광고 배너 높이 */
+
+  padding: 10px;
+
+  /* 탑바(56px) + 광고(65px) 높이만큼 전체 페이지를 더 내려서
+     힐링톡 전체 보기 배너가 광고 아래에서 시작되도록 조정 */
+  margin-top: calc(var(--gt-topbar-h) + var(--gt-ad-h));
+}
+
+/* 상단 한 줄 광고 영역 (TopBar 바로 아래에 고정) */
+.gt-ad-bar{
+  position: fixed;                    /* 🔒 viewport 기준으로 완전 고정 */
+  top: var(--gt-topbar-h);           /* 탑바 바로 아래에 붙이기 */
+  left: 0;
+  right: 0;
+  z-index: 150;                      /* 탑바(200)보다 한 단계 아래, 콘텐츠보다 위 */
+
+  height: var(--gt-ad-h);
+  margin: 0;
+  padding: 0 8px;
+  box-sizing: border-box;
+  background: var(--bg);
+}
+
+.gt-ad-inner{
+  width: 100%;
+  height: 100%;
+  border-radius: 999px;
+  border: 1px solid rgba(0,0,0,0.06);
+  background: color-mix(in oklab, var(--accent), white 92%);
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  padding: 0 12px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #111;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.12);
+}
+
+/* 광고 한 줄이 없을 때: 좌측에서 우측으로 흐르는 텍스트 */
+.gt-ad-marquee{
+  position: relative;
+}
+
+.gt-ad-marquee-inner{
+  display: inline-block;
+  padding-left: 100%;               /* 시작 위치를 오른쪽 바깥에서 */
+  white-space: nowrap;
+
+  /* 🔺 글자 크기·굵기 업 (기존 12.5px → 약 2.5배) */
+  font-size: 32px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+
+  /* 🔆 네온 느낌 색상 + 기본 글자색 */
+  color: #fff;
+
+  /* 네온 글로우 기본 상태 */
+  text-shadow:
+    0 0 4px  #ff8ac1,
+    0 0 8px  #ff8ac1,
+    0 0 14px #ff4da3,
+    0 0 22px #ff4da3;
+
+  /* 👉 좌→우 이동 + 네온 깜빡임을 함께 적용 */
+  animation:
+    gt-ad-marquee 12s linear infinite,
+    neonPulse 1.4s ease-in-out infinite alternate;
+}
+
+@keyframes heroNeon{
+  0%{
+    border-color:#ff8ac1;
+    box-shadow:
+      0 0 4px  rgba(255,138,193,0.8),
+      0 0 10px rgba(255,77,163,0.6),
+      0 0 18px rgba(255,0,102,0.4);
+  }
+  50%{
+    border-color:#ff4da3;
+    box-shadow:
+      0 0 6px  rgba(255,170,210,0.9),
+      0 0 16px rgba(255,77,163,0.8),
+      0 0 30px rgba(255,0,102,0.7);
+  }
+  100%{
+    border-color:#ff8ac1;
+    box-shadow:
+      0 0 3px  rgba(255,138,193,0.75),
+      0 0 8px  rgba(255,77,163,0.6),
+      0 0 16px rgba(255,0,102,0.5);
+  }
+}
+
+@keyframes gt-ad-marquee{
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-100%); }
+}
+
+@keyframes neonPulse{
+  0%{
+    opacity: 0.5;
+    text-shadow:
+      0 0 2px  #ff8ac1,
+      0 0 4px  #ff8ac1,
+      0 0 8px  #ff4da3;
+  }
+  50%{
+    opacity: 1;
+    text-shadow:
+      0 0 4px  #ff8ac1,
+      0 0 10px #ff8ac1,
+      0 0 18px #ff4da3,
+      0 0 26px #ff0066;
+  }
+  100%{
+    opacity: 0.7;
+    text-shadow:
+      0 0 3px  #ff8ac1,
+      0 0 6px  #ff8ac1,
+      0 0 12px #ff4da3;
+  }
+}
+
 /* ===== 헤더 & 타이틀 ===== */
 .page-head{ display:flex; flex-direction:column; gap:8px; margin-bottom:8px }
 .title{ margin:0; font-size:18px; font-weight:900 }
@@ -2287,49 +3039,77 @@ console.log('[sim-templates] loaded v2025-09-30-01')
 /* ===== 히어로 ===== */
 .hero{
   position:relative;
-  border:1px solid var(--line);
-  border-radius:14px;
+  border-radius:16px;
 
-  /* ▶ 배너 높이 2배 수준 */
-  --hero-h: 86px;              /* 기존 40px → 86px (원하면 90~110px로 조절) */
+  /* 🔸 위에 광고 배너(`--gt-ad-h`) 높이만큼 키우기 */
+  --hero-h: calc(var(--gt-ad-h) + 8px);   /* 광고 높이 + 여유 8px */
   min-height: var(--hero-h);
-  padding: 12px 14px;
+  padding: 10px 16px;
 
-  display:flex; align-items:center;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+
   color:var(--fg);
 
-  /* ▶ 투명/흐림 오버레이 완전 제거 (이미지만 그대로) */
-  background-color: #0000;     /* 투명한 바탕 */
+  /* 배경 이미지 */
+  background-color: #0000;
   background-repeat: no-repeat;
   background-position: var(--hero-pos, center center);
   background-size: cover;
-
-  /* 고해상도에서도 선명하게: image-set 사용 */
   background-image:
     image-set(
       var(--hero-img-1x) 1x,
       var(--hero-img-2x) 2x
     );
-
-  /* 사파리 대응(선택) */
   background-image:
     -webkit-image-set(
       var(--hero-img-1x) 1x,
       var(--hero-img-2x) 2x
     );
 
-  box-shadow:0 4px 12px var(--shadow);
+  /* 🔥 네온 번쩍 효과 보더/그로우 */
+  border: 2px solid #ff8ac1;
+  box-shadow:
+    0 0 6px  rgba(255,138,193,0.9),
+    0 0 14px rgba(255,77,163,0.75),
+    0 0 24px rgba(255,0,102,0.55);
+
+  animation: heroNeon 1.6s ease-in-out infinite alternate;
 }
 
 /* 배너 안 아이콘/텍스트도 살짝 키워 비율 맞추기 */
 .yh-logo{ width:34px; height:34px; color:var(--accent) }  /* 26 → 34 */
-.yh-title{ font-size:18px; font-weight:900 }              /* 14 → 18 */
+.yh-title{
+  font-size:16px;
+  font-weight:900;
+  color:#111;
+  /* 흰색 테두리/글로우 효과 */
+  text-shadow:
+    -1px -1px 0 #fff,
+     1px -1px 0 #fff,
+    -1px  1px 0 #fff,
+     1px  1px 0 #fff,
+     0    0   4px #fff;
+}
+
 .tagline{
-  display:inline-flex; align-items:center; gap:8px;
-  height:26px; padding:0 12px;
+  display:inline-flex; align-items:center; gap:6px;
+  height:22px; padding:0 10px;
   border-radius:999px; border:1px solid var(--line);
   background:var(--bg);
-  font-weight:900; font-size:12px; line-height:1;
+  font-weight:900; font-size:11px; line-height:1;
+  /* 안에 들어가는 글씨도 배너 위에서 잘 보이게 */
+}
+
+.tagline span{
+  color:#111;
+  text-shadow:
+    -1px -1px 0 #fff,
+     1px -1px 0 #fff,
+    -1px  1px 0 #fff,
+     1px  1px 0 #fff,
+     0    0   4px #fff;
 }
 
 .yh-left{ display:flex; align-items:center; gap:8px; flex-wrap:wrap }
@@ -2385,7 +3165,7 @@ console.log('[sim-templates] loaded v2025-09-30-01')
 .sec-head h3{ margin:0; font-size:15px; font-weight:900 }
 
 /* ===== 게시판 리스트(ql-list) ===== */
-.ql-list{ list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:8px }
+.ql-list{ list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:0 }
 .ql-row{
   border:1px solid var(--line); border-radius:12px; background:var(--surface); box-shadow:0 4px 12px var(--shadow);
   padding:10px; display:grid; grid-template-columns:42px 1fr; gap:8px; align-items:center;
@@ -2394,7 +3174,14 @@ console.log('[sim-templates] loaded v2025-09-30-01')
 .ql-body{ min-width:0 }
 .ql-top{ display:flex; align-items:center; gap:6px }
 .ql-ico{ font-size:14px }
-.ql-title{ font-size:14px; font-weight:900; line-height:1.25 }
+/* 제목: 일반 텍스트 느낌(굵기 감소, 색상 동일) */
+.ql-title{
+  font-size:13.5px;
+  font-weight:500;
+  line-height:1.25;
+  color:var(--fg);
+}
+
 .ql-arr{ width:18px; height:18px; margin-left:auto }
 .ql-snippet{ font-size:12.5px; color:var(--muted); margin-top:2px }
 .clickable{ cursor: pointer; }
@@ -2403,6 +3190,12 @@ console.log('[sim-templates] loaded v2025-09-30-01')
 .ql-meta{ margin-top:4px; font-size:11.5px; color:var(--muted); display:flex; align-items:center; gap:6px }
 .ql-meta .sep{ opacity:.55 }
 .ql-admin .btn-mini{ font-size:11px }
+
+/* ✅ 날짜/조회수/추천수 빨간색 */
+.ql-meta .m.red,
+.ql-meta .m.red b{
+  color:#e53935;  /* 진한 빨강 */
+}
 
 /* ===== 공통 시트 ===== */
 .sheet-backdrop{
@@ -2439,6 +3232,13 @@ console.log('[sim-templates] loaded v2025-09-30-01')
 .sheet-head{ display:flex; justify-content:space-between; align-items:center; gap:8px }
 .sheet-title{ font-size:17px }
 .sheet-head .x{ width:32px; height:32px; border-radius:50%; border:1px solid var(--line); background:var(--surface); display:flex; align-items:center; justify-content:center; color:var(--fg); }
+/* 글쓰기 헤더: 제목 + 내 글/댓글 보기 버튼 정렬 */
+.sheet-head-left{
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 :root[data-theme="white"] .sheet-head .x{ color:#111 !important }
 
 /* 카테고리 탭 */
@@ -2505,7 +3305,28 @@ console.log('[sim-templates] loaded v2025-09-30-01')
   background: #ffe6ef !important;   /* 연한 핑크 */
   border-color: #ffbcd2 !important;  /* 핑크 테두리 */
   color: #8a2241 !important;         /* 글자색(딥 핑크) */
-  box-shadow: 0 1px 0 rgba(0,0,0,.03);
+
+  border-radius: 999px !important;   /* 🔹 둥근 사각형 모양 통일 */
+  box-shadow: 0 2px 4px rgba(0,0,0,.06);
+}
+/* 공지 메타: 닉네임 강조 + / 구분 */
+.n-meta{
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.n-meta .n-author{
+  color: #e53935;        /* 🔴 빨간색 닉네임 */
+  font-weight: 800;
+}
+
+.n-meta .sep{
+  margin: 0 3px;
+  opacity: 0.7;
+}
+
+.n-meta .n-time{
+  opacity: 0.85;
 }
 
 /* 삭제(danger) 버튼은 살짝 더 진한 핑크 */
@@ -2550,9 +3371,34 @@ console.log('[sim-templates] loaded v2025-09-30-01')
 .fade-enter-active, .fade-leave-active { transition: all .15s ease; }
 .fade-enter-from, .fade-leave-to { opacity: 0; max-height: 0; }
 .notice-sec .older { border-top: 1px dashed var(--line); }
+/* 공지 헤더: "공지"는 중앙, 이전 공지 버튼은 오른쪽 */
+.notice-head{
+  position: relative;
+  display: flex;
+  justify-content: center;   /* ▶ 공지 텍스트를 중앙으로 */
+  align-items: center;
+  margin: 4px 2px 6px;
+}
+
+/* 공지 라벨 살짝 강조 */
+.notice-head > span:first-child{
+  font-weight: 700;
+}
+
+/* spacer는 중앙 정렬에 방해되므로 숨김 */
+.notice-head .spacer{
+  display: none;
+}
+
+/* 이전 공지 버튼은 오른쪽에 고정 */
+.notice-head .btn-mini{
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+}
 
 /* 컴팩트 */
-.wrap.compact { padding: 10px; }
 .wrap.compact .chip{ height:24px; font-size:11px; padding:0 8px; }
 .wrap.compact .btn-write{ height:24px; font-size:12px; padding:0 10px; }
 .wrap.compact .detail-sheet .detail-pre{ font-size:14px; }
@@ -2613,12 +3459,12 @@ console.log('[sim-templates] loaded v2025-09-30-01')
 .pill-row .lbl{ line-height:1 }
 .pill-row:active{ transform:translateY(1px) }
 
-.heal-quick{ list-style:none; padding:6px 0 2px; margin:0; display:flex; flex-direction:column; gap:8px }
+.heal-quick{ list-style:none; padding:6px 0 2px; margin:0; display:flex; flex-direction:column; gap:0 }
 .yaho-quick{ margin-top:8px }
-.yq-list{ list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:8px }
+.yq-list{ list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:0 }
 
 /* 가게 리스트 */
-.biz-list{ list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:8px }
+.biz-list{ list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:0 }
 .biz-row{ display:grid; grid-template-columns:50px 1fr; align-items:center; gap:10px; border:1px solid var(--line); border-radius:14px; background:var(--surface); color:var(--fg); box-shadow:0 4px 12px var(--shadow); padding:8px; }
 .biz-row .thumb{ width:50px; height:50px; object-fit:cover; border-radius:10px; background:#eee; }
 .biz-row .meta{ min-width:0; display:flex; flex-direction:column; gap:2px }
@@ -2626,8 +3472,26 @@ console.log('[sim-templates] loaded v2025-09-30-01')
 .biz-row .last{ font-size:11.5px; color:var(--muted) }
 
 /* 풀스크린 오버레이(카테고리/상세) */
-.cat-mask{ position: fixed; inset: 0; z-index: 80; background: var(--bg); display: flex; }
-.cat-sheet{ flex:1; display:flex; flex-direction:column; background:var(--bg); overflow: auto; padding-bottom: max(16px, env(safe-area-inset-bottom)); }
+.cat-mask{
+  position: fixed;
+  /* ▶ TopBar 높이 + 광고 바 높이만큼 위를 비워서 둘 다 항상 보이게 */
+  top: calc(var(--gt-topbar-h) + var(--gt-ad-h));
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 80;
+  background: var(--bg);
+  display: flex;
+}
+
+/* 👉 flex + overflow 조합 제거 + 상단 safe-area 확보 */
+.cat-sheet{
+  flex: 1;
+  background: var(--bg);
+  overflow: auto;
+  padding-bottom: max(16px, env(safe-area-inset-bottom));
+  padding-top: env(safe-area-inset-top); /* iOS 노치 영역만큼 내려서 그 아래에 헤더 고정 */
+}
 
 /* 시트/헤더 공통 보정 */
 .cat-head{
@@ -2664,9 +3528,26 @@ console.log('[sim-templates] loaded v2025-09-30-01')
 .compose-attach{ right:14px !important; bottom:70px !important }
 .hidden{ display:none }
 
-/* 상세 페이지 */
-.detail-mask{ position:fixed; inset:0; z-index:120; background:var(--bg); display:flex; }
-.detail-sheet{ flex:1; display:flex; flex-direction:column; overflow:auto; background:var(--bg); padding-bottom: max(18px, env(safe-area-inset-bottom) + 90px); }
+.detail-mask{
+  position: fixed;
+  top: calc(var(--gt-topbar-h) + var(--gt-ad-h));
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 120;
+  background: var(--bg);
+  display: flex;
+}
+
+/* 👉 flex 제거 + 상단 safe-area 확보 */
+.detail-sheet{
+  flex: 1;
+  background: var(--bg);
+  overflow: auto;
+  padding-bottom: max(18px, env(safe-area-inset-bottom) + 90px);
+  padding-top: env(safe-area-inset-top);
+}
+
 .detail-head{ position:sticky; top:0; z-index:2; }
 .detail-body{ padding:12px; padding-top:8px; }
 .d-meta{ font-size:12px; margin-bottom:8px; display:flex; align-items:center; gap:6px }
@@ -2699,6 +3580,39 @@ console.log('[sim-templates] loaded v2025-09-30-01')
 .composer .ta{ min-height:64px; resize:vertical }
 .cmt-actions{ display:flex; align-items:center; gap:8px; padding-top:6px }
 .btn-cmt{ height:34px; padding:0 12px; border-radius:10px; border:1px solid var(--accent); background: color-mix(in oklab, var(--accent), white 85%); font-weight:900; color:#111 }
+/* ===== 미니 버튼 공통 스타일 (내 글/댓글 보기, 첨부, 이전 공지 등) ===== */
+.btn-mini{
+  height: 28px;
+  padding: 0 12px;
+  border-radius: 999px;  /* 둥근 사각형(필 모양) */
+  border: 1px solid color-mix(in oklab, var(--accent), white 20%);
+
+  background: color-mix(in oklab, var(--accent), white 90%);
+  color: #111;
+
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  cursor: pointer;
+  box-shadow: 0 2px 4px rgba(0,0,0,.06);
+}
+
+.btn-mini:active{
+  transform: translateY(1px);
+  box-shadow: 0 1px 2px rgba(0,0,0,.12);
+}
+
+/* 위험(danger) 버튼 - 삭제 등 */
+.btn-mini.danger{
+  border-color: #e53935;
+  background: color-mix(in oklab, #e53935, white 90%);
+  color: #b00020;
+}
 
 /* 포커스 표시 */
 .ql-row, .notice-row{ cursor:pointer; }
@@ -2711,6 +3625,223 @@ console.log('[sim-templates] loaded v2025-09-30-01')
   position: relative;
   z-index: 2;            /* 위로 올리기 */
   pointer-events: auto;  /* 클릭 보장 */
+}
+
+/* ===== 상단 베스트 탭 ===== */
+.best-tabs{
+  display:flex;
+  gap:8px;
+
+  /* 🔹 강톡 배너 네온이랑 안 겹치도록 위쪽 여백 넉넉히 추가 */
+  margin-top: 14px;
+  margin-bottom: 6px;
+}
+
+/* 🔹 인기글/인기댓글/인기추천수 버튼 크기 & 글씨 키우기 */
+.best-tabs .chip.sm{
+  flex:1;
+  justify-content:center;
+
+  height: 34px;          /* 26px → 34px */
+  padding: 0 14px;       /* 좌우 여유 */
+  font-size: 13.5px;     /* 글씨 조금 크게 */
+  font-weight: 800;      /* 글씨 두껍게 */
+  border-radius: 999px;  /* 동글동글 pill 느낌 강조 */
+}
+
+.best-tabs .chip.sm.on{
+  background: color-mix(in oklab, var(--accent), white 85%);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px color-mix(in oklab, var(--accent), white 80%);
+}
+
+/* ===== 베스트 랭킹 ===== */
+.best-sec{
+  margin-top:8px;
+}
+.best-list{
+  list-style:none;
+  padding:0;
+  margin:0;
+  display:flex;
+  flex-direction:column;
+  gap:0;
+}
+
+.best-row{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  padding:8px 10px;
+  border-radius:12px;
+  border:1px solid var(--line);
+  background:var(--surface);
+  box-shadow:0 2px 8px var(--shadow);
+  cursor:pointer;
+}
+.best-row:active{
+  transform:translateY(1px);
+}
+.best-row .rank{
+  width:28px;
+  text-align:center;
+  font-weight:900;
+  color:#e53935;
+}
+.best-row .b-main{
+  flex:1;
+  min-width:0;
+  display:flex;
+  flex-direction:column;
+  gap:2px;
+}
+.best-row .b-title{
+  font-size:13.5px;
+  font-weight:900;
+}
+.best-row .b-meta{
+  font-size:11.5px;
+  color:var(--muted);
+  display:flex;
+  align-items:center;
+  gap:4px;
+}
+.best-row .b-meta .m.red,
+.best-row .b-meta .m.red b{
+  color:#e53935;
+}
+.best-empty{
+  font-size:12px;
+  color:var(--muted);
+  padding:4px 2px 10px;
+}
+/* 힐링톡 / 강톡 배너 오른쪽 "전체" 버튼 */
+.hero-all-btn{
+  height:26px;
+  padding:0 12px;
+  border-radius:999px;
+  border:1px solid #fff;              /* 흰색 테두리 */
+  background:rgba(255,255,255,0.85);  /* 살짝 흰 배경으로 클릭 유도 */
+  color:#111;                         /* 검은색 글씨 */
+  font-size:12px;
+  font-weight:800;
+  letter-spacing:0.02em;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  box-shadow:0 2px 6px rgba(0,0,0,0.18);
+}
+.hero-all-btn:active{
+  transform:translateY(1px);
+  box-shadow:0 1px 3px rgba(0,0,0,0.22);
+}
+/* 강톡 배너 오른쪽 버튼 묶음 */
+.hero-rt{
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* "이벤트 참여" 텍스트 버튼 */
+.hero-event-btn{
+  border: 0;
+  background: transparent;
+  padding: 0 4px;
+
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: var(--accent);           /* 핑크 계열 포인트 색 */
+  text-decoration: underline;     /* 텍스트형 버튼 느낌 */
+
+  cursor: pointer;
+}
+.hero-event-btn:active{
+  opacity: 0.7;
+}
+
+/* 글쓰기 사진 첨부 미리보기 */
+.attach-info{
+  margin: 6px 0 4px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.attach-preview{
+  display: flex;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.attach-thumb{
+  width: 48px;
+  height: 48px;
+  border-radius: 8px;
+  object-fit: cover;
+  border: 1px solid var(--line);
+}
+/* 상세 글 첨부 이미지 영역 */
+.detail-images{
+  margin-bottom: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.detail-img-wrap{
+  border-radius: 12px;
+  overflow: hidden;
+  background: #000;
+}
+
+.detail-img{
+  width: 100%;
+  display: block;
+  object-fit: contain;
+}
+/* 상세 시트 상단 카테고리 탭 (강톡/힐링 공용) */
+.cat-filter-tabs{
+  display:flex;
+  align-items:center;
+  gap:6px;
+  padding:6px 10px 8px;
+  overflow-x:auto;
+  overflow-y:hidden;
+  white-space:nowrap;
+  -ms-overflow-style:none;
+  scrollbar-width:none;
+}
+.cat-filter-tabs::-webkit-scrollbar{
+  display:none;
+}
+.cat-filter-tabs .chip.xs{
+  flex:0 0 auto;
+}
+/* 새 글 N 표시 */
+.badge-new{
+  margin-left:4px;
+  font-size:11px;
+  font-weight:900;
+  color:#e53935;
+}
+
+/* 댓글 수 [2] */
+.badge-cmt{
+  margin-left:4px;
+  font-size:11px;
+  font-weight:700;
+  color:#e53935;
+}
+
+/* mobile / web 뱃지 */
+.badge-device{
+  margin-left:6px;
+  padding:2px 6px;
+  border-radius:999px;
+  border:1px solid var(--line);
+  font-size:11px;
+  font-weight:700;
+  color:var(--muted);
 }
 
 </style>
