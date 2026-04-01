@@ -1,195 +1,56 @@
 <template>
   <section class="wrap compact">
-    <!-- ✅ 상단 탑바 바로 아래 한 줄 광고 영역 -->
-    <section class="gt-ad-bar">
-      <!-- 나중에 Firestore 등에서 받아온 한줄 광고 텍스트 -->
-      <div v-if="adLine && adLine.trim().length" class="gt-ad-inner">
-        {{ adLine }}
-      </div>
-
-      <!-- 한줄 광고가 없을 때: 좌→우로 흘러가는 안내 문구 -->
-      <div v-else class="gt-ad-inner gt-ad-marquee">
-        <div class="gt-ad-marquee-inner">
-          여기에 광고 신청을 받습니다.
+    <!-- ✅ 상단 이미지 슬라이더 배너 -->
+    <section class="gt-slider-bar">
+      <div class="gt-slider-track" :style="{ transform: `translateX(-${sliderIdx * 100}%)` }">
+        <div
+          v-for="(slide, i) in sliderItems"
+          :key="i"
+          class="gt-slide"
+        >
+          <img :src="slide.img" :alt="slide.alt" class="gt-slide-img" />
         </div>
+      </div>
+      <div class="gt-slider-dots">
+        <span
+          v-for="(_, i) in sliderItems"
+          :key="i"
+          class="gt-dot"
+          :class="{ on: sliderIdx === i }"
+          @click="sliderIdx = i"
+        ></span>
       </div>
     </section>
 
-    <!-- ===== 상단 헤더 ===== -->
-    <header class="page-head">
-      <!-- ① 힐링톡 히어로 -->
-      <div
-        class="healing-head hero"
-        role="button"
-        tabindex="0"
-        :style="heroStyle('heal')"
-        @click="openHealing"
-      >
-        <span class="yh-left">
-          <b class="yh-title">힐링톡</b>
-          <span class="tagline"><span>여행.맛집 · 건강.다이어트 · 명언.동기부여</span></span>
-        </span>
-
-        <!-- ▶ 힐링톡 전체 버튼 -->
-        <button
-          type="button"
-          class="hero-all-btn"
-          @click.stop="openHealing"
-        >
-          전체
-        </button>
+    <!-- ===== 커뮤니티 2x2 그리드 ===== -->
+    <section class="community-grid">
+      <div class="grid-card dark" role="button" tabindex="0" @click="openCategoryPage('all')">
+        <svg class="grid-lock" viewBox="0 0 24 24" aria-hidden="true">
+          <rect x="6" y="10" width="12" height="10" rx="2" stroke="currentColor" fill="none" stroke-width="2"/>
+          <path d="M8 10V8a4 4 0 0 1 8 0v2" stroke="currentColor" fill="none" stroke-width="2"/>
+        </svg>
+        <b class="grid-title">강톡</b>
+        <span class="grid-sub">100% 비공개</span>
       </div>
-
-      <ul class="heal-quick" v-if="SHOW_INLINE_CATS">
-        <li>
-          <button class="pill-row" type="button" @click="openHealingCat('travel')">
-            <span class="ico">🧭</span>
-            <span class="txt">
-              <span class="lbl">여행.맛집</span>
-              <span class="sub">{{ HEAL_SUBS.travel }}</span>
-            </span>
-          </button>
-        </li>
-        <li>
-          <button class="pill-row" type="button" @click="openHealingCat('health')">
-            <span class="ico">🩺</span>
-            <span class="txt">
-              <span class="lbl">건강.다이어트</span>
-              <span class="sub">{{ HEAL_SUBS.health }}</span>
-            </span>
-          </button>
-        </li>
-        <li>
-          <button class="pill-row" type="button" @click="openHealingCat('quote')">
-            <span class="ico">📝</span>
-            <span class="txt">
-              <span class="lbl">명언.동기부여</span>
-              <span class="sub">{{ HEAL_SUBS.quote }}</span>
-            </span>
-          </button>
-        </li>
-      </ul>
-
-      <!-- ③ 강톡 히어로 -->
-      <div
-        class="yaho-head hero"
-        role="button"
-        tabindex="0"
-        :style="heroStyle('yaho')"
-        @click="openCategoryPage('all')"
-      >
-        <span class="yh-left">
-          <b class="yh-title">강톡</b>
-          <span class="tagline">
-            <svg class="tag-lock" viewBox="0 0 24 24" aria-hidden="true">
-              <rect x="6" y="10" width="12" height="10" rx="2" stroke="currentColor" fill="none" stroke-width="2"/>
-              <path d="M8 10V8a4 4 0 0 1 8 0v2" stroke="currentColor" fill="none" stroke-width="2"/>
-            </svg>
-            <span><b>100% 비공개</b></span>
-          </span>
-        </span>
-
-        <!-- ▶ 오른쪽 버튼 영역: 이벤트 참여 + 전체 -->
-        <span class="hero-rt">
-          <button
-            type="button"
-            class="hero-event-btn"
-            @click.stop="openCategoryPage('event')"
-          >
-            이벤트 참여
-          </button>
-
-          <button
-            type="button"
-            class="hero-all-btn"
-            @click.stop="openCategoryPage('all')"
-          >
-            전체
-          </button>
-        </span>
+      <div class="grid-card light" role="button" tabindex="0" @click="openHealing">
+        <b class="grid-title">힐링톡</b>
+        <span class="grid-sub">명언 · 건강 · 여행 · 다이어트</span>
       </div>
+      <div class="grid-card biz" role="button" tabindex="0" @click="openFirstBiz">
+        <b class="grid-title">우리 가게 게시판</b>
+        <span class="grid-sub">공지 · 소식 · 가게 이야기</span>
+      </div>
+      <div class="grid-card event" role="button" tabindex="0" @click="openCategoryPage('event')">
+        <b class="grid-title">이벤트 참여</b>
+        <span class="grid-sub">이벤트 · 혜택 · 참여</span>
+      </div>
+    </section>
 
-      <!-- ④ 야호톡 긴 바(카테고리) -->
-      <section class="yaho-quick" v-if="SHOW_INLINE_CATS">
-        <ul class="yq-list">
-          <li>
-            <button class="pill-row" type="button" @click="openCategoryPage('hot')">
-              <span class="ico">{{ catIcon('hot') }}</span>
-              <span class="txt">
-                <span class="lbl">인기</span>
-                <span class="sub">{{ YA_SUBS.hot }}</span>
-              </span>
-            </button>
-          </li>
-
-          <li>
-            <button class="pill-row" type="button" @click="openCategoryPage('daily')">
-              <span class="ico">{{ catIcon('daily') }}</span>
-              <span class="txt">
-                <span class="lbl">뉴스게시판</span>
-                <span class="sub">{{ YA_SUBS.daily }}</span>
-              </span>
-            </button>
-          </li>
-
-          <li>
-            <button class="pill-row" type="button" @click="openCategoryPage('suggest')">
-              <span class="ico">{{ catIcon('suggest') }}</span>
-              <span class="txt">
-                <span class="lbl">건의</span>
-                <span class="sub">{{ YA_SUBS.suggest }}</span>
-              </span>
-            </button>
-          </li>
-
-          <li>
-            <button class="pill-row" type="button" @click="openCategoryPage('pledge')">
-              <span class="ico">{{ catIcon('pledge') }}</span>
-              <span class="txt">
-                <span class="lbl">다짐</span>
-                <span class="sub">{{ YA_SUBS.pledge }}</span>
-              </span>
-            </button>
-          </li>
-
-          <li>
-            <button class="pill-row" type="button" @click="openCategoryPage('vote')">
-              <span class="ico">{{ catIcon('vote') }}</span>
-              <span class="txt">
-                <span class="lbl">투표</span>
-                <span class="sub">{{ YA_SUBS.vote }}</span>
-              </span>
-            </button>
-          </li>
-
-          <li>
-            <button class="pill-row" type="button" @click="openCategoryPage('quiz')">
-              <span class="ico">{{ catIcon('quiz') }}</span>
-              <span class="txt">
-                <span class="lbl">팡팡</span>
-                <span class="sub">{{ YA_SUBS.quiz }}</span>
-              </span>
-            </button>
-          </li>
-
-          <li>
-            <button class="pill-row" type="button" @click="openCategoryPage('event')">
-              <span class="ico">{{ catIcon('event') }}</span>
-              <span class="txt">
-                <span class="lbl">이벤트</span>
-                <span class="sub">{{ YA_SUBS.event }}</span>
-              </span>
-            </button>
-          </li>
-        </ul>
-      </section>
-    </header>
-
-    <!-- ===== 베스트 탭: 인기글 / 인기댓글 / 인기추천수 ===== -->
+    <!-- ===== 베스트 탭: 인기글 / 인기댓글 / 인기추천수 (pill 스타일) ===== -->
     <div class="best-tabs" role="tablist" aria-label="인기 정렬">
       <button
         type="button"
-        class="chip sm"
+        class="pill-tab"
         :class="{ on: bestMode === 'views' }"
         role="tab"
         @click="bestMode = 'views'"
@@ -198,7 +59,7 @@
       </button>
       <button
         type="button"
-        class="chip sm"
+        class="pill-tab"
         :class="{ on: bestMode === 'comments' }"
         role="tab"
         @click="bestMode = 'comments'"
@@ -207,7 +68,7 @@
       </button>
       <button
         type="button"
-        class="chip sm"
+        class="pill-tab"
         :class="{ on: bestMode === 'likes' }"
         role="tab"
         @click="bestMode = 'likes'"
@@ -216,7 +77,7 @@
       </button>
     </div>
 
-    <!-- ===== 베스트 랭킹 ===== -->
+    <!-- ===== 베스트 랭킹 (카드형) ===== -->
     <section class="best-sec">
       <header class="sec-head">
         <h3>인기 {{ bestLabel }}</h3>
@@ -225,20 +86,25 @@
         <li
           v-for="(p, idx) in bestTop3"
           :key="p.id"
-          class="best-row"
+          class="post-card"
           @click="openPost(p)"
         >
-          <span class="rank">#{{ idx + 1 }}</span>
-          <div class="b-main">
-            <div class="b-title ellip">{{ p.title }}</div>
-            <div class="b-meta">
-              <span class="m red">조회 {{ Number(p.views || 0).toLocaleString() }}</span>
-              <span class="sep">/</span>
-              <span class="m red">댓 {{ Number(p.cmtCount || 0).toLocaleString() }}</span>
-              <span class="sep">/</span>
-              <span class="m red">추천 {{ Number(p.likes || 0).toLocaleString() }}</span>
+          <div class="pc-body">
+            <span class="pc-nick">{{ authorName(p) }}</span>
+            <div class="pc-title ellip">{{ p.title }}</div>
+            <div class="pc-snippet ellip">{{ firstLine(p) }}</div>
+            <div class="pc-footer">
+              <span class="pc-time">{{ timeAgo(p.updatedAt || p.createdAt) }}</span>
+              <span class="pc-stat">&#x2764; {{ Number(p.likes || 0).toLocaleString() }}</span>
+              <span class="pc-stat">&#x1F4AC; {{ Number(p.cmtCount || 0).toLocaleString() }}</span>
             </div>
           </div>
+          <img
+            v-if="p.images && p.images.length"
+            :src="p.images[0]"
+            class="pc-thumb"
+            alt=""
+          />
         </li>
         <li v-if="!bestTop3.length" class="best-empty">
           아직 베스트 글이 없습니다.
@@ -246,52 +112,7 @@
       </ul>
     </section>
 
-    <!-- ===== 우리가게 게시판: 한 줄 리스트 ===== -->
-    <section class="biz-one-line">
-      <header class="sec-head">
-        <h3 role="button" tabindex="0" @click="openFirstBiz">우리가게 게시판</h3>
-      </header>
-
-      <div class="biz-filters" @click.stop>
-        <div class="filter">
-          <button class="chip sm" type="button" @click="uiBiz.regionOpen = !uiBiz.regionOpen">
-            {{ regionLabelBiz(selectedRegionBiz) }}
-          </button>
-          <ul v-if="uiBiz.regionOpen" class="menu" @click.self="uiBiz.regionOpen=false">
-            <li v-for="opt in regionOptionsBiz" :key="opt.key">
-              <button class="menu-item" type="button" @click="selectRegionBiz(opt.key)">
-                {{ opt.label }}
-              </button>
-            </li>
-          </ul>
-        </div>
-
-        <div class="filter">
-          <button class="chip sm" type="button" @click="uiBiz.typeOpen = !uiBiz.typeOpen">
-            {{ typeLabelBiz(selectedTypeBiz) }}
-          </button>
-          <ul v-if="uiBiz.typeOpen" class="menu" @click.self="uiBiz.typeOpen=false">
-            <li v-for="opt in typeOptionsBiz" :key="opt.key">
-              <button class="menu-item" type="button" @click="selectTypeBiz(opt.key)">
-                {{ opt.label }}
-              </button>
-            </li>
-          </ul>
-        </div>
-      </div>
-
-      <div v-if="loading" class="muted center" style="padding:6px 0;">불러오는 중…</div>
-      <ul v-else class="biz-list">
-        <li v-for="r in filteredBizRooms" :key="r.id" class="biz-row" @click="openBiz(r)">
-          <img class="thumb" :src="r.logo || FALLBACK_BIZ_IMG" alt="" />
-          <div class="meta">
-            <div class="name ellip">{{ r.name }}</div>
-            <div class="last ellip">{{ latestLine(r) }}</div>
-          </div>
-        </li>
-      </ul>
-      <p v-if="!loading && bizRooms.length === 0" class="muted center">등록된 업체가 없습니다.</p>
-    </section>
+    <!-- 우리가게 게시판 섹션 제거됨 (2x2 그리드 카드로 이동) -->
 
     <!-- ===== 투표 상세 바텀시트 ===== -->
     <div v-if="votePost" class="sheet-backdrop" @click.self="closeVote">
@@ -847,7 +668,24 @@ const emoji = ref({ open:false, target:'', style:{ right:'16px', bottom:'126px' 
 // 👇 힐링톡/강톡 아래의 “여러 카테고리 버튼”을 보일지 여부
 const SHOW_INLINE_CATS = false
 
-// ✅ 상단 한 줄 광고 텍스트 (나중에 Firestore 연동 예정)
+// ✅ 상단 이미지 슬라이더 (광고 배너 대체)
+const sliderIdx = ref(0)
+const sliderItems = ref([
+  { img: '/img/banner1.jpg', alt: '배너 1' },
+  { img: '/img/banner2.jpg', alt: '배너 2' },
+  { img: '/img/banner3.jpg', alt: '배너 3' },
+])
+let sliderTimer = null
+function startSlider() {
+  sliderTimer = setInterval(() => {
+    sliderIdx.value = (sliderIdx.value + 1) % sliderItems.value.length
+  }, 4000)
+}
+function stopSlider() {
+  if (sliderTimer) { clearInterval(sliderTimer); sliderTimer = null }
+}
+
+// ✅ (레거시) 상단 한 줄 광고 텍스트
 const adLine = ref('')
 const composeBodyEl = ref(null)
 const noticeBodyEl  = ref(null)
@@ -2606,9 +2444,11 @@ onMounted(()=>{
   subscribeStores()
   subscribePosts()
   tryOpenFromQuery()
+  startSlider()
   window.addEventListener('resize', scrollToBottom)
 })
 onBeforeUnmount(()=>{
+  stopSlider()
   window.removeEventListener('resize', scrollToBottom)
   if (typeof unsubStores === 'function') unsubStores()
   if (typeof unsubPosts === 'function') unsubPosts()
@@ -2904,216 +2744,103 @@ console.log('[sim-templates] loaded v2025-09-30-01')
 /* 페이지 여백 */
 .wrap{ padding:14px }
 
-/* 이 페이지에서만 사용할 레이아웃 변수 (TopBar/광고 높이) */
+/* 이 페이지에서만 사용할 레이아웃 변수 (TopBar 높이) */
 .wrap.compact{
-  --gt-topbar-h: 56px;    /* TopBar 대략 높이 */
-  --gt-ad-h: 65px;        /* 광고 배너 높이 */
-
+  --gt-topbar-h: 56px;
+  --gt-ad-h: 0px;
   padding: 10px;
-
-  /* 탑바(56px) + 광고(65px) 높이만큼 전체 페이지를 더 내려서
-     힐링톡 전체 보기 배너가 광고 아래에서 시작되도록 조정 */
-  margin-top: calc(var(--gt-topbar-h) + var(--gt-ad-h));
+  margin-top: var(--gt-topbar-h);
 }
 
-/* 상단 한 줄 광고 영역 (TopBar 바로 아래에 고정) */
-.gt-ad-bar{
-  position: fixed;                    /* 🔒 viewport 기준으로 완전 고정 */
-  top: var(--gt-topbar-h);           /* 탑바 바로 아래에 붙이기 */
-  left: 0;
-  right: 0;
-  z-index: 150;                      /* 탑바(200)보다 한 단계 아래, 콘텐츠보다 위 */
-
-  height: var(--gt-ad-h);
-  margin: 0;
-  padding: 0 8px;
-  box-sizing: border-box;
-  background: var(--bg);
+/* ===== 상단 이미지 슬라이더 ===== */
+.gt-slider-bar{
+  position: relative;
+  border-radius: 14px;
+  overflow: hidden;
+  margin-bottom: 12px;
+  aspect-ratio: 16 / 7;
+  background: #eee;
 }
-
-.gt-ad-inner{
+.gt-slider-track{
+  display: flex;
   width: 100%;
   height: 100%;
-  border-radius: 999px;
-  border: 1px solid rgba(0,0,0,0.06);
-  background: color-mix(in oklab, var(--accent), white 92%);
+  transition: transform 0.5s ease;
+}
+.gt-slide{
+  flex: 0 0 100%;
+  width: 100%;
+  height: 100%;
+}
+.gt-slide-img{
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.gt-slider-dots{
+  position: absolute;
+  bottom: 8px;
+  left: 50%;
+  transform: translateX(-50%);
   display: flex;
-  align-items: center;
-  overflow: hidden;
-  padding: 0 12px;
-  font-size: 12.5px;
-  font-weight: 700;
-  color: #111;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.12);
+  gap: 6px;
+}
+.gt-dot{
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.5);
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.gt-dot.on{
+  background: #fff;
+  box-shadow: 0 0 4px rgba(0,0,0,0.3);
 }
 
-/* 광고 한 줄이 없을 때: 좌측에서 우측으로 흐르는 텍스트 */
-.gt-ad-marquee{
-  position: relative;
+/* ===== 2x2 커뮤니티 그리드 ===== */
+.community-grid{
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 14px;
 }
+.grid-card{
+  border-radius: 14px;
+  padding: 16px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  cursor: pointer;
+  transition: transform 0.15s;
+}
+.grid-card:active{ transform: scale(0.97); }
+.grid-title{ font-size: 15px; font-weight: 900; }
+.grid-sub{ font-size: 11.5px; opacity: 0.8; line-height: 1.3; }
+.grid-lock{ width: 18px; height: 18px; margin-bottom: 2px; }
 
-.gt-ad-marquee-inner{
-  display: inline-block;
-  padding-left: 100%;               /* 시작 위치를 오른쪽 바깥에서 */
-  white-space: nowrap;
-
-  /* 🔺 글자 크기·굵기 업 (기존 12.5px → 약 2.5배) */
-  font-size: 32px;
-  font-weight: 900;
-  letter-spacing: 0.04em;
-
-  /* 🔆 네온 느낌 색상 + 기본 글자색 */
+.grid-card.dark{
+  background: #1e1e2e;
   color: #fff;
-
-  /* 네온 글로우 기본 상태 */
-  text-shadow:
-    0 0 4px  #ff8ac1,
-    0 0 8px  #ff8ac1,
-    0 0 14px #ff4da3,
-    0 0 22px #ff4da3;
-
-  /* 👉 좌→우 이동 + 네온 깜빡임을 함께 적용 */
-  animation:
-    gt-ad-marquee 12s linear infinite,
-    neonPulse 1.4s ease-in-out infinite alternate;
 }
-
-@keyframes heroNeon{
-  0%{
-    border-color:#ff8ac1;
-    box-shadow:
-      0 0 4px  rgba(255,138,193,0.8),
-      0 0 10px rgba(255,77,163,0.6),
-      0 0 18px rgba(255,0,102,0.4);
-  }
-  50%{
-    border-color:#ff4da3;
-    box-shadow:
-      0 0 6px  rgba(255,170,210,0.9),
-      0 0 16px rgba(255,77,163,0.8),
-      0 0 30px rgba(255,0,102,0.7);
-  }
-  100%{
-    border-color:#ff8ac1;
-    box-shadow:
-      0 0 3px  rgba(255,138,193,0.75),
-      0 0 8px  rgba(255,77,163,0.6),
-      0 0 16px rgba(255,0,102,0.5);
-  }
+.grid-card.light{
+  background: linear-gradient(135deg, #fff5f8, #ffe4ec);
+  color: #333;
 }
-
-@keyframes gt-ad-marquee{
-  0%   { transform: translateX(0); }
-  100% { transform: translateX(-100%); }
+.grid-card.biz{
+  background: linear-gradient(135deg, #f0f4ff, #e4ecff);
+  color: #333;
 }
-
-@keyframes neonPulse{
-  0%{
-    opacity: 0.5;
-    text-shadow:
-      0 0 2px  #ff8ac1,
-      0 0 4px  #ff8ac1,
-      0 0 8px  #ff4da3;
-  }
-  50%{
-    opacity: 1;
-    text-shadow:
-      0 0 4px  #ff8ac1,
-      0 0 10px #ff8ac1,
-      0 0 18px #ff4da3,
-      0 0 26px #ff0066;
-  }
-  100%{
-    opacity: 0.7;
-    text-shadow:
-      0 0 3px  #ff8ac1,
-      0 0 6px  #ff8ac1,
-      0 0 12px #ff4da3;
-  }
+.grid-card.event{
+  background: linear-gradient(135deg, #fff8e1, #ffecb3);
+  color: #333;
 }
 
 /* ===== 헤더 & 타이틀 ===== */
-.page-head{ display:flex; flex-direction:column; gap:8px; margin-bottom:8px }
 .title{ margin:0; font-size:18px; font-weight:900 }
 
-/* ===== 히어로 ===== */
-.hero{
-  position:relative;
-  border-radius:16px;
-
-  /* 🔸 위에 광고 배너(`--gt-ad-h`) 높이만큼 키우기 */
-  --hero-h: calc(var(--gt-ad-h) + 8px);   /* 광고 높이 + 여유 8px */
-  min-height: var(--hero-h);
-  padding: 10px 16px;
-
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-
-  color:var(--fg);
-
-  /* 배경 이미지 */
-  background-color: #0000;
-  background-repeat: no-repeat;
-  background-position: var(--hero-pos, center center);
-  background-size: cover;
-  background-image:
-    image-set(
-      var(--hero-img-1x) 1x,
-      var(--hero-img-2x) 2x
-    );
-  background-image:
-    -webkit-image-set(
-      var(--hero-img-1x) 1x,
-      var(--hero-img-2x) 2x
-    );
-
-  /* 🔥 네온 번쩍 효과 보더/그로우 */
-  border: 2px solid #ff8ac1;
-  box-shadow:
-    0 0 6px  rgba(255,138,193,0.9),
-    0 0 14px rgba(255,77,163,0.75),
-    0 0 24px rgba(255,0,102,0.55);
-
-  animation: heroNeon 1.6s ease-in-out infinite alternate;
-}
-
-/* 배너 안 아이콘/텍스트도 살짝 키워 비율 맞추기 */
-.yh-logo{ width:34px; height:34px; color:var(--accent) }  /* 26 → 34 */
-.yh-title{
-  font-size:16px;
-  font-weight:900;
-  color:#111;
-  /* 흰색 테두리/글로우 효과 */
-  text-shadow:
-    -1px -1px 0 #fff,
-     1px -1px 0 #fff,
-    -1px  1px 0 #fff,
-     1px  1px 0 #fff,
-     0    0   4px #fff;
-}
-
-.tagline{
-  display:inline-flex; align-items:center; gap:6px;
-  height:22px; padding:0 10px;
-  border-radius:999px; border:1px solid var(--line);
-  background:var(--bg);
-  font-weight:900; font-size:11px; line-height:1;
-  /* 안에 들어가는 글씨도 배너 위에서 잘 보이게 */
-}
-
-.tagline span{
-  color:#111;
-  text-shadow:
-    -1px -1px 0 #fff,
-     1px -1px 0 #fff,
-    -1px  1px 0 #fff,
-     1px  1px 0 #fff,
-     0    0   4px #fff;
-}
-
-.yh-left{ display:flex; align-items:center; gap:8px; flex-wrap:wrap }
-.tag-lock{ width:14px; height:14px; opacity:.8 }
+/* (히어로/tagline 스타일은 2x2 그리드로 대체됨) */
 
 /* ===== 공통 칩/버튼 ===== */
 .cat-row{ display:flex; align-items:center; gap:6px; flex-wrap:wrap }
@@ -3474,8 +3201,7 @@ console.log('[sim-templates] loaded v2025-09-30-01')
 /* 풀스크린 오버레이(카테고리/상세) */
 .cat-mask{
   position: fixed;
-  /* ▶ TopBar 높이 + 광고 바 높이만큼 위를 비워서 둘 다 항상 보이게 */
-  top: calc(var(--gt-topbar-h) + var(--gt-ad-h));
+  top: var(--gt-topbar-h);
   left: 0;
   right: 0;
   bottom: 0;
@@ -3530,7 +3256,7 @@ console.log('[sim-templates] loaded v2025-09-30-01')
 
 .detail-mask{
   position: fixed;
-  top: calc(var(--gt-topbar-h) + var(--gt-ad-h));
+  top: var(--gt-topbar-h);
   left: 0;
   right: 0;
   bottom: 0;
@@ -3627,93 +3353,107 @@ console.log('[sim-templates] loaded v2025-09-30-01')
   pointer-events: auto;  /* 클릭 보장 */
 }
 
-/* ===== 상단 베스트 탭 ===== */
+/* ===== 상단 베스트 탭 (pill 스타일) ===== */
 .best-tabs{
-  display:flex;
-  gap:8px;
-
-  /* 🔹 강톡 배너 네온이랑 안 겹치도록 위쪽 여백 넉넉히 추가 */
-  margin-top: 14px;
-  margin-bottom: 6px;
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+  margin-bottom: 8px;
+}
+.pill-tab{
+  flex: 1;
+  height: 36px;
+  border: none;
+  border-radius: 999px;
+  font-size: 13.5px;
+  font-weight: 800;
+  cursor: pointer;
+  background: var(--surface);
+  color: var(--fg);
+  border: 1px solid var(--line);
+  transition: background 0.15s, color 0.15s;
+}
+.pill-tab.on{
+  background: #ff6b9d;
+  color: #fff;
+  border-color: #ff6b9d;
+  box-shadow: 0 2px 8px rgba(255,107,157,0.35);
 }
 
-/* 🔹 인기글/인기댓글/인기추천수 버튼 크기 & 글씨 키우기 */
-.best-tabs .chip.sm{
-  flex:1;
-  justify-content:center;
-
-  height: 34px;          /* 26px → 34px */
-  padding: 0 14px;       /* 좌우 여유 */
-  font-size: 13.5px;     /* 글씨 조금 크게 */
-  font-weight: 800;      /* 글씨 두껍게 */
-  border-radius: 999px;  /* 동글동글 pill 느낌 강조 */
-}
-
-.best-tabs .chip.sm.on{
-  background: color-mix(in oklab, var(--accent), white 85%);
-  border-color: var(--accent);
-  box-shadow: 0 0 0 2px color-mix(in oklab, var(--accent), white 80%);
-}
-
-/* ===== 베스트 랭킹 ===== */
+/* ===== 베스트 랭킹 (카드형) ===== */
 .best-sec{
-  margin-top:8px;
+  margin-top: 4px;
 }
 .best-list{
-  list-style:none;
-  padding:0;
-  margin:0;
-  display:flex;
-  flex-direction:column;
-  gap:0;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
-.best-row{
-  display:flex;
-  align-items:center;
-  gap:8px;
-  padding:8px 10px;
-  border-radius:12px;
-  border:1px solid var(--line);
-  background:var(--surface);
-  box-shadow:0 2px 8px var(--shadow);
-  cursor:pointer;
+/* ===== 게시글 카드 ===== */
+.post-card{
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  box-shadow: 0 2px 10px var(--shadow);
+  cursor: pointer;
+  transition: transform 0.12s;
 }
-.best-row:active{
-  transform:translateY(1px);
+.post-card:active{ transform: translateY(1px); }
+.pc-body{
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
-.best-row .rank{
-  width:28px;
-  text-align:center;
-  font-weight:900;
-  color:#e53935;
+.pc-nick{
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
 }
-.best-row .b-main{
-  flex:1;
-  min-width:0;
-  display:flex;
-  flex-direction:column;
-  gap:2px;
+.pc-title{
+  font-size: 14px;
+  font-weight: 900;
+  line-height: 1.3;
 }
-.best-row .b-title{
-  font-size:13.5px;
-  font-weight:900;
+.pc-snippet{
+  font-size: 12.5px;
+  color: var(--muted);
+  line-height: 1.4;
 }
-.best-row .b-meta{
-  font-size:11.5px;
-  color:var(--muted);
-  display:flex;
-  align-items:center;
-  gap:4px;
+.pc-footer{
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 4px;
+  font-size: 11.5px;
+  color: var(--muted);
 }
-.best-row .b-meta .m.red,
-.best-row .b-meta .m.red b{
-  color:#e53935;
+.pc-stat{
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+.pc-thumb{
+  width: 72px;
+  height: 72px;
+  border-radius: 10px;
+  object-fit: cover;
+  flex-shrink: 0;
+  background: #eee;
 }
 .best-empty{
-  font-size:12px;
-  color:var(--muted);
-  padding:4px 2px 10px;
+  font-size: 12px;
+  color: var(--muted);
+  padding: 4px 2px 10px;
 }
 /* 힐링톡 / 강톡 배너 오른쪽 "전체" 버튼 */
 .hero-all-btn{
