@@ -134,24 +134,8 @@ const route  = useRoute()
 const router = useRouter()
 const isMyPage = computed(() => route.path.startsWith('/mypage'))
 
-/* theme utils */
-const THEME_KEY = 'theme'
-const norm = (v)=>{
-  const s=String(v||'').toLowerCase()
-  if(['dark','black','b'].includes(s)) return 'black'
-  if(['light','white','w'].includes(s)) return 'white'
-  return ''
-}
-function applyThemeToDom(theme){
-  const t=norm(theme)||'white'
-  document.documentElement.setAttribute('data-theme',t)
-  localStorage.setItem(THEME_KEY,t)
-  isBlack.value=(t==='black')
-}
-function setUrlTheme(theme){
-  const t=norm(theme)||'white'
-  router.replace({ query:{ ...route.query, theme:t } })
-}
+/* theme utils — localStorage만 사용 (URL 쿼리 제거) */
+import { setTheme, getTheme, normalizeTheme } from '@/store/theme.js'
 
 /* state */
 const isBlack = ref(false)
@@ -159,9 +143,9 @@ const nextModeTitle = computed(()=> isBlack.value ? '화이트 모드로 전환'
 
 /* actions */
 function onToggle(){
-  const next=isBlack.value?'white':'black'
-  applyThemeToDom(next)
-  setUrlTheme(next)
+  const next = isBlack.value ? 'white' : 'black'
+  setTheme(next)
+  isBlack.value = (next === 'black')
 }
 
 /* init & sync */
@@ -175,17 +159,10 @@ onMounted(()=>{
   img.onerror = () => { hasExternalWordmark.value = false }
   img.src = WORDMARK_PATH
 
-  // 테마 초기화
-  const q=norm(route.query.theme)
-  const saved=norm(localStorage.getItem(THEME_KEY))
-  const os=(window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'black' : 'white')
-  const initial=q||saved||os
-  applyThemeToDom(initial)
-  if(q!==initial) setUrlTheme(initial)
+  // 테마 초기화: localStorage 기반
+  const current = getTheme()
+  isBlack.value = (current === 'black')
 })
-
-// 다른 탭에서 테마 변경 동기화
-window.addEventListener('storage',(e)=>{ if(e.key===THEME_KEY) applyThemeToDom(e.newValue) })
 </script>
 
 <style scoped>

@@ -167,10 +167,7 @@ router.isReady().then(async () => {
     console.warn('[bootstrap] firebaseReady 실패(계속 진행):', e)
   }
 
-  const cur = router.currentRoute.value
-  const initialTheme = normalizeTheme(
-    cur.query.theme || localStorage.getItem('theme') || 'white'
-  )
+  const initialTheme = normalizeTheme(localStorage.getItem('theme') || 'white')
   applyThemeToDom(initialTheme)
   try { localStorage.setItem('theme', initialTheme) } catch {}
 
@@ -190,12 +187,9 @@ router.isReady().then(async () => {
   }
 })
 
-// 라우트 변경마다 theme 반영 (쿼리 우선, 없으면 로컬)
-router.afterEach((to) => {
-  const theme = normalizeTheme(
-    to.query.theme || localStorage.getItem('theme') || 'white'
-  )
-  applyThemeToDom(theme)
+// 라우트 변경마다 theme 반영 (localStorage 기준)
+router.afterEach(() => {
+  applyThemeToDom(normalizeTheme(localStorage.getItem('theme') || 'white'))
 })
 
 /* ============================================================

@@ -59,6 +59,12 @@ firebase deploy --only hosting
 
 ## 작업 로그
 
+### 2026-04-02: 다크모드 유지 + 카드 흰선 v2 (`fix/darkmode-persist-and-card-line-v2`)
+- **다크모드**: TopBar의 URL 쿼리 기반 테마 관리를 제거, localStorage만 사용하도록 통일
+  - TopBar: 자체 norm/applyThemeToDom/setUrlTheme → store/theme.js의 setTheme/getTheme 사용
+  - main.js afterEach: to.query.theme 제거, localStorage만 참조
+- **카드 흰선**: aspect-ratio를 이미지 실제 비율(650/336)로 맞추고, object-fit: fill로 변경
+
 ### 2026-04-02: 다크모드 유지 + 카드 흰선 완전 제거 (`fix/darkmode-persist-and-card-line`)
 - main.js: normalizeTheme/applyThemeToDom/attachThemeSync 사용으로 테마 일관성 확보
 - afterEach에서 localStorage 중복 저장 제거 (setTheme이 이미 처리)
