@@ -1,73 +1,60 @@
 <template>
-  <main class="page">
-    <!-- 상단 헤더 -->
-    <header class="sb-header">
-      <!-- 🔙 뒤로가기 -->
-      <button class="sb-nav sb-back" type="button" aria-label="뒤로가기" @click="goBack">
-        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M15 18l-6-6 6-6"></path>
-        </svg>
+  <main class="page-v2">
+    <!-- 헤더 -->
+    <header class="v2-head">
+      <button class="v2-back" type="button" @click="goBack">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
       </button>
-
-      <h1 class="sb-title">{{ storeName || '업체 게시판' }}</h1>
-
-      <!-- ✏️ 글쓰기 -->
-      <button class="sb-nav sb-write" type="button" @click="openCompose">글쓰기</button>
+      <strong class="v2-head-title">{{ storeName || '우리가게 게시판' }}</strong>
+      <span class="spacer"></span>
+      <button class="v2-write-btn" type="button" @click="openCompose">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+        글쓰기
+      </button>
     </header>
 
-    <!-- 목록 -->
-    <section class="list">
-      <article v-for="p in posts" :key="p.id" class="post card" @click="openPost(p)">
-        <h3 class="p-title ellip">{{ p.title }}</h3>
-        <p class="p-preview ellip2">{{ p.content }}</p>
-        <div class="meta">
-          <span class="author">{{ p.authorName || '익명' }}</span>
-          <span class="dot">·</span>
-          <span class="time">{{ timeAgo(p.createdAt) }}</span>
-          <span class="dot">·</span>
-          <span class="cmt">댓글 {{ p.commentCount || 0 }}</span>
+    <!-- 게시글 카드 리스트 -->
+    <ul class="v2-post-list">
+      <li v-for="p in posts" :key="p.id" class="v2-post-card" @click="openPost(p)">
+        <div class="v2-pc-main">
+          <div class="v2-pc-top">
+            <span class="v2-cat-badge">📋 게시판</span>
+            <span class="v2-pc-nick">{{ p.authorName || '익명' }}</span>
+          </div>
+          <div class="v2-pc-title ellip">{{ p.title }}</div>
+          <div class="v2-pc-snippet ellip2">{{ p.content }}</div>
+          <div class="v2-pc-footer">
+            <span>{{ timeAgo(p.createdAt) }}</span>
+            <span>💬 {{ p.commentCount || 0 }}</span>
+          </div>
         </div>
-      </article>
+      </li>
+      <li v-if="!posts.length" class="v2-empty">첫 글을 남겨보세요.</li>
+    </ul>
 
-      <div v-if="!posts.length" class="empty">첫 글을 남겨보세요.</div>
-    </section>
-
-    <!-- ===== 글쓰기: 바텀시트 모달 ===== -->
+    <!-- ===== 글쓰기: 바텀시트 모달 (v2 감성) ===== -->
     <div v-if="showCompose" class="sheet-backdrop" @click.self="closeCompose">
-      <section class="sheet write-sheet" role="dialog" aria-modal="true">
-        <header class="sheet-head">
-          <strong class="sheet-title">글쓰기</strong>
-          <button class="x" type="button" aria-label="닫기" @click="closeCompose">✕</button>
+      <section class="sheet v2-compose" role="dialog" aria-modal="true">
+        <div class="v2-handle"></div>
+        <header class="v2-compose-head">
+          <strong class="v2-compose-title">새 글 작성</strong>
+          <button class="v2-close" type="button" @click="closeCompose">✕</button>
         </header>
 
-        <div class="sheet-body">
-          <div class="compose-row">
-            <label class="label">제목</label>
-            <input
-              ref="titleEl"
-              v-model.trim="title"
-              class="field"
-              placeholder="제목을 입력하세요"
-            />
-          </div>
+        <form @submit.prevent="submitPost" class="v2-compose-form">
+          <input class="v2-title-input" type="text" ref="titleEl" v-model.trim="title" placeholder="제목을 입력하세요" />
+          <div class="v2-divider"></div>
+          <textarea class="v2-body-input" rows="8" v-model.trim="content" placeholder="내용을 입력하세요..."></textarea>
 
-          <div class="compose-row">
-            <label class="label">내용</label>
-            <textarea
-              v-model.trim="content"
-              class="field ta"
-              rows="6"
-              placeholder="내용을 입력하세요"
-            />
+          <div class="v2-compose-toolbar">
+            <button type="button" class="v2-tool-btn" @click="onFuture">📷</button>
+            <span class="spacer"></span>
+            <span class="v2-char-count" v-if="content">{{ content.length }}자</span>
+            <button class="v2-submit-btn" type="submit" :disabled="saving || !canPost">
+              {{ saving ? '작성 중…' : '등록' }}
+            </button>
           </div>
-        </div>
-
-        <footer class="compose-bottom">
-          <button class="compose-plus" type="button" aria-label="첨부" @click="onFuture">+</button>
-          <button class="compose-create" type="button" :disabled="saving || !canPost" @click="submitPost">
-            {{ saving ? '작성 중…' : '등록' }}
-          </button>
-        </footer>
+        </form>
       </section>
     </div>
   </main>
@@ -90,7 +77,6 @@ const auth = getAuth()
 const storeId = String(route.params.id || '')
 const storeName = ref('')
 
-/* 상단 제목용: stores/{id}.name */
 async function loadStoreName(){
   try{
     const s = await getDoc(doc(db, 'stores', storeId))
@@ -98,7 +84,6 @@ async function loadStoreName(){
   }catch{}
 }
 
-/* ===== 글쓰기 모달 상태 ===== */
 const showCompose = ref(false)
 const title = ref('')
 const content = ref('')
@@ -106,67 +91,43 @@ const titleEl = ref(null)
 const saving = ref(false)
 const canPost = computed(() => title.value.length > 0 && content.value.length > 0)
 
-function resetDraft(){
-  title.value = ''
-  content.value = ''
-}
-function openCompose(){
-  resetDraft()
-  showCompose.value = true
-  nextTick(()=> titleEl.value?.focus())
-}
-function closeCompose(){
-  showCompose.value = false
-  resetDraft()
-}
+function resetDraft(){ title.value = ''; content.value = '' }
+function openCompose(){ resetDraft(); showCompose.value = true; nextTick(()=> titleEl.value?.focus()) }
+function closeCompose(){ showCompose.value = false; resetDraft() }
 function onFuture(){ alert('첨부는 추후 연결 예정입니다.') }
 
 async function submitPost(){
   if (!canPost.value || saving.value) return
   const u = auth.currentUser
   if (!u) { alert('로그인이 필요합니다.'); return }
-
   saving.value = true
   try{
-    // 규칙 요건 충족: authorUid == auth.uid, title 필수, content 또는 body 중 하나 존재
     await addDoc(collection(db, 'stores', storeId, 'posts'), {
       title: title.value,
-      content: content.value,            // 읽기용
-      body: content.value,               // 규칙 만족(둘 중 하나면 되지만 호환 위해 같이 저장)
+      content: content.value,
+      body: content.value,
       author: u.displayName || (u.email || '익명'),
       authorUid: u.uid,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
-      commentCount: 0,
-      views: 0,
-      likes: 0,
+      commentCount: 0, views: 0, likes: 0,
     })
     closeCompose()
     alert('등록되었습니다.')
-  }catch(e){
-    alert('등록 중 오류가 발생했어요.')
-    console.warn(e)
-  }finally{
-    saving.value = false
-  }
+  }catch(e){ alert('등록 중 오류가 발생했어요.'); console.warn(e) }
+  finally{ saving.value = false }
 }
 
-/* ===== 목록 구독 ===== */
 const posts = ref([])
 let unsub = null
 function subPosts(){
-  const qRef = query(
-    collection(db, 'stores', storeId, 'posts'),
-    orderBy('createdAt','desc'),
-    limit(100)
-  )
+  const qRef = query(collection(db, 'stores', storeId, 'posts'), orderBy('createdAt','desc'), limit(100))
   unsub = onSnapshot(qRef, snap=>{
     posts.value = snap.docs.map(d => {
       const x = d.data()
       return {
-        id: d.id,
-        title: String(x.title || ''),
-        content: String(x.content || x.body || ''), // body로만 저장된 기존 글 대비
+        id: d.id, title: String(x.title || ''),
+        content: String(x.content || x.body || ''),
         authorName: String(x.author || x.authorName || ''),
         createdAt: x.createdAt || null,
         commentCount: Number(x.cmtCount ?? x.commentCount ?? 0),
@@ -177,16 +138,9 @@ function subPosts(){
 onMounted(()=>{ loadStoreName(); subPosts() })
 onUnmounted(()=>{ if (typeof unsub==='function') unsub() })
 
-/* 네비게이션 */
-function openPost(p){
-  router.push({ name:'storePost', params:{ id: storeId, postId: p.id } })
-}
-function goBack(){
-  if (history.length > 1) router.back()
-  else router.push({ name:'dashboard' })
-}
+function openPost(p){ router.push({ name:'storePost', params:{ id: storeId, postId: p.id } }) }
+function goBack(){ if (history.length > 1) router.back(); else router.push({ name:'dashboard' }) }
 
-/* 시간 포맷(간단) */
 function timeAgo(ts){
   try{
     const t = ts?.toDate ? ts.toDate().getTime() : Number(ts) || Date.now()
@@ -200,108 +154,100 @@ function timeAgo(ts){
 </script>
 
 <style scoped>
-.page{
-  padding:10px;
-  padding-bottom:calc(92px + env(safe-area-inset-bottom));
+.page-v2{
+  padding:0 0 calc(92px + env(safe-area-inset-bottom));
+  background:#fff;
+  min-height:100vh;
 }
 
-/* 상단 헤더 */
-.sb-header{
-  position: sticky; top: 0; z-index: 5;
-  display:flex; align-items:center; justify-content:space-between;
-  gap:8px; padding:8px 10px; background:var(--bg);
-  border-bottom:1px solid var(--line);
+/* v2 공통 헤더 */
+.v2-head{
+  display:flex; align-items:center; gap:8px;
+  padding:12px 16px; background:#fff;
+  border-bottom:1px solid #f0f0f0;
+  position:sticky; top:0; z-index:2;
 }
-.sb-title{ font-size:16px; font-weight:900; }
-.sb-nav{
-  height:34px; min-width:34px; padding:0 10px;
-  border-radius:999px; border:1px solid var(--line);
-  background:var(--surface); display:grid; place-items:center;
-  font-weight:800;
+.v2-back{
+  width:36px; height:36px; border-radius:50%; border:none;
+  background:#f5f5f5; display:flex; align-items:center; justify-content:center; cursor:pointer;
 }
-.sb-write{ min-width:auto; }
-
-/* 카드 공통 */
-.card{
-  border:1px solid var(--line);
-  border-radius:14px;
-  background:var(--surface);
-  padding:10px;
-  box-shadow:0 4px 12px var(--shadow);
+.v2-head-title{ font-size:17px; font-weight:800; color:#111; }
+.spacer{ flex:1; }
+.v2-write-btn{
+  display:inline-flex; align-items:center; gap:4px;
+  height:34px; padding:0 14px; border-radius:999px; border:none;
+  background:linear-gradient(135deg,#FF4D8D,#E91E8C); color:#fff;
+  font-size:13px; font-weight:700; cursor:pointer;
 }
 
-/* 목록 */
-.list{ display:flex; flex-direction:column; gap:8px; margin-top:12px }
-.post{ cursor:pointer }
-.p-title{ margin:0 0 4px; font-size:14px; font-weight:900 }
-.p-preview{ margin:0 0 6px; color:var(--muted); font-size:12px }
-.meta{ font-size:11.5px; color:var(--muted); display:flex; gap:6px; align-items:center }
-.dot{ opacity:.6 }
-.empty{ text-align:center; color:var(--muted); padding:24px 0 }
+/* v2 게시글 카드 리스트 */
+.v2-post-list{ list-style:none; padding:0 16px; margin:0; }
+.v2-post-card{
+  display:flex; gap:12px; padding:16px 0;
+  border-bottom:1px solid #f0f0f0; cursor:pointer;
+}
+.v2-post-card:last-child{ border-bottom:none; }
+.v2-pc-main{ flex:1; min-width:0; display:flex; flex-direction:column; gap:4px; }
+.v2-pc-top{ display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+.v2-cat-badge{
+  display:inline-flex; align-items:center; gap:3px;
+  padding:2px 8px; border-radius:999px;
+  background:#FFE4EF; color:#E91E8C;
+  font-size:11px; font-weight:700;
+}
+.v2-pc-nick{ font-size:11.5px; color:#999; }
+.v2-pc-title{ font-size:14.5px; font-weight:800; color:#111; line-height:1.35; }
+.v2-pc-snippet{ font-size:12.5px; color:#888; line-height:1.4; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.v2-pc-footer{ display:flex; gap:10px; font-size:11px; color:#aaa; margin-top:4px; }
+.v2-empty{ padding:40px 0; text-align:center; color:#ccc; font-size:13px; list-style:none; }
 
-/* 줄바꿈 제어 */
-.ellip{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
-.ellip2{ display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden }
+.ellip{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.ellip2{ display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
 
-/* ===== 글쓰기 모달 ===== */
+/* v2 글쓰기 모달 */
 .sheet-backdrop{
   position:fixed; inset:0; background:rgba(0,0,0,.35);
-  display:flex; align-items:flex-end;
-  z-index:10020;
+  display:flex; align-items:flex-end; z-index:10020;
 }
 .sheet{
-  width:100%; background:var(--bg); border-radius:18px 18px 0 0;
+  width:100%; background:#fff; border-radius:20px 20px 0 0;
   box-shadow:0 -10px 30px rgba(0,0,0,.25);
   padding:14px; padding-bottom:max(14px, env(safe-area-inset-bottom));
-  max-height:92dvh; display:flex; flex-direction:column;
 }
-.sheet-head{ display:flex; justify-content:space-between; align-items:center; gap:8px }
-.sheet-title{ font-size:17px; font-weight:900 }
-.sheet-head .x{
-  width:32px; height:32px; border-radius:50%; border:1px solid var(--line);
-  background:var(--surface); display:flex; align-items:center; justify-content:center;
+.v2-compose{
+  max-height:calc(100vh - 60px); overflow:auto;
+  padding-bottom:max(16px, env(safe-area-inset-bottom));
 }
-.sheet-body{ overflow:auto; padding-bottom:88px }
-.compose-row{ display:flex; flex-direction:column; gap:6px; margin-top:8px }
-.compose-row .label{ font-size:12px; color:var(--muted) }
-.field{
-  height:40px; border-radius:12px; border:1px solid var(--line);
-  padding:0 12px; background:transparent;
+.v2-handle{ width:40px; height:4px; border-radius:2px; background:#ddd; margin:10px auto 6px; }
+.v2-compose-head{ display:flex; align-items:center; justify-content:space-between; padding:8px 16px 12px; }
+.v2-compose-title{ font-size:18px; font-weight:900; color:#111; }
+.v2-close{
+  width:32px; height:32px; border-radius:50%; border:none;
+  background:#f5f5f5; font-size:16px; color:#999; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
 }
-.field.ta{ height:auto; padding:10px 12px; resize:vertical; min-height:120px }
-
-/* 하단 고정 바 */
-.compose-bottom{
-  position:sticky; bottom:0; left:0; right:0;
-  display:flex; gap:8px; padding:10px 0;
-  padding-bottom:calc(10px + env(safe-area-inset-bottom));
-  margin-top:auto;
-  background:linear-gradient(180deg, transparent, color-mix(in oklab, var(--bg), white 30%));
-  border-top:1px solid var(--line);
-  z-index:5;
+.v2-compose-form{ padding:0 16px; }
+.v2-title-input{
+  width:100%; border:none; background:none; padding:8px 0;
+  font-size:17px; font-weight:800; color:#111;
 }
-.compose-plus{
-  width:44px; height:44px; border-radius:12px; border:1px solid var(--line);
-  background:var(--surface); font-size:22px; font-weight:900; line-height:0;
+.v2-title-input::placeholder{ color:#ccc; font-weight:400; }
+.v2-divider{ height:1px; background:#f0f0f0; margin:4px 0 8px; }
+.v2-body-input{
+  width:100%; border:none; background:none; padding:8px 0;
+  font-size:14.5px; line-height:1.7; color:#333; resize:none;
 }
-.compose-create{
-  flex:1; height:44px; border-radius:12px; border:1px solid var(--accent);
-  background: color-mix(in oklab, var(--accent), white 85%);
-  font-weight:900;
+.v2-body-input::placeholder{ color:#ccc; }
+.v2-compose-toolbar{
+  display:flex; align-items:center; gap:8px; padding:12px 0 8px;
+  border-top:1px solid #f0f0f0; margin-top:8px;
 }
-
-/* ===== 화이트 모드 가독성 보정 ===== */
-:root[data-theme="white"] .sb-back,
-:root[data-theme="white"] .sb-write,
-:root[data-theme="white"] .sheet-head .x{
-  color:#111 !important;
-  background:#fff !important;
-  border-color:#bbb !important;
+.v2-tool-btn{ border:none; background:none; font-size:14px; color:#888; cursor:pointer; padding:4px 6px; }
+.v2-char-count{ font-size:12px; color:#ccc; }
+.v2-submit-btn{
+  height:34px; padding:0 20px; border-radius:999px; border:none;
+  background:linear-gradient(135deg,#FF4D8D,#E91E8C); color:#fff;
+  font-size:13.5px; font-weight:700; cursor:pointer;
 }
-:root[data-theme="white"] .sb-back svg path,
-:root[data-theme="white"] .sheet-head .x svg path{
-  stroke:#111 !important;
-}
-:root[data-theme="white"] .sb-title{ color:#111 !important }
-:root[data-theme="white"] .compose-create{ color:#111 !important }
+.v2-submit-btn:disabled{ opacity:.5; cursor:default; }
 </style>

@@ -235,119 +235,72 @@
 
     <!-- ========== 힐링톡(여행/건강/명언) 풀스크린 페이지 ========== -->
     <div v-if="healingPage.open" class="cat-mask" @click.self="closeHealingPage">
-      <section class="cat-sheet" role="dialog" aria-modal="true">
-        <header class="cat-head">
-          <button class="back-btn" type="button" aria-label="뒤로가기" @click="closeHealingPage">
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"
-                 stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+      <section class="cat-sheet v2" role="dialog" aria-modal="true">
+        <header class="v2-head">
+          <button class="v2-back" type="button" @click="closeHealingPage">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
           </button>
-          <strong class="cat-title">힐링톡 · {{ healLabel }}</strong>
+          <strong class="v2-head-title">힐링톡 · {{ healLabel }}</strong>
           <span class="spacer"></span>
-
-          <!-- 관리자 전용 시더 토글 -->
-          <button v-if="isAdmin" class="btn-mini" type="button" @click.stop="toggleAutoSeed">
-            {{ AUTO_SEED ? '자동글 OFF' : '자동글 ON' }}
+          <button v-if="isAdmin" class="btn-mini" type="button" @click.stop="toggleAutoSeed">{{ AUTO_SEED ? '자동글 OFF' : '자동글 ON' }}</button>
+          <button class="v2-write-btn" type="button" @click="openCreate">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+            글쓰기
           </button>
-
-          <button class="btn-write" type="button" @click="openCreate">글쓰기</button>
         </header>
 
-        <!-- ✅ 힐링톡 카테고리 탭 (공지 바로 위) -->
-        <div class="cat-filter-tabs">
+        <div class="v2-cat-tabs">
           <button
             v-for="t in healTabsInPage"
             :key="t.key"
             type="button"
-            class="chip xs"
+            class="v2-pill"
             :class="{ on: healingPage.filter === t.key }"
             @click="onHealFilterClick(t.key)"
           >
-            <span class="ico" v-if="t.icon">{{ t.icon }}</span>
-            <span>{{ t.label }}</span>
+            <span v-if="t.icon" class="v2-pill-ico">{{ t.icon }}</span>
+            {{ t.label }}
           </button>
         </div>
 
-        <!-- ✅ 힐링 공지는 있을 때만 표시 (없으면 섹션 자체를 숨김) -->
-        <section v-if="recentHealNotice" class="notice-sec tight">
-          <header class="notice-head"><span>공지</span></header>
-          <ul class="notice-list">
-            <li class="notice-row" role="button" tabindex="0"
-                @click="openDetail(recentHealNotice)"
-                @keydown.enter.prevent="openDetail(recentHealNotice)"
-                @keydown.space.prevent="openDetail(recentHealNotice)">
-              <span class="n-bullet">📌</span>
-              <span class="n-title ellip">{{ recentHealNotice.title }}</span>
-              <span class="n-meta">
-                <span class="n-author">{{ authorName(recentHealNotice) }}</span>
-                <span class="sep"> / </span>
-                <span class="n-time">{{ timeAgo(recentHealNotice.updatedAt || recentHealNotice.createdAt) }}</span>
-              </span>
-              <template v-if="isAdmin">
-                <div class="n-admin" @click.stop>
-                  <button class="btn-mini" type="button" @click="startNoticeEdit(recentHealNotice)">수정</button>
-                  <button class="btn-mini danger" type="button" @click="deleteNotice(recentHealNotice)">삭제</button>
-                </div>
-              </template>
-            </li>
-          </ul>
-        </section>
+        <div v-if="recentHealNotice" class="v2-notice" @click="openDetail(recentHealNotice)">
+          <span class="v2-notice-pin">📌</span>
+          <div class="v2-notice-body">
+            <div class="v2-notice-title ellip">{{ recentHealNotice.title }}</div>
+            <div class="v2-notice-meta">{{ authorName(recentHealNotice) }} · {{ timeAgo(recentHealNotice.updatedAt || recentHealNotice.createdAt) }}</div>
+          </div>
+          <template v-if="isAdmin">
+            <div class="v2-notice-admin" @click.stop>
+              <button class="btn-mini" type="button" @click="startNoticeEdit(recentHealNotice)">수정</button>
+              <button class="btn-mini danger" type="button" @click="deleteNotice(recentHealNotice)">삭제</button>
+            </div>
+          </template>
+        </div>
 
-        <ul class="ql-list">
-          <li v-for="(p, idx) in healPosts" :key="p.id" class="ql-row"
-              role="button" tabindex="0"
-              @click="openDetail(p)"
-              @keydown.enter.prevent="openDetail(p)"
-              @keydown.space.prevent="openDetail(p)">
-            <div class="ql-left">{{ /^\d+$/.test(String(p.id)) ? p.id : (healPosts.length - idx) }}</div>
-            <div class="ql-body">
-              <div class="ql-top">
-                <!-- 힐링 카테고리 아이콘 -->
-                <span class="ql-ico" :title="healCatLabelFor(p.category)" aria-hidden="true">
-                  {{ healCatIcon(p.category) }}
-                </span>
-
-                <span class="ql-title ellip clickable" role="button" tabindex="0">
-                  <small v-if="p.isSeed" class="muted" style="margin-right:6px">가이드</small>
-                  {{ p.title }}
-                </span>
-
-                <!-- 새글 N -->
-                <span v-if="isNewPost(p)" class="badge-new">N</span>
-
-                <!-- 댓글 수 [2] -->
-                <span v-if="p.cmtCount" class="badge-cmt">
-                  [{{ Number(p.cmtCount || 0).toLocaleString() }}]
-                </span>
-
-                <!-- 모바일/웹 뱃지 -->
-                <span v-if="deviceLabel(p)" class="badge-device">
-                  {{ deviceLabel(p) }}
-                </span>
-
-                <svg class="ql-arr" viewBox="0 0 24 24" role="button" tabindex="0">
-                  <path d="M8 4l8 8-8 8" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" />
-                </svg>
-              </div> <!-- ✅ ql-top 닫기 -->
-
-              <div class="ql-snippet ellip clickable" role="button" tabindex="0">
-                {{ firstLine(p) }}
+        <ul class="v2-post-list">
+          <li v-for="p in healPosts" :key="p.id" class="v2-post-card" @click="openDetail(p)">
+            <div class="v2-pc-main">
+              <div class="v2-pc-top">
+                <span class="v2-cat-badge">{{ healCatIcon(p.category) }} {{ healCatLabelFor(p.category) }}</span>
+                <span class="v2-pc-nick">{{ authorName(p) }}</span>
+                <span v-if="isNewPost(p)" class="v2-badge-new">N</span>
               </div>
-
-              <div class="ql-meta">
-                <span class="m by">{{ authorName(p) }}</span><span class="sep">/</span>
-                <span class="m red date">{{ ymd(p.updatedAt || p.createdAt) }}</span><span class="sep">/</span>
-                <span class="m red">조회수 : <b>{{ Number(p.views||0).toLocaleString() }}</b></span><span class="sep">/</span>
-                <span class="m red">추천수 : <b>{{ Number(p.likes||0).toLocaleString() }}</b></span>
+              <div class="v2-pc-title ellip">{{ p.title }}</div>
+              <div class="v2-pc-snippet ellip">{{ firstLine(p) }}</div>
+              <div class="v2-pc-footer">
+                <span>{{ ymd(p.updatedAt || p.createdAt) }}</span>
+                <span>👁 {{ Number(p.views||0).toLocaleString() }}</span>
+                <span>❤️ {{ Number(p.likes||0).toLocaleString() }}</span>
+                <span>💬 {{ Number(p.cmtCount||0).toLocaleString() }}</span>
               </div>
-
-              <!-- ✅ 관리자만 보이는 수정/삭제 (야호톡과 동일) -->
-              <div class="ql-admin" v-if="isAdmin" @click.stop>
+              <div class="v2-pc-admin" v-if="isAdmin" @click.stop>
                 <button class="btn-mini" type="button" @click="startEdit(p)">수정</button>
                 <button class="btn-mini danger" type="button" @click="deletePost(p)">삭제</button>
               </div>
             </div>
+            <img v-if="p.images && p.images.length" :src="p.images[0]" class="v2-pc-thumb" alt="" loading="lazy" />
           </li>
-          <li v-if="!healPosts.length" class="ql-empty">아직 글이 없습니다.</li>
+          <li v-if="!healPosts.length" class="v2-empty">아직 글이 없습니다.</li>
         </ul>
       </section>
     </div>
