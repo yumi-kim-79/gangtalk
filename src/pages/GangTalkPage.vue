@@ -2730,7 +2730,7 @@ console.log('[sim-templates] loaded v2025-09-30-01')
   cursor: pointer;
   transition: transform 0.15s;
   box-sizing: border-box;
-  background-size: cover;
+  background-size: 100% 100%;
   background-position: center;
   background-repeat: no-repeat;
   background-color: var(--surface);

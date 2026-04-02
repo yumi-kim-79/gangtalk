@@ -59,6 +59,9 @@ firebase deploy --only hosting
 
 ## 작업 로그
 
+### 2026-04-02: 커뮤니티 카드 이미지 꽉 채우기 (`fix/community-card-image-fill`)
+- background-size: cover → 100% 100% 변경 (카드 하단 여백 제거)
+
 ### 2026-04-02: 야간모드 커뮤니티 카드 gap 배경색 제거 (`fix/darkmode-card-gap`)
 - gap: 10px → column-gap: 6px, row-gap: 4px 로 줄여서 행 간 선 최소화
 
