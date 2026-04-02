@@ -59,6 +59,11 @@ firebase deploy --only hosting
 
 ## 작업 로그
 
+### 2026-04-02: App.vue onMounted 테마 적용 + MainPage/StoreFinder onMounted 보강 (`fix/darkmode-app-vue-onmounted`)
+- App.vue: onMounted에서 applyThemeToDom(getTheme()) + attachThemeSync() 추가
+- MainPage.vue: 첫 onMounted에 applyThemeToDom(getTheme()) 추가
+- StoreFinder.vue: 첫 onMounted에 applyThemeToDom(getTheme()) 추가
+
 ### 2026-04-02: 다크모드 현황판/가게찾기 수정 + 카드 인라인 교체 (`fix/darkmode-mainpage-storeboard-card`)
 - MainPage.vue: URL 쿼리 기반 테마 → store/theme.js setTheme/getTheme 사용, 모든 router.push에서 theme 쿼리 제거
 - StoreFinder.vue: applyThemeFromQuery/watch/onMounted 제거 → getTheme/setTheme 사용

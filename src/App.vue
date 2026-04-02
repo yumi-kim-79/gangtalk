@@ -18,10 +18,17 @@
 </template>
 
 <script setup>
+import { onMounted } from 'vue'
 import TopBar from '@/components/TopBar.vue'
 import BottomNav from '@/components/BottomNav.vue'
 // import LeftConsultRibbon from '@/components/LeftConsultRibbon.vue'
-import NearbyMapModal from '@/components/map/NearbyMapModal.vue'  // ← 추가
+import NearbyMapModal from '@/components/map/NearbyMapModal.vue'
+import { applyThemeToDom, getTheme, attachThemeSync } from '@/store/theme.js'
+
+onMounted(() => {
+  applyThemeToDom(getTheme())
+  attachThemeSync()
+})
 </script>
 
 <!-- ▼ 전역 스타일 (scoped 아님): 자식 컴포넌트까지 적용됨 -->
