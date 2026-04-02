@@ -375,14 +375,9 @@ const router = createRouter({
 
 /* global guard */
 router.beforeEach(async (to, from) => {
-  // ===== 1) 테마 처리 =====
-  const ls = normTheme(localStorage.getItem('theme'))
-  const q  = normTheme(to.query.theme)
-  const desired = q || ls || 'white'
+  // ===== 1) 테마 처리 (localStorage 기준, URL 쿼리 무시) =====
+  const desired = normTheme(localStorage.getItem('theme')) || 'white'
   applyThemeToDom(desired)
-  if (q && q !== ls) {
-    localStorage.setItem('theme', desired)
-  }
 
   // ===== 2) 로그인/권한 체크 =====
   await user.ensureAuthReady()
@@ -430,7 +425,6 @@ router.beforeEach(async (to, from) => {
       query: {
         next: to.fullPath,
         mode: 'signup',
-        theme: desired,
       },
     }
   }
@@ -442,7 +436,6 @@ router.beforeEach(async (to, from) => {
       query: {
         next: to.fullPath,
         mode: 'signup',
-        theme: desired,
       },
     }
   }
@@ -458,7 +451,7 @@ router.beforeEach(async (to, from) => {
     const who = requiredRole === 'company' ? 'biz' : 'user'
     return {
       path: '/auth',
-      query: { next: to.fullPath, mode: 'login', who, theme: desired },
+      query: { next: to.fullPath, mode: 'login', who },
     }
   }
 
@@ -467,13 +460,13 @@ router.beforeEach(async (to, from) => {
     if (requiredRole === 'company' && !['company', 'admin'].includes(myType)) {
       return {
         path: '/auth',
-        query: { next: to.fullPath, mode: 'login', who: 'biz', theme: desired },
+        query: { next: to.fullPath, mode: 'login', who: 'biz' },
       }
     }
     if (requiredRole === 'admin' && myType !== 'admin') {
       return {
         path: '/auth',
-        query: { next: to.fullPath, mode: 'login', theme: desired },
+        query: { next: to.fullPath, mode: 'login' },
       }
     }
   }

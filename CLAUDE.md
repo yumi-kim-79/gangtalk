@@ -59,6 +59,14 @@ firebase deploy --only hosting
 
 ## 작업 로그
 
+### 2026-04-02: URL ?theme= 쿼리 파라미터 전면 제거 (`fix/remove-url-theme-params`)
+- **근본 원인**: BottomNav.vue에 `theme: 'light'` 하드코딩, router/index.js/MainPage/PartnersPage 등 여러 곳에서 URL 쿼리로 theme 전달
+- BottomNav.vue: `theme: 'light'` 제거
+- router/index.js: beforeEach에서 query.theme 읽기 제거, 리다이렉트 query에서 theme 제거
+- GangTalkPage.vue: openBiz query에서 theme 제거, URL replaceState에서 theme 제거
+- PartnersPage.vue: 자체 applyTheme/watch 제거 → store/theme.js 사용
+- UserSection.vue: router.push query에서 theme 제거
+
 ### 2026-04-02: App.vue onMounted 테마 적용 + MainPage/StoreFinder onMounted 보강 (`fix/darkmode-app-vue-onmounted`)
 - App.vue: onMounted에서 applyThemeToDom(getTheme()) + attachThemeSync() 추가
 - MainPage.vue: 첫 onMounted에 applyThemeToDom(getTheme()) 추가

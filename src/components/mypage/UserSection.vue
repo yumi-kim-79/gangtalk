@@ -576,7 +576,7 @@ async function loadAll() {
 function goPost(postId) {
   router.push({
     name: 'chat',
-    query: { ...route.query, postId, theme: route.query.theme || 'white' },
+    query: { ...route.query, postId },
   })
 }
 
