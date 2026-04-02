@@ -1165,10 +1165,9 @@ async function requireAuth(){
 }
 
 /* 가게 게시판 */
-const theme = computed(() => String(route.query.theme || 'white'))
 function openBiz(r){
   if (!r || !r.id) return
-  const target = { name: 'storeBoard', params: { id: String(r.id) }, query:  { theme: theme.value } }
+  const target = { name: 'storeBoard', params: { id: String(r.id) }, query: {} }
   if (route.name === 'storeBoard' && String(route.params.id) === String(r.id)) {
     target.query.ts = Date.now().toString()
     router.replace(target)
@@ -1264,7 +1263,7 @@ function openDetail(p){
   // URL만 살짝 바꿔주기(라우터 가드 우회)
   const params = new URLSearchParams({ ...route.query })
   params.set('postId', String(found.id))
-  if (!params.get('theme')) params.set('theme', String(route.query.theme || 'white'))
+  params.delete('theme')
   window.history.replaceState({}, '', `${route.path}?${params.toString()}`)
 }
 

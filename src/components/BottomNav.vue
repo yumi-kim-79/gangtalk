@@ -32,7 +32,7 @@ const svg = {
 /* 탭 정의 (홈을 /dashboard 로, 가게찾기는 한줄보기+화이트 모드로 이동) */
 const tabs = [
   { key: 'home',     to: { path: '/dashboard' },                                     label:'현황판',    svg: svg.home },
-  { key: 'find',     to: { path: '/find',     query: { view: 'list', theme: 'light' } }, label:'가게찾기',  svg: svg.find },
+  { key: 'find',     to: { path: '/find',     query: { view: 'list' } }, label:'가게찾기',  svg: svg.find },
   { key: 'chat',     to: { path: '/chat' },                                          label:'강톡',      svg: svg.chat },
   { key: 'partners', to: { path: '/partners' },                                      label:'제휴관',    svg: svg.deal },
   { key: 'my',       to: { path: '/mypage' },                                        label:'마이페이지', svg: svg.my },

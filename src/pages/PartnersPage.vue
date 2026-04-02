@@ -484,18 +484,14 @@ const Icons = {
   `
 }
 
-/* ───────── 테마 토글: StoreFinder와 동일 동작 ───────── */
-const theme = ref((route.query?.theme || localStorage.getItem('theme') || 'white').toString())
+/* ───────── 테마 토글: localStorage 기반 ───────── */
+import { getTheme, setTheme } from '@/store/theme.js'
+const theme = ref(getTheme())
 const isDark = computed(() => theme.value === 'dark' || theme.value === 'black')
-function applyTheme(v){
-  document.documentElement.setAttribute('data-theme', v)
-  localStorage.setItem('theme', v)
-}
-watch(theme, applyTheme, { immediate:true })
 function toggleTheme(){
-  theme.value = isDark.value ? 'white' : 'dark'
-  // 라우터가 있으면 공유 가능하게 쿼리 반영(없으면 이 줄은 제거해도 됨)
-  try{ router.replace?.({ query:{ ...route.query, theme: theme.value } }) }catch{}
+  const next = isDark.value ? 'white' : 'black'
+  theme.value = next
+  setTheme(next)
 }
 
 /* ───────── 내 주변: 페이지에 맞게 라우팅 연결 ─────────
