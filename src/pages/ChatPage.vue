@@ -14,7 +14,7 @@
           @keydown.enter.prevent="go(c)"
           @keydown.space.prevent="go(c)"
         >
-          <img :src="c.avatar" class="avatar" alt="" />
+          <img :src="c.avatar" class="avatar" alt="" loading="lazy" />
           <div style="flex:1">
             <div class="row" style="justify-content:space-between;">
               <strong>{{ c.name }}</strong>

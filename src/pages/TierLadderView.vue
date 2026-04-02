@@ -18,7 +18,7 @@
         <div class="rank">{{ idx + 1 }}</div>
 
         <div class="logo-wrap">
-          <img class="logo" :src="badgeSrc(t.key)" :alt="t.label" />
+          <img class="logo" :src="badgeSrc(t.key)" :alt="t.label" loading="lazy" />
           <div class="label">{{ t.label }}</div>
         </div>
 

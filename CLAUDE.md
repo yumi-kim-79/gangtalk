@@ -59,6 +59,11 @@ firebase deploy --only hosting
 
 ## 작업 로그
 
+### 2026-04-02: 전체 성능 최적화 24개 문제 수정 (`perf/global-performance-optimization`)
+- **높음 6건**: UserSection board_posts limit(100)+getDoc, AdminTools limit(200), useMyPageCore connectRequests limit(100), PartnersPage partners limit(200)
+- **중간 12건**: BizManagerTabs 3개 쿼리 limit(100), useMyPageCore stores/connectRequests/partnerRequests/extendRequests limit(100), ChatPage/PartnersPage lazy loading
+- **낮음 6건**: useMyPageCore config 서브컬렉션 limit(50), partners limit(200), UserSection getDocs→getDoc, TierLadderView lazy loading
+
 ### 2026-04-02: 강톡 페이지 6단계 성능 최적화 (`perf/optimize-gangtalk-page`)
 1. **힐링톡 흰선**: height 120→130px, background-size: 100% 100%로 완전 채움
 2. **게시글 페이지네이션**: limit(10) 적용, "더 보기" 버튼, startAfter 커서 기반

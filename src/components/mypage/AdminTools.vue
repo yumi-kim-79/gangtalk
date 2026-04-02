@@ -233,7 +233,7 @@
 <script setup>
 import { ref, reactive, computed, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import { fbDb, fbStorage, ensureSignedIn } from '@/firebase'
-import { collection, doc, serverTimestamp, writeBatch, getDocs } from 'firebase/firestore'
+import { collection, doc, serverTimestamp, writeBatch, getDocs, query, limit } from 'firebase/firestore'
 import { ref as sRef, getDownloadURL, uploadBytes } from 'firebase/storage'
 
 /* ===== emits ===== */
@@ -434,7 +434,7 @@ async function saveToFirestore(group, listRef){
   const baseCol = collection(fbDb, a, b, c)
 
   // 기존 문서
-  const snap = await getDocs(baseCol)
+  const snap = await getDocs(query(baseCol, limit(200)))
   const existingIds = new Set(snap.docs.map(d => d.id))
 
   // 정규화 + 업로드

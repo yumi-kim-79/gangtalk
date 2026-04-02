@@ -362,7 +362,7 @@ import { db as fbDb } from '@/firebase'
 
 import {
   collection, doc, getDoc, getDocs, query, where,
-  addDoc, setDoc, serverTimestamp, deleteDoc
+  addDoc, setDoc, serverTimestamp, deleteDoc, limit
 } from 'firebase/firestore'
 
 /* ── props ── */
@@ -876,6 +876,7 @@ async function reloadAdmin(){
         query(
           collection(fbDb, 'stores'),
           where('applyStatus', '==', 'pending'),
+          limit(100),
         ),
       )
       rows.push(...mapStores(snapStores.docs))
@@ -886,6 +887,7 @@ async function reloadAdmin(){
         query(
           collection(fbDb, 'partnerRequests'),
           where('status', '==', 'pending'),
+          limit(100),
         ),
       )
       rows.push(...mapPartners(snapPartners.docs))
@@ -897,6 +899,7 @@ async function reloadAdmin(){
           collection(fbDb, 'applications'),
           where('type', '==', 'ad'),
           where('status', '==', 'pending'),
+          limit(100),
         ),
       )
       rows.push(...mapAds(snapAds.docs))
