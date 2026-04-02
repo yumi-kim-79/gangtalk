@@ -1527,26 +1527,16 @@ function toggleViewMode () {
 
 watch(() => route.query.view, (nv) => { if (nv && nv !== view.value) view.value = String(nv) })
 
-function applyThemeFromQuery(){
-  const th = (route.query.theme || localStorage.getItem('theme') || 'white').toString()
-  document.documentElement.setAttribute('data-theme', th)
-  localStorage.setItem('theme', th)
-}
-applyThemeFromQuery()
-onMounted(applyThemeFromQuery)
-watch(() => route.query.theme, applyThemeFromQuery)
+/* ▶ 테마: localStorage 기반 (URL 쿼리 제거) */
+import { getTheme, setTheme } from '@/store/theme.js'
 
-/* ▶ 추가: 테마 토글 상태/동작 */
-const theme = ref((route.query.theme || localStorage.getItem('theme') || 'white').toString())
+const theme = ref(getTheme())
 const isDark = computed(() => theme.value === 'dark' || theme.value === 'black')
 
 function toggleTheme(){
-  // white ↔ dark 중심 스위칭(black은 다크 계열로 취급)
-  theme.value = isDark.value ? 'white' : 'dark'
-  document.documentElement.setAttribute('data-theme', theme.value)
-  localStorage.setItem('theme', theme.value)
-  // URL query에도 반영(새로고침없이 공유 가능)
-  router.replace({ query: { ...route.query, theme: theme.value } })
+  const next = isDark.value ? 'white' : 'black'
+  theme.value = next
+  setTheme(next)
 }
 
 /* ───────────────────────── 이동/도구/상세 ───────────────────────── */

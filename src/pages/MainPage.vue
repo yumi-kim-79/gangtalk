@@ -770,60 +770,38 @@ async function goNearMe(){
   }
 }
 
-/* === 테마 & 뷰 전환 (통합/안전 버전) === */
+/* === 테마 & 뷰 전환 (localStorage 기반, URL 쿼리 제거) === */
+import { getTheme, setTheme, normalizeTheme } from '@/store/theme.js'
+
 const viewMode  = ref(route.query.view || localStorage.getItem('finder:view') || 'list')
-const theme     = ref(String(route.query?.theme ?? localStorage.getItem('theme') ?? 'white'))
+const theme     = ref(getTheme())
 const isDark    = computed(() => theme.value === 'dark' || theme.value === 'black')
 
-/** 리스트 뷰 여부 (공통) */
 const isListView = computed(() => viewMode.value === 'list')
-
-/** 템플릿 호환용 별칭 (view === 'list' / 'grid') */
 const view = viewMode
 
-function applyTheme(v = theme.value){
-  document.documentElement.setAttribute('data-theme', v)
-  localStorage.setItem('theme', v)
-}
-watch(theme, v => applyTheme(v), { immediate: true })
-
-// 주소창의 ?theme= 변경되면 동기화
-watch(() => route.query.theme, (nv) => { if (nv) theme.value = String(nv) })
-
-// 주소창의 ?view= 변경되면 뷰 모드도 동기화
 watch(() => route.query.view, (nv) => {
-  if (nv === 'list' || nv === 'grid') {
-    viewMode.value = nv
-  }
+  if (nv === 'list' || nv === 'grid') viewMode.value = nv
 })
 
-/** 한줄/두칸 토글 (공통) */
 function toggleViewMode(){
-  // list → grid → list …
   const next = isListView.value ? 'grid' : 'list'
   viewMode.value = next
   localStorage.setItem('finder:view', next)
-  router.replace({
-    query: { ...route.query, view: next, theme: theme.value }
-  }).catch(()=>{})
+  router.replace({ query: { ...route.query, view: next } }).catch(()=>{})
 }
 
-/** 명시적으로 목록/그리드 지정 (template 의 setView 호출용) */
 function setView(mode){
   const next = mode === 'grid' ? 'grid' : 'list'
   viewMode.value = next
   localStorage.setItem('finder:view', next)
-  router.replace({
-    query: { ...route.query, view: next, theme: theme.value }
-  }).catch(()=>{})
+  router.replace({ query: { ...route.query, view: next } }).catch(()=>{})
 }
 
-// 테마 토글: 현재 viewMode를 그대로 보존
 function toggleTheme(){
-  theme.value = (theme.value === 'white') ? 'dark' : 'white'
-  router.replace({
-    query: { ...route.query, theme: theme.value, view: viewMode.value }
-  }).catch(()=>{})
+  const next = isDark.value ? 'white' : 'black'
+  theme.value = next
+  setTheme(next)
 }
 
 /* === 이름 정규화 & id 매핑 헬퍼 (먼저 선언) === */
@@ -1258,12 +1236,7 @@ function updateMacroMenuPos(){
 
 // 1) 테마 토글: white ↔ dark  (※ 내부용, toggleTheme 와 동일 동작)
 function onThemeToggle(){
-  const next = theme.value === 'white' ? 'dark' : 'white'
-  theme.value = next
-  applyTheme(next)
-  router.replace({
-    query: { ...route.query, theme: next, view: viewMode.value }
-  }).catch(()=>{})
+  toggleTheme()
 }
 
 function openMacroMenu(){
@@ -1335,7 +1308,7 @@ function openStoreBoard(s){
   const target = {
     name: 'storeBoard',
     params: { id: String(s.id) },
-    query:  { theme: theme.value }
+    query:  {}
   }
   if (route.name === 'storeBoard' && String(route.params.id) === String(s.id)) {
     target.query.ts = Date.now().toString()
@@ -2268,7 +2241,7 @@ async function openChotok(s){
   if (!s) return
   const storeId = String(s.id || s.storeId || s.chatRoomId || s.roomId || s.chatId || '').trim()
   if (!storeId) return
-  const target = { name: 'bizChat', params: { storeId }, query: { name: roomTitle(s), theme: theme.value } }
+  const target = { name: 'bizChat', params: { storeId }, query: { name: roomTitle(s) } }
   try{ await router.push(target) }catch{ router.replace({ ...target, query:{ ...target.query, ts: Date.now().toString() } }).catch(()=>{}) }
 }
 async function openOpenChat(s){
@@ -2280,9 +2253,8 @@ async function openOpenChat(s){
     name: 'openChat',
     params: { storeId },
     query: {
-      theme: theme.value,
-      name : roomTitle(s),      // 상단 텍스트
-      thumb: thumbOf(s) || '',  // 현황판에서 이미 쓰고 있는 썸네일 URL
+      name : roomTitle(s),
+      thumb: thumbOf(s) || '',
     },
   }
 

@@ -59,6 +59,11 @@ firebase deploy --only hosting
 
 ## 작업 로그
 
+### 2026-04-02: 다크모드 현황판/가게찾기 수정 + 카드 인라인 교체 (`fix/darkmode-mainpage-storeboard-card`)
+- MainPage.vue: URL 쿼리 기반 테마 → store/theme.js setTheme/getTheme 사용, 모든 router.push에서 theme 쿼리 제거
+- StoreFinder.vue: applyThemeFromQuery/watch/onMounted 제거 → getTheme/setTheme 사용
+- 커뮤니티 카드: CSS 클래스 방식 완전 폐기 → 인라인 스타일로 교체 (position:absolute + object-fit:cover + display:block)
+
 ### 2026-04-02: 다크모드 유지 + 카드 흰선 v2 (`fix/darkmode-persist-and-card-line-v2`)
 - **다크모드**: TopBar의 URL 쿼리 기반 테마 관리를 제거, localStorage만 사용하도록 통일
   - TopBar: 자체 norm/applyThemeToDom/setUrlTheme → store/theme.js의 setTheme/getTheme 사용
