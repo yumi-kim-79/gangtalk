@@ -2721,6 +2721,7 @@ console.log('[sim-templates] loaded v2025-09-30-01')
   column-gap: 6px;
   row-gap: 4px;
   margin-bottom: 18px;
+  background-color: var(--bg);
 }
 .grid-card{
   position: relative;
