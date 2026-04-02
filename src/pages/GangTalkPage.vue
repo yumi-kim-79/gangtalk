@@ -38,19 +38,19 @@
     <!-- ===== 섹션 타이틀 ===== -->
     <h2 class="section-title">🔥 주제 별 커뮤니티</h2>
 
-    <!-- ===== 커뮤니티 2x2 그리드 (img 태그 + object-fit: cover) ===== -->
+    <!-- ===== 커뮤니티 2x2 그리드 (인라인 스타일로 흰선 완전 방지) ===== -->
     <section class="community-grid">
-      <div class="grid-card" role="button" tabindex="0" @click="openCategoryPage('all')">
-        <img src="/img/community/cat-gangtok.jpg" alt="강톡" class="grid-card-img" />
+      <div style="position:relative;overflow:hidden;border-radius:16px;height:130px;cursor:pointer" @click="openCategoryPage('all')">
+        <img src="/img/community/cat-gangtok.jpg" alt="강톡" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;display:block">
       </div>
-      <div class="grid-card" role="button" tabindex="0" @click="openHealing">
-        <img src="/img/community/cat-healing.jpg" alt="힐링톡" class="grid-card-img" />
+      <div style="position:relative;overflow:hidden;border-radius:16px;height:130px;cursor:pointer" @click="openHealing">
+        <img src="/img/community/cat-healing.jpg" alt="힐링톡" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;display:block">
       </div>
-      <div class="grid-card" role="button" tabindex="0" @click="openFirstBiz">
-        <img src="/img/community/cat-store.jpg" alt="우리가게" class="grid-card-img" />
+      <div style="position:relative;overflow:hidden;border-radius:16px;height:130px;cursor:pointer" @click="openFirstBiz">
+        <img src="/img/community/cat-store.jpg" alt="우리가게" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;display:block">
       </div>
-      <div class="grid-card" role="button" tabindex="0" @click="openCategoryPage('event')">
-        <img src="/img/community/cat-event.jpg" alt="이벤트" class="grid-card-img" />
+      <div style="position:relative;overflow:hidden;border-radius:16px;height:130px;cursor:pointer" @click="openCategoryPage('event')">
+        <img src="/img/community/cat-event.jpg" alt="이벤트" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;display:block">
       </div>
     </section>
 
@@ -2723,27 +2723,7 @@ console.log('[sim-templates] loaded v2025-09-30-01')
   margin-bottom: 18px;
   background-color: var(--bg);
 }
-.grid-card{
-  position: relative;
-  border-radius: 16px;
-  aspect-ratio: 650 / 336;
-  overflow: hidden;
-  cursor: pointer;
-  transition: transform 0.15s;
-  box-sizing: border-box;
-  background: var(--surface);
-  border: none;
-  outline: none;
-  font-size: 0;
-  line-height: 0;
-}
-.grid-card:active{ transform: scale(0.97); }
-.grid-card-img{
-  width: 100%;
-  height: 100%;
-  object-fit: fill;
-  display: block;
-}
+/* grid-card 스타일은 인라인으로 이동 */
 
 /* ===== 헤더 & 타이틀 ===== */
 .title{ margin:0; font-size:18px; font-weight:900 }
