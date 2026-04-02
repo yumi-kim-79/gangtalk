@@ -59,6 +59,11 @@ firebase deploy --only hosting
 
 ## 작업 로그
 
+### 2026-04-02: 야간모드 커뮤니티 카드 흰색 선 제거 (`fix/darkmode-community-card-border`)
+- 인라인 backgroundColor 제거 (밝은 고정색이 다크모드에서 새어 보임)
+- background-color: var(--surface) 로 통일
+- background-size: cover, border/outline: none 추가
+
 ### 2026-04-02: 개선 페이지 야간모드 적용 (`feat/darkmode-apply-redesigned-pages`)
 - GangTalkPage v2 CSS: 하드코딩 #fff/#111/#888 등 → var(--bg)/var(--fg)/var(--muted)/var(--line)/var(--surface)/var(--accent-weak) 전면 교체
 - StoreBoard v2 CSS: 동일하게 CSS 변수 교체
