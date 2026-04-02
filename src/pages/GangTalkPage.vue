@@ -943,6 +943,8 @@ const POSTS_PER_PAGE = 10
 const hasMorePosts = ref(true)
 const loadingMore = ref(false)
 let lastPostDoc = null
+// "더 보기"로 추가 로드된 게시글을 별도 보관 (onSnapshot 덮어쓰기 방지)
+const olderPosts = ref([])
 
 async function subscribePosts () {
   try{
@@ -953,20 +955,20 @@ async function subscribePosts () {
       limit(POSTS_PER_PAGE)
     )
 
-    // onSnapshot이 첫 결과도 전달하므로 getDocs 중복 호출 제거
     unsubPosts = onSnapshot(
       qRef,
       (snap)=>{
-        const newPosts = snap.docs.map(d => normalizePost(d.id, d.data()))
+        const firstPage = snap.docs.map(d => normalizePost(d.id, d.data()))
         if (!lastPostDoc) {
-          // 첫 로드
           lastPostDoc = snap.docs[snap.docs.length - 1] || null
           hasMorePosts.value = snap.docs.length >= POSTS_PER_PAGE
-          console.log('[gangtalk] board_posts first load =', newPosts.length)
+          console.log('[gangtalk] board_posts first load =', firstPage.length)
         }
-        const existingIds = new Set(newPosts.map(p => p.id))
-        const olderPosts = posts.value.filter(p => !existingIds.has(p.id))
-        posts.value = [...newPosts, ...olderPosts]
+        // 첫 페이지 ID 세트
+        const firstIds = new Set(firstPage.map(p => p.id))
+        // olderPosts에서 첫 페이지와 중복되지 않는 것만 유지
+        const kept = olderPosts.value.filter(p => !firstIds.has(p.id))
+        posts.value = [...firstPage, ...kept]
         maybePatchRoomTitleFromPosts()
       },
       (err)=>{
@@ -992,6 +994,9 @@ async function loadMorePosts() {
     )
     const snap = await getDocs(qRef)
     const more = snap.docs.map(d => normalizePost(d.id, d.data()))
+    // 기존 olderPosts에 append
+    olderPosts.value = [...olderPosts.value, ...more]
+    // posts도 append
     posts.value = [...posts.value, ...more]
     lastPostDoc = snap.docs[snap.docs.length - 1] || lastPostDoc
     hasMorePosts.value = snap.docs.length >= POSTS_PER_PAGE
