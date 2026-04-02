@@ -159,161 +159,76 @@
 
     <!-- ========== 카테고리(야호) 전용 풀스크린 페이지 ========== -->
     <div v-if="catPage.open" class="cat-mask" @click.self="closeCatPage">
-      <section class="cat-sheet" role="dialog" aria-modal="true">
-        <header class="cat-head">
-          <button class="back-btn" type="button" aria-label="뒤로가기" @click="closeCatPage">
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"
-                 stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+      <section class="cat-sheet v2" role="dialog" aria-modal="true">
+        <!-- 헤더 -->
+        <header class="v2-head">
+          <button class="v2-back" type="button" @click="closeCatPage">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
           </button>
-          <strong class="cat-title">{{ catLabel }}</strong>
+          <strong class="v2-head-title">{{ catLabel }}</strong>
           <span class="spacer"></span>
-
-          <!-- 관리자 전용 시더 토글 -->
-          <button v-if="isAdmin" class="btn-mini" type="button" @click.stop="toggleAutoSeed">
-            {{ AUTO_SEED ? '자동글 OFF' : '자동글 ON' }}
+          <button v-if="isAdmin" class="btn-mini" type="button" @click.stop="toggleAutoSeed">{{ AUTO_SEED ? '자동글 OFF' : '자동글 ON' }}</button>
+          <button class="v2-write-btn" type="button" @click="openCreate">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+            글쓰기
           </button>
-
-          <button class="btn-write" type="button" @click="openCreate">글쓰기</button>
         </header>
 
-        <!-- ✅ 강톡 카테고리 탭 (공지 바로 위) -->
-        <div class="cat-filter-tabs">
+        <!-- 카테고리 pill 탭 -->
+        <div class="v2-cat-tabs">
           <button
             v-for="t in yaTabsInPage"
             :key="t.key"
             type="button"
-            class="chip xs"
+            class="v2-pill"
             :class="{ on: catPage.filter === t.key }"
             @click="onCatFilterClick(t.key)"
           >
-            <span class="ico" v-if="t.icon">{{ t.icon }}</span>
-            <span>{{ t.label }}</span>
+            <span v-if="t.icon" class="v2-pill-ico">{{ t.icon }}</span>
+            {{ t.label }}
           </button>
         </div>
 
-        <section class="notice-sec tight">
-          <header class="notice-head">
-            <span>공지</span>
-            <span class="spacer"></span>
-            <button
-              v-if="otherNotices.length"
-              class="btn-mini"
-              type="button"
-              @click="showAllNotices = !showAllNotices"
-            >
-              {{ showAllNotices ? '접기' : `이전 공지 ${otherNotices.length}개` }}
-            </button>
-          </header>
+        <!-- 공지 카드 -->
+        <div v-if="recentNotice" class="v2-notice" @click="openDetail(recentNotice)">
+          <span class="v2-notice-pin">📌</span>
+          <div class="v2-notice-body">
+            <div class="v2-notice-title ellip">{{ recentNotice.title }}</div>
+            <div class="v2-notice-meta">{{ authorName(recentNotice) }} · {{ timeAgo(recentNotice.updatedAt || recentNotice.createdAt) }}</div>
+          </div>
+          <template v-if="isAdmin">
+            <div class="v2-notice-admin" @click.stop>
+              <button class="btn-mini" type="button" @click="startNoticeEdit(recentNotice)">수정</button>
+              <button class="btn-mini danger" type="button" @click="deleteNotice(recentNotice)">삭제</button>
+            </div>
+          </template>
+        </div>
 
-          <ul class="notice-list">
-            <li v-if="recentNotice" class="notice-row" role="button" tabindex="0"
-                @click="openDetail(recentNotice)"
-                @keydown.enter.prevent="openDetail(recentNotice)"
-                @keydown.space.prevent="openDetail(recentNotice)">
-              <span class="n-bullet">📌</span>
-              <span class="n-title ellip">{{ recentNotice.title }}</span>
-              <!-- ✅ authorName() 으로 닉네임/익명 표시 -->
-              <span class="n-meta">
-                <span class="n-author">{{ authorName(recentNotice) }}</span>
-                <span class="sep"> / </span>
-                <span class="n-time">{{ timeAgo(recentNotice.updatedAt || recentNotice.createdAt) }}</span>
-              </span>
-              <template v-if="isAdmin">
-                <div class="n-admin" @click.stop>
-                  <button class="btn-mini" type="button" @click="startNoticeEdit(recentNotice)">수정</button>
-                  <button class="btn-mini danger" type="button" @click="deleteNotice(recentNotice)">삭제</button>
-                </div>
-              </template>
-            </li>
-            <li v-else class="notice-empty">
-              등록된 공지가 없습니다.
-              <button v-if="isAdmin" class="btn-mini" type="button" @click="openNoticeCreate" style="margin-left:8px">공지 작성</button>
-            </li>
-          </ul>
-
-          <transition name="fade">
-            <ul v-if="showAllNotices && otherNotices.length" class="notice-list older">
-              <li v-for="n in otherNotices" :key="n.id" class="notice-row" role="button" tabindex="0"
-                  @click="openDetail(n)"
-                  @keydown.enter.prevent="openDetail(n)"
-                  @keydown.space.prevent="openDetail(n)">
-                <span class="n-bullet">📌</span>
-                <span class="n-title ellip">{{ n.title }}</span>
-                <!-- ✅ authorName() 사용 -->
-                <span class="n-meta">
-                  <span class="n-author">{{ authorName(n) }}</span>
-                  <span class="sep"> / </span>
-                  <span class="n-time">{{ timeAgo(n.updatedAt || n.createdAt) }}</span>
-                </span>
-                <template v-if="isAdmin">
-                  <div class="n-admin" @click.stop>
-                    <button class="btn-mini" type="button" @click="startNoticeEdit(n)">수정</button>
-                    <button class="btn-mini danger" type="button" @click="deleteNotice(n)">삭제</button>
-                  </div>
-                </template>
-              </li>
-            </ul>
-          </transition>
-        </section>
-
-        <ul class="ql-list">
-          <li v-for="(p, idx) in catPosts" :key="p.id" class="ql-row"
-              role="button" tabindex="0"
-              @click="openDetail(p)"
-              @keydown.enter.prevent="openDetail(p)"
-              @keydown.space.prevent="openDetail(p)">
-            <div class="ql-left">{{ /^\d+$/.test(String(p.id)) ? p.id : (catPosts.length - idx) }}</div>
-            <div class="ql-body">
-              <div class="ql-top">
-                <!-- 카테고리 아이콘 -->
-                <span class="ql-ico" :title="catLabelFor(p.category)" aria-hidden="true">
-                  {{ catIcon(p.category) }}
-                </span>
-
-                <!-- 제목: 일반 글씨 느낌 -->
-                <span class="ql-title ellip clickable" role="button" tabindex="0">
-                  {{ p.title }}
-                </span>
-
-                <!-- 새글 N (최근 24시간 이내) -->
-                <span v-if="isNewPost(p)" class="badge-new">N</span>
-
-                <!-- 댓글 수 [2] -->
-                <span v-if="p.cmtCount" class="badge-cmt">
-                  [{{ Number(p.cmtCount || 0).toLocaleString() }}]
-                </span>
-
-                <!-- 모바일/웹 뱃지 -->
-                <span v-if="deviceLabel(p)" class="badge-device">
-                  {{ deviceLabel(p) }}
-                </span>
-
-                <!-- 화살표(행 클릭으로 위임) -->
-                <svg class="ql-arr" viewBox="0 0 24 24" role="button" tabindex="0">
-                  <path d="M8 4l8 8-8 8" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-                </svg>
+        <!-- 게시글 카드 리스트 -->
+        <ul class="v2-post-list">
+          <li v-for="p in catPosts" :key="p.id" class="v2-post-card" @click="openDetail(p)">
+            <div class="v2-pc-main">
+              <div class="v2-pc-top">
+                <span class="v2-cat-badge">{{ catIcon(p.category) }} {{ catLabelFor(p.category) }}</span>
+                <span class="v2-pc-nick">{{ authorName(p) }}</span>
+                <span v-if="isNewPost(p)" class="v2-badge-new">N</span>
               </div>
-
-              <!-- 스니펫(행 클릭으로 위임) -->
-              <div v-if="shouldShowSnippet(p)" class="ql-snippet ellip clickable" role="button" tabindex="0">
-                {{ firstLine(p) }}
+              <div class="v2-pc-title ellip">{{ p.title }}</div>
+              <div v-if="shouldShowSnippet(p)" class="v2-pc-snippet ellip">{{ firstLine(p) }}</div>
+              <div class="v2-pc-footer">
+                <span>{{ ymd(p.updatedAt || p.createdAt) }}</span>
+                <span>👁 {{ Number(p.views||0).toLocaleString() }}</span>
+                <span>❤️ {{ Number(p.likes||0).toLocaleString() }}</span>
+                <span>💬 {{ Number(p.cmtCount||0).toLocaleString() }}</span>
               </div>
-
-              <div class="ql-meta">
-                <span class="m by">{{ authorName(p) }}</span><span class="sep">/</span>
-                <span class="m red date">{{ ymd(p.updatedAt || p.createdAt) }}</span><span class="sep">/</span>
-                <span class="m red">조회수 : <b>{{ Number(p.views||0).toLocaleString() }}</b></span><span class="sep">/</span>
-                <span class="m red">추천수 : <b>{{ Number(p.likes||0).toLocaleString() }}</b></span>
-              </div>
-
-              <!-- 관리자 영역만 클릭 막기 유지 -->
-              <div class="ql-admin" v-if="isAdmin" @click.stop>
+              <div class="v2-pc-admin" v-if="isAdmin" @click.stop>
                 <button class="btn-mini" type="button" @click="startEdit(p)">수정</button>
                 <button class="btn-mini danger" type="button" @click="deletePost(p)">삭제</button>
               </div>
             </div>
+            <img v-if="p.images && p.images.length" :src="p.images[0]" class="v2-pc-thumb" alt="" loading="lazy" />
           </li>
-          <li v-if="!catPosts.length" class="ql-empty">아직 등록된 글이 없습니다.</li>
+          <li v-if="!catPosts.length" class="v2-empty">아직 등록된 글이 없습니다.</li>
         </ul>
       </section>
     </div>
@@ -456,107 +371,70 @@
       </section>
     </div>
 
-    <!-- ========== 글쓰기(일반/투표/업체) 모달 — 위치 이동(전역) ========== -->
+    <!-- ========== 글쓰기 모달 (v2 감성 디자인) ========== -->
     <div v-if="showGenModal" class="sheet-backdrop" @click.self="showGenModal=false">
-      <div class="sheet compose-sheet">
-        <header class="sheet-head">
-          <div class="sheet-head-left">
-            <strong class="sheet-title">{{ editTargetId ? '글 수정' : '글쓰기' }}</strong>
-
-            <!-- ✅ 내 글/댓글 보기 버튼 -->
-            <button
-              class="btn-mini"
-              type="button"
-              @click="goMyPosts"
-            >
-              내 글/댓글 보기
-            </button>
-          </div>
-
-          <button class="x" type="button" @click="showGenModal=false">✕</button>
+      <div class="sheet v2-compose">
+        <!-- 핸들바 -->
+        <div class="v2-handle"></div>
+        <header class="v2-compose-head">
+          <strong class="v2-compose-title">{{ editTargetId ? '글 수정' : '새 글 작성' }}</strong>
+          <button class="v2-close" type="button" @click="showGenModal=false">✕</button>
         </header>
 
-        <!-- 카테고리/대상 -->
-        <div class="compose-top">
+        <!-- 카테고리 pill 태그 -->
+        <div class="v2-compose-cats">
           <template v-if="composeBiz">
-            <div class="muted small">업체 게시판</div>
-            <div class="chip sm">{{ composeBizStoreName }}</div>
+            <span class="v2-pill on">{{ composeBizStoreName }}</span>
           </template>
           <template v-else>
-            <label class="muted small">카테고리</label>
-            <div class="cat-tabs one-line" role="tablist" aria-label="글쓰기 카테고리">
-              <button
-                v-for="c in composeCats"
-                :key="c.key"
-                class="chip xs"
-                :class="{ on: composeCat === c.key }"
-                type="button"
-                @click="composeCat = c.key"
-              >{{ c.label }}</button>
-            </div>
-
+            <button
+              v-for="c in composeCats"
+              :key="c.key"
+              class="v2-pill"
+              :class="{ on: composeCat === c.key }"
+              type="button"
+              @click="composeCat = c.key"
+            >{{ c.label }}</button>
           </template>
         </div>
 
+        <!-- 닉네임 표시 -->
+        <div class="v2-compose-user">
+          <div class="v2-cmt-avatar sm">{{ (composeNick || '익')[0] }}</div>
+          <input class="v2-nick-input" type="text" v-model="composeNick" placeholder="닉네임 (비우면 익명)" />
+        </div>
+
         <!-- 입력 폼 -->
-        <form @submit.prevent="confirmCreate" class="compose-form">
-          <!-- 닉네임 (비우면 익명) -->
-          <input
-            class="field"
-            type="text"
-            v-model="composeNick"
-            placeholder="닉네임 (비우면 익명으로 표시됩니다)"
-          />
+        <form @submit.prevent="confirmCreate" class="v2-compose-form">
+          <input class="v2-title-input" type="text" v-model="composeTitle" placeholder="제목을 입력하세요" />
+          <div class="v2-divider"></div>
 
-          <input class="field" type="text" v-model="composeTitle" placeholder="제목을 입력하세요" />
-
-          <!-- 투표일 때 A/B 항목 -->
           <div v-if="!composeBiz && composeCat==='vote'" class="vote-fields">
-            <input class="field" type="text" v-model="composeA" placeholder="항목 A" />
-            <input class="field" type="text" v-model="composeB" placeholder="항목 B" />
+            <input class="v2-field" type="text" v-model="composeA" placeholder="항목 A" />
+            <input class="v2-field" type="text" v-model="composeB" placeholder="항목 B" />
           </div>
 
-          <!-- 일반 본문 -->
-          <textarea class="field ta" rows="7" v-model="composeBody" placeholder="내용을 입력하세요" v-if="composeCat!=='vote'"></textarea>
+          <textarea class="v2-body-input" rows="8" v-model="composeBody" placeholder="내용을 입력하세요..." v-if="composeCat!=='vote'"></textarea>
 
-          <!-- 첨부 메뉴(간단) -->
-          <div class="cmt-actions" style="margin-top:8px">
-            <button type="button" class="btn-mini" @click="cToggleAttach">첨부</button>
+          <!-- 첨부 미리보기 -->
+          <div v-if="composeImages.length" class="v2-attach-preview">
+            <img v-for="(img, idx) in composeImages" :key="idx" :src="img.preview" class="v2-attach-thumb" />
+          </div>
+
+          <!-- 하단 툴바 -->
+          <div class="v2-compose-toolbar">
+            <button type="button" class="v2-tool-btn" @click="cToggleAttach">📷</button>
+            <button type="button" class="v2-tool-btn" @click="goMyPosts">📝 내 글</button>
             <span class="spacer"></span>
-            <button class="btn-cmt" type="submit">{{ editTargetId ? '수정 완료' : '등록' }}</button>
+            <span class="v2-char-count" v-if="composeBody">{{ composeBody.length }}자</span>
+            <button class="v2-submit-btn" type="submit">{{ editTargetId ? '수정' : '등록' }}</button>
           </div>
 
-          <!-- 첨부 팝 (사진만, 최대 3장) -->
+          <!-- 사진 선택 input (숨김) -->
           <div v-if="cAttach.open" class="attach-pop compose-attach" :style="cAttach.style" @click.stop>
-            <button class="attach-item" type="button" @click="cPickImage">
-              사진 첨부 (최대 3장)
-            </button>
-
-            <p class="attach-info">
-              선택된 사진: {{ composeImages.length }} / 3
-            </p>
-
-            <div v-if="composeImages.length" class="attach-preview">
-              <img
-                v-for="(img, idx) in composeImages"
-                :key="idx"
-                :src="img.preview"
-                class="attach-thumb"
-                alt="첨부 이미지 미리보기"
-              />
-            </div>
-
+            <button class="attach-item" type="button" @click="cPickImage">사진 첨부 (최대 3장)</button>
             <button class="attach-item" type="button" @click="cCloseAttach">닫기</button>
-
-            <!-- 사진 선택 input -->
-            <input
-              ref="cImgInput"
-              type="file"
-              accept="image/*"
-              class="hidden"
-              multiple
-              @change="cOnImage"
-            />
+            <input ref="cImgInput" type="file" accept="image/*" class="hidden" multiple @change="cOnImage" />
           </div>
         </form>
       </div>
@@ -564,88 +442,92 @@
 
     <!-- ✅ 상세 페이지(풀스크린 시트) -->
     <div v-if="detail.open" class="detail-mask" @click.self="closeDetail">
-      <section class="detail-sheet" role="dialog" aria-modal="true">
+      <section class="detail-sheet v2" role="dialog" aria-modal="true">
         <!-- 헤더 -->
-        <header class="cat-head detail-head">
-          <button class="back-btn" type="button" aria-label="닫기" @click="closeDetail">
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"
-                 stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+        <header class="v2-head">
+          <button class="v2-back" type="button" @click="closeDetail">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
           </button>
-          <strong class="cat-title">{{ detail.post?.title || '상세' }}</strong>
+          <span class="v2-head-title">게시글</span>
           <span class="spacer"></span>
-          <button class="btn-mini" type="button" @click="likeDetail">추천</button>
         </header>
 
         <!-- 본문 -->
-        <section class="detail-body">
-          <!-- ✅ 첨부 이미지: 글 상단에 순서대로 표시 -->
-          <div v-if="detailImages.length" class="detail-images">
-            <div
-              v-for="(img, idx) in detailImages"
-              :key="idx"
-              class="detail-img-wrap"
-            >
-              <img
-                :src="img"
-                class="detail-img"
-                :alt="`첨부 이미지 ${idx + 1}`"
-              />
-            </div>
-          </div>
-
-          <div class="d-meta muted">
+        <section class="v2-detail-body">
+          <span class="v2-cat-badge" v-if="detail.post">{{ catIcon(detail.post.category) }} {{ catLabelFor(detail.post.category) }}</span>
+          <h1 class="v2-detail-title">{{ detail.post?.title || '상세' }}</h1>
+          <div class="v2-detail-meta">
+            <span>{{ authorName(detail.post) }}</span>
             <span>{{ ymd(detail.post?.updatedAt || detail.post?.createdAt) }}</span>
           </div>
-          <div v-if="detailBodyText" class="detail-pre" v-html="detailBodyHtml"></div>
-          <div v-else class="detail-pre muted">내용 없음</div>
+
+          <div v-if="detailImages.length" class="v2-detail-images">
+            <img v-for="(img, idx) in detailImages" :key="idx" :src="img" class="v2-detail-img" :alt="`첨부 ${idx+1}`" loading="lazy" />
+          </div>
+
+          <div v-if="detailBodyText" class="v2-detail-content" v-html="detailBodyHtml"></div>
+          <div v-else class="v2-detail-content muted">내용 없음</div>
+
+          <!-- 추천 버튼 -->
+          <div class="v2-like-wrap">
+            <button class="v2-like-btn" type="button" @click="likeDetail">
+              <span class="v2-like-heart">❤️</span>
+              <span>{{ Number(detail.post?.likes || 0).toLocaleString() }}</span>
+            </button>
+          </div>
         </section>
 
         <!-- 댓글 -->
-        <section class="cmt-sec">
-          <header class="cmt-head"><b>댓글 {{ commentsCount }}</b></header>
-          <ul class="cmt-list">
-            <li v-for="c in topComments" :key="c.id" class="cmt-row">
-              <div class="cmt-top">
-                <span class="by">익명</span>
-                <span class="time muted">{{ timeAgo(c.createdAt) }}</span>
-                <span class="spacer"></span>
-                <button class="cmt-mini" type="button" @click="startReply(c)">답글</button>
-                <button class="cmt-mini danger" v-if="canDeleteComment(c)" type="button" @click="deleteComment(c)">삭제</button>
-              </div>
-              <div class="cmt-body" v-html="renderCmt(c.body)"></div>
-
-              <ul class="reply-list">
-                <li v-for="r in repliesOf(c.id)" :key="r.id" class="reply-row">
-                  <div class="cmt-top">
-                    <span class="by">익명</span>
-                    <span class="time muted">{{ timeAgo(r.createdAt) }}</span>
-                    <span class="spacer"></span>
-                    <button class="cmt-mini danger" v-if="canDeleteComment(r)" type="button" @click="deleteComment(r)">삭제</button>
-                  </div>
-                  <div class="cmt-body" v-html="renderCmt(r.body)"></div>
-                </li>
-              </ul>
-
-              <!-- 대댓글 입력 -->
-              <div v-if="replyForId === c.id" class="reply-composer">
-                <textarea class="field ta" rows="3" v-model="replyDraft" placeholder="답글을 입력하세요"></textarea>
-                <div class="cmt-actions">
-                  <button class="btn-mini" type="button" @click="cancelReply">취소</button>
+        <section class="v2-cmt-sec">
+          <header class="v2-cmt-head">💬 댓글 {{ commentsCount }}</header>
+          <ul class="v2-cmt-list">
+            <li v-for="c in topComments" :key="c.id" class="v2-cmt-card">
+              <div class="v2-cmt-avatar">{{ (c.author || '익')[0] }}</div>
+              <div class="v2-cmt-body">
+                <div class="v2-cmt-top">
+                  <span class="v2-cmt-nick">익명</span>
+                  <span class="v2-cmt-time">{{ timeAgo(c.createdAt) }}</span>
                   <span class="spacer"></span>
-                  <button class="btn-cmt" type="button" @click="submitReply(c.id)">등록</button>
+                  <button class="v2-cmt-action" type="button" @click="startReply(c)">답글</button>
+                  <button class="v2-cmt-action danger" v-if="canDeleteComment(c)" type="button" @click="deleteComment(c)">삭제</button>
+                </div>
+                <div class="v2-cmt-text" v-html="renderCmt(c.body)"></div>
+
+                <!-- 대댓글 -->
+                <ul v-if="repliesOf(c.id).length" class="v2-reply-list">
+                  <li v-for="r in repliesOf(c.id)" :key="r.id" class="v2-reply-card">
+                    <div class="v2-cmt-avatar sm">{{ (r.author || '익')[0] }}</div>
+                    <div class="v2-cmt-body">
+                      <div class="v2-cmt-top">
+                        <span class="v2-cmt-nick">익명</span>
+                        <span class="v2-cmt-time">{{ timeAgo(r.createdAt) }}</span>
+                        <span class="spacer"></span>
+                        <button class="v2-cmt-action danger" v-if="canDeleteComment(r)" type="button" @click="deleteComment(r)">삭제</button>
+                      </div>
+                      <div class="v2-cmt-text" v-html="renderCmt(r.body)"></div>
+                    </div>
+                  </li>
+                </ul>
+
+                <!-- 대댓글 입력 -->
+                <div v-if="replyForId === c.id" class="v2-reply-composer">
+                  <textarea class="v2-field" rows="2" v-model="replyDraft" placeholder="답글을 입력하세요"></textarea>
+                  <div class="v2-reply-actions">
+                    <button class="btn-mini" type="button" @click="cancelReply">취소</button>
+                    <button class="v2-submit-sm" type="button" @click="submitReply(c.id)">등록</button>
+                  </div>
                 </div>
               </div>
             </li>
           </ul>
         </section>
 
-        <!-- 댓글 작성 (하단 고정) -->
-        <form class="composer sticky" @submit.prevent="submitComment">
-          <textarea class="field ta" rows="3" v-model="cmtDraft" placeholder="댓글을 입력하세요"></textarea>
-          <div class="cmt-actions">
-            <span class="spacer"></span>
-            <button class="btn-cmt" type="submit">등록</button>
-          </div>
+        <!-- 댓글 입력 (하단 고정) -->
+        <form class="v2-composer" @submit.prevent="submitComment">
+          <input class="v2-composer-input" type="text" v-model="cmtDraft" placeholder="댓글을 남겨보세요..." />
+          <button class="v2-send-btn" type="submit">
+            <svg viewBox="0 0 24 24" width="20" height="20"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" fill="#FF4D8D"/></svg>
+          </button>
         </form>
       </section>
     </div>
@@ -3670,5 +3552,226 @@ console.log('[sim-templates] loaded v2025-09-30-01')
   font-weight:700;
   color:var(--muted);
 }
+
+/* ============================================================
+   V2 감성 디자인 (20대 여성 타겟)
+   ============================================================ */
+
+/* --- 공통 헤더 --- */
+.v2-head{
+  display:flex; align-items:center; gap:8px;
+  padding:12px 16px; background:#fff;
+  border-bottom:1px solid #f0f0f0;
+  position:sticky; top:0; z-index:2;
+}
+.v2-back{
+  width:36px; height:36px; border-radius:50%; border:none;
+  background:#f5f5f5; display:flex; align-items:center; justify-content:center; cursor:pointer;
+}
+.v2-head-title{ font-size:17px; font-weight:800; color:#111; }
+.v2-write-btn{
+  display:inline-flex; align-items:center; gap:4px;
+  height:34px; padding:0 14px; border-radius:999px; border:none;
+  background:linear-gradient(135deg,#FF4D8D,#E91E8C); color:#fff;
+  font-size:13px; font-weight:700; cursor:pointer;
+}
+
+/* --- 카테고리 pill 탭 --- */
+.v2-cat-tabs{
+  display:flex; gap:8px; padding:12px 16px; overflow-x:auto;
+  -ms-overflow-style:none; scrollbar-width:none;
+}
+.v2-cat-tabs::-webkit-scrollbar{ display:none; }
+.v2-pill{
+  flex:0 0 auto; height:32px; padding:0 14px; border-radius:999px;
+  border:1px solid #e8e8e8; background:#fff; color:#888;
+  font-size:13px; font-weight:600; cursor:pointer;
+  display:inline-flex; align-items:center; gap:4px;
+}
+.v2-pill.on{
+  background:linear-gradient(135deg,#FF4D8D,#E91E8C); color:#fff; border-color:transparent;
+}
+.v2-pill-ico{ font-size:14px; }
+
+/* --- 공지 카드 --- */
+.v2-notice{
+  margin:0 16px 12px; padding:12px 16px; border-radius:14px;
+  background:#FFE4EF; display:flex; align-items:center; gap:10px; cursor:pointer;
+}
+.v2-notice-pin{ font-size:16px; }
+.v2-notice-body{ flex:1; min-width:0; }
+.v2-notice-title{ font-size:13.5px; font-weight:700; color:#111; }
+.v2-notice-meta{ font-size:11px; color:#E91E8C; margin-top:2px; }
+
+/* --- 게시글 카드 리스트 --- */
+.v2-post-list{ list-style:none; padding:0 16px; margin:0; }
+.v2-post-card{
+  display:flex; gap:12px; padding:16px 0;
+  border-bottom:1px solid #f0f0f0; cursor:pointer;
+}
+.v2-post-card:last-child{ border-bottom:none; }
+.v2-pc-main{ flex:1; min-width:0; display:flex; flex-direction:column; gap:4px; }
+.v2-pc-top{ display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+.v2-cat-badge{
+  display:inline-flex; align-items:center; gap:3px;
+  padding:2px 8px; border-radius:999px;
+  background:#FFE4EF; color:#E91E8C;
+  font-size:11px; font-weight:700;
+}
+.v2-pc-nick{ font-size:11.5px; color:#999; }
+.v2-badge-new{
+  padding:1px 6px; border-radius:999px;
+  background:#FF4D8D; color:#fff;
+  font-size:10px; font-weight:800;
+}
+.v2-pc-title{ font-size:14.5px; font-weight:800; color:#111; line-height:1.35; }
+.v2-pc-snippet{ font-size:12.5px; color:#888; line-height:1.4; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.v2-pc-footer{ display:flex; gap:10px; font-size:11px; color:#aaa; margin-top:4px; }
+.v2-pc-thumb{
+  width:72px; height:72px; border-radius:12px; object-fit:cover;
+  flex-shrink:0; background:#f5f5f5;
+}
+.v2-pc-admin{ margin-top:6px; display:flex; gap:6px; }
+.v2-empty{ padding:40px 0; text-align:center; color:#ccc; font-size:13px; }
+
+/* --- 상세 페이지 --- */
+.detail-sheet.v2{ background:#fff; }
+.v2-detail-body{ padding:20px 16px 0; }
+.v2-detail-title{ font-size:20px; font-weight:900; color:#111; margin:8px 0 6px; line-height:1.4; }
+.v2-detail-meta{ font-size:12px; color:#aaa; display:flex; gap:8px; margin-bottom:16px; }
+.v2-detail-images{ display:flex; flex-direction:column; gap:8px; margin-bottom:16px; }
+.v2-detail-img{ width:100%; border-radius:14px; display:block; }
+.v2-detail-content{
+  font-size:15px; line-height:1.8; color:#333; word-break:break-word;
+  padding-bottom:20px; border-bottom:1px solid #f0f0f0; margin-bottom:8px;
+}
+.v2-like-wrap{ display:flex; justify-content:center; padding:16px 0; }
+.v2-like-btn{
+  display:inline-flex; align-items:center; gap:8px;
+  height:44px; padding:0 28px; border-radius:999px; border:none;
+  background:linear-gradient(135deg,#FF4D8D,#E91E8C); color:#fff;
+  font-size:15px; font-weight:800; cursor:pointer;
+  box-shadow:0 4px 16px rgba(255,77,141,0.35);
+}
+.v2-like-heart{ font-size:18px; }
+
+/* --- 댓글 섹션 --- */
+.v2-cmt-sec{ padding:0 16px 100px; }
+.v2-cmt-head{ font-size:15px; font-weight:800; color:#111; padding:12px 0 8px; }
+.v2-cmt-list{ list-style:none; padding:0; margin:0; }
+.v2-cmt-card{
+  display:flex; gap:10px; padding:12px 0;
+  border-bottom:1px solid #f5f5f5;
+}
+.v2-cmt-avatar{
+  width:34px; height:34px; border-radius:50%;
+  background:linear-gradient(135deg,#FFE4EF,#ffd6e5); color:#E91E8C;
+  display:flex; align-items:center; justify-content:center;
+  font-size:14px; font-weight:800; flex-shrink:0;
+}
+.v2-cmt-avatar.sm{ width:26px; height:26px; font-size:11px; }
+.v2-cmt-body{ flex:1; min-width:0; }
+.v2-cmt-top{ display:flex; align-items:center; gap:6px; margin-bottom:4px; }
+.v2-cmt-nick{ font-size:13px; font-weight:700; color:#111; }
+.v2-cmt-time{ font-size:11px; color:#bbb; }
+.v2-cmt-action{
+  font-size:11px; border:none; background:none; color:#aaa; cursor:pointer; padding:0 2px;
+}
+.v2-cmt-action.danger{ color:#FF4D8D; }
+.v2-cmt-text{ font-size:13.5px; color:#333; line-height:1.5; }
+.v2-reply-list{ list-style:none; padding:8px 0 0; margin:0; }
+.v2-reply-card{ display:flex; gap:8px; padding:8px 0; }
+.v2-reply-composer{ margin-top:8px; }
+.v2-reply-actions{ display:flex; justify-content:flex-end; gap:6px; margin-top:6px; }
+.v2-submit-sm{
+  height:28px; padding:0 14px; border-radius:999px; border:none;
+  background:#FF4D8D; color:#fff; font-size:12px; font-weight:700; cursor:pointer;
+}
+.v2-field{
+  width:100%; border:1px solid #eee; border-radius:10px; padding:8px 12px;
+  font-size:13px; background:#fafafa; color:#111; resize:none;
+}
+
+/* --- 댓글 입력 (하단 고정) --- */
+.v2-composer{
+  position:sticky; bottom:0; z-index:3;
+  display:flex; align-items:center; gap:8px;
+  padding:10px 16px; background:#fff;
+  border-top:1px solid #f0f0f0;
+  padding-bottom:max(10px, env(safe-area-inset-bottom));
+}
+.v2-composer-input{
+  flex:1; height:38px; border:1px solid #eee; border-radius:999px;
+  padding:0 16px; font-size:13.5px; background:#f8f8f8; color:#111;
+}
+.v2-composer-input::placeholder{ color:#bbb; }
+.v2-send-btn{
+  width:38px; height:38px; border-radius:50%; border:none;
+  background:#FFE4EF; display:flex; align-items:center; justify-content:center; cursor:pointer;
+}
+
+/* --- 글쓰기 모달 --- */
+.v2-compose{
+  max-height:calc(100vh - 60px); overflow:auto; border-radius:20px 20px 0 0;
+  padding-bottom:max(16px, env(safe-area-inset-bottom));
+}
+.v2-handle{
+  width:40px; height:4px; border-radius:2px; background:#ddd;
+  margin:10px auto 6px;
+}
+.v2-compose-head{
+  display:flex; align-items:center; justify-content:space-between;
+  padding:8px 16px 12px;
+}
+.v2-compose-title{ font-size:18px; font-weight:900; color:#111; }
+.v2-close{
+  width:32px; height:32px; border-radius:50%; border:none;
+  background:#f5f5f5; font-size:16px; color:#999; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+}
+.v2-compose-cats{
+  display:flex; gap:8px; padding:0 16px 12px; overflow-x:auto;
+  -ms-overflow-style:none; scrollbar-width:none;
+}
+.v2-compose-cats::-webkit-scrollbar{ display:none; }
+.v2-compose-user{
+  display:flex; align-items:center; gap:10px; padding:0 16px 12px;
+}
+.v2-nick-input{
+  flex:1; border:none; background:none; font-size:14px; color:#111; font-weight:600;
+}
+.v2-nick-input::placeholder{ color:#ccc; font-weight:400; }
+.v2-compose-form{ padding:0 16px; }
+.v2-title-input{
+  width:100%; border:none; background:none; padding:8px 0;
+  font-size:17px; font-weight:800; color:#111;
+}
+.v2-title-input::placeholder{ color:#ccc; font-weight:400; }
+.v2-divider{ height:1px; background:#f0f0f0; margin:4px 0 8px; }
+.v2-body-input{
+  width:100%; border:none; background:none; padding:8px 0;
+  font-size:14.5px; line-height:1.7; color:#333; resize:none;
+}
+.v2-body-input::placeholder{ color:#ccc; }
+.v2-attach-preview{ display:flex; gap:8px; padding:8px 0; }
+.v2-attach-thumb{
+  width:56px; height:56px; border-radius:10px; object-fit:cover;
+}
+.v2-compose-toolbar{
+  display:flex; align-items:center; gap:8px; padding:12px 0 8px;
+  border-top:1px solid #f0f0f0; margin-top:8px;
+}
+.v2-tool-btn{
+  border:none; background:none; font-size:14px; color:#888; cursor:pointer; padding:4px 6px;
+}
+.v2-char-count{ font-size:12px; color:#ccc; }
+.v2-submit-btn{
+  height:34px; padding:0 20px; border-radius:999px; border:none;
+  background:linear-gradient(135deg,#FF4D8D,#E91E8C); color:#fff;
+  font-size:13.5px; font-weight:700; cursor:pointer;
+}
+
+/* v2 시트 배경 흰색 */
+.cat-sheet.v2{ background:#fff; }
 
 </style>
