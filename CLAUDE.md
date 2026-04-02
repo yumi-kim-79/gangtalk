@@ -59,6 +59,10 @@ firebase deploy --only hosting
 
 ## 작업 로그
 
+### 2026-04-02: 커뮤니티 카드 텍스트 임시 숨김 (`fix/community-card-hide-text`)
+- 이미지 자체에 텍스트가 포함되어 있어 코드 텍스트/오버레이 전부 제거
+- 카드는 배경 이미지만 표시 (overlay, grid-text, grid-title, grid-sub CSS 삭제)
+
 ### 2026-04-02: 커뮤니티 카드 텍스트 겹침 및 하단 선 수정 (`fix/community-card-text-overlap`)
 - **오버레이**: border-radius 제거 (부모 overflow:hidden으로 처리), 불투명도 0.3→0.35
 - **하단 선 수정**: background-repeat:no-repeat, backface-visibility:hidden 추가
