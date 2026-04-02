@@ -1,14 +1,20 @@
 <template>
   <section class="wrap compact">
-    <!-- ✅ 상단 이미지 슬라이더 배너 -->
+    <!-- ✅ 상단 배너 슬라이더 (REJURAN 스타일 CSS 배너) -->
     <section class="gt-slider-bar">
       <div class="gt-slider-track" :style="{ transform: `translateX(-${sliderIdx * 100}%)` }">
         <div
           v-for="(slide, i) in sliderItems"
           :key="i"
           class="gt-slide"
+          :class="slide.theme"
         >
-          <img :src="slide.img" :alt="slide.alt" class="gt-slide-img" />
+          <div class="slide-content">
+            <div class="slide-logo">{{ slide.logo }}</div>
+            <div class="slide-brand">{{ slide.brand }}</div>
+            <div class="slide-tagline">{{ slide.tagline }}</div>
+          </div>
+          <div class="slide-circle" :style="{ background: slide.circleColor }"></div>
         </div>
       </div>
       <div class="gt-slider-dots">
@@ -22,6 +28,9 @@
       </div>
     </section>
 
+    <!-- ===== 섹션 타이틀 ===== -->
+    <h2 class="section-title">🔥 주제 별 커뮤니티</h2>
+
     <!-- ===== 커뮤니티 2x2 그리드 ===== -->
     <section class="community-grid">
       <div class="grid-card dark" role="button" tabindex="0" @click="openCategoryPage('all')">
@@ -30,23 +39,23 @@
           <path d="M8 10V8a4 4 0 0 1 8 0v2" stroke="currentColor" fill="none" stroke-width="2"/>
         </svg>
         <b class="grid-title">강톡</b>
-        <span class="grid-sub">100% 비공개</span>
+        <span class="grid-sub pink">100% 비공개</span>
       </div>
-      <div class="grid-card light" role="button" tabindex="0" @click="openHealing">
+      <div class="grid-card pink" role="button" tabindex="0" @click="openHealing">
         <b class="grid-title">힐링톡</b>
-        <span class="grid-sub">명언 · 건강 · 여행 · 다이어트</span>
+        <span class="grid-sub">명언·건강·여행·다이어트</span>
       </div>
-      <div class="grid-card biz" role="button" tabindex="0" @click="openFirstBiz">
+      <div class="grid-card purple" role="button" tabindex="0" @click="openFirstBiz">
         <b class="grid-title">우리 가게 게시판</b>
-        <span class="grid-sub">공지 · 소식 · 가게 이야기</span>
+        <span class="grid-sub">공지·소식·가게 이야기</span>
       </div>
-      <div class="grid-card event" role="button" tabindex="0" @click="openCategoryPage('event')">
+      <div class="grid-card orange" role="button" tabindex="0" @click="openCategoryPage('event')">
         <b class="grid-title">이벤트 참여</b>
-        <span class="grid-sub">이벤트 · 혜택 · 참여</span>
+        <span class="grid-sub">이벤트·혜택·참여</span>
       </div>
     </section>
 
-    <!-- ===== 베스트 탭: 인기글 / 인기댓글 / 인기추천수 (pill 스타일) ===== -->
+    <!-- ===== 베스트 탭 (pill 스타일, 작은 크기) ===== -->
     <div class="best-tabs" role="tablist" aria-label="인기 정렬">
       <button
         type="button"
@@ -64,7 +73,7 @@
         role="tab"
         @click="bestMode = 'comments'"
       >
-        인기댓글
+        인기 댓글
       </button>
       <button
         type="button"
@@ -73,18 +82,15 @@
         role="tab"
         @click="bestMode = 'likes'"
       >
-        인기추천수
+        인기 추천수
       </button>
     </div>
 
-    <!-- ===== 베스트 랭킹 (카드형) ===== -->
+    <!-- ===== 게시글 리스트 (카드형 + 구분선) ===== -->
     <section class="best-sec">
-      <header class="sec-head">
-        <h3>인기 {{ bestLabel }}</h3>
-      </header>
-      <ul class="best-list">
+      <ul class="post-list">
         <li
-          v-for="(p, idx) in bestTop3"
+          v-for="p in bestTop3"
           :key="p.id"
           class="post-card"
           @click="openPost(p)"
@@ -94,9 +100,9 @@
             <div class="pc-title ellip">{{ p.title }}</div>
             <div class="pc-snippet ellip">{{ firstLine(p) }}</div>
             <div class="pc-footer">
-              <span class="pc-time">{{ timeAgo(p.updatedAt || p.createdAt) }}</span>
-              <span class="pc-stat">&#x2764; {{ Number(p.likes || 0).toLocaleString() }}</span>
-              <span class="pc-stat">&#x1F4AC; {{ Number(p.cmtCount || 0).toLocaleString() }}</span>
+              <span class="pc-time">{{ ymd(p.updatedAt || p.createdAt) }}</span>
+              <span class="pc-stat"><svg class="pc-ico" viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" fill="currentColor"/></svg> {{ Number(p.likes || 0).toLocaleString() }}</span>
+              <span class="pc-stat"><svg class="pc-ico" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" fill="none" stroke="currentColor" stroke-width="2"/></svg> {{ Number(p.cmtCount || 0).toLocaleString() }}개</span>
             </div>
           </div>
           <img
@@ -671,9 +677,9 @@ const SHOW_INLINE_CATS = false
 // ✅ 상단 이미지 슬라이더 (광고 배너 대체)
 const sliderIdx = ref(0)
 const sliderItems = ref([
-  { img: '/img/banner1.jpg', alt: '배너 1' },
-  { img: '/img/banner2.jpg', alt: '배너 2' },
-  { img: '/img/banner3.jpg', alt: '배너 3' },
+  { theme: 'slide-rejuran', logo: 'ℜ REJURAN', brand: 'COSMETIC', tagline: 'REWRITE YOUR STORY', circleColor: 'rgba(0,180,180,0.35)' },
+  { theme: 'slide-dark', logo: '강남특방', brand: '강톡', tagline: '100% 비공개 커뮤니티', circleColor: 'rgba(255,107,157,0.3)' },
+  { theme: 'slide-blue', logo: '힐링톡', brand: '명언·건강·여행', tagline: '일상에 쉼표를 더하다', circleColor: 'rgba(100,149,237,0.3)' },
 ])
 let sliderTimer = null
 function startSlider() {
@@ -2748,18 +2754,20 @@ console.log('[sim-templates] loaded v2025-09-30-01')
 .wrap.compact{
   --gt-topbar-h: 56px;
   --gt-ad-h: 0px;
-  padding: 10px;
+  padding: 10px 14px;
   margin-top: var(--gt-topbar-h);
+  background: #fff;
+  color: #111;
 }
 
-/* ===== 상단 이미지 슬라이더 ===== */
+/* ===== 상단 배너 슬라이더 ===== */
 .gt-slider-bar{
   position: relative;
-  border-radius: 14px;
+  border-radius: 16px;
   overflow: hidden;
-  margin-bottom: 12px;
-  aspect-ratio: 16 / 7;
-  background: #eee;
+  margin-bottom: 16px;
+  height: 200px;
+  background: #1a1a2e;
 }
 .gt-slider-track{
   display: flex;
@@ -2771,32 +2779,80 @@ console.log('[sim-templates] loaded v2025-09-30-01')
   flex: 0 0 100%;
   width: 100%;
   height: 100%;
+  position: relative;
+  overflow: hidden;
 }
-.gt-slide-img{
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
+.gt-slide.slide-rejuran{ background: linear-gradient(135deg, #1a1a2e 0%, #2d1b3d 50%, #1a1a2e 100%); }
+.gt-slide.slide-dark{ background: linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 100%); }
+.gt-slide.slide-blue{ background: linear-gradient(135deg, #0d1b2a 0%, #1b2838 100%); }
+
+.slide-content{
+  position: relative;
+  z-index: 2;
+  padding: 28px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
+.slide-logo{
+  font-size: 20px;
+  font-weight: 300;
+  color: #fff;
+  letter-spacing: 0.08em;
+}
+.slide-brand{
+  font-size: 13px;
+  font-weight: 400;
+  color: rgba(255,255,255,0.7);
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+}
+.slide-tagline{
+  font-size: 12px;
+  font-weight: 400;
+  color: rgba(255,255,255,0.55);
+  letter-spacing: 0.05em;
+  font-style: italic;
+  margin-top: 4px;
+}
+.slide-circle{
+  position: absolute;
+  right: -30px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 200px;
+  height: 200px;
+  border-radius: 50%;
+  z-index: 1;
+}
+
 .gt-slider-dots{
   position: absolute;
-  bottom: 8px;
+  bottom: 12px;
   left: 50%;
   transform: translateX(-50%);
   display: flex;
   gap: 6px;
+  z-index: 3;
 }
 .gt-dot{
-  width: 8px;
-  height: 8px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
-  background: rgba(255,255,255,0.5);
+  background: rgba(255,255,255,0.4);
   cursor: pointer;
   transition: background 0.2s;
 }
 .gt-dot.on{
   background: #fff;
-  box-shadow: 0 0 4px rgba(0,0,0,0.3);
+}
+
+/* ===== 섹션 타이틀 ===== */
+.section-title{
+  font-size: 17px;
+  font-weight: 900;
+  margin: 0 0 12px 2px;
+  color: #111;
 }
 
 /* ===== 2x2 커뮤니티 그리드 ===== */
@@ -2804,36 +2860,56 @@ console.log('[sim-templates] loaded v2025-09-30-01')
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 10px;
-  margin-bottom: 14px;
+  margin-bottom: 18px;
 }
 .grid-card{
-  border-radius: 14px;
-  padding: 16px 14px;
+  border-radius: 16px;
+  padding: 18px 16px;
+  height: 120px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  justify-content: flex-end;
+  gap: 3px;
   cursor: pointer;
   transition: transform 0.15s;
+  box-sizing: border-box;
 }
 .grid-card:active{ transform: scale(0.97); }
-.grid-title{ font-size: 15px; font-weight: 900; }
-.grid-sub{ font-size: 11.5px; opacity: 0.8; line-height: 1.3; }
-.grid-lock{ width: 18px; height: 18px; margin-bottom: 2px; }
+.grid-title{
+  font-size: 16px;
+  font-weight: 900;
+}
+.grid-sub{
+  font-size: 11px;
+  opacity: 0.75;
+  line-height: 1.3;
+}
+.grid-sub.pink{
+  color: #ff6b9d;
+  opacity: 1;
+  font-weight: 700;
+}
+.grid-lock{
+  width: 20px;
+  height: 20px;
+  margin-bottom: 4px;
+  opacity: 0.85;
+}
 
 .grid-card.dark{
-  background: #1e1e2e;
+  background: #1e2040;
   color: #fff;
 }
-.grid-card.light{
-  background: linear-gradient(135deg, #fff5f8, #ffe4ec);
+.grid-card.pink{
+  background: linear-gradient(135deg, #ffe0ec, #ffc8d9);
   color: #333;
 }
-.grid-card.biz{
-  background: linear-gradient(135deg, #f0f4ff, #e4ecff);
+.grid-card.purple{
+  background: linear-gradient(135deg, #ede7f6, #d1c4e9);
   color: #333;
 }
-.grid-card.event{
-  background: linear-gradient(135deg, #fff8e1, #ffecb3);
+.grid-card.orange{
+  background: linear-gradient(135deg, #fff3e0, #ffe0b2);
   color: #333;
 }
 
@@ -3353,94 +3429,100 @@ console.log('[sim-templates] loaded v2025-09-30-01')
   pointer-events: auto;  /* 클릭 보장 */
 }
 
-/* ===== 상단 베스트 탭 (pill 스타일) ===== */
+/* ===== 베스트 탭 (pill, 작은 크기) ===== */
 .best-tabs{
   display: flex;
-  gap: 8px;
-  margin-top: 4px;
-  margin-bottom: 8px;
+  gap: 6px;
+  margin-bottom: 14px;
 }
 .pill-tab{
-  flex: 1;
-  height: 36px;
-  border: none;
+  height: 30px;
+  padding: 0 14px;
   border-radius: 999px;
-  font-size: 13.5px;
-  font-weight: 800;
+  font-size: 12.5px;
+  font-weight: 700;
   cursor: pointer;
-  background: var(--surface);
-  color: var(--fg);
-  border: 1px solid var(--line);
+  background: #fff;
+  color: #888;
+  border: 1px solid #e0e0e0;
   transition: background 0.15s, color 0.15s;
 }
 .pill-tab.on{
   background: #ff6b9d;
   color: #fff;
   border-color: #ff6b9d;
-  box-shadow: 0 2px 8px rgba(255,107,157,0.35);
 }
 
-/* ===== 베스트 랭킹 (카드형) ===== */
+/* ===== 게시글 리스트 ===== */
 .best-sec{
-  margin-top: 4px;
+  margin-top: 0;
 }
-.best-list{
+.post-list{
   list-style: none;
   padding: 0;
   margin: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
 }
 
-/* ===== 게시글 카드 ===== */
+/* ===== 게시글 카드 (구분선 스타일) ===== */
 .post-card{
   display: flex;
   align-items: flex-start;
   gap: 12px;
-  padding: 14px;
-  border-radius: 14px;
-  border: 1px solid var(--line);
-  background: var(--surface);
-  box-shadow: 0 2px 10px var(--shadow);
+  padding: 14px 0;
+  border-bottom: 1px solid #f0f0f0;
   cursor: pointer;
-  transition: transform 0.12s;
+  background: transparent;
 }
-.post-card:active{ transform: translateY(1px); }
+.post-card:first-child{
+  padding-top: 0;
+}
+.post-card:active{ opacity: 0.7; }
 .pc-body{
   flex: 1;
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 3px;
 }
 .pc-nick{
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--muted);
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #999;
 }
 .pc-title{
-  font-size: 14px;
-  font-weight: 900;
-  line-height: 1.3;
+  font-size: 14.5px;
+  font-weight: 800;
+  line-height: 1.35;
+  color: #111;
 }
 .pc-snippet{
   font-size: 12.5px;
-  color: var(--muted);
+  color: #888;
   line-height: 1.4;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .pc-footer{
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-top: 4px;
+  margin-top: 5px;
   font-size: 11.5px;
-  color: var(--muted);
+  color: #aaa;
 }
 .pc-stat{
   display: flex;
   align-items: center;
   gap: 3px;
+  color: #ff6b9d;
+}
+.pc-ico{
+  width: 13px;
+  height: 13px;
+}
+.pc-time{
+  color: #aaa;
 }
 .pc-thumb{
   width: 72px;
@@ -3448,12 +3530,13 @@ console.log('[sim-templates] loaded v2025-09-30-01')
   border-radius: 10px;
   object-fit: cover;
   flex-shrink: 0;
-  background: #eee;
+  background: #f5f5f5;
 }
 .best-empty{
   font-size: 12px;
-  color: var(--muted);
-  padding: 4px 2px 10px;
+  color: #aaa;
+  padding: 16px 0;
+  text-align: center;
 }
 /* 힐링톡 / 강톡 배너 오른쪽 "전체" 버튼 */
 .hero-all-btn{
