@@ -89,7 +89,7 @@
     <section class="best-sec">
       <ul class="post-list">
         <li
-          v-for="p in bestTop3"
+          v-for="p in sortedPostList"
           :key="p.id"
           class="post-card"
           @click="openPost(p)"
@@ -112,12 +112,12 @@
             loading="lazy"
           />
         </li>
-        <li v-if="!bestTop3.length" class="best-empty">
-          아직 베스트 글이 없습니다.
+        <li v-if="!sortedPostList.length" class="best-empty">
+          아직 게시글이 없습니다.
         </li>
       </ul>
       <button
-        v-if="hasMorePosts && bestTop3.length"
+        v-if="hasMorePosts && sortedPostList.length"
         type="button"
         class="btn-load-more"
         :disabled="loadingMore"
@@ -962,7 +962,7 @@ async function subscribePosts () {
         if (!lastPostDoc) {
           lastPostDoc = snap.docs[snap.docs.length - 1] || null
           hasMorePosts.value = snap.docs.length >= POSTS_PER_PAGE
-          console.log('[gangtalk] board_posts first load =', firstPage.length)
+          console.log('[gangtalk] 첫 로드:', firstPage.length, '개, hasMore:', hasMorePosts.value, 'lastDoc:', !!lastPostDoc)
         }
         // 첫 페이지 ID 세트
         const firstIds = new Set(firstPage.map(p => p.id))
@@ -982,6 +982,7 @@ async function subscribePosts () {
 }
 
 async function loadMorePosts() {
+  console.log('[더보기] 클릭 — hasMore:', hasMorePosts.value, 'loading:', loadingMore.value, 'lastDoc:', !!lastPostDoc)
   if (!hasMorePosts.value || loadingMore.value || !lastPostDoc) return
   loadingMore.value = true
   try {
@@ -994,12 +995,14 @@ async function loadMorePosts() {
     )
     const snap = await getDocs(qRef)
     const more = snap.docs.map(d => normalizePost(d.id, d.data()))
+    console.log('[더보기] 추가 로드:', more.length, '개, 기존:', posts.value.length, '개')
     // 기존 olderPosts에 append
     olderPosts.value = [...olderPosts.value, ...more]
     // posts도 append
     posts.value = [...posts.value, ...more]
     lastPostDoc = snap.docs[snap.docs.length - 1] || lastPostDoc
     hasMorePosts.value = snap.docs.length >= POSTS_PER_PAGE
+    console.log('[더보기] 결과 — 전체:', posts.value.length, '개, hasMore:', hasMorePosts.value)
   } catch(e) {
     console.warn('더 보기 실패:', e)
   } finally {
@@ -1073,6 +1076,18 @@ const bestTop3 = computed(() => {
   if (bestMode.value === 'comments') return top3Cmts.value
   if (bestMode.value === 'likes') return top3Likes.value
   return top3Views.value
+})
+
+// 전체 게시글 리스트 (탭별 정렬, "더 보기"용)
+const sortedPostList = computed(() => {
+  const all = posts.value.filter(p => !p.isNotice)
+  if (bestMode.value === 'comments') {
+    return all.slice().sort((a, b) => Number(b.cmtCount || 0) - Number(a.cmtCount || 0))
+  }
+  if (bestMode.value === 'likes') {
+    return all.slice().sort((a, b) => Number(b.likes || 0) - Number(a.likes || 0))
+  }
+  return all.slice().sort((a, b) => Number(b.views || 0) - Number(a.views || 0))
 })
 
 /* Firestore: 업체 */

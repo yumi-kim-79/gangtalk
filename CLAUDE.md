@@ -59,6 +59,10 @@ firebase deploy --only hosting
 
 ## 작업 로그
 
+### 2026-04-02: 더 보기 디버그 및 리스트 수정 (`fix/load-more-debug`)
+- **핵심 버그 발견**: bestTop3가 `.slice(0,3)`으로 항상 3개만 표시 → sortedPostList(전체 정렬)로 교체
+- 디버그 console.log 추가: 첫 로드 개수, 더보기 클릭 시 lastDoc/추가개수/전체개수
+
 ### 2026-04-02: 더 보기 버튼 목록 교체→추가 방식 수정 (`fix/load-more-append`)
 - onSnapshot이 첫 페이지를 덮어쓰면서 "더 보기"로 추가된 게시글이 사라지는 문제 수정
 - olderPosts를 별도 ref로 보관하여 onSnapshot 갱신 시에도 유지
