@@ -59,6 +59,15 @@ firebase deploy --only hosting
 
 ## 작업 로그
 
+### 2026-04-02: 강톡 페이지 6단계 성능 최적화 (`perf/optimize-gangtalk-page`)
+1. **힐링톡 흰선**: height 120→130px, background-size: 100% 100%로 완전 채움
+2. **게시글 페이지네이션**: limit(10) 적용, "더 보기" 버튼, startAfter 커서 기반
+3. **리스너 최적화**: stores limit(50), getDocs 중복 호출 제거 (onSnapshot이 첫 결과 전달)
+4. **이미지 lazy loading**: 썸네일 loading="lazy", 커뮤니티 카드 preload
+5. **Firebase 쿼리**: 모든 쿼리 limit 적용, 중복 getDocs 제거
+6. **번들 최적화**: Firebase/Vue 별도 chunk 분리, 15개 페이지 dynamic import 전환
+   - 결과: 1,520KB 단일번들 → index 272KB + firebase 833KB + vue 98KB + 페이지별 chunk
+
 ### 2026-04-02: 힐링톡 하단 흰선 완전 제거 v2 (`fix/healing-white-line-v2`)
 - 원인: background-color:#ddd가 이미지 서브픽셀 갭에서 노출됨
 - 각 카드에 이미지 하단 색상과 동일한 backgroundColor 인라인 설정

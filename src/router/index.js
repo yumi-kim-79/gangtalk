@@ -1,37 +1,30 @@
 // src/router/index.js
 import { createRouter, createWebHistory } from 'vue-router'
 
-// ===== pages =====
+// ===== 핵심 페이지 (정적 import) =====
 import MainPage          from '@/pages/MainPage.vue'
 import GangTalkPage      from '@/pages/GangTalkPage.vue'
-import PartnersPage      from '@/pages/PartnersPage.vue'
-import PartnerDetail     from '@/pages/PartnerDetail.vue'
-import MyPage            from '@/pages/MyPage.vue'
-import SupportPage       from '@/pages/SupportPage.vue'
 import AuthPage          from '@/pages/AuthPage.vue'
-import StoreFinder       from '@/views/StoreFinder.vue'
-import MapView           from '@/views/MapView.vue'
-import StoreDetail       from '@/pages/StoreDetail.vue'
-import StoreManagers     from '@/pages/StoreManagers.vue'
-import StoreEditPage     from '@/pages/StoreEditPage.vue'
-import StoreBoard        from '@/pages/StoreBoard.vue'
-import StorePost         from '@/pages/StorePost.vue'
-import LegalConsultBoard from '@/pages/LegalConsultBoard.vue'
 
-// 채팅 전용 페이지
-import ChatBiz           from '@/pages/ChatBiz.vue'
-import ChatOpen          from '@/pages/ChatOpen.vue'
-
-import DiaryPage         from '@/pages/DiaryPage.vue'
-
-// 동적 import → 정적 import
-import MyStoresPage      from '@/pages/MyStoresPage.vue'
-
-// 이벤트 상세
-import EventDetail       from '@/pages/EventDetail.vue'
-
-// 상담 도움말 페이지
-const ConsultHelpPage = () => import('@/pages/ConsultHelpPage.vue')
+// ===== 비핵심 페이지 (동적 import → 코드 스플리팅) =====
+const PartnersPage      = () => import('@/pages/PartnersPage.vue')
+const PartnerDetail     = () => import('@/pages/PartnerDetail.vue')
+const MyPage            = () => import('@/pages/MyPage.vue')
+const SupportPage       = () => import('@/pages/SupportPage.vue')
+const StoreFinder       = () => import('@/views/StoreFinder.vue')
+const MapView           = () => import('@/views/MapView.vue')
+const StoreDetail       = () => import('@/pages/StoreDetail.vue')
+const StoreManagers     = () => import('@/pages/StoreManagers.vue')
+const StoreEditPage     = () => import('@/pages/StoreEditPage.vue')
+const StoreBoard        = () => import('@/pages/StoreBoard.vue')
+const StorePost         = () => import('@/pages/StorePost.vue')
+const LegalConsultBoard = () => import('@/pages/LegalConsultBoard.vue')
+const ChatBiz           = () => import('@/pages/ChatBiz.vue')
+const ChatOpen          = () => import('@/pages/ChatOpen.vue')
+const DiaryPage         = () => import('@/pages/DiaryPage.vue')
+const MyStoresPage      = () => import('@/pages/MyStoresPage.vue')
+const EventDetail       = () => import('@/pages/EventDetail.vue')
+const ConsultHelpPage   = () => import('@/pages/ConsultHelpPage.vue')
 
 // session store
 import { me as user } from '@/store/user.js'

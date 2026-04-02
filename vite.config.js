@@ -111,7 +111,7 @@ export default defineConfig({
     sourcemap: false,
     emptyOutDir: true, // ✅ 이전 빌드 잔재 제거
     manifest: true,
-    chunkSizeWarningLimit: 900,
+    chunkSizeWarningLimit: 1200,
     rollupOptions: {
       output: {
         // ✅ 해시 파일명으로 강력 캐시 무효화
@@ -120,6 +120,15 @@ export default defineConfig({
         assetFileNames: ({ name }) => {
           const ext = name ? name.split('.').pop() : 'asset'
           return `assets/[name]-[hash].${ext}`
+        },
+        // ✅ Firebase를 별도 chunk로 분리
+        manualChunks(id) {
+          if (id.includes('node_modules/firebase') || id.includes('node_modules/@firebase')) {
+            return 'firebase'
+          }
+          if (id.includes('node_modules/vue') || id.includes('node_modules/@vue')) {
+            return 'vue-vendor'
+          }
         },
       },
     },

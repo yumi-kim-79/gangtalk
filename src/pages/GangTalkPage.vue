@@ -1,4 +1,11 @@
 <template>
+  <!-- 커뮤니티 카드 이미지 프리로드 -->
+  <teleport to="head">
+    <link rel="preload" as="image" href="/img/community/cat-gangtok.jpg" />
+    <link rel="preload" as="image" href="/img/community/cat-healing.jpg" />
+    <link rel="preload" as="image" href="/img/community/cat-store.jpg" />
+    <link rel="preload" as="image" href="/img/community/cat-event.jpg" />
+  </teleport>
   <section class="wrap compact">
     <!-- ✅ 상단 배너 슬라이더 (REJURAN 스타일 CSS 배너) -->
     <section class="gt-slider-bar">
@@ -102,12 +109,22 @@
             :src="p.images[0]"
             class="pc-thumb"
             alt=""
+            loading="lazy"
           />
         </li>
         <li v-if="!bestTop3.length" class="best-empty">
           아직 베스트 글이 없습니다.
         </li>
       </ul>
+      <button
+        v-if="hasMorePosts && bestTop3.length"
+        type="button"
+        class="btn-load-more"
+        :disabled="loadingMore"
+        @click="loadMorePosts"
+      >
+        {{ loadingMore ? '불러오는 중...' : '더 보기' }}
+      </button>
     </section>
 
     <!-- 우리가게 게시판 섹션 제거됨 (2x2 그리드 카드로 이동) -->
@@ -649,7 +666,7 @@ try {
 const storage = getStorage()
 import {
   collection, query, orderBy, onSnapshot, getDocs,
-  doc, serverTimestamp, increment, limit
+  doc, serverTimestamp, increment, limit, startAfter
 } from 'firebase/firestore'
 import { getStorage, ref as sRef, uploadBytes, getDownloadURL } from 'firebase/storage'
 
@@ -922,36 +939,35 @@ const newsPosts = computed(() => {
   })
 })
 
+const POSTS_PER_PAGE = 10
+const hasMorePosts = ref(true)
+const loadingMore = ref(false)
+let lastPostDoc = null
+
 async function subscribePosts () {
   try{
     const qRef = query(
       collection(fbDb, 'board_posts'),
       orderBy('updatedAt','desc'),
-      orderBy('createdAt','desc')
+      orderBy('createdAt','desc'),
+      limit(POSTS_PER_PAGE)
     )
-    // 화면 최초 오픈 여부 플래그
-    const openedCatOnce = ref(false)
 
-    const first = await getDocs(qRef)
-    posts.value = first.docs.map(d => normalizePost(d.id, d.data()))
-    console.log('[gangtalk] board_posts first load =', posts.value.length)
-
-    if (!openedCatOnce.value && posts.value.length > 0 && AUTO_OPEN_CAT) {
-      openedCatOnce.value = true
-      openCategoryPage('all')            // ← 토글이 true일 때만 자동 오픈
-    }
-
+    // onSnapshot이 첫 결과도 전달하므로 getDocs 중복 호출 제거
     unsubPosts = onSnapshot(
       qRef,
       (snap)=>{
-        posts.value = snap.docs.map(d => normalizePost(d.id, d.data()))
-        console.log('[gangtalk] board_posts snap =', posts.value.length)
-        maybePatchRoomTitleFromPosts()
-
-        if (!openedCatOnce.value && posts.value.length > 0 && AUTO_OPEN_CAT) {
-          openedCatOnce.value = true
-          openCategoryPage('all')        // ← 토글이 true일 때만 자동 오픈
+        const newPosts = snap.docs.map(d => normalizePost(d.id, d.data()))
+        if (!lastPostDoc) {
+          // 첫 로드
+          lastPostDoc = snap.docs[snap.docs.length - 1] || null
+          hasMorePosts.value = snap.docs.length >= POSTS_PER_PAGE
+          console.log('[gangtalk] board_posts first load =', newPosts.length)
         }
+        const existingIds = new Set(newPosts.map(p => p.id))
+        const olderPosts = posts.value.filter(p => !existingIds.has(p.id))
+        posts.value = [...newPosts, ...olderPosts]
+        maybePatchRoomTitleFromPosts()
       },
       (err)=>{
         if (err?.code !== 'permission-denied') console.warn('board_posts onSnapshot error:', err)
@@ -960,6 +976,29 @@ async function subscribePosts () {
 
   }catch(e){
     console.warn('board_posts 구독 실패:', e)
+  }
+}
+
+async function loadMorePosts() {
+  if (!hasMorePosts.value || loadingMore.value || !lastPostDoc) return
+  loadingMore.value = true
+  try {
+    const qRef = query(
+      collection(fbDb, 'board_posts'),
+      orderBy('updatedAt','desc'),
+      orderBy('createdAt','desc'),
+      startAfter(lastPostDoc),
+      limit(POSTS_PER_PAGE)
+    )
+    const snap = await getDocs(qRef)
+    const more = snap.docs.map(d => normalizePost(d.id, d.data()))
+    posts.value = [...posts.value, ...more]
+    lastPostDoc = snap.docs[snap.docs.length - 1] || lastPostDoc
+    hasMorePosts.value = snap.docs.length >= POSTS_PER_PAGE
+  } catch(e) {
+    console.warn('더 보기 실패:', e)
+  } finally {
+    loadingMore.value = false
   }
 }
 const normalizePost = (id, x={}) => ({
@@ -1068,35 +1107,8 @@ function isStoreApproved(x = {}) {
 async function subscribeStores () {
   loading.value = true
   try{
-    const qRef = query(collection(fbDb, 'stores'), orderBy('updatedAt','desc'))
-    const first = await getDocs(qRef)
-    bizRooms.value = first.docs.map(d => {
-      const x = d.data() || {}
-      return {
-        id: d.id,
-        name: x.name || '(이름 없음)',
-        region: x.region || '',
-        type: catLabelFromStore(x.category),
-        manager: x.manager || '',
-        logo: x.thumb || '',
-        adTitle: x.adTitle || x.desc || '',
-        // 🔹 승인 여부/상태 저장
-        isApproved: isStoreApproved(x),
-        applyStatus: x.applyStatus || '',
-        active: x.active !== false,
-        // ✅ 작성글 수(필드명은 상황에 맞게 자동 사용)
-        postCount: Number(
-          x.postCount ||
-          x.postsCount ||
-          x.boardPostCount ||
-          x.boardPosts ||
-          0
-        ),
-        createdAt: tsToMs(x.createdAt || x.updatedAt),
-        updatedAt: tsToMs(x.updatedAt || x.createdAt),
-      }
-    })
-
+    const qRef = query(collection(fbDb, 'stores'), orderBy('updatedAt','desc'), limit(50))
+    // onSnapshot이 첫 결과도 전달하므로 getDocs 중복 호출 제거
     unsubStores = onSnapshot(
       qRef,
       (snap)=>{
@@ -2857,13 +2869,12 @@ console.log('[sim-templates] loaded v2025-09-30-01')
 .grid-card{
   position: relative;
   border-radius: 16px;
-  height: 120px;
+  height: 130px;
   overflow: hidden;
   cursor: pointer;
   transition: transform 0.15s;
   box-sizing: border-box;
-  /* 이미지를 카드보다 1px 크게 채워서 서브픽셀 갭 방지 */
-  background-size: calc(100% + 2px) calc(100% + 2px);
+  background-size: 100% 100%;
   background-position: center;
   background-repeat: no-repeat;
   line-height: 0;
@@ -3496,6 +3507,21 @@ console.log('[sim-templates] loaded v2025-09-30-01')
   padding: 16px 0;
   text-align: center;
 }
+.btn-load-more{
+  display: block;
+  width: 100%;
+  margin-top: 12px;
+  padding: 10px 0;
+  border: 1px solid #e0e0e0;
+  border-radius: 10px;
+  background: #fff;
+  color: #666;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.btn-load-more:active{ background: #f5f5f5; }
+.btn-load-more:disabled{ opacity: 0.5; cursor: default; }
 /* 힐링톡 / 강톡 배너 오른쪽 "전체" 버튼 */
 .hero-all-btn{
   height:26px;
