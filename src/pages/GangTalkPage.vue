@@ -2866,9 +2866,14 @@ console.log('[sim-templates] loaded v2025-09-30-01')
   background-position: center;
   background-repeat: no-repeat;
   background-color: #ddd;
-  /* 하단 선 방지: GPU 레이어 분리 */
+  /* 하단 흰선 방지 */
+  line-height: 0;
+  font-size: 0;
   -webkit-backface-visibility: hidden;
   backface-visibility: hidden;
+  /* WebKit 서브픽셀 렌더링 클리핑 강제 */
+  -webkit-mask-image: -webkit-radial-gradient(white, black);
+  isolation: isolate;
 }
 .grid-card:active{ transform: scale(0.97); }
 
