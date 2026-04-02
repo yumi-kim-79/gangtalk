@@ -59,6 +59,10 @@ firebase deploy --only hosting
 
 ## 작업 로그
 
+### 2026-04-02: 커뮤니티 카드 img 태그로 교체 (`fix/community-card-img-tag`)
+- background-image 방식 → img 태그 + object-fit:cover 방식으로 변경
+- position:absolute + width/height:100% 로 카드 꽉 채움
+
 ### 2026-04-02: 커뮤니티 카드 이미지 꽉 채우기 (`fix/community-card-image-fill`)
 - background-size: cover → 100% 100% 변경 (카드 하단 여백 제거)
 

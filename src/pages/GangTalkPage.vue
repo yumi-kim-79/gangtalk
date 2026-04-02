@@ -38,19 +38,19 @@
     <!-- ===== 섹션 타이틀 ===== -->
     <h2 class="section-title">🔥 주제 별 커뮤니티</h2>
 
-    <!-- ===== 커뮤니티 2x2 그리드 (이미지에 텍스트 포함, 코드 텍스트 숨김) ===== -->
+    <!-- ===== 커뮤니티 2x2 그리드 (img 태그 + object-fit: cover) ===== -->
     <section class="community-grid">
-      <div class="grid-card" role="button" tabindex="0" @click="openCategoryPage('all')"
-           :style="{ backgroundImage: `url('/img/community/cat-gangtok.jpg')` }">
+      <div class="grid-card" role="button" tabindex="0" @click="openCategoryPage('all')">
+        <img src="/img/community/cat-gangtok.jpg" alt="강톡" class="grid-card-img" />
       </div>
-      <div class="grid-card" role="button" tabindex="0" @click="openHealing"
-           :style="{ backgroundImage: `url('/img/community/cat-healing.jpg')` }">
+      <div class="grid-card" role="button" tabindex="0" @click="openHealing">
+        <img src="/img/community/cat-healing.jpg" alt="힐링톡" class="grid-card-img" />
       </div>
-      <div class="grid-card" role="button" tabindex="0" @click="openFirstBiz"
-           :style="{ backgroundImage: `url('/img/community/cat-store.jpg')` }">
+      <div class="grid-card" role="button" tabindex="0" @click="openFirstBiz">
+        <img src="/img/community/cat-store.jpg" alt="우리가게" class="grid-card-img" />
       </div>
-      <div class="grid-card" role="button" tabindex="0" @click="openCategoryPage('event')"
-           :style="{ backgroundImage: `url('/img/community/cat-event.jpg')` }">
+      <div class="grid-card" role="button" tabindex="0" @click="openCategoryPage('event')">
+        <img src="/img/community/cat-event.jpg" alt="이벤트" class="grid-card-img" />
       </div>
     </section>
 
@@ -2730,16 +2730,21 @@ console.log('[sim-templates] loaded v2025-09-30-01')
   cursor: pointer;
   transition: transform 0.15s;
   box-sizing: border-box;
-  background-size: 100% 100%;
-  background-position: center;
-  background-repeat: no-repeat;
   background-color: var(--surface);
   border: none;
   outline: none;
-  line-height: 0;
-  font-size: 0;
 }
 .grid-card:active{ transform: scale(0.97); }
+.grid-card-img{
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  border-radius: 16px;
+}
 
 /* ===== 헤더 & 타이틀 ===== */
 .title{ margin:0; font-size:18px; font-weight:900 }
