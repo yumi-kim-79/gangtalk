@@ -2718,7 +2718,8 @@ console.log('[sim-templates] loaded v2025-09-30-01')
 .community-grid{
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 10px;
+  column-gap: 6px;
+  row-gap: 4px;
   margin-bottom: 18px;
 }
 .grid-card{

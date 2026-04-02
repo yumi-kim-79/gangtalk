@@ -59,6 +59,9 @@ firebase deploy --only hosting
 
 ## 작업 로그
 
+### 2026-04-02: 야간모드 커뮤니티 카드 gap 배경색 제거 (`fix/darkmode-card-gap`)
+- gap: 10px → column-gap: 6px, row-gap: 4px 로 줄여서 행 간 선 최소화
+
 ### 2026-04-02: 야간모드 커뮤니티 카드 흰색 선 제거 (`fix/darkmode-community-card-border`)
 - 인라인 backgroundColor 제거 (밝은 고정색이 다크모드에서 새어 보임)
 - background-color: var(--surface) 로 통일
