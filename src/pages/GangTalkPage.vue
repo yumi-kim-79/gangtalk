@@ -2884,14 +2884,18 @@ console.log('[sim-templates] loaded v2025-09-30-01')
   box-sizing: border-box;
   background-size: cover;
   background-position: center;
+  background-repeat: no-repeat;
   background-color: #ddd;
+  /* 하단 선 방지: GPU 레이어 분리 */
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
 }
 .grid-card:active{ transform: scale(0.97); }
 .grid-overlay{
   position: absolute;
   inset: 0;
-  background: rgba(0,0,0,0.3);
-  border-radius: 16px;
+  background: rgba(0,0,0,0.35);
+  /* border-radius 제거 — 부모의 overflow:hidden이 처리 */
 }
 .grid-text{
   position: relative;
@@ -2902,17 +2906,20 @@ console.log('[sim-templates] loaded v2025-09-30-01')
   justify-content: center;
   height: 100%;
   gap: 4px;
+  padding: 12px;
   text-align: center;
 }
 .grid-title{
   font-size: 16px;
   font-weight: 900;
   color: #ff4d8d;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.5);
 }
 .grid-sub{
   font-size: 11px;
   color: #fff;
   line-height: 1.3;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.5);
 }
 
 /* ===== 헤더 & 타이틀 ===== */

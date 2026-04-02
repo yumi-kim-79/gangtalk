@@ -59,6 +59,11 @@ firebase deploy --only hosting
 
 ## 작업 로그
 
+### 2026-04-02: 커뮤니티 카드 텍스트 겹침 및 하단 선 수정 (`fix/community-card-text-overlap`)
+- **오버레이**: border-radius 제거 (부모 overflow:hidden으로 처리), 불투명도 0.3→0.35
+- **하단 선 수정**: background-repeat:no-repeat, backface-visibility:hidden 추가
+- **텍스트 가독성**: text-shadow 추가, padding 12px
+
 ### 2026-04-02: 커뮤니티 카드 이미지 적용 및 오타 수정 (`fix/community-card-images`)
 - **오타 수정**: 배너 텍스트 "강남특방" → "강남톡방"
 - **그리드 카드**: 색상 배경 → 실제 배경 이미지 4장 적용 (cat-gangtok/healing/store/event.jpg)
