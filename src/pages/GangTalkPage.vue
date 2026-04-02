@@ -34,16 +34,16 @@
     <!-- ===== 커뮤니티 2x2 그리드 (이미지에 텍스트 포함, 코드 텍스트 숨김) ===== -->
     <section class="community-grid">
       <div class="grid-card" role="button" tabindex="0" @click="openCategoryPage('all')"
-           :style="{ backgroundImage: `url('/img/community/cat-gangtok.jpg')` }">
+           :style="{ backgroundImage: `url('/img/community/cat-gangtok.jpg')`, backgroundColor: '#1e2040' }">
       </div>
       <div class="grid-card" role="button" tabindex="0" @click="openHealing"
-           :style="{ backgroundImage: `url('/img/community/cat-healing.jpg')` }">
+           :style="{ backgroundImage: `url('/img/community/cat-healing.jpg')`, backgroundColor: '#c4a882' }">
       </div>
       <div class="grid-card" role="button" tabindex="0" @click="openFirstBiz"
-           :style="{ backgroundImage: `url('/img/community/cat-store.jpg')` }">
+           :style="{ backgroundImage: `url('/img/community/cat-store.jpg')`, backgroundColor: '#d1c4e9' }">
       </div>
       <div class="grid-card" role="button" tabindex="0" @click="openCategoryPage('event')"
-           :style="{ backgroundImage: `url('/img/community/cat-event.jpg')` }">
+           :style="{ backgroundImage: `url('/img/community/cat-event.jpg')`, backgroundColor: '#ffe0b2' }">
       </div>
     </section>
 
@@ -2862,18 +2862,12 @@ console.log('[sim-templates] loaded v2025-09-30-01')
   cursor: pointer;
   transition: transform 0.15s;
   box-sizing: border-box;
-  background-size: cover;
+  /* 이미지를 카드보다 1px 크게 채워서 서브픽셀 갭 방지 */
+  background-size: calc(100% + 2px) calc(100% + 2px);
   background-position: center;
   background-repeat: no-repeat;
-  background-color: #ddd;
-  /* 하단 흰선 방지 */
   line-height: 0;
   font-size: 0;
-  -webkit-backface-visibility: hidden;
-  backface-visibility: hidden;
-  /* WebKit 서브픽셀 렌더링 클리핑 강제 */
-  -webkit-mask-image: -webkit-radial-gradient(white, black);
-  isolation: isolate;
 }
 .grid-card:active{ transform: scale(0.97); }
 

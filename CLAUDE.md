@@ -59,6 +59,12 @@ firebase deploy --only hosting
 
 ## 작업 로그
 
+### 2026-04-02: 힐링톡 하단 흰선 완전 제거 v2 (`fix/healing-white-line-v2`)
+- 원인: background-color:#ddd가 이미지 서브픽셀 갭에서 노출됨
+- 각 카드에 이미지 하단 색상과 동일한 backgroundColor 인라인 설정
+- background-size: calc(100%+2px) calc(100%+2px)로 1px 여유 확보
+- 불필요한 -webkit-mask-image, backface-visibility, isolation 제거
+
 ### 2026-04-02: 힐링톡 카드 하단 흰선 제거 (`fix/healing-card-white-line`)
 - line-height:0, font-size:0 추가 (인라인 요소 공백에 의한 하단 갭 제거)
 - -webkit-mask-image + isolation:isolate 추가 (WebKit 서브픽셀 클리핑 강제)
