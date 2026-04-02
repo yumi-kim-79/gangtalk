@@ -2726,7 +2726,7 @@ console.log('[sim-templates] loaded v2025-09-30-01')
 .grid-card{
   position: relative;
   border-radius: 16px;
-  height: 130px;
+  aspect-ratio: 16 / 9;
   overflow: hidden;
   cursor: pointer;
   transition: transform 0.15s;
@@ -2734,6 +2734,8 @@ console.log('[sim-templates] loaded v2025-09-30-01')
   background-color: var(--surface);
   border: none;
   outline: none;
+  font-size: 0;
+  line-height: 0;
 }
 .grid-card:active{ transform: scale(0.97); }
 .grid-card-img{
@@ -2744,7 +2746,7 @@ console.log('[sim-templates] loaded v2025-09-30-01')
   height: 100%;
   object-fit: cover;
   display: block;
-  border-radius: 16px;
+  vertical-align: bottom;
 }
 
 /* ===== 헤더 & 타이틀 ===== */

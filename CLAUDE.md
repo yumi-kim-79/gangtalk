@@ -59,6 +59,11 @@ firebase deploy --only hosting
 
 ## 작업 로그
 
+### 2026-04-02: 다크모드 유지 + 카드 흰선 완전 제거 (`fix/darkmode-persist-and-card-line`)
+- main.js: normalizeTheme/applyThemeToDom/attachThemeSync 사용으로 테마 일관성 확보
+- afterEach에서 localStorage 중복 저장 제거 (setTheme이 이미 처리)
+- 카드: height:130px → aspect-ratio:16/9, font-size:0, line-height:0, vertical-align:bottom
+
 ### 2026-04-02: 커뮤니티 카드 img 태그로 교체 (`fix/community-card-img-tag`)
 - background-image 방식 → img 태그 + object-fit:cover 방식으로 변경
 - position:absolute + width/height:100% 로 카드 꽉 채움
