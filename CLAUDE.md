@@ -59,6 +59,10 @@ firebase deploy --only hosting
 
 ## 작업 로그
 
+### 2026-04-02: 힐링톡 카드 하단 흰선 제거 (`fix/healing-card-white-line`)
+- line-height:0, font-size:0 추가 (인라인 요소 공백에 의한 하단 갭 제거)
+- -webkit-mask-image + isolation:isolate 추가 (WebKit 서브픽셀 클리핑 강제)
+
 ### 2026-04-02: 커뮤니티 카드 텍스트 임시 숨김 (`fix/community-card-hide-text`)
 - 이미지 자체에 텍스트가 포함되어 있어 코드 텍스트/오버레이 전부 제거
 - 카드는 배경 이미지만 표시 (overlay, grid-text, grid-title, grid-sub CSS 삭제)
