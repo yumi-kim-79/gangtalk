@@ -59,6 +59,10 @@ firebase deploy --only hosting
 
 ## 작업 로그
 
+### 2026-04-02: 커뮤니티 카드 이미지 상하단 어둡게 편집 (`fix/community-card-image-darkening`)
+- Pillow로 4개 이미지 상단 30%, 하단 30% 검정 그라디언트 적용 (최대 alpha 160)
+- 이미지 자체가 어두워져서 카드 경계 흰선 완전 해소
+
 ### 2026-04-02: 커뮤니티 카드 상하단 그라디언트 오버레이 추가 (`fix/community-card-gradient-overlay`)
 - 각 카드 img 위에 linear-gradient 오버레이 추가 (상단 15%, 하단 25% 어둡게)
 - 이미지 상하단 밝은 부분이 카드 경계에서 흰선으로 보이는 문제 완화
