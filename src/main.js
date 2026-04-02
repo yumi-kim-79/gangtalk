@@ -39,6 +39,7 @@ import {
 // 전역 스타일
 import './reset.css'
 import '@/styles/theme.css'
+import { normalizeTheme, applyThemeToDom, attachThemeSync } from '@/store/theme.js'
 import '@/styles/safeTap.css'
 import './styles/pwa.css'
 
@@ -167,14 +168,13 @@ router.isReady().then(async () => {
   }
 
   const cur = router.currentRoute.value
-  const initialTheme = (
-    cur.query.theme ||
-    localStorage.getItem('theme') ||
-    'white'
-  ).toString()
+  const initialTheme = normalizeTheme(
+    cur.query.theme || localStorage.getItem('theme') || 'white'
+  )
+  applyThemeToDom(initialTheme)
+  try { localStorage.setItem('theme', initialTheme) } catch {}
 
-  document.documentElement.setAttribute('data-theme', initialTheme)
-  localStorage.setItem('theme', initialTheme)
+  attachThemeSync()
 
   app.mount('#app')
 
@@ -192,13 +192,10 @@ router.isReady().then(async () => {
 
 // 라우트 변경마다 theme 반영 (쿼리 우선, 없으면 로컬)
 router.afterEach((to) => {
-  const theme = (
-    to.query.theme ||
-    localStorage.getItem('theme') ||
-    'white'
-  ).toString()
-  document.documentElement.setAttribute('data-theme', theme)
-  localStorage.setItem('theme', theme)
+  const theme = normalizeTheme(
+    to.query.theme || localStorage.getItem('theme') || 'white'
+  )
+  applyThemeToDom(theme)
 })
 
 /* ============================================================
