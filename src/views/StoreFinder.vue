@@ -1009,6 +1009,7 @@ function rebuildStores(){
 
 // Firestore 구독
 onMounted(() => {
+  applyThemeToDom(getTheme())
   // 1) stores 컬렉션
   try{
     const qRef = query(collection(db, 'stores'), orderBy('updatedAt','desc'))
@@ -1528,7 +1529,7 @@ function toggleViewMode () {
 watch(() => route.query.view, (nv) => { if (nv && nv !== view.value) view.value = String(nv) })
 
 /* ▶ 테마: localStorage 기반 (URL 쿼리 제거) */
-import { getTheme, setTheme } from '@/store/theme.js'
+import { getTheme, setTheme, applyThemeToDom } from '@/store/theme.js'
 
 const theme = ref(getTheme())
 const isDark = computed(() => theme.value === 'dark' || theme.value === 'black')

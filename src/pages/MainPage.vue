@@ -771,7 +771,7 @@ async function goNearMe(){
 }
 
 /* === 테마 & 뷰 전환 (localStorage 기반, URL 쿼리 제거) === */
-import { getTheme, setTheme, normalizeTheme } from '@/store/theme.js'
+import { getTheme, setTheme, normalizeTheme, applyThemeToDom } from '@/store/theme.js'
 
 const viewMode  = ref(route.query.view || localStorage.getItem('finder:view') || 'list')
 const theme     = ref(getTheme())
@@ -957,6 +957,7 @@ function onCloseEvent() {
 
 onBeforeMount(decideShowEvent)
 onMounted(async () => {
+  applyThemeToDom(getTheme())
   _isMounted.value = true
   await openEventSafely(_wantEvent.value)
   watch(() => route.query.event, decideShowEvent)
