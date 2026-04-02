@@ -7,7 +7,7 @@ import { useUserNick } from '@/store/userNick.js'
 import { fbDb, fbStorage, ensureSignedIn } from '@/firebase'
 import {
   doc, setDoc, getDoc, serverTimestamp,
-  collection, getDocs, query, where, onSnapshot, deleteDoc, deleteField
+  collection, getDocs, query, where, onSnapshot, deleteDoc, deleteField, limit
 } from 'firebase/firestore'
 import { ref as sRef, uploadBytes, getDownloadURL } from 'firebase/storage'
 
@@ -172,13 +172,13 @@ export function useMyPageCore(){
     if (!isAdmin.value || !fbDb) return
     try{
       // 1) stores 대기 목록
-      const snap = await getDocs(query(collection(fbDb,'stores'), where('applyStatus','==','pending')))
+      const snap = await getDocs(query(collection(fbDb,'stores'), where('applyStatus','==','pending'), limit(100)))
       const arr = []
       snap.forEach(d => arr.push({ id:d.id, ...d.data() }))
 
       // 2) connectRequests(pending) → storeId 기준으로 _reqId 매핑
       try {
-        const cr = await getDocs(query(collection(fbDb,'connectRequests'), where('status','==','pending')))
+        const cr = await getDocs(query(collection(fbDb,'connectRequests'), where('status','==','pending'), limit(100)))
         const byStore = new Map()
         cr.forEach(docu => {
           const x = docu.data() || {}
@@ -205,7 +205,7 @@ export function useMyPageCore(){
   async function loadPartnerPending(){
     if (!isAdmin.value || !fbDb) return
     try{
-      const snap = await getDocs(query(collection(fbDb,'partnerRequests'), where('status','==','pending')))
+      const snap = await getDocs(query(collection(fbDb,'partnerRequests'), where('status','==','pending'), limit(100)))
       const arr = []
       snap.forEach(d => arr.push({ id:d.id, ...d.data() }))
       // 세부 토글/라인 기본값
@@ -278,8 +278,8 @@ export function useMyPageCore(){
     if (!fbDb || !state.value.loggedIn) return
     try{
       let snap
-      if (isAdmin.value) snap = await getDocs(query(collection(fbDb, 'connectRequests')))
-      else snap = await getDocs(query(collection(fbDb, 'connectRequests'), where('ownerId', '==', String(state.value.uid))))
+      if (isAdmin.value) snap = await getDocs(query(collection(fbDb, 'connectRequests'), limit(100)))
+      else snap = await getDocs(query(collection(fbDb, 'connectRequests'), where('ownerId', '==', String(state.value.uid)), limit(100)))
       const arr = []; snap.forEach(d => arr.push({ id:d.id, ...d.data() }))
       if (isAdmin.value) {
         await Promise.all(arr.map(async (r) => {
@@ -450,7 +450,7 @@ export function useMyPageCore(){
     if (!isAdmin.value || !fbDb) return
     try{
       _mkCache = null;
-      const snap = await getDocs(query(collection(fbDb,'extendRequests'), where('status','==','pending')))
+      const snap = await getDocs(query(collection(fbDb,'extendRequests'), where('status','==','pending'), limit(100)))
       const arr = []
       snap.forEach(d => arr.push({ id:d.id, _open:false, ...d.data() }))
       await Promise.all(arr.map(hydrateExtendMeta))
@@ -1344,7 +1344,7 @@ export function useMyPageCore(){
       if (!rawAdsP || !rawAdsP.length) {
         // 서브컬렉션 우선: adBannersP
         try {
-          const subP = await getDocs(collection(fbDb,'config','marketing','adBannersP'))
+          const subP = await getDocs(query(collection(fbDb,'config','marketing','adBannersP'), limit(50)))
           const temp = []
           subP.forEach(d => temp.push({ id:d.id, ...(d.data()||{}) }))
           if (temp.length) rawAdsP = temp
@@ -1380,7 +1380,7 @@ export function useMyPageCore(){
 
       if (!rawAdsF || !rawAdsF.length) {
         try {
-          const subF = await getDocs(collection(fbDb,'config','marketing','adBannersFinder'))
+          const subF = await getDocs(query(collection(fbDb,'config','marketing','adBannersFinder'), limit(50)))
           const temp = []
           subF.forEach(d => temp.push({ id:d.id, ...(d.data()||{}) }))
           if (temp.length) rawAdsF = temp
@@ -1421,7 +1421,7 @@ export function useMyPageCore(){
       const indexList = Array.isArray(data.partnerCardIndex) ? data.partnerCardIndex : []
       let ptList = []
       try{
-        const snap2 = await getDocs(collection(fbDb, 'config', 'marketing', 'partnerCards'))
+        const snap2 = await getDocs(query(collection(fbDb, 'config', 'marketing', 'partnerCards'), limit(50)))
         snap2.forEach(d => ptList.push({ id:d.id, ...(d.data() || {}) }))
       }catch(e){
         console.warn('partnerCards subcollection load 실패:', e?.message || e)
@@ -1459,7 +1459,7 @@ export function useMyPageCore(){
 
       if (!ptList.length) {
         try {
-          const ps = await getDocs(collection(fbDb,'partners'))
+          const ps = await getDocs(query(collection(fbDb,'partners'), limit(200)))
           const temp = []
           ps.forEach(d => {
             const x = d.data() || {}

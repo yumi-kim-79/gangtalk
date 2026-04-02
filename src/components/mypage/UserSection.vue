@@ -262,10 +262,12 @@ import {
   query,
   where,
   getDocs,
+  getDoc,
   doc,
   updateDoc,
   deleteDoc,
   serverTimestamp,
+  limit,
 } from 'firebase/firestore'
 
 /* ===== Props ===== */
@@ -514,7 +516,7 @@ async function loadCommentsAndReplies() {
     try {
       all = await tryGroup()
     } catch {
-      const postsSnap = await getDocs(collection(fbDb, 'board_posts'))
+      const postsSnap = await getDocs(query(collection(fbDb, 'board_posts'), limit(100)))
       const tasks = postsSnap.docs.map(async (p) => {
         const pid = p.id
         const cSnap = await getDocs(
@@ -559,10 +561,8 @@ async function mapCommentsSnapshot(
     }
     if (!postTitle && postId) {
       try {
-        const ps = await getDocs(
-          query(collection(fbDb, 'board_posts'), where('__name__', '==', postId)),
-        )
-        postTitle = ps.docs[0]?.data()?.title || ''
+        const ps = await getDoc(doc(fbDb, 'board_posts', postId))
+        postTitle = ps.data()?.title || ''
       } catch {}
     }
     result.push({ id: d.id, _ref: ref, postId, postTitle, ...data })

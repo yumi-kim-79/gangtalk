@@ -68,7 +68,7 @@
         class="banner"
         @click="onBannerClick"
       >
-        <img v-if="bannerImage(b)" :src="bannerImage(b)" alt="" class="banner-img" />
+        <img v-if="bannerImage(b)" :src="bannerImage(b)" alt="" class="banner-img" loading="lazy" />
         <span
           v-for="(t, tIdx) in (b.tags||[])"
           :key="t + '_' + tIdx"
@@ -389,7 +389,7 @@ function isSecureOrigin(){
 /* ====== ⬆⬆⬆ 추가 끝 ⬆⬆⬆ ====== */
 
 import {
-  doc, getDoc, setDoc, addDoc, collection, getDocs, onSnapshot, serverTimestamp
+  doc, getDoc, setDoc, addDoc, collection, getDocs, onSnapshot, serverTimestamp, query, limit
 } from 'firebase/firestore'
 import { getAuth, onAuthStateChanged } from 'firebase/auth'
 import { getStorage, ref as sRef, getDownloadURL } from 'firebase/storage'
@@ -785,7 +785,7 @@ const partners = ref([])
 
 async function loadPartners(){
   try{
-    const pSnap = await getDocs(collection(db, 'partners'))
+    const pSnap = await getDocs(query(collection(db, 'partners'), limit(200)))
     const base = []
     const missingIds = []
 
