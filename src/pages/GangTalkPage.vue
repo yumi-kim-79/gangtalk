@@ -38,19 +38,23 @@
     <!-- ===== 섹션 타이틀 ===== -->
     <h2 class="section-title">🔥 주제 별 커뮤니티</h2>
 
-    <!-- ===== 커뮤니티 2x2 그리드 (인라인 스타일로 흰선 완전 방지) ===== -->
+    <!-- ===== 커뮤니티 2x2 그리드 ===== -->
     <section class="community-grid">
       <div style="position:relative;overflow:hidden;border-radius:16px;height:130px;cursor:pointer" @click="openCategoryPage('all')">
         <img src="/img/community/cat-gangtok.jpg" alt="강톡" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;display:block">
+        <div style="position:absolute;top:0;left:0;width:100%;height:100%;background:linear-gradient(to bottom, rgba(0,0,0,0.15) 0%, transparent 40%, transparent 60%, rgba(0,0,0,0.25) 100%);border-radius:16px;"></div>
       </div>
       <div style="position:relative;overflow:hidden;border-radius:16px;height:130px;cursor:pointer" @click="openHealing">
         <img src="/img/community/cat-healing.jpg" alt="힐링톡" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;display:block">
+        <div style="position:absolute;top:0;left:0;width:100%;height:100%;background:linear-gradient(to bottom, rgba(0,0,0,0.15) 0%, transparent 40%, transparent 60%, rgba(0,0,0,0.25) 100%);border-radius:16px;"></div>
       </div>
       <div style="position:relative;overflow:hidden;border-radius:16px;height:130px;cursor:pointer" @click="openFirstBiz">
         <img src="/img/community/cat-store.jpg" alt="우리가게" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;display:block">
+        <div style="position:absolute;top:0;left:0;width:100%;height:100%;background:linear-gradient(to bottom, rgba(0,0,0,0.15) 0%, transparent 40%, transparent 60%, rgba(0,0,0,0.25) 100%);border-radius:16px;"></div>
       </div>
       <div style="position:relative;overflow:hidden;border-radius:16px;height:130px;cursor:pointer" @click="openCategoryPage('event')">
         <img src="/img/community/cat-event.jpg" alt="이벤트" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;display:block">
+        <div style="position:absolute;top:0;left:0;width:100%;height:100%;background:linear-gradient(to bottom, rgba(0,0,0,0.15) 0%, transparent 40%, transparent 60%, rgba(0,0,0,0.25) 100%);border-radius:16px;"></div>
       </div>
     </section>
 

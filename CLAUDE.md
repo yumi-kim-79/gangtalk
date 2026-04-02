@@ -59,6 +59,10 @@ firebase deploy --only hosting
 
 ## 작업 로그
 
+### 2026-04-02: 커뮤니티 카드 상하단 그라디언트 오버레이 추가 (`fix/community-card-gradient-overlay`)
+- 각 카드 img 위에 linear-gradient 오버레이 추가 (상단 15%, 하단 25% 어둡게)
+- 이미지 상하단 밝은 부분이 카드 경계에서 흰선으로 보이는 문제 완화
+
 ### 2026-04-02: URL ?theme= 쿼리 파라미터 전면 제거 (`fix/remove-url-theme-params`)
 - **근본 원인**: BottomNav.vue에 `theme: 'light'` 하드코딩, router/index.js/MainPage/PartnersPage 등 여러 곳에서 URL 쿼리로 theme 전달
 - BottomNav.vue: `theme: 'light'` 제거
