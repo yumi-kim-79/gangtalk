@@ -31,27 +31,39 @@
     <!-- ===== 섹션 타이틀 ===== -->
     <h2 class="section-title">🔥 주제 별 커뮤니티</h2>
 
-    <!-- ===== 커뮤니티 2x2 그리드 ===== -->
+    <!-- ===== 커뮤니티 2x2 그리드 (배경 이미지) ===== -->
     <section class="community-grid">
-      <div class="grid-card dark" role="button" tabindex="0" @click="openCategoryPage('all')">
-        <svg class="grid-lock" viewBox="0 0 24 24" aria-hidden="true">
-          <rect x="6" y="10" width="12" height="10" rx="2" stroke="currentColor" fill="none" stroke-width="2"/>
-          <path d="M8 10V8a4 4 0 0 1 8 0v2" stroke="currentColor" fill="none" stroke-width="2"/>
-        </svg>
-        <b class="grid-title">강톡</b>
-        <span class="grid-sub pink">100% 비공개</span>
+      <div class="grid-card" role="button" tabindex="0" @click="openCategoryPage('all')"
+           :style="{ backgroundImage: `url('/img/community/cat-gangtok.jpg')` }">
+        <div class="grid-overlay"></div>
+        <div class="grid-text">
+          <b class="grid-title">강톡</b>
+          <span class="grid-sub">100% 비공개</span>
+        </div>
       </div>
-      <div class="grid-card pink" role="button" tabindex="0" @click="openHealing">
-        <b class="grid-title">힐링톡</b>
-        <span class="grid-sub">명언·건강·여행·다이어트</span>
+      <div class="grid-card" role="button" tabindex="0" @click="openHealing"
+           :style="{ backgroundImage: `url('/img/community/cat-healing.jpg')` }">
+        <div class="grid-overlay"></div>
+        <div class="grid-text">
+          <b class="grid-title">힐링톡</b>
+          <span class="grid-sub">명언·건강·여행·다이어트</span>
+        </div>
       </div>
-      <div class="grid-card purple" role="button" tabindex="0" @click="openFirstBiz">
-        <b class="grid-title">우리 가게 게시판</b>
-        <span class="grid-sub">공지·소식·가게 이야기</span>
+      <div class="grid-card" role="button" tabindex="0" @click="openFirstBiz"
+           :style="{ backgroundImage: `url('/img/community/cat-store.jpg')` }">
+        <div class="grid-overlay"></div>
+        <div class="grid-text">
+          <b class="grid-title">우리 가게 게시판</b>
+          <span class="grid-sub">공지·소식·가게 이야기</span>
+        </div>
       </div>
-      <div class="grid-card orange" role="button" tabindex="0" @click="openCategoryPage('event')">
-        <b class="grid-title">이벤트 참여</b>
-        <span class="grid-sub">이벤트·혜택·참여</span>
+      <div class="grid-card" role="button" tabindex="0" @click="openCategoryPage('event')"
+           :style="{ backgroundImage: `url('/img/community/cat-event.jpg')` }">
+        <div class="grid-overlay"></div>
+        <div class="grid-text">
+          <b class="grid-title">이벤트 참여</b>
+          <span class="grid-sub">이벤트·혜택·참여</span>
+        </div>
       </div>
     </section>
 
@@ -678,7 +690,7 @@ const SHOW_INLINE_CATS = false
 const sliderIdx = ref(0)
 const sliderItems = ref([
   { theme: 'slide-rejuran', logo: 'ℜ REJURAN', brand: 'COSMETIC', tagline: 'REWRITE YOUR STORY', circleColor: 'rgba(0,180,180,0.35)' },
-  { theme: 'slide-dark', logo: '강남특방', brand: '강톡', tagline: '100% 비공개 커뮤니티', circleColor: 'rgba(255,107,157,0.3)' },
+  { theme: 'slide-dark', logo: '강남톡방', brand: '강톡', tagline: '100% 비공개 커뮤니티', circleColor: 'rgba(255,107,157,0.3)' },
   { theme: 'slide-blue', logo: '힐링톡', brand: '명언·건강·여행', tagline: '일상에 쉼표를 더하다', circleColor: 'rgba(100,149,237,0.3)' },
 ])
 let sliderTimer = null
@@ -2863,54 +2875,44 @@ console.log('[sim-templates] loaded v2025-09-30-01')
   margin-bottom: 18px;
 }
 .grid-card{
+  position: relative;
   border-radius: 16px;
-  padding: 18px 16px;
   height: 120px;
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
-  gap: 3px;
+  overflow: hidden;
   cursor: pointer;
   transition: transform 0.15s;
   box-sizing: border-box;
+  background-size: cover;
+  background-position: center;
+  background-color: #ddd;
 }
 .grid-card:active{ transform: scale(0.97); }
+.grid-overlay{
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,0.3);
+  border-radius: 16px;
+}
+.grid-text{
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 4px;
+  text-align: center;
+}
 .grid-title{
   font-size: 16px;
   font-weight: 900;
+  color: #ff4d8d;
 }
 .grid-sub{
   font-size: 11px;
-  opacity: 0.75;
-  line-height: 1.3;
-}
-.grid-sub.pink{
-  color: #ff6b9d;
-  opacity: 1;
-  font-weight: 700;
-}
-.grid-lock{
-  width: 20px;
-  height: 20px;
-  margin-bottom: 4px;
-  opacity: 0.85;
-}
-
-.grid-card.dark{
-  background: #1e2040;
   color: #fff;
-}
-.grid-card.pink{
-  background: linear-gradient(135deg, #ffe0ec, #ffc8d9);
-  color: #333;
-}
-.grid-card.purple{
-  background: linear-gradient(135deg, #ede7f6, #d1c4e9);
-  color: #333;
-}
-.grid-card.orange{
-  background: linear-gradient(135deg, #fff3e0, #ffe0b2);
-  color: #333;
+  line-height: 1.3;
 }
 
 /* ===== 헤더 & 타이틀 ===== */
