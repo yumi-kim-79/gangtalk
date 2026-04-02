@@ -2726,12 +2726,12 @@ console.log('[sim-templates] loaded v2025-09-30-01')
 .grid-card{
   position: relative;
   border-radius: 16px;
-  aspect-ratio: 16 / 9;
+  aspect-ratio: 650 / 336;
   overflow: hidden;
   cursor: pointer;
   transition: transform 0.15s;
   box-sizing: border-box;
-  background-color: var(--surface);
+  background: var(--surface);
   border: none;
   outline: none;
   font-size: 0;
@@ -2739,14 +2739,10 @@ console.log('[sim-templates] loaded v2025-09-30-01')
 }
 .grid-card:active{ transform: scale(0.97); }
 .grid-card-img{
-  position: absolute;
-  top: 0;
-  left: 0;
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: fill;
   display: block;
-  vertical-align: bottom;
 }
 
 /* ===== 헤더 & 타이틀 ===== */
