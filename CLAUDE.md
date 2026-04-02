@@ -59,6 +59,12 @@ firebase deploy --only hosting
 
 ## 작업 로그
 
+### 2026-04-02: 개선 페이지 야간모드 적용 (`feat/darkmode-apply-redesigned-pages`)
+- GangTalkPage v2 CSS: 하드코딩 #fff/#111/#888 등 → var(--bg)/var(--fg)/var(--muted)/var(--line)/var(--surface)/var(--accent-weak) 전면 교체
+- StoreBoard v2 CSS: 동일하게 CSS 변수 교체
+- 핑크 그라디언트/accent 색상은 다크모드에서도 유지 (의도적)
+- pill-tab, post-card, section-title, btn-load-more 등 메인 페이지 영역도 교체
+
 ### 2026-04-02: 힐링톡/우리가게 게시판 UI 강톡 스타일 통일 (`feat/healing-storeboard-ui-redesign`)
 - **힐링톡**: 구 ql-list/ql-row 스타일 → v2 카드형(v2-post-list/v2-post-card), pill 탭, 핑크 공지 카드, 글쓰기 버튼 핑크 그라디언트
 - **StoreBoard.vue**: 전면 교체 → v2 헤더/카드 리스트/글쓰기 모달(핸들바+테두리없는 입력+핑크 등록)
