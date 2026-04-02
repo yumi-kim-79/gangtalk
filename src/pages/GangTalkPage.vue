@@ -31,39 +31,19 @@
     <!-- ===== 섹션 타이틀 ===== -->
     <h2 class="section-title">🔥 주제 별 커뮤니티</h2>
 
-    <!-- ===== 커뮤니티 2x2 그리드 (배경 이미지) ===== -->
+    <!-- ===== 커뮤니티 2x2 그리드 (이미지에 텍스트 포함, 코드 텍스트 숨김) ===== -->
     <section class="community-grid">
       <div class="grid-card" role="button" tabindex="0" @click="openCategoryPage('all')"
            :style="{ backgroundImage: `url('/img/community/cat-gangtok.jpg')` }">
-        <div class="grid-overlay"></div>
-        <div class="grid-text">
-          <b class="grid-title">강톡</b>
-          <span class="grid-sub">100% 비공개</span>
-        </div>
       </div>
       <div class="grid-card" role="button" tabindex="0" @click="openHealing"
            :style="{ backgroundImage: `url('/img/community/cat-healing.jpg')` }">
-        <div class="grid-overlay"></div>
-        <div class="grid-text">
-          <b class="grid-title">힐링톡</b>
-          <span class="grid-sub">명언·건강·여행·다이어트</span>
-        </div>
       </div>
       <div class="grid-card" role="button" tabindex="0" @click="openFirstBiz"
            :style="{ backgroundImage: `url('/img/community/cat-store.jpg')` }">
-        <div class="grid-overlay"></div>
-        <div class="grid-text">
-          <b class="grid-title">우리 가게 게시판</b>
-          <span class="grid-sub">공지·소식·가게 이야기</span>
-        </div>
       </div>
       <div class="grid-card" role="button" tabindex="0" @click="openCategoryPage('event')"
            :style="{ backgroundImage: `url('/img/community/cat-event.jpg')` }">
-        <div class="grid-overlay"></div>
-        <div class="grid-text">
-          <b class="grid-title">이벤트 참여</b>
-          <span class="grid-sub">이벤트·혜택·참여</span>
-        </div>
       </div>
     </section>
 
@@ -2891,36 +2871,6 @@ console.log('[sim-templates] loaded v2025-09-30-01')
   backface-visibility: hidden;
 }
 .grid-card:active{ transform: scale(0.97); }
-.grid-overlay{
-  position: absolute;
-  inset: 0;
-  background: rgba(0,0,0,0.35);
-  /* border-radius 제거 — 부모의 overflow:hidden이 처리 */
-}
-.grid-text{
-  position: relative;
-  z-index: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  gap: 4px;
-  padding: 12px;
-  text-align: center;
-}
-.grid-title{
-  font-size: 16px;
-  font-weight: 900;
-  color: #ff4d8d;
-  text-shadow: 0 1px 4px rgba(0,0,0,0.5);
-}
-.grid-sub{
-  font-size: 11px;
-  color: #fff;
-  line-height: 1.3;
-  text-shadow: 0 1px 3px rgba(0,0,0,0.5);
-}
 
 /* ===== 헤더 & 타이틀 ===== */
 .title{ margin:0; font-size:18px; font-weight:900 }
