@@ -2643,6 +2643,10 @@ console.log('[sim-templates] loaded v2025-09-30-01')
 .wrap{ padding: 14px var(--page-h-pad, 16px); }
 
 .gt-page{
+  /* 옛 wrap.compact 에 있던 변수들을 새 컨테이너에도 보존 (자식 시트가 참조하더라도 안전) */
+  --gt-topbar-h: 0px;
+  --gt-ad-h: 0px;
+
   padding-top: 0;
   padding-left:  max(var(--page-h-pad, 16px), env(safe-area-inset-left));
   padding-right: max(var(--page-h-pad, 16px), env(safe-area-inset-right));
@@ -3213,7 +3217,9 @@ console.log('[sim-templates] loaded v2025-09-30-01')
 /* 풀스크린 오버레이(카테고리/상세) */
 .cat-mask{
   position: fixed;
-  top: var(--gt-topbar-h);
+  /* TopBar 제거 + AppHeader 사용으로 --gt-topbar-h 가 미정의됨.
+     풀스크린 시트가 viewport 상단부터 표시되도록 top: 0 으로 고정. */
+  top: 0;
   left: 0;
   right: 0;
   bottom: 0;
@@ -3268,7 +3274,8 @@ console.log('[sim-templates] loaded v2025-09-30-01')
 
 .detail-mask{
   position: fixed;
-  top: var(--gt-topbar-h);
+  /* --gt-topbar-h 미정의 → top: 0 으로 viewport 상단부터 풀스크린 */
+  top: 0;
   left: 0;
   right: 0;
   bottom: 0;
