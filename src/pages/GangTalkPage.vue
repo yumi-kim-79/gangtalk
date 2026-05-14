@@ -2609,14 +2609,14 @@ console.log('[sim-templates] loaded v2025-09-30-01')
 </script>
 
 <style scoped>
-/* 페이지 여백 */
-.wrap{ padding:14px }
+/* 페이지 여백 — 좌우는 전역 --page-h-pad 변수 사용으로 모든 페이지와 통일 */
+.wrap{ padding: 14px var(--page-h-pad, 16px); }
 
 /* 이 페이지에서만 사용할 레이아웃 변수 (TopBar 높이) */
 .wrap.compact{
   --gt-topbar-h: 56px;
   --gt-ad-h: 0px;
-  padding: 10px 14px;
+  padding: 10px var(--page-h-pad, 16px);
   margin-top: var(--gt-topbar-h);
   background: var(--bg);
   color: var(--fg);

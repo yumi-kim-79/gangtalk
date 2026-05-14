@@ -1753,8 +1753,8 @@ function toggleSort(){ ui.value.sortOpen = !ui.value.sortOpen; if(ui.value.sortO
 /* ===== Header / Search / Hamburger Dropdown ===== */
 /* 모두 AppHeader 공통 컴포넌트로 이관됨 — sf-* 헤더/검색/메뉴 CSS 제거 */
 
-/* 실시간 순위 섹션 컨테이너 (좌우 여백을 wrap 에서만 관리, 카드는 마진 제거) */
-.sf-search-wrap{ margin:0 16px; padding:0 !important; }
+/* 실시간 순위 섹션 컨테이너 — 좌우는 .page 가 책임 */
+.sf-search-wrap{ margin:0; padding:0 !important; }
 
 /* ===== 실시간 순위 (MainPage .mp-hot 과 패딩/마진/radius 통일) ===== */
 .sf-hot{
@@ -1818,7 +1818,7 @@ function toggleSort(){ ui.value.sortOpen = !ui.value.sortOpen; if(ui.value.sortO
 /* ===== 배너 ===== */
 .sf-banners{
   position:relative;
-  margin:0 16px 8px;
+  margin:0 0 8px;
 }
 .sf-banners :deep(.banner){
   border-radius:16px;
@@ -1853,7 +1853,7 @@ function toggleSort(){ ui.value.sortOpen = !ui.value.sortOpen; if(ui.value.sortO
 /* ===== Category (MainPage .mp-cat 와 동일 톤) ===== */
 .sf-cat{
   padding:4px 0 12px;
-  margin:0 16px;
+  margin:0;
   position:relative;
 }
 .sf-cat-scroll{
@@ -1915,7 +1915,7 @@ function toggleSort(){ ui.value.sortOpen = !ui.value.sortOpen; if(ui.value.sortO
 }
 
 /* ===== Top5 섹션 ===== */
-.sf-tops{ padding:20px 16px; }
+.sf-tops{ padding:20px 0; }
 .sf-top-head{
   display:flex; align-items:center; justify-content:space-between;
   margin-bottom:14px; padding:0 2px;
@@ -1975,7 +1975,7 @@ function toggleSort(){ ui.value.sortOpen = !ui.value.sortOpen; if(ui.value.sortO
 }
 
 /* ===== List Head 정렬: 좌우 여백 일치 ===== */
-.sf-list-head{ padding:8px 16px; }
+.sf-list-head{ padding:8px 0; }
 
 /* ===== List Head 톤 정리 ===== */
 .sf-list-head{
@@ -2010,7 +2010,12 @@ function toggleSort(){ ui.value.sortOpen = !ui.value.sortOpen; if(ui.value.sortO
    Page Padding / Layout Locks
 ============================= */
 /* sf-page 자체 패딩은 0, 내부 섹션들이 좌우 16px 여백을 직접 책임진다 */
-.page{ padding: 0 0 calc(92px + env(safe-area-inset-bottom)) }
+.page{
+  padding-top: 0;
+  padding-left:  max(var(--page-h-pad, 16px), env(safe-area-inset-left));
+  padding-right: max(var(--page-h-pad, 16px), env(safe-area-inset-right));
+  padding-bottom: calc(92px + env(safe-area-inset-bottom));
+}
 
 :root{
   --search-height: 32px;

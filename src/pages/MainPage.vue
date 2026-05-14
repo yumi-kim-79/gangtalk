@@ -2281,8 +2281,8 @@ onUnmounted(() => {
   /* 새 디자인: 페이지 배경/여백 — 상단 패딩은 AppHeader 가 책임 */
   background: var(--bg, #fafafa);
   padding-top: 0;
-  padding-left:  max(12px, env(safe-area-inset-left));
-  padding-right: max(12px, env(safe-area-inset-right));
+  padding-left:  max(var(--page-h-pad, 16px), env(safe-area-inset-left));
+  padding-right: max(var(--page-h-pad, 16px), env(safe-area-inset-right));
   padding-bottom: calc(var(--tabbar-height) + env(safe-area-inset-bottom));
 }
 

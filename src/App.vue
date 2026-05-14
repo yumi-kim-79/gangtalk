@@ -65,6 +65,7 @@ onMounted(async () => {
   --app-header-height: 64px;   /* 헤더 영역 최소 높이 (로고+타이틀+버튼 한 줄) */
   --app-search-height: 48px;   /* 검색창 박스 높이 */
   --app-header-total:  130px;  /* 헤더 + 검색창 + 위·아래 패딩 합계 */
+  --page-h-pad:        16px;   /* 모든 페이지의 좌우 패딩 단일 토큰 — .page 가 책임 */
 }
 
 /* 앱 루트 최소 높이 */
