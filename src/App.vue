@@ -18,7 +18,7 @@
 </template>
 
 <script setup>
-import { onMounted, computed, watch } from 'vue'
+import { onMounted, computed, watch, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
 import TopBar from '@/components/TopBar.vue'
 import BottomNav from '@/components/BottomNav.vue'
@@ -37,15 +37,22 @@ const hideTopBar = computed(() => {
 })
 
 // 해당 라우트에서는 TopBar 가 부착한 body 클래스도 제거해
-// .page padding-top(60px) 보정이 새 헤더 위에 겹쳐 보이지 않도록 함
-watch(hideTopBar, (on) => {
-  if (on) document.body.classList.remove('has-fixed-topbar')
+// .page padding-top(60px) 보정이 새 헤더 위에 겹쳐 보이지 않도록 함.
+// TopBar 의 onMounted 가 add 한 다음 프레임에 remove 가 실행되도록 nextTick 사용.
+watch(hideTopBar, async (on) => {
+  if (on) {
+    await nextTick()
+    document.body.classList.remove('has-fixed-topbar')
+  }
 }, { immediate: true })
 
-onMounted(() => {
+onMounted(async () => {
   applyThemeToDom(getTheme())
   attachThemeSync()
-  if (hideTopBar.value) document.body.classList.remove('has-fixed-topbar')
+  if (hideTopBar.value) {
+    await nextTick()
+    document.body.classList.remove('has-fixed-topbar')
+  }
 })
 </script>
 

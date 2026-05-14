@@ -60,7 +60,7 @@ firebase deploy --only hosting
 - [ ] 구글플레이 등록
 - [ ] 애플 앱스토어 등록
 
-**현재 단계**: 공통 `AppHeader.vue` 추출 + MainPage/StoreFinder 마이그레이션 완료 — 페이지 전환 시 헤더/검색창 레이아웃 점프 차단
+**현재 단계**: 페이지 전환 점프 4대 원인 모두 수정 완료 (padding 통일, v-if→v-show+스켈레톤, 카드 통일, has-fixed-topbar nextTick)
 
 ---
 
@@ -74,6 +74,22 @@ firebase deploy --only hosting
 ---
 
 ## 작업 로그
+
+### 2026-05-14: 페이지 전환 시 화면 점프 4가지 원인 수정 (`fix/page-transition-jump`)
+- **수정 1: `.page padding-top` 통일** — 상단 여백 책임을 AppHeader 로 일원화
+  - `MainPage .page { padding-top: 8px → 0 }`
+  - `AppHeader .app-header { padding: 8/12 → 16/12 }` (상단 16 으로 늘려 흡수)
+  - StoreFinder `.page` 는 기존 `padding:0` 유지 → 양 페이지 콘텐츠 시작점 일치
+- **수정 2: StoreFinder 첫 섹션 v-if 점프 차단**
+  - `<section class="sf-search-wrap" v-if="hotRanks10.length">` → `v-show` + 빈 상태에서도 동일 높이의 `.sf-hot--skeleton` 카드 자리 보유
+  - `<section v-if="oneBanner.length">` 위에 `v-if="!oneBanner.length"` 스켈레톤 섹션 추가 (높이 180 + 인디케이터 3개)
+- **수정 3: 첫 카드 패딩/마진/radius 통일**
+  - 두 페이지 모두 `padding: 12px 16px; margin: 0 0 14px; border-radius: 14px;`
+  - StoreFinder `.sf-search-wrap` 의 bottom 14 마진 제거 → 카드가 직접 책임
+  - `.sf-hot { min-height:62px; box-sizing:border-box }` 추가
+- **수정 4: `body.has-fixed-topbar` 잔존 차단**
+  - `App.vue` 의 `hideTopBar` watcher 와 `onMounted` 가 클래스 제거를 `await nextTick()` 이후 실행
+  - TopBar `onMounted` 가 클래스 add → 다음 프레임에 watcher 가 remove → 한 프레임 짧은 깜빡임 차단
 
 ### 2026-05-14: 공통 AppHeader 컴포넌트 추출 (`refactor/common-app-header`)
 - **신규 `src/components/common/AppHeader.vue`**: 헤더 + 검색창 + 햄버거 카드 드롭다운 단일 컴포넌트

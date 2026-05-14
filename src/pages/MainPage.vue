@@ -2278,9 +2278,9 @@ onUnmounted(() => {
 }
 
 .page{
-  /* 새 디자인: 페이지 배경/여백 */
+  /* 새 디자인: 페이지 배경/여백 — 상단 패딩은 AppHeader 가 책임 */
   background: var(--bg, #fafafa);
-  padding-top: 8px;
+  padding-top: 0;
   padding-left:  max(12px, env(safe-area-inset-left));
   padding-right: max(12px, env(safe-area-inset-right));
   padding-bottom: calc(var(--tabbar-height) + env(safe-area-inset-bottom));
@@ -2293,15 +2293,15 @@ onUnmounted(() => {
 /* ===== Header / Search ===== */
 /* AppHeader 공통 컴포넌트로 이관됨 — 관련 CSS 제거 */
 
-/* ===== Hot Issue ===== */
+/* ===== Hot Issue (StoreFinder .sf-hot 과 패딩/마진/radius 통일) ===== */
 .mp-hot{
   display:flex;
   align-items:center;
   gap:10px;
-  padding:12px 14px;
+  padding:12px 16px;
   background:var(--surface, #fff);
   border-radius:14px;
-  margin:0 4px 14px;
+  margin:0 0 14px;
   box-shadow:0 2px 10px rgba(0,0,0,.04);
   cursor:pointer;
 }
