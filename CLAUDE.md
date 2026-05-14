@@ -61,7 +61,7 @@ firebase deploy --only hosting
 - [ ] 구글플레이 등록
 - [ ] 애플 앱스토어 등록
 
-**현재 단계**: 강톡 탭 AppHeader 적용 + 실사 이미지 배너 + 커뮤니티 4카드 개편 완료
+**현재 단계**: 강톡 카드 솔리드화 + 뱃지 제거 + 헤더-배너 간격 제거 완료
 
 ---
 
@@ -76,6 +76,18 @@ firebase deploy --only hosting
 ---
 
 ## 작업 로그
+
+### 2026-05-14: 강톡 카드 정리 + 헤더-배너 간격 제거 (`fix/gangtalk-card-and-spacing`)
+- **AppHeader `showSearch=false` 모드 보강**: 검색창 없는 페이지에서 wrap min-height 가 130 으로 남아 헤더 아래 공백이 컸음
+  - `.app-header-wrap.no-search { min-height: var(--app-header-height, 64px) }` 헤더만 차지
+  - `.app-header.no-search { padding-bottom: 0 }` 하단 패딩 제거
+  - 템플릿에서 `:class="{ 'no-search': !showSearch }"` 토글
+- **강톡 카드**: 배경 이미지 + 오버레이 제거, 솔리드 `#1a1a2e` 배경 + 흰색 텍스트 + 우하단 화살표만 유지
+- **힐링톡 카드**: 배경 이미지 + 강한 오버레이 제거, 솔리드 `#FFF0F5` 배경 + 핑크 텍스트 + 서비스 준비중 pill
+- **4개 카드 모두 좌상단 핑크 사각 아이콘 뱃지 완전 제거** (`.gc-badge` 마크업/CSS 삭제)
+- **배경 이미지 관련 CSS 정리**: `.gc-bg-img / .gc-overlay / .gc-overlay--strong / .gc-badge` 룰 전부 제거
+- **`.gt-slider-bar margin-top: 0`** 명시로 AppHeader 바로 아래 배너가 붙도록 보장
+- **preload 태그 제거**: `<teleport to="head">` 의 `cat-gangtok.jpg / cat-healing.jpg` 프리로드 모두 제거 (더 이상 사용 안 함)
 
 ### 2026-05-14: 강톡 탭 AppHeader + 실사 배너 + 커뮤니티 카드 개편 v2 (`feat/gangtalk-page-redesign-v2`)
 - **App.vue `hideTopBar`** 에 `'gangtalk' / 'chat'` 라우트 추가 → 강톡 탭 진입 시 전역 TopBar 숨김
