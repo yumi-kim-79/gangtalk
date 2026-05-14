@@ -2,7 +2,7 @@
 <template>
   <main class="page pp-page">
     <!-- ===== 공통 AppHeader (헤더 + 검색창) ===== -->
-    <AppHeader v-model="q" :search-placeholder="searchPH" @search="doSearch" @filter-click="openFilter" />
+    <AppHeader v-model="q" @search="doSearch" @filter-click="openFilter" />
 
     <!-- 🔸 배너 등록 버튼 (실시간 순위 아래, 배너 위) -->
     <section v-if="isEnterprise || canEdit" class="banner-cta">
@@ -581,9 +581,7 @@ function setLocalRating(id, rating){
 /* ---------- 검색 ---------- */
 const q = ref('')
 
-// 제휴관 상단 검색창 안내 문구
-// → 시술명 / 시술부위 / 이벤트 중심이지만, 실제로는 업체명·담당자명도 함께 검색됨
-const searchPH = '시술명, 시술부위, 이벤트를 입력해 보세요.'
+// 검색 placeholder 는 AppHeader 의 전역 기본값을 사용 (페이지 공통 통일)
 
 function doSearch(){
   router.replace({ query: { ...route.query, q: q.value || undefined } })

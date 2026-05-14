@@ -61,7 +61,7 @@ firebase deploy --only hosting
 - [ ] 구글플레이 등록
 - [ ] 애플 앱스토어 등록
 
-**현재 단계**: 제휴관(PartnersPage)을 가게찾기 스타일로 통일 + 실시간순위 티커 제거 완료
+**현재 단계**: 검색창 placeholder 전 페이지 통일 (AppHeader 기본값 "업체명, 지역, 업종을 검색해보세요") 완료
 
 ---
 
@@ -76,6 +76,14 @@ firebase deploy --only hosting
 ---
 
 ## 작업 로그
+
+### 2026-05-14: 검색창 placeholder 전 페이지 통일 (`fix/search-placeholder-unify`)
+- **AppHeader 기본값 유지**: `searchPlaceholder: { default: '업체명, 지역, 업종을 검색해보세요' }` (이미 통일된 상태)
+- **PartnersPage**: `<AppHeader :search-placeholder="searchPH">` → prop 제거 → 기본값 사용. `const searchPH = '시술명, 시술부위, 이벤트를 입력해 보세요.'` 상수 삭제
+- **StoreFinder**: AppHeader 에는 placeholder prop 을 전달 안 했었지만, 옛 SearchBar 시절 유산인 `const searchPlaceholder = '업체명, 담당자명을 입력해 보세요.'` 잔존 상수 삭제 (deadcode 제거)
+- **MainPage**: 변경 없음 (이미 기본값 사용 중)
+- **GangTalkPage**: `<AppHeader :show-search="false">` 라 검색창 비노출, 무관
+- **결과**: 4개 탭(현황판/가게찾기/강톡/제휴관) 의 검색창이 모두 동일 placeholder 사용
 
 ### 2026-05-14: 제휴관 가게찾기 스타일로 통일 + 실시간순위 제거 (`feat/partners-redesign`)
 - **App.vue `hideTopBar`** 에 `'partners'` 라우트 추가 → 제휴관 진입 시 TopBar 자동 숨김

@@ -642,9 +642,7 @@ function openStoreFromHot(item){
 // ───────────────────────── 검색 ───────────────────────── */
 const q = ref((route.query.q || '').toString())
 
-// 현황판(가게찾기) 상단 검색창 문구
-// → 업체명, 담당자명 중심으로 안내
-const searchPlaceholder = '업체명, 담당자명을 입력해 보세요.'
+// 검색 placeholder 는 AppHeader 의 전역 기본값을 사용 (페이지 공통 통일)
 
 function scrollToList(){ document.getElementById('list')?.scrollIntoView({ behavior:'smooth', block:'start' }) }
 const doSearch = ()=>{
