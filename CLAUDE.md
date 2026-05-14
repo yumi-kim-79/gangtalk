@@ -45,12 +45,12 @@ firebase deploy --only hosting
 - [ ] 구글플레이 등록
 - [ ] 애플 앱스토어 등록
 
-**현재 단계**: 현황판(MainPage) 전면 디자인 개편 완료
+**현재 단계**: 현황판 TopBar 정리 + 햄버거 슬라이드 메뉴 추가 완료
 
 ---
 
 ## 다음 작업
-1. 알림벨/햄버거 메뉴 페이지 연결 (현재 mypage로 폴백)
+1. 알림벨 클릭 시 별도 알림 페이지 연결 (현재 mypage로 폴백)
 2. 핫이슈 텍스트를 Firestore config에서 가져오도록 연동
 3. 별점/리뷰 카운트 실제 데이터 연동
 4. Capacitor 적용 전 웹앱 완성도 점검
@@ -59,6 +59,14 @@ firebase deploy --only hosting
 ---
 
 ## 작업 로그
+
+### 2026-05-14: 현황판 TopBar 제거 + 햄버거 슬라이드 메뉴 추가 (`fix/mainpage-header-cleanup`)
+- **App.vue**: `route.name === 'dashboard'` 일 때 `<TopBar v-if="!isDashboard">` 로 숨김 + `body.has-fixed-topbar` 클래스 자동 제거 (다른 페이지는 TopBar 정상 노출)
+- **MainPage 로고**: `<span>강톡</span>` → `BrandLogo` SVG 컴포넌트 사용 (핑크 라운디드 정사각 + 말풍선)
+- **타이틀 색상**: `var(--fg)` → 핑크 `#ff2e7e` (BrandLogo와 통일)
+- **햄버거 슬라이드 패널**: 우측에서 슬라이드 인, dimmed 외부 클릭/ESC/X 버튼으로 닫기, body scroll lock, 다크모드 대응
+- **메뉴 항목**: ❓도움말(`/help`) · 📅일정/달력(`/diary`) · 🎧고객센터(`/support`) · ❤️즐겨찾기(`/favorites`) · 로그인/로그아웃(Firebase signOut)
+- `signOut` import 추가, `menuOpen/closeMenu/menuItems/onMenuItem` 헬퍼 신설
 
 ### 2026-05-14: 현황판 메인페이지 전면 디자인 개편 (`feat/mainpage-redesign`)
 - **헤더**: 로고+타이틀+서브타이틀 / 알림벨(빨간 뱃지) + 햄버거 메뉴
