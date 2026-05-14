@@ -47,20 +47,40 @@
       </div>
     </header>
 
-    <!-- =================== 검색 + 실시간순위(티커) =================== -->
-    <section class="search-wrap search-lock sf-search-wrap">
-      <div class="sf-search-shell">
-        <SearchBar
+    <!-- =================== Search (현황판과 동일 톤) =================== -->
+    <section class="sf-search">
+      <div class="sf-search-box">
+        <svg class="sf-search-ic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <circle cx="11" cy="11" r="7"/>
+          <path d="M21 21l-4.3-4.3"/>
+        </svg>
+        <input
           v-model="q"
-          :placeholder="searchPlaceholder"
-          @submit="doSearch"
+          type="search"
+          class="sf-search-input"
+          placeholder="업체명, 지역, 업종을 검색해보세요"
+          @keyup.enter="doSearch"
+          autocomplete="off"
+          spellcheck="false"
+          aria-label="검색어"
         />
+        <button class="sf-search-filter" type="button" aria-label="필터" @click="openFilter">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <path d="M4 6h12"/>
+            <path d="M4 12h8"/>
+            <path d="M4 18h14"/>
+            <circle cx="18" cy="6" r="2" fill="currentColor"/>
+            <circle cx="14" cy="12" r="2" fill="currentColor"/>
+            <circle cx="20" cy="18" r="2" fill="currentColor"/>
+          </svg>
+        </button>
       </div>
+    </section>
 
-      <!-- 실시간 순위 (한 줄 가로 + 더보기 버튼) -->
+    <!-- =================== 실시간 순위 (가게찾기 고유, 디자인 톤만 통일) =================== -->
+    <section class="sf-search-wrap" v-if="hotRanks10.length">
       <div
         class="sf-hot"
-        v-if="hotRanks10.length"
         role="button"
         tabindex="0"
         @click="openHotSheet"
@@ -140,39 +160,33 @@
       </div>
     </section>
 
-    <!-- =================== 카테고리/필터 =================== -->
-    <section class="cats sf-cats">
-      <div class="tops-head"><div></div><div></div></div>
-
-      <!-- 카테고리 그리드 (전체 타일 = 지역 드롭다운 트리거) -->
-      <div class="cat-grid">
+    <!-- =================== Category (현황판과 동일 톤) =================== -->
+    <section class="sf-cat">
+      <div class="sf-cat-scroll">
         <button
-          v-for="c in categories"
+          v-for="c in mpCategories"
           :key="c.key"
-          class="cat"
-          :class="{ active: type===c.key }"
+          class="sf-cat-item"
+          :class="{ on: type === c.key }"
           type="button"
-          @click="c.key==='all' ? openRegionMenuFromCat($event) : setType(c.key)"
-          :ref="el => setCatRef(el)"
           :data-key="c.key"
+          :ref="(el) => setCatRef(el)"
+          @click="c.key === 'all' ? openRegionMenuFromCat($event) : setType(c.key)"
         >
-          <!-- 요청: '전체'의 아이콘/텍스트 제거, 현재 지역만 표시 -->
-          <template v-if="c.key!=='all'">
-            <div class="ico">
-              <span class="badge" v-if="c.badge">{{ c.badge }}</span>
-              <span v-else>{{ c.emoji }}</span>
-            </div>
-            <div class="lbl">{{ c.label }}</div>
-          </template>
-          <template v-else>
-            <div class="lbl">
-              <span class="lbl-region">{{ regionLabel(selectedRegion) }}</span> 🔽
-            </div>
-          </template>
+          <span class="sf-cat-ic" :class="{ on: type === c.key }" aria-hidden="true" v-html="c.iconSvg"></span>
+          <span class="sf-cat-label">
+            <template v-if="c.key === 'all'">{{ regionLabel(selectedRegion) }} 🔽</template>
+            <template v-else>{{ c.label }}</template>
+          </span>
+        </button>
+        <button class="sf-cat-expand" type="button" aria-label="더 보기" @click="expandCategories = !expandCategories">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" :style="expandCategories ? 'transform:rotate(180deg)' : ''">
+            <path d="M6 9l6 6 6-6"/>
+          </svg>
         </button>
       </div>
 
-      <!-- 지역 드롭다운(전체 타일에 앵커링) -->
+      <!-- 지역 드롭다운('전체' 칩에 앵커링) -->
       <ul
         v-if="ui.regionOpen"
         class="menu region-menu"
@@ -627,7 +641,7 @@
 <script setup>
 import { computed, ref, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import SearchBar from '@/components/SearchBar.vue'
+// SearchBar 컴포넌트 미사용 (현황판과 동일하게 직접 input 마크업으로 통일)
 import { db } from '@/firebase'
 import { collection, onSnapshot, doc, query, orderBy, setDoc, serverTimestamp, getDoc } from 'firebase/firestore'
 
@@ -659,6 +673,26 @@ onMounted(() => {
 const isLoggedIn = computed(() => !!currentUser.value)
 
 function goNotif(){ router.push({ name: 'mypage' }).catch(()=>{}) }
+
+/* ===== Category (MainPage 와 동일 톤) ===== */
+const mpCategories = [
+  { key:'all',    label:'전체',   iconSvg:'<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg>' },
+  { key:'hopper', label:'하퍼',   iconSvg:'<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h14l-2 6a5 5 0 0 1-10 0z"/><path d="M12 10v8"/><path d="M8 21h8"/></svg>' },
+  { key:'point5', label:'쩜오',   iconSvg:'<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9 13c0 1.5 1.3 2.5 3 2.5s3-1 3-2.5-1.3-2.5-3-2.5h-1l1-3h3"/></svg>' },
+  { key:'ten',    label:'텐카페', iconSvg:'<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11h14a4 4 0 0 1 0 8H3z"/><path d="M17 13h2a2 2 0 0 1 0 4h-2"/><path d="M7 4v3M11 4v3M15 4v3"/></svg>' },
+  { key:'tenpro', label:'텐프로', iconSvg:'<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87L18.18 22 12 18.56 5.82 22 7 14.14 2 9.27l6.91-1.01z"/></svg>' },
+  { key:'bar',    label:'바(Bar)', iconSvg:'<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3h14l-7 9z"/><path d="M12 12v8"/><path d="M8 21h8"/></svg>' },
+  { key:'onep',   label:'일프로', iconSvg:'<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 6h2v12"/><path d="M8 18h6"/></svg>' },
+  { key:'nrb',    label:'노래방', iconSvg:'<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="3" width="4" height="11" rx="2"/><path d="M5 11a5 5 0 0 0 10 0"/><path d="M10 16v4"/><path d="M7 20h6"/></svg>' },
+  { key:'kara',   label:'가라오케', iconSvg:'<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>' },
+  { key:'etc',    label:'기타',   iconSvg:'<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>' },
+]
+const expandCategories = ref(false)
+
+/* 검색창 필터 버튼 — 현재 카테고리/지역 전체로 초기화 */
+function openFilter(){
+  if (type.value !== 'all') setType('all')
+}
 
 const menuOpen = ref(false)
 function openMenu(){ menuOpen.value = true }
@@ -1899,32 +1933,51 @@ function toggleSort(){ ui.value.sortOpen = !ui.value.sortOpen; if(ui.value.sortO
   transition:opacity .14s ease, transform .14s ease;
 }
 
-/* ===== 검색 카드형 셸 ===== */
-.sf-search-wrap{ margin:0 16px 14px; padding:0 !important; }
-.sf-search-shell{
-  height:52px;
-  display:flex; align-items:center;
-  background:#fff;
+/* ===== Search (MainPage .mp-search 와 동일 톤) ===== */
+.sf-search{
+  padding:0 4px 10px;
+  margin:0 16px;
+}
+.sf-search-box{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  height:48px;
+  padding:0 14px;
+  background:var(--surface, #fff);
   border-radius:14px;
-  padding:0 16px;
+  box-shadow:0 2px 10px rgba(0,0,0,.05);
+  border:1px solid var(--line, #f0f0f0);
+}
+.sf-search-ic{
+  flex:none;
+  color:var(--muted, #999);
+}
+.sf-search-input{
+  flex:1;
+  min-width:0;
   border:none;
-  box-shadow:0 2px 12px rgba(0,0,0,.08);
-}
-/* SearchBar 내부 톤 보정 */
-.sf-search-shell :deep(*){ height:auto !important; }
-.sf-search-shell :deep(input){
-  font-size:15px;
-  color:#222;
+  outline:none;
   background:transparent;
-  border:none !important;
-  outline:none !important;
-  box-shadow:none !important;
-  width:100%;
+  font-size:14px;
+  color:var(--fg, #222);
+  font-weight:500;
 }
-.sf-search-shell :deep(input::placeholder){
-  color:#bbb;
-  font-weight:400;
+.sf-search-input::placeholder{ color:var(--muted, #bbb); font-weight:400; }
+.sf-search-filter{
+  flex:none;
+  background:transparent;
+  border:none;
+  width:28px; height:28px;
+  display:grid; place-items:center;
+  color:var(--muted, #999);
+  cursor:pointer;
+  padding:0;
 }
+.sf-search-filter:active{ color:var(--accent, #ff4d8d); }
+
+/* 실시간 순위 섹션 컨테이너(좌우 여백만 통일) */
+.sf-search-wrap{ margin:0 16px 14px; padding:0 !important; }
 
 /* ===== 실시간 순위 (카드형) ===== */
 .sf-hot{
@@ -2001,7 +2054,69 @@ function toggleSort(){ ui.value.sortOpen = !ui.value.sortOpen; if(ui.value.sortO
 }
 
 /* ===== 카테고리: 2줄 그리드 복원 ===== */
-.sf-cats{ padding:8px 16px 4px; }
+/* ===== Category (MainPage .mp-cat 와 동일 톤) ===== */
+.sf-cat{
+  padding:4px 0 12px;
+  margin:0 16px;
+  position:relative;
+}
+.sf-cat-scroll{
+  display:flex;
+  align-items:flex-start;
+  gap:14px;
+  overflow-x:auto;
+  padding:4px 4px 8px;
+  scrollbar-width:none;
+  -webkit-overflow-scrolling:touch;
+}
+.sf-cat-scroll::-webkit-scrollbar{ display:none; }
+.sf-cat-item{
+  flex:none;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:6px;
+  background:none;
+  border:none;
+  padding:0;
+  cursor:pointer;
+  min-width:54px;
+}
+.sf-cat-ic{
+  width:48px; height:48px;
+  border-radius:50%;
+  display:grid; place-items:center;
+  border:1.5px solid var(--line, #e8e8e8);
+  background:var(--surface, #fff);
+  color:var(--muted, #999);
+  transition:all .15s ease;
+}
+.sf-cat-ic.on{
+  background:linear-gradient(135deg, #ff6b9d, #ff4d8d);
+  border-color:transparent;
+  color:#fff;
+  box-shadow:0 4px 12px rgba(255,77,141,.3);
+}
+.sf-cat-label{
+  font-size:11px;
+  font-weight:600;
+  color:var(--muted, #999);
+}
+.sf-cat-item.on .sf-cat-label{
+  color:#ff4d8d;
+  font-weight:800;
+}
+.sf-cat-expand{
+  flex:none;
+  width:32px; height:48px;
+  border:none;
+  background:none;
+  display:grid; place-items:center;
+  color:var(--muted, #bbb);
+  cursor:pointer;
+  align-self:flex-start;
+  margin-top:0;
+}
 
 /* ===== Top5 섹션 ===== */
 .sf-tops{ padding:20px 16px; }
@@ -2091,12 +2206,12 @@ function toggleSort(){ ui.value.sortOpen = !ui.value.sortOpen; if(ui.value.sortO
   border-color:var(--line, #2a2a2a);
   color:var(--fg, #eee);
 }
-:root[data-theme="dark"] .sf-search-shell,
-:root[data-theme="black"] .sf-search-shell,
+:root[data-theme="dark"] .sf-search-box,
+:root[data-theme="black"] .sf-search-box,
 :root[data-theme="dark"] .sf-hot,
 :root[data-theme="black"] .sf-hot,
-:root[data-theme="dark"] .cat-grid .cat:not([data-key="all"]):not([data-key="spacer"]) .ico,
-:root[data-theme="black"] .cat-grid .cat:not([data-key="all"]):not([data-key="spacer"]) .ico{
+:root[data-theme="dark"] .sf-cat-ic,
+:root[data-theme="black"] .sf-cat-ic{
   background:var(--surface, #1c1c1c);
   border-color:var(--line, #2a2a2a);
 }
@@ -2258,120 +2373,7 @@ function toggleSort(){ ui.value.sortOpen = !ui.value.sortOpen; if(ui.value.sortO
 
 .menu.region-menu{ z-index:35; position:fixed; } /* 지역 메뉴는 고정 포지셔닝 */
 
-/* 카테고리 v2: 2줄 그리드 (1번 목표 디자인) */
-.cat-grid{
-  display:grid;
-  grid-template-columns:repeat(6, minmax(0, 1fr));
-  row-gap:12px;
-  column-gap:8px;
-  padding:6px 0 4px;
-}
-
-/* 두 번째 줄 첫 칸(빈 칸)용 spacer */
-.cat[data-key="spacer"]{
-  visibility:hidden;
-  pointer-events:none;
-}
-
-/* 공통: 카테고리 셀 (전체/일반 모두) */
-.cat{
-  appearance:none;
-  background:transparent;
-  border:none;
-  box-shadow:none;
-  display:flex;
-  flex-direction:column;
-  align-items:center;
-  justify-content:flex-start;
-  gap:6px;
-  padding:0;
-  color:#333;
-  height:auto;
-  transition:transform .08s ease;
-  position:relative;
-}
-.cat:active{ transform:scale(.97); }
-
-/* 일반 카테고리: 원형 아이콘 + 라벨 */
-.cat:not([data-key="all"]):not([data-key="spacer"]) .ico{
-  width:48px; height:48px;
-  border-radius:50%;
-  border:1.5px solid #eee;
-  background:#fff;
-  display:grid; place-items:center;
-  font-size:16px;
-  font-weight:800;
-  color:#666;
-  transition:all .15s ease;
-}
-.cat:not([data-key="all"]):not([data-key="spacer"]).active .ico{
-  background:linear-gradient(135deg, #ff6b9d, #ff4d8d);
-  border-color:transparent;
-  color:#fff;
-  box-shadow:0 4px 12px rgba(255,77,141,.3);
-}
-.cat:not([data-key="all"]):not([data-key="spacer"]) .lbl{
-  font-size:12px;
-  font-weight:600;
-  color:#888;
-}
-.cat:not([data-key="all"]):not([data-key="spacer"]).active .lbl{
-  color:#ff4d8d;
-  font-weight:800;
-}
-
-/* H/5/10/TP/1P 원형 배지 (아이콘 내부) */
-.ico .badge{
-  display:inline-flex; align-items:center; justify-content:center;
-  width:100%; height:100%;
-  border-radius:999px;
-  background:transparent;
-  border:none;
-  line-height:1;
-  font-weight:900;
-  font-size:15px;
-  color:inherit;
-}
-
-/* '전체' 타일: 핑크 박스 + 흰색 텍스트 */
-.cat[data-key="all"]{
-  height:64px;
-  border-radius:14px;
-  background:linear-gradient(135deg, #ff6b9d, #ff4d8d);
-  color:#fff;
-  box-shadow:0 4px 12px rgba(255,77,141,.25);
-  justify-content:center;
-}
-.cat[data-key="all"] .lbl{
-  color:#fff;
-  font-weight:800;
-  font-size:14px;
-  display:flex; align-items:center; justify-content:center;
-  gap:4px;
-}
-
-/* 공통 라벨 컨테이너 */
-.cat .lbl{
-  width:100%;
-  display:flex; align-items:center; justify-content:center;
-  gap:3px; padding:0 4px; min-width:0;
-}
-
-/* 지역명(‘전체’ 타일) — 핑크 박스 안에서 흰색 14px */
-.cat[data-key="all"] .lbl .lbl-region{
-  font-size:14px;
-  color:#fff;
-}
-.lbl-region{
-  flex:0 1 auto;
-  font-weight:900;
-  white-space:nowrap;
-  overflow:visible;
-  text-overflow:clip;
-  font-size:14px;
-  line-height:1;
-  max-width:100%;
-}
+/* (제거) 레거시 .cat-grid / .cat / .ico / .lbl-region 룰은 sf-cat-* 통합으로 모두 제거됨 */
 
 /* =============================
    Top Sections & Cards
@@ -2604,11 +2606,7 @@ function toggleSort(){ ui.value.sortOpen = !ui.value.sortOpen; if(ui.value.sortO
 /* 바텀시트를 최상단으로 */
 .action-mask{ z-index:100000; }
 
-/* 가라오케 라벨 줄바꿈만 방지 (transform/font-size 축소 룰 제거됨) */
-.cat[data-key="kara"] .lbl{
-  white-space:nowrap;
-  word-break:keep-all;
-}
+/* (제거) 옛 .cat[data-key="kara"] .lbl 룰: 마크업이 sf-cat-* 로 통합되어 더 이상 매칭되지 않음 */
 /* ── 검색창 폰트 사이즈/굵기 통일: 16px / 400 ── */
 .search-wrap :deep(input[type="search"]),
 .search-wrap :deep(input[type="text"]),
