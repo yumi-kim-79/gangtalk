@@ -61,7 +61,7 @@ firebase deploy --only hosting
 - [ ] 구글플레이 등록
 - [ ] 애플 앱스토어 등록
 
-**현재 단계**: 강톡 카드 클릭 멈춤 원인 차단 + 힐링톡/우리가게/이벤트톡 카드 클릭 비활성화 완료
+**현재 단계**: 강톡 카테고리/상세 시트 CSS 변수 미정의 멈춤 현상 수정 완료
 
 ---
 
@@ -76,6 +76,16 @@ firebase deploy --only hosting
 ---
 
 ## 작업 로그
+
+### 2026-05-15: 강톡 카테고리/상세 시트 CSS 변수 미정의 멈춤 수정 (`fix/gangtalk-sheet-mask-top`)
+- **원인 (진짜 멈춤 범인)**: `.cat-mask` 와 `.detail-mask` 의 `top: var(--gt-topbar-h)` 가 미정의 변수 참조
+  - 이전 `feat/gangtalk-page-redesign-v2` 작업에서 루트 클래스를 `<section class="wrap compact">` → `<main class="page gt-page">` 로 변경하면서 `.wrap.compact` 안에 있던 `--gt-topbar-h: 0px` 정의가 함께 사라짐
+  - `var(--gt-topbar-h)` 가 미정의 → CSS spec 상 invalid → `top` 속성 무효화 → `top: auto` 기본값 → `position: fixed` 풀스크린 시트가 viewport 상단을 기준으로 위치를 잡지 못해 비정상 표시 → 사용자에게 "멈춤"으로 인식
+- **수정**:
+  - `.cat-mask top: var(--gt-topbar-h) → top: 0`
+  - `.detail-mask top: var(--gt-topbar-h) → top: 0`
+  - `.gt-page` 에 안전망으로 `--gt-topbar-h: 0px` + `--gt-ad-h: 0px` 변수 정의 (자식 컴포넌트가 참조해도 안전하도록)
+- **다른 mask 클래스 점검**: `.chat-mask`, `.ref-mask`, `.healing-mask` 는 CSS 룰 자체 없음 (마크업만 존재) → 영향 없음. `.sheet-backdrop` 은 `var(--gt-topbar-h)` 미사용
 
 ### 2026-05-15: 강톡 카드 클릭 멈춤 차단 + 3개 카드 클릭 비활성 (`fix/gangtalk-community-click`)
 - **원인 진단 — 강톡 카드 클릭 시 화면 멈춤**:
