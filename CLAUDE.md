@@ -61,7 +61,7 @@ firebase deploy --only hosting
 - [ ] 구글플레이 등록
 - [ ] 애플 앱스토어 등록
 
-**현재 단계**: AppHeader 알림벨 실제 Firestore 알림(adminInbox) 연동 완료
+**현재 단계**: 마이페이지 심플 디자인 개편 (HeaderBar/UserSection 카드 톤, 페이지 배경 #fdf8fa) 완료
 
 ---
 
@@ -70,11 +70,32 @@ firebase deploy --only hosting
 2. 핫이슈 텍스트를 Firestore config에서 가져오도록 연동
 3. 별점/리뷰 카운트 실제 데이터 연동
 4. 힐링톡/우리가게/이벤트톡 실 서비스 오픈 준비
-5. Capacitor 적용 전 웹앱 완성도 점검
+5. CompanySection / AdminTools / ProfileEditSheet 톤도 동일하게 정리
+6. Capacitor 적용 전 웹앱 완성도 점검
 
 ---
 
 ## 작업 로그
+
+### 2026-05-15: 마이페이지 심플 디자인 개편 (`feat/mypage-redesign`)
+- **MyPage.vue**:
+  - `<AdminNotifyBell v-if="isAdmin" />` 마운트 + import 제거 (AppHeader 알림벨과 중복)
+  - HeaderBar 감싸는 `<section>` flex 컨테이너 제거 → `<HeaderBar>` 단독 배치
+  - `.page-flat.mypage-page` 배경 `#fdf8fa` 강제, 섹션 간 `margin: 0 0 16px` 일괄
+- **HeaderBar.vue 전면 교체**:
+  - `<h2>여성회원</h2>` → `.member-pill` 핑크 그라디언트 pill 뱃지 (`data-type="company"` 시 보라 그라디언트)
+  - `<button class="btn">프로필 수정</button>` → 36×36 원형 아이콘 버튼(연필 SVG)
+  - `<button class="btn">로그아웃</button>` → 회색 텍스트 링크 (`#999`, hover 핑크)
+- **UserSection.vue 디자인 톤 업**:
+  - 카드 공통: `background:#fff; border-radius:16; box-shadow:0 4px 16px rgba(0,0,0,.05); border:none`
+  - 프로필 카드: padding 20, 아바타 원형 56, 닉 17/900 / 이메일 12/회색
+  - 행 구분: `dashed var(--line)` → `1px solid #f3f3f5`, 라벨 13/500 회색, 값 14
+  - 포인트 행 값을 핑크(`#ff4d8d`) 800 강조
+  - 추천코드 박스: `font-family:monospace; padding:4 10; border:1.5px solid #ffd6e4; background:#fff5f8; color:#ff4d8d; border-radius:10`
+  - 보조 버튼: 28px 둥근 알약, hover 시 핑크 테두리
+  - **추천 리워드 promo 카드**: 연핑크 `#FFE4EF` 배경 + soft shadow, 핵심 텍스트 핑크 강조, 흰색 둥근 알약 CTA
+  - **"내 글/댓글 관리" 타일** → 메뉴 카드 (`📝 + 텍스트 + 화살표`) 패턴. 펼침 시 화살표 90° 회전
+- **결과**: 마이페이지 전체가 다른 페이지(#fdf8fa 배경 + 흰 카드 + 핑크 포인트) 와 일관된 톤
 
 ### 2026-05-15: AppHeader 알림벨 실제 알림 기능 연결 (`fix/appheader-notif-bell`)
 - **AppHeader 알림벨** 의 `notifBadge = ref(3)` 하드코딩 제거 → 실제 Firestore `adminInbox` 연동

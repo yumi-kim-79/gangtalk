@@ -206,13 +206,18 @@
       </div>
     </section>
 
-    <!-- 관리 패널 열기 버튼 -->
-    <div class="grid two">
-      <button class="tile on" type="button" @click="toggleMyPanel">
-        <span class="title">내 글/댓글 관리</span>
-        <span class="hint">{{ panel.open ? '접기' : '활동 기록 보기' }}</span>
+    <!-- 관리 메뉴 (심플한 아이콘+텍스트+화살표 행) -->
+    <div class="us-menu-card">
+      <button class="us-menu-item" type="button" @click="toggleMyPanel">
+        <span class="us-menu-ico" aria-hidden="true">📝</span>
+        <span class="us-menu-text">
+          <span class="us-menu-title">내 글/댓글 관리</span>
+          <span class="us-menu-hint">{{ panel.open ? '접기' : '활동 기록 보기' }}</span>
+        </span>
+        <svg class="us-menu-arrow" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" :style="panel.open ? 'transform:rotate(90deg)' : ''">
+          <path d="M9 6l6 6-6 6"/>
+        </svg>
       </button>
-      <span></span>
     </div>
 
     <!-- ===== 수정 모달(글) ===== -->
@@ -678,70 +683,93 @@ function ymd(ts) {
 
 <style scoped>
 .user-section {
-  padding-top: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;             /* 섹션 간 간격 통일 */
+  padding-top: 0;
 }
 
-/* 프로필 카드 */
-.profile-card {
-  padding: 14px 14px 6px;
+/* ===== 카드 공통 ===== */
+.user-section .card,
+.user-section .profile-card,
+.user-section .promo,
+.user-section .mypanel,
+.user-section .us-menu-card {
+  background: #fff;
   border-radius: 16px;
-  margin-top: 0;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.05);
+  border: none;
+  margin: 0;
+}
+
+/* ===== 프로필 카드 ===== */
+.profile-card {
+  padding: 20px;
 }
 .profile {
   display: flex;
-  gap: 12px;
+  gap: 14px;
   align-items: center;
-  padding: 6px 2px 2px;
+  padding: 0;
 }
 .avatar {
   width: 56px;
   height: 56px;
-  border-radius: 14px;
-  background-color: #ffe8f1;
+  border-radius: 50%;
+  background-color: #ffe4ef;
   background-size: cover;
   background-position: center;
   display: flex;
   align-items: center;
   justify-content: center;
   font-weight: 900;
+  font-size: 18px;
   color: inherit;
+  flex: none;
 }
 .info .nick {
-  font-size: 16px;
+  font-size: 17px;
   font-weight: 900;
+  color: #111;
+  letter-spacing: -0.2px;
 }
 .info .email {
+  margin-top: 2px;
   font-size: 12px;
-  color: var(--muted);
+  color: #999;
 }
 
+/* ===== 정보 행 (포인트/리워드/등급/진행/추천코드) ===== */
 .rows {
   list-style: none;
   padding: 0;
-  margin: 10px 0 2px 0;
+  margin: 16px 0 0 0;
 }
 .row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 2px;
-  border-top: 1px dashed var(--line);
+  padding: 14px 0;
+  border-top: 1px solid #f3f3f5;
 }
 .row:first-of-type {
   border-top: none;
+  padding-top: 6px;
 }
 .row.row-clickable {
   cursor: pointer;
-  border-radius: 10px;
+  border-radius: 0;
 }
 .row.row-clickable:active {
-  background: color-mix(in oklab, var(--bg), white 70%);
+  background: #fafafa;
 }
 .row.row-clickable:focus-visible {
-  outline: 2px solid color-mix(in oklab, var(--accent), white 70%);
+  outline: 2px solid #ffd6e4;
 }
 .key {
-  color: var(--muted);
+  font-size: 13px;
+  color: #888;
+  font-weight: 500;
   white-space: nowrap;
 }
 .val {
@@ -749,27 +777,53 @@ function ymd(ts) {
   align-items: center;
   gap: 8px;
   min-height: 24px;
+  font-size: 14px;
+  color: #222;
 }
 .val.gap {
   gap: 10px;
 }
 .val.strong {
-  font-weight: 900;
+  font-weight: 800;
 }
 .val.code b {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color: #ff4d8d;
+  font-size: 15px;
+  padding: 4px 10px;
+  border: 1.5px solid #ffd6e4;
+  border-radius: 10px;
+  background: #fff5f8;
+  letter-spacing: 0.5px;
 }
+
+/* 포인트 숫자만 핑크 강조 — '보유 포인트' 행의 .val.strong 첫 텍스트 노드 */
+.row:nth-of-type(1) .val.strong {
+  color: #ff4d8d;
+}
+
+/* 작은 보조 버튼들 */
 .btn.xs {
-  height: 26px;
-  padding: 0 10px;
-  border-radius: 8px;
-  border: 1px solid var(--line);
-  background: var(--surface);
+  height: 28px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid #f0f0f0;
+  background: #fff;
   font-size: 12px;
+  font-weight: 700;
+  color: #555;
+  cursor: pointer;
+}
+.btn.xs:hover {
+  border-color: #ffd6e4;
+  color: #ff4d8d;
 }
 .btn.xs.ghost {
   background: transparent;
+  border-color: transparent;
+  color: #888;
 }
+.btn.xs.ghost:hover { color: #ff4d8d; }
 
 /* ===== Tier Badge (브랜드 배지) ===== */
 .tier-badge {
@@ -825,38 +879,95 @@ function ymd(ts) {
   color: var(--muted);
 }
 
-/* 프로모션 */
+/* 추천 리워드 배너 — 연핑크 카드 */
 .promo {
-  margin-top: 12px;
-  padding: 12px;
+  margin: 0;
+  padding: 18px 20px;
   border-radius: 16px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  gap: 12px;
+  background: #FFE4EF !important;
+  box-shadow: 0 4px 14px rgba(255, 77, 141, 0.10) !important;
 }
 .promo .text {
-  font-size: 14px;
+  font-size: 13px;
+  color: #1a1a1a;
+  font-weight: 500;
+  line-height: 1.4;
 }
+.promo .text b { font-weight: 800; color: #ff2e7e; }
+.promo .text u { color: #ff4d8d; text-decoration: underline; font-weight: 800; }
 .btn.primary.sm {
-  height: 38px;
+  height: 36px;
   padding: 0 14px;
-  border-radius: 12px;
-  font-weight: 900;
-  border: 1px solid var(--accent);
-  background: color-mix(in oklab, var(--accent), white 85%);
+  border-radius: 999px;
+  font-weight: 800;
+  font-size: 12px;
+  background: #fff;
+  color: #ff4d8d;
+  border: none;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  white-space: nowrap;
+  flex: none;
+  cursor: pointer;
 }
 html[data-theme='white'] :where(.btn.primary.sm) {
-  background: #ff2c8a !important;
-  border-color: #ff2c8a !important;
-  color: #fff !important;
+  background: #fff !important;
+  border: none !important;
+  color: #ff4d8d !important;
 }
 
 /* 다크 모드 버튼색 보정 */
 html[data-theme='black'] :where(.btn.primary.sm) {
-  background: #555 !important;
-  border-color: #666 !important;
-  color: #fff !important;
+  background: #2a2a2a !important;
+  color: #ff8ab8 !important;
+}
+
+/* ===== 활동 관리 메뉴 카드 ===== */
+.us-menu-card { padding: 0; }
+.us-menu-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 18px 20px;
+  background: transparent;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+  font-size: 14px;
+}
+.us-menu-item:active { background: #fafafa; }
+.us-menu-ico {
+  width: 36px; height: 36px;
+  border-radius: 10px;
+  background: #fff5f8;
+  display: grid; place-items: center;
+  font-size: 16px;
+  flex: none;
+}
+.us-menu-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.us-menu-title {
+  font-size: 15px;
+  font-weight: 800;
+  color: #222;
+}
+.us-menu-hint {
+  font-size: 12px;
+  color: #999;
+}
+.us-menu-arrow {
+  color: #ccc;
+  flex: none;
+  transition: transform .15s ease;
 }
 
 /* ===== 내 활동 패널 ===== */
