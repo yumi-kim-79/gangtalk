@@ -3440,24 +3440,8 @@ onUnmounted(() => {
 .r-right{ gap:4px }        /* 이름줄~지표 간 간격 최소화 */
 .metric-wide{ gap:6px }    /* 지표 3칸 사이 간격 살짝 축소 */
 .metric.big{ height:48px } /* 지표 상자 높이 소폭 축소(52→48) */
-/* ▼ 글씨 크기 & 두께 통일 — 요청 반영 */
-/* 1) 검색창: 입력/플레이스홀더 모두 크게, 얇게 */
-:deep(input[type="search"]),
-:deep(.search-input),
-:deep(.searchbar input),
-:deep(.search input[type="text"]) {
-  font-size: 16px !important;
-  font-weight: 300 !important;   /* 얇게 */
-  line-height: 1.2 !important;
-}
-:deep(input[type="search"]::placeholder),
-:deep(.search-input::placeholder),
-:deep(.searchbar input::placeholder),
-:deep(.search input::placeholder) {
-  font-size: 16px !important;
-  font-weight: 300 !important;   /* 얇게 */
-  opacity: .65 !important;
-}
+/* (제거됨) 1) 검색창 input 강제 룰 — AppHeader 컴포넌트의 .app-search-input 톤을 덮어써
+   페이지마다 검색창 글씨 크기/두께가 달라지던 문제 해결을 위해 일괄 삭제 */
 
 /* 2) 업체명 / 위치·유형(비율 맞춰 키우고 얇게) */
 .info-name{

@@ -61,7 +61,7 @@ firebase deploy --only hosting
 - [ ] 구글플레이 등록
 - [ ] 애플 앱스토어 등록
 
-**현재 단계**: 검색창 placeholder 전 페이지 통일 (AppHeader 기본값 "업체명, 지역, 업종을 검색해보세요") 완료
+**현재 단계**: 검색창 input 스타일 단일 톤 강제 + 페이지별 :deep(input) 덮어쓰기 룰 제거 완료
 
 ---
 
@@ -76,6 +76,18 @@ firebase deploy --only hosting
 ---
 
 ## 작업 로그
+
+### 2026-05-14: 검색창 input 스타일 페이지 통일 (`fix/mainpage-search-input-style`)
+- **원인 진단**: MainPage `:deep(input[type="search"])` 룰이 `font-size:16px !important; font-weight:300 !important;` + placeholder opacity 0.65 로 AppHeader 의 `.app-search-input` (font-size:14, weight:500) 을 덮어써 현황판에서만 검색창 글씨가 다르게 보였음
+- **MainPage**: 검색창 input 강제 룰 (`:deep(input[type="search"]), :deep(.search-input), :deep(.searchbar input), :deep(.search input[type="text"])` + placeholder 변종 4개) 일괄 삭제
+- **StoreFinder**: 동일한 deadcode `.search-wrap :deep(input)` 룰 삭제 (AppHeader 마이그레이션 후 `.search-wrap` 마크업 자체가 없어 매칭 안 됐지만 향후 오염 차단)
+- **AppHeader**: `.app-search-input` 톤 단일 강제 (`!important`)
+  - `font-size: 15px`
+  - `color: var(--fg, #333)`
+  - `font-weight: 500`
+  - `line-height: 1.2`
+  - placeholder: `color: #aaa; font-weight: 400; font-size: 15px; opacity: 1`
+- **결과**: 4개 탭(현황판/가게찾기/강톡 검색창은 비노출/제휴관) 검색창 글씨가 모두 동일한 톤
 
 ### 2026-05-14: 검색창 placeholder 전 페이지 통일 (`fix/search-placeholder-unify`)
 - **AppHeader 기본값 유지**: `searchPlaceholder: { default: '업체명, 지역, 업종을 검색해보세요' }` (이미 통일된 상태)

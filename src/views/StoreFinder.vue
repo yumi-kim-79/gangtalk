@@ -2383,18 +2383,7 @@ function toggleSort(){ ui.value.sortOpen = !ui.value.sortOpen; if(ui.value.sortO
 .action-mask{ z-index:100000; }
 
 /* (제거) 옛 .cat[data-key="kara"] .lbl 룰: 마크업이 sf-cat-* 로 통합되어 더 이상 매칭되지 않음 */
-/* ── 검색창 폰트 사이즈/굵기 통일: 16px / 400 ── */
-.search-wrap :deep(input[type="search"]),
-.search-wrap :deep(input[type="text"]),
-.search-wrap :deep(input) {
-  font-size: 16px !important;
-  font-weight: 300 !important;
-}
-.search-wrap :deep(input::placeholder) {
-  font-size: 16px !important;
-  font-weight: 300 !important;   /* 더 얇게 */
-  opacity: .65 !important;       /* 살짝 더 옅게 */
-}
+/* (제거) 옛 .search-wrap :deep(input) 룰: AppHeader 마이그레이션 이후 마크업 자체가 없어 매칭되지 않음. AppHeader 의 .app-search-input 톤만 사용. */
 /* ===== 운영자 순서 편집 툴바(기준과 동일) - 맨 아래에 추가 ===== */
 .orders-head{ margin:6px 0 4px; }
 .orders-head .rank-tools{

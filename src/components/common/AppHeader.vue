@@ -276,11 +276,18 @@ watch(menuOpen, (on) => {
   border:none;
   outline:none;
   background:transparent;
-  font-size:14px;
-  color:var(--fg, #222);
-  font-weight:500;
+  /* 페이지 전역 CSS 가 input 을 덮어쓰는 경우가 잦아 단일 톤을 강제한다 */
+  font-size:15px !important;
+  color:var(--fg, #333) !important;
+  font-weight:500 !important;
+  line-height:1.2 !important;
 }
-.app-search-input::placeholder{ color:var(--muted, #bbb); font-weight:400; }
+.app-search-input::placeholder{
+  color:#aaa !important;
+  font-weight:400 !important;
+  font-size:15px !important;
+  opacity:1 !important;
+}
 .app-search-filter{
   flex:none;
   background:transparent;
