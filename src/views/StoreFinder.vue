@@ -1833,6 +1833,10 @@ function toggleSort(){ ui.value.sortOpen = !ui.value.sortOpen; if(ui.value.sortO
 .sf-header{
   display:flex; align-items:center; justify-content:space-between;
   gap:10px; padding:8px 4px 12px;
+  position:sticky;
+  top:env(safe-area-inset-top, 0);
+  z-index:100;
+  background:var(--bg, #fafafa);
 }
 .sf-brand{ display:flex; align-items:center; gap:10px; min-width:0; }
 .sf-brand-logo-img{
@@ -2012,12 +2016,13 @@ function toggleSort(){ ui.value.sortOpen = !ui.value.sortOpen; if(ui.value.sortO
   box-shadow:0 4px 12px rgba(255,77,141,.3);
 }
 .sf-cat-scroll :deep(.cat .lbl){
-  font-size:11px;
-  font-weight:600;
-  color:var(--muted, #999);
+  font-size:11px !important;
+  font-weight:600 !important;
+  color:var(--muted, #999) !important;
 }
 .sf-cat-scroll :deep(.cat.active .lbl){
-  color:#ff4d8d; font-weight:800;
+  color:#ff4d8d !important;
+  font-weight:800 !important;
 }
 
 /* ===== Top5 섹션 ===== */
@@ -2228,10 +2233,11 @@ function toggleSort(){ ui.value.sortOpen = !ui.value.sortOpen; if(ui.value.sortO
   --cat-ico:      12px;
 }
 
-/* 카테고리 그리드: 위·아래 행 간격 줄이기 */
+/* 카테고리 가로 스크롤 (새 디자인 sf-cat-scroll 과 충돌 방지) */
 .cat-grid{
-  display:grid;
-  grid-template-columns:repeat(6, minmax(0,1fr));
+  display:flex;
+  flex-wrap:nowrap;
+  overflow-x:auto;
   row-gap:4px;
   column-gap:6px;
   padding:0;
@@ -2295,15 +2301,7 @@ function toggleSort(){ ui.value.sortOpen = !ui.value.sortOpen; if(ui.value.sortO
   font-size: calc(var(--cat-font) + 1px);
 }
 
-/* 카테고리 라벨(전체 제외) = 현재 크기의 절반 */
-.cat[data-key]:not([data-key="all"]) .lbl{
-  font-size: calc(var(--cat-font) * .5) !important;
-}
-
-/* ▶ ‘전체(지역)’을 제외한 카테고리 라벨을 절반 크기로 */
-.cat:not([data-key="all"]) .lbl{
-  font-size: calc(var(--cat-font) * .5);  /* 지금의 1/2 */
-}
+/* (제거) 레거시 .cat .lbl 폰트 강제 룰은 sf-cat-scroll 새 디자인에 양보 */
 
 /* 그대로 사용 (전체/일반 모두 공통 컨테이너) */
 /* ▶ 라벨은 살짝 위 여백을 줘서 원이 잘려 보이지 않게 */

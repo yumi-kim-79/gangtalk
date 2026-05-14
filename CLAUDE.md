@@ -45,7 +45,7 @@ firebase deploy --only hosting
 - [ ] 구글플레이 등록
 - [ ] 애플 앱스토어 등록
 
-**현재 단계**: 가게찾기 전면 디자인 개편 + 현황판 CTA Auth 타이밍 수정 완료
+**현재 단계**: 가게찾기 카테고리 CSS 충돌 수정 + 헤더 sticky 처리 완료
 
 ---
 
@@ -59,6 +59,12 @@ firebase deploy --only hosting
 ---
 
 ## 작업 로그
+
+### 2026-05-14: 가게찾기 카테고리 CSS 충돌 수정 + 헤더 sticky (`fix/storefinder-category-css`)
+- **레거시 `.cat-grid` grid → flex**: `display:grid` + `grid-template-columns:repeat(6,...)` 제거, `display:flex; flex-wrap:nowrap; overflow-x:auto;` 로 교체해 새 `sf-cat-scroll` 가로 스크롤과 일관
+- **레거시 `.cat .lbl` 폰트 강제 룰 삭제**: `.cat[data-key]:not([data-key="all"]) .lbl{ font-size: calc(var(--cat-font)*.5) !important }` + `.cat:not([data-key="all"]) .lbl{ ... }` 두 룰 완전 제거 (라벨이 ~4.3px 로 축소되던 버그 해결)
+- **새 디자인 `.sf-cat-scroll :deep(.cat .lbl)` 에 `!important` 추가**: 다른 외부 CSS 가 다시 덮어쓰지 못하도록 font-size/weight/color 모두 보강
+- **`.sf-header` sticky 처리**: `position:sticky; top:env(safe-area-inset-top,0); z-index:100; background:var(--bg,#fafafa)` 추가 — 스크롤 시 헤더가 상단에 고정되도록
 
 ### 2026-05-14: 가게찾기 디자인 개편 v2 + CTA Auth 타이밍 수정 (`feat/storefinder-redesign-v2`)
 - **MainPage CTA 타이밍 수정**: Firebase Auth 초기화 직후 `currentUser` 가 잠시 `null` 로 읽혀 CTA 가 깜빡이던 문제 해결
