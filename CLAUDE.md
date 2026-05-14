@@ -45,7 +45,7 @@ firebase deploy --only hosting
 - [ ] 구글플레이 등록
 - [ ] 애플 앱스토어 등록
 
-**현재 단계**: 현황판 TopBar 정리 + 햄버거 슬라이드 메뉴 추가 완료
+**현재 단계**: 현황판 로고 이미지화 + 카드형 드롭다운 메뉴 + 도움말 전체 삭제 완료
 
 ---
 
@@ -59,6 +59,19 @@ firebase deploy --only hosting
 ---
 
 ## 작업 로그
+
+### 2026-05-14: 로고 이미지화 + 카드형 드롭다운 + 도움말 삭제 + CTA 정리 (`feat/mainpage-logo-menu-cta`)
+- **헤더 로고**: `BrandLogo` SVG → `<img src="/icons/icon-192.png">` (48×48px, border-radius 12px)
+- **타이틀 크기**: 18px → 20px, 핑크(#ff2e7e) 유지
+- **서브타이틀**: 11px → 12px
+- **햄버거 메뉴**: 전체화면 슬라이드 패널 → 우측 상단 카드형 드롭다운 (width 200px, border-radius 16px, scale+opacity 진입 애니메이션, 항목 간 얇은 구분선)
+- **외부 클릭/ESC 닫힘**: `document.addEventListener('click')` + ESC 핸들러, scroll lock 제거
+- **도움말 완전 삭제**:
+  - 메뉴 항목 4개로 축소: 일정/달력 · 고객센터 · 즐겨찾기 · 로그인/로그아웃
+  - `TopBar.vue`: 도움말 버튼 + `.round-icon.help` CSS 제거
+  - `router/index.js`: `/help` 라우트 제거, `publicForGuests`에서 `'help'` 제거, 주석 갱신
+  - `src/pages/HelpPage.vue`: 파일 삭제 (`ConsultHelpPage.vue`는 별개 기능이므로 유지)
+- **CTA 배너**: 명세 정렬 — ✨를 좌측 맨 위로, 그라디언트 → 단색 `#FFE4EF`, 패딩 18px 20px, 타이틀 색 진하게
 
 ### 2026-05-14: 현황판 TopBar 제거 + 햄버거 슬라이드 메뉴 추가 (`fix/mainpage-header-cleanup`)
 - **App.vue**: `route.name === 'dashboard'` 일 때 `<TopBar v-if="!isDashboard">` 로 숨김 + `body.has-fixed-topbar` 클래스 자동 제거 (다른 페이지는 TopBar 정상 노출)
