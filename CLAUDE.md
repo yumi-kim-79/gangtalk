@@ -45,7 +45,7 @@ firebase deploy --only hosting
 - [ ] 구글플레이 등록
 - [ ] 애플 앱스토어 등록
 
-**현재 단계**: 가게찾기 카테고리 CSS 충돌 수정 + 헤더 sticky 처리 완료
+**현재 단계**: 가게찾기 전체 UI 톤 일괄 업그레이드 완료 (배경/헤더/검색/순위/배너/카테고리 2줄/Top5)
 
 ---
 
@@ -59,6 +59,24 @@ firebase deploy --only hosting
 ---
 
 ## 작업 로그
+
+### 2026-05-14: 가게찾기 전체 UI 톤 업그레이드 (`feat/storefinder-ui-polish`)
+- **배경**: `var(--bg)` → `#fdf8fa` 밝은 연핑크 흰색
+- **`.page` 패딩**: `8px 12px` → `0 0 ...` (각 섹션이 좌우 16px 여백 직접 책임)
+- **헤더**: 패딩 8/4 → 16/20, 로고 48→52, 타이틀 20→22, 서브 12→13, 아이콘 버튼 38→40 + `border:1.5px solid #eee` + `background:#fff`, 뱃지 색 `#ff3d3d` 빨간 원
+- **검색**: 높이 52px, 패딩 `0 16px`, radius 14, 흰색 + `box-shadow:0 2px 12px rgba(0,0,0,.08)`, SearchBar 내부 input 폰트 15px
+- **실시간 순위**: 카드형 (흰색, radius 12, padding 12/16, `box-shadow:0 2px 10px`), 핑크 원형 22px 뱃지, 점 구분자 자동(::before "·"), 더보기 13px
+- **광고 배너**: 좌우 여백 16, banner radius 16, `banner-img height 180px`, 인디케이터 active pill 형태
+- **카테고리 v2 (2줄 그리드 복원)**:
+  - HTML 에서 `sf-cat-scroll` 클래스 제거, `.cat-grid{ display:grid; grid-template-columns:repeat(6,1fr); row-gap:12, column-gap:8 }`
+  - 공통 `.cat` 박스/테두리/그림자 제거, transparent
+  - `[data-key="all"]` = 핑크 그라디언트 박스 64px + 흰 텍스트 14px (지역명 + 🔽)
+  - 일반 카테고리 = 원형 48×48 흰 배경 + 1.5px `#eee` 테두리 + 16px 굵은 글자
+  - `.active` 일반 = 원형 핑크 그라디언트 + 흰 글자 + 라벨 핑크 800
+  - 레거시 `transform:scale(.8)` 라벨 축소 룰 + `font-size: calc(var(--cat-font)*.85)` 등 제거
+- **Top5**: 섹션 패딩 `20px 16px`, 헤더 17px, 카드 min-width 200, radius 14, image height 140 (padding-top 비율 → 고정 px), meta padding 12, 업체명 16/800, 일급 14/900 `#ff2e7e`, 담당자 12/`#888`, soft shadow `0 4px 14px`
+- **List Head**: 좌우 여백 16 통일
+- **다크모드 보정**: `sf-page / sf-header` 배경 var(--bg), `sf-icon-btn` 다크 surface, 카테고리 일반 아이콘 ico 다크 배경
 
 ### 2026-05-14: 가게찾기 카테고리 CSS 충돌 수정 + 헤더 sticky (`fix/storefinder-category-css`)
 - **레거시 `.cat-grid` grid → flex**: `display:grid` + `grid-template-columns:repeat(6,...)` 제거, `display:flex; flex-wrap:nowrap; overflow-x:auto;` 로 교체해 새 `sf-cat-scroll` 가로 스크롤과 일관
