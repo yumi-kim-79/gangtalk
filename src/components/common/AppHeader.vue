@@ -87,9 +87,14 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { getAuth, onAuthStateChanged, signOut } from 'firebase/auth'
+import { db as fbDb } from '@/firebase'
+import {
+  collection, doc, onSnapshot, query, where, orderBy, limit,
+  updateDoc, serverTimestamp, getDocs,
+} from 'firebase/firestore'
 
 const props = defineProps({
   modelValue:        { type: String,  default: '' },
@@ -103,12 +108,7 @@ function onInput(e){ emit('update:modelValue', e.target.value) }
 const router = useRouter()
 const auth   = getAuth()
 
-const notifBadge = ref(3)
-function openNotif(){
-  router.push({ name: 'mypage' }).catch(()=>{})
-}
-
-/* Auth 상태 (메뉴 항목 분기용) */
+/* Auth 상태 (메뉴 항목 분기 + 알림 뱃지용) */
 const currentUser = ref(undefined)
 const isAuthReady = ref(false)
 onMounted(() => {
@@ -117,7 +117,102 @@ onMounted(() => {
     if (!isAuthReady.value) isAuthReady.value = true
   })
 })
+
+/* ===== 알림벨 (관리자 인박스 기반) =====
+ * 현재 서비스에는 일반 사용자용 알림 컬렉션이 없고 adminInbox 만 존재.
+ *  - 비로그인: 뱃지 안 보임
+ *  - 로그인 + 비관리자: 뱃지 0
+ *  - 로그인 + 관리자: adminInbox.where('unread', '==', true) 카운트
+ * 클릭 시 markAllRead() 후 /mypage?view=apps 로 이동 (AdminNotifyBell 과 동일 동작)
+ */
+const isAdmin = ref(false)
+const unreadCount = ref(0)
+let unsubAdmin = null
+let unsubInbox = null
+
+function stopInbox(){
+  if (unsubInbox) { try { unsubInbox() } catch {} ; unsubInbox = null }
+  unreadCount.value = 0
+}
+function watchInbox(){
+  stopInbox()
+  const qInbox = query(
+    collection(fbDb, 'adminInbox'),
+    where('unread', '==', true),
+    orderBy('createdAt', 'desc'),
+    limit(50),
+  )
+  unsubInbox = onSnapshot(
+    qInbox,
+    (snap) => { unreadCount.value = snap.size },
+    () => { unreadCount.value = 0 },
+  )
+}
+function stopAdmin(){
+  if (unsubAdmin) { try { unsubAdmin() } catch {} ; unsubAdmin = null }
+  isAdmin.value = false
+  stopInbox()
+}
+function watchAdmin(uid){
+  stopAdmin()
+  if (!uid) return
+  const ref = doc(fbDb, 'admins', String(uid))
+  unsubAdmin = onSnapshot(
+    ref,
+    (snap) => {
+      const next = snap.exists()
+      isAdmin.value = next
+      if (next) watchInbox()
+      else stopInbox()
+    },
+    () => { isAdmin.value = false; stopInbox() },
+  )
+}
+watch(currentUser, (u) => {
+  if (u?.uid) watchAdmin(u.uid)
+  else stopAdmin()
+}, { immediate: false })
+
+onBeforeUnmount(() => { stopAdmin() })
+
 const isLoggedIn = computed(() => !!currentUser.value)
+/* 뱃지 표시 규칙:
+ *  - 비로그인이면 0 (템플릿 v-if 로 숨김)
+ *  - 관리자면 실제 unreadCount
+ *  - 비관리자면 0
+ */
+const notifBadge = computed(() => {
+  if (!isLoggedIn.value) return 0
+  if (!isAdmin.value) return 0
+  return Number(unreadCount.value || 0)
+})
+
+async function markAllRead(){
+  try {
+    const qUnread = query(
+      collection(fbDb, 'adminInbox'),
+      where('unread', '==', true),
+      limit(25),
+    )
+    const s = await getDocs(qUnread)
+    const ps = []
+    s.forEach((d) => ps.push(
+      updateDoc(doc(fbDb, 'adminInbox', d.id), { unread: false, readAt: serverTimestamp() })
+    ))
+    await Promise.allSettled(ps)
+  } catch {}
+}
+
+async function openNotif(){
+  // 관리자: 미읽음 일괄 처리 후 /mypage?view=apps
+  if (isLoggedIn.value && isAdmin.value) {
+    await markAllRead()
+    router.push({ path: '/mypage', query: { view: 'apps' } }).catch(() => {})
+    return
+  }
+  // 비관리자: 마이페이지로
+  router.push({ name: 'mypage' }).catch(() => {})
+}
 
 /* 햄버거 카드형 드롭다운 메뉴 */
 const menuOpen = ref(false)

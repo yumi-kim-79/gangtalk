@@ -61,12 +61,12 @@ firebase deploy --only hosting
 - [ ] 구글플레이 등록
 - [ ] 애플 앱스토어 등록
 
-**현재 단계**: 5개 탭(현황판/가게찾기/강톡/제휴관/마이페이지) AppHeader 적용 완료 — 전 탭 헤더 통일 완성
+**현재 단계**: AppHeader 알림벨 실제 Firestore 알림(adminInbox) 연동 완료
 
 ---
 
 ## 다음 작업
-1. 알림벨 클릭 시 별도 알림 페이지 연결 (현재 AppHeader 내부에서 mypage로 폴백)
+1. 일반 사용자용 알림 컬렉션(user_inbox 등) 신설 검토 — 현재는 관리자 전용
 2. 핫이슈 텍스트를 Firestore config에서 가져오도록 연동
 3. 별점/리뷰 카운트 실제 데이터 연동
 4. 힐링톡/우리가게/이벤트톡 실 서비스 오픈 준비
@@ -75,6 +75,17 @@ firebase deploy --only hosting
 ---
 
 ## 작업 로그
+
+### 2026-05-15: AppHeader 알림벨 실제 알림 기능 연결 (`fix/appheader-notif-bell`)
+- **AppHeader 알림벨** 의 `notifBadge = ref(3)` 하드코딩 제거 → 실제 Firestore `adminInbox` 연동
+  - `currentUser` (auth watch) 변화 시 `admins/{uid}` 문서 존재 여부 구독 → `isAdmin`
+  - `isAdmin === true` 일 때만 `adminInbox.where('unread','==',true).orderBy('createdAt','desc').limit(50)` 구독 → `unreadCount`
+  - `notifBadge` computed: 비로그인 0 / 비관리자 0 / 관리자 = `unreadCount`
+  - 클릭 시 관리자면 `markAllRead()` (미읽음 25건 batch `updateDoc unread:false, readAt: serverTimestamp()`) 후 `router.push('/mypage?view=apps')`. 비관리자/비로그인은 그냥 `/mypage` 이동
+- **자원 정리**: `onBeforeUnmount` 에서 admin/inbox watch 모두 해제
+- **참고**: 현재 일반 사용자용 알림 컬렉션이 없어(`user_inbox` 등 미존재) 비관리자 뱃지는 0. 향후 신설 시 같은 자리에서 분기만 추가하면 됨
+- **로그인 여부 분기**: 뱃지 자체가 `notifBadge > 0` 일 때만 표시되므로 비로그인 시 자동으로 안 보임 (`v-if="notifBadge > 0"`)
+- **레거시 컴포넌트**: `AdminNotifyBell.vue` / `BellButton.vue` 는 별도 사용처에서 그대로 동작 (이번 변경 없음)
 
 ### 2026-05-14: 마이페이지 상단 AppHeader 적용 (`feat/mypage-appheader`)
 - **App.vue `hideTopBar`** 에 `'mypage'` 라우트 추가 → 마이페이지 진입 시 TopBar 자동 숨김
