@@ -1,17 +1,65 @@
 <!-- views/StoreFinder.vue -->
 <template>
-  <main class="page">
-    <!-- =================== 검색 + 실시간순위(티커) =================== -->
-    <section class="search-wrap search-lock">
-      <SearchBar
-        v-model="q"
-        :placeholder="searchPlaceholder"
-        @submit="doSearch"
-      />
+  <main class="page sf-page">
+    <!-- =================== Header (MainPage 와 동일 톤) =================== -->
+    <header class="sf-header">
+      <div class="sf-brand">
+        <img class="sf-brand-logo-img" src="/icons/icon-192.png" alt="강톡" width="48" height="48" decoding="async" />
+        <div class="sf-brand-text">
+          <h1 class="sf-brand-title">강남톡방</h1>
+          <p class="sf-brand-sub">강남의 모든 공간, 한눈에.</p>
+        </div>
+      </div>
+      <div class="sf-header-actions">
+        <button class="sf-icon-btn" type="button" aria-label="알림" @click="goNotif">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M18 16v-5a6 6 0 1 0-12 0v5l-2 3h16z"/>
+            <path d="M10 21a2 2 0 0 0 4 0"/>
+          </svg>
+          <span v-if="notifBadge > 0" class="sf-bell-badge">{{ notifBadge }}</span>
+        </button>
+        <div class="sf-menu-anchor">
+          <button class="sf-icon-btn" type="button" aria-label="메뉴" aria-haspopup="true" :aria-expanded="menuOpen" @click.stop="toggleMenu">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+              <path d="M4 7h16M4 12h16M4 17h16"/>
+            </svg>
+          </button>
+          <transition name="sf-dd">
+            <div v-if="menuOpen" class="sf-menu-card" role="menu" @click.stop>
+              <button
+                v-for="(m, i) in menuItems"
+                :key="m.key"
+                class="sf-menu-row"
+                :class="{ divider: i > 0 }"
+                type="button"
+                role="menuitem"
+                @click="onMenuItem(m)"
+              >
+                <span class="sf-menu-emoji" aria-hidden="true">{{ m.emoji }}</span>
+                <span class="sf-menu-label">{{ m.label }}</span>
+                <svg class="sf-menu-arrow" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                  <path d="M9 6l6 6-6 6"/>
+                </svg>
+              </button>
+            </div>
+          </transition>
+        </div>
+      </div>
+    </header>
 
-      <!-- 실시간 순위 (상단 티커: 1줄씩 세로 스크롤) -->
+    <!-- =================== 검색 + 실시간순위(티커) =================== -->
+    <section class="search-wrap search-lock sf-search-wrap">
+      <div class="sf-search-shell">
+        <SearchBar
+          v-model="q"
+          :placeholder="searchPlaceholder"
+          @submit="doSearch"
+        />
+      </div>
+
+      <!-- 실시간 순위 (한 줄 가로 + 더보기 버튼) -->
       <div
-        class="hot-box"
+        class="sf-hot"
         v-if="hotRanks10.length"
         role="button"
         tabindex="0"
@@ -19,28 +67,22 @@
         @keydown.enter.prevent="openHotSheet"
         @keydown.space.prevent="openHotSheet"
       >
-        <div class="hot-ticker nowrap">
-          <span class="hot-label">실시간순위</span>
-          <span class="hot-sep">:</span>
-
-          <div class="ticker-window" aria-label="실시간 순위">
-            <ul class="ticker-list" :style="tickerStyle">
-              <li
-                v-for="(s, i) in loopedRanks"
-                :key="`hr_${i}_${s.id || s.name}`"
-                class="ticker-item"
-                @click.stop="openHotSheet"
-              >
-                <span class="badge-rank" :data-rank="displayRank(i)">{{ displayRank(i) }}</span>
-                <!-- 요청: 업체명은 줄임표 금지, 전체 노출 -->
-                <span class="name">{{ s.name }}</span>
-                <span class="dot">·</span>
-                <!-- 내용만 줄임표 -->
-                <span class="intro ellip1">{{ s.intro }}</span>
-              </li>
-            </ul>
-          </div>
+        <span class="sf-hot-label">실시간 순위</span>
+        <div class="sf-hot-window" aria-label="실시간 순위">
+          <ul class="sf-hot-list ticker-list" :style="tickerStyle">
+            <li
+              v-for="(s, i) in loopedRanks"
+              :key="`hr_${i}_${s.id || s.name}`"
+              class="sf-hot-item ticker-item"
+              @click.stop="openHotSheet"
+            >
+              <span class="sf-rank-badge">{{ displayRank(i) }}</span>
+              <span class="sf-hot-name">{{ s.name }}</span>
+              <span class="sf-hot-intro ellip1" v-if="s.intro">{{ s.intro }}</span>
+            </li>
+          </ul>
         </div>
+        <button class="sf-hot-more" type="button" @click.stop="openHotSheet">더보기 ›</button>
       </div>
     </section>
 
@@ -63,7 +105,7 @@
     </section>
 
     <!-- =================== 배너(실사) =================== -->
-    <section class="banners" v-if="oneBanner.length">
+    <section class="banners sf-banners" v-if="oneBanner.length">
       <article
         v-for="b in oneBanner"
         :key="b.id || b._key || b.title"
@@ -90,14 +132,20 @@
           {{ t }}
         </span>
       </article>
+      <!-- 핑크 인디케이터 (배너가 1장이지만 점 3개 시각 디자인 통일용) -->
+      <div class="sf-banner-dots" aria-hidden="true">
+        <span class="dot active"></span>
+        <span class="dot"></span>
+        <span class="dot"></span>
+      </div>
     </section>
 
     <!-- =================== 카테고리/필터 =================== -->
-    <section class="cats">
+    <section class="cats sf-cats">
       <div class="tops-head"><div></div><div></div></div>
 
       <!-- 카테고리 그리드 (전체 타일 = 지역 드롭다운 트리거) -->
-      <div class="cat-grid">
+      <div class="cat-grid sf-cat-scroll">
         <button
           v-for="c in categories"
           :key="c.key"
@@ -173,25 +221,27 @@
         </section>
 
         <!-- =================== 카테고리 인기 순위 =================== -->
-        <section class="tops">
+        <section class="tops sf-tops">
           <div class="tops-head">
             <!-- 글씨만 제거, 레이아웃 유지 -->
             <h3 class="sec-ttl"></h3>
           </div>
 
-      <div v-for="sec in topLists" :key="sec.key" class="top-sec">
-        <div class="top-head">
-          <span class="ttl">{{ sec.label }} Top 5</span>
-
-          <!-- ✅ Top5 등록 버튼: 제목 오른쪽 (기업회원만 보임) -->
-          <button
-            v-if="isEnterprise"
-            class="pink-cta top5-btn"
-            type="button"
-            @click="toggleBizCreate($event)"
-          >
-            Top5 등록
-          </button>
+      <div v-for="sec in topLists" :key="sec.key" class="top-sec sf-top-sec">
+        <div class="top-head sf-top-head">
+          <span class="ttl sf-top-ttl"><span class="spark" aria-hidden="true">✨</span> {{ sec.label }} Top 5</span>
+          <div class="sf-top-actions">
+            <!-- ✅ Top5 등록 버튼: 제목 오른쪽 (기업회원만 보임) -->
+            <button
+              v-if="isEnterprise"
+              class="pink-cta top5-btn"
+              type="button"
+              @click="toggleBizCreate($event)"
+            >
+              Top5 등록
+            </button>
+            <button class="sf-top-more" type="button" @click="setType(sec.key); scrollToList()">더보기 ›</button>
+          </div>
         </div>
         <div class="top-row">
           <button
@@ -258,7 +308,7 @@
     </section>
 
     <!-- =================== 상단 목록 헤드/툴 =================== -->
-   <section class="list-head" id="list">
+   <section class="list-head sf-list-head" id="list">
      <!-- “총 N개” 제거하고 정렬만 좌측에 배치 -->
      <div class="filter-row only-sort">
        <!-- 📌 정렬(티시 높은순 등) 버튼: 왼쪽 -->
@@ -582,7 +632,7 @@ import { db } from '@/firebase'
 import { collection, onSnapshot, doc, query, orderBy, setDoc, serverTimestamp, getDoc } from 'firebase/firestore'
 
 import { getStorage, ref as sRef, getDownloadURL } from 'firebase/storage'
-import { getAuth, onAuthStateChanged } from 'firebase/auth'
+import { getAuth, onAuthStateChanged, signOut } from 'firebase/auth'
 import { useMarketingBanners } from '@/composables/useMarketingBanners'   // ⬅️ 추가
 import { useNearby } from '@/composables/useNearby'
 import StoreQuickCreate from '@/components/biz/StoreQuickCreate.vue'
@@ -595,6 +645,64 @@ const router = useRouter()
 const route  = useRoute()
 const storage = getStorage()
 const auth = getAuth()
+
+/* ───────────────────────── 새 헤더(MainPage 톤) ───────────────────────── */
+const notifBadge = ref(0)
+const currentUser = ref(undefined)
+const isAuthReady = ref(false)
+onMounted(() => {
+  onAuthStateChanged(auth, (u) => {
+    currentUser.value = u || null
+    if (!isAuthReady.value) isAuthReady.value = true
+  })
+})
+const isLoggedIn = computed(() => !!currentUser.value)
+
+function goNotif(){ router.push({ name: 'mypage' }).catch(()=>{}) }
+
+const menuOpen = ref(false)
+function openMenu(){ menuOpen.value = true }
+function closeMenu(){ menuOpen.value = false }
+function toggleMenu(){ menuOpen.value = !menuOpen.value }
+
+const menuItems = computed(() => {
+  const base = [
+    { key:'diary',     emoji:'📅', label:'일정/달력', to:{ path:'/diary' } },
+    { key:'support',   emoji:'🎧', label:'고객센터', to:{ name:'support' } },
+    { key:'favorites', emoji:'❤️', label:'즐겨찾기', to:{ name:'favorites' } },
+  ]
+  base.push(
+    isLoggedIn.value
+      ? { key:'logout', emoji:'🚪', label:'로그아웃', action:'logout' }
+      : { key:'login',  emoji:'🔑', label:'로그인',   to:{ name:'auth' } }
+  )
+  return base
+})
+
+async function onMenuItem(m){
+  closeMenu()
+  if (m.action === 'logout') {
+    try { await signOut(auth) } catch (e) { console.warn('signOut error:', e) }
+    return
+  }
+  if (m.to) router.push(m.to).catch(()=>{})
+}
+
+watch(menuOpen, (on) => {
+  if (on) {
+    const onDocClick = () => closeMenu()
+    const onEsc = (e) => { if (e.key === 'Escape') closeMenu() }
+    document.addEventListener('click', onDocClick)
+    window.addEventListener('keydown', onEsc)
+    menuOpen._cleanup = () => {
+      document.removeEventListener('click', onDocClick)
+      window.removeEventListener('keydown', onEsc)
+    }
+  } else if (menuOpen._cleanup) {
+    menuOpen._cleanup()
+    menuOpen._cleanup = null
+  }
+})
 
 /* ───────────────────────── 실시간순위 Top10 시트 ───────────────────────── */
 const hotSheet = ref({ open:false })
@@ -1715,6 +1823,260 @@ function toggleSort(){ ui.value.sortOpen = !ui.value.sortOpen; if(ui.value.sortO
 </script>
 
 <style scoped>
+/* =================================
+ * ▼▼▼ StoreFinder 새 디자인 v2 ▼▼▼
+ * ================================= */
+
+.sf-page{ background:var(--bg, #fafafa); }
+
+/* ===== Header ===== */
+.sf-header{
+  display:flex; align-items:center; justify-content:space-between;
+  gap:10px; padding:8px 4px 12px;
+}
+.sf-brand{ display:flex; align-items:center; gap:10px; min-width:0; }
+.sf-brand-logo-img{
+  flex:none; width:48px; height:48px; border-radius:12px;
+  object-fit:cover; display:block;
+  box-shadow:0 4px 10px rgba(255,77,141,.18);
+}
+.sf-brand-text{ min-width:0; line-height:1.15; }
+.sf-brand-title{
+  margin:0; font-size:20px; font-weight:900;
+  color:#ff2e7e; letter-spacing:-0.3px;
+}
+.sf-brand-sub{
+  margin:2px 0 0; font-size:12px;
+  color:var(--muted, #888); font-weight:500;
+}
+.sf-header-actions{ display:flex; align-items:center; gap:4px; }
+.sf-icon-btn{
+  position:relative; width:38px; height:38px; border-radius:50%;
+  background:transparent; border:none;
+  display:grid; place-items:center;
+  color:var(--fg, #222); cursor:pointer;
+}
+.sf-icon-btn:active{ background:rgba(0,0,0,.05); }
+.sf-bell-badge{
+  position:absolute; top:4px; right:4px;
+  min-width:16px; height:16px; padding:0 4px;
+  border-radius:999px; background:#ff4d8d; color:#fff;
+  font-size:10px; font-weight:800; line-height:16px;
+  text-align:center; border:2px solid var(--bg, #fafafa);
+  box-sizing:content-box;
+}
+
+/* ===== Header 카드형 드롭다운 ===== */
+.sf-menu-anchor{ position:relative; }
+.sf-menu-card{
+  position:absolute; top:calc(100% + 8px); right:0;
+  width:200px; background:var(--surface, #fff);
+  border-radius:16px; box-shadow:0 4px 20px rgba(0,0,0,.15);
+  z-index:1000; overflow:hidden; transform-origin:top right;
+}
+.sf-menu-row{
+  width:100%; display:flex; align-items:center; gap:10px;
+  padding:14px 16px; background:transparent; border:none;
+  font-size:14px; font-weight:600; color:var(--fg, #222);
+  cursor:pointer; text-align:left;
+}
+.sf-menu-row.divider{ border-top:1px solid var(--line, #f0f0f0); }
+.sf-menu-row:active{ background:rgba(0,0,0,.04); }
+.sf-menu-emoji{
+  width:22px; display:grid; place-items:center;
+  font-size:16px; flex:none;
+}
+.sf-menu-label{ flex:1; min-width:0; }
+.sf-menu-arrow{ color:var(--muted, #bbb); flex:none; }
+.sf-dd-enter-from, .sf-dd-leave-to{
+  opacity:0; transform:scale(.92) translateY(-4px);
+}
+.sf-dd-enter-active, .sf-dd-leave-active{
+  transition:opacity .14s ease, transform .14s ease;
+}
+
+/* ===== 검색 카드형 셸 ===== */
+.sf-search-wrap{ margin-bottom:10px; }
+.sf-search-shell{
+  background:var(--surface, #fff);
+  border-radius:12px;
+  padding:6px 10px;
+  border:1px solid var(--line, #f0f0f0);
+  box-shadow:0 2px 10px rgba(0,0,0,.05);
+}
+/* SearchBar 내부 placeholder 톤 보정 */
+.sf-search-shell :deep(input){
+  font-size:14px;
+  color:var(--fg, #222);
+}
+.sf-search-shell :deep(input::placeholder){
+  color:var(--muted, #bbb);
+  font-weight:400;
+}
+
+/* ===== 실시간 순위 (한 줄 가로 + 더보기) ===== */
+.sf-hot{
+  display:flex; align-items:center; gap:8px;
+  padding:10px 12px; margin-bottom:10px;
+  background:var(--surface, #fff); border:1px solid var(--line, #f0f0f0);
+  border-radius:12px; box-shadow:0 2px 10px rgba(0,0,0,.04);
+  cursor:pointer; overflow:hidden;
+}
+.sf-hot-label{
+  flex:none; font-size:12px; font-weight:800;
+  color:#ff4d8d; white-space:nowrap;
+}
+.sf-hot-window{
+  flex:1; min-width:0; height:24px; overflow:hidden;
+}
+.sf-hot-list{
+  list-style:none; margin:0; padding:0;
+  display:flex; flex-direction:column;
+}
+.sf-hot-item{
+  display:flex; align-items:center; gap:8px;
+  height:24px; padding:0; cursor:pointer; min-width:0;
+}
+.sf-rank-badge{
+  flex:none; width:20px; height:20px; border-radius:50%;
+  background:linear-gradient(135deg, #ff6b9d, #ff4d8d);
+  color:#fff; font-size:11px; font-weight:800;
+  display:grid; place-items:center;
+}
+.sf-hot-name{
+  font-size:13px; font-weight:700;
+  color:var(--fg, #222); white-space:nowrap;
+}
+.sf-hot-intro{
+  font-size:12px; color:var(--muted, #888);
+  min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.sf-hot-more{
+  flex:none; background:transparent; border:none;
+  font-size:12px; font-weight:700; color:var(--muted, #888);
+  cursor:pointer; padding:4px 2px;
+}
+
+/* ===== 배너 인디케이터 ===== */
+.sf-banners{ position:relative; }
+.sf-banner-dots{
+  display:flex; justify-content:center; gap:6px;
+  margin-top:6px;
+}
+.sf-banner-dots .dot{
+  width:6px; height:6px; border-radius:50%;
+  background:var(--line, #e8e8e8);
+}
+.sf-banner-dots .dot.active{
+  background:#ff4d8d;
+  width:18px; border-radius:999px;
+}
+
+/* ===== 카테고리 가로 스크롤 ===== */
+.sf-cats{ padding:0; }
+.sf-cat-scroll{
+  display:flex; gap:14px;
+  overflow-x:auto;
+  padding:4px 4px 8px;
+  scrollbar-width:none;
+  -webkit-overflow-scrolling:touch;
+  grid-template-columns:none !important;
+}
+.sf-cat-scroll::-webkit-scrollbar{ display:none; }
+.sf-cat-scroll :deep(.cat){
+  flex:none !important;
+  display:flex !important;
+  flex-direction:column !important;
+  align-items:center !important;
+  gap:6px;
+  background:none !important;
+  border:none !important;
+  padding:0 !important;
+  min-width:54px;
+  box-shadow:none !important;
+  height:auto !important;
+}
+.sf-cat-scroll :deep(.cat .ico){
+  width:48px; height:48px; border-radius:50%;
+  display:grid; place-items:center;
+  border:1.5px solid var(--line, #e8e8e8);
+  background:var(--surface, #fff);
+  color:var(--muted, #777);
+  transition:all .15s ease;
+  font-size:16px; font-weight:800;
+}
+.sf-cat-scroll :deep(.cat.active .ico){
+  background:linear-gradient(135deg, #ff6b9d, #ff4d8d);
+  border-color:transparent;
+  color:#fff;
+  box-shadow:0 4px 12px rgba(255,77,141,.3);
+}
+.sf-cat-scroll :deep(.cat .lbl){
+  font-size:11px;
+  font-weight:600;
+  color:var(--muted, #999);
+}
+.sf-cat-scroll :deep(.cat.active .lbl){
+  color:#ff4d8d; font-weight:800;
+}
+
+/* ===== Top5 섹션 ===== */
+.sf-top-head{
+  display:flex; align-items:center; justify-content:space-between;
+  margin-bottom:10px; padding:0 2px;
+}
+.sf-top-ttl{
+  font-size:15px; font-weight:900; color:var(--fg, #111);
+  letter-spacing:-0.2px;
+}
+.sf-top-ttl .spark{ margin-right:4px; }
+.sf-top-actions{ display:flex; align-items:center; gap:8px; }
+.sf-top-more{
+  background:none; border:none; cursor:pointer;
+  font-size:13px; font-weight:600; color:var(--muted, #888);
+  padding:4px 6px;
+}
+
+/* ===== List Head 톤 정리 ===== */
+.sf-list-head{
+  padding:6px 2px;
+}
+.sf-list-head :deep(.drop){
+  background:var(--surface, #fff);
+  border:1px solid var(--line, #f0f0f0);
+  border-radius:999px;
+  padding:6px 12px;
+  font-size:12px; font-weight:700;
+}
+
+/* ===== 다크모드 보정 ===== */
+:root[data-theme="dark"] .sf-search-shell,
+:root[data-theme="black"] .sf-search-shell,
+:root[data-theme="dark"] .sf-hot,
+:root[data-theme="black"] .sf-hot,
+:root[data-theme="dark"] .sf-cat-scroll :deep(.cat .ico),
+:root[data-theme="black"] .sf-cat-scroll :deep(.cat .ico){
+  background:var(--surface, #1c1c1c);
+  border-color:var(--line, #2a2a2a);
+}
+:root[data-theme="dark"] .sf-menu-card,
+:root[data-theme="black"] .sf-menu-card{
+  background:var(--surface, #1c1c1c);
+  box-shadow:0 4px 20px rgba(0,0,0,.5);
+}
+:root[data-theme="dark"] .sf-menu-row.divider,
+:root[data-theme="black"] .sf-menu-row.divider{
+  border-top-color:var(--line, #2a2a2a);
+}
+:root[data-theme="dark"] .sf-bell-badge,
+:root[data-theme="black"] .sf-bell-badge{
+  border-color:var(--bg, #111);
+}
+
+/* =================================
+ * ▲▲▲ StoreFinder 새 디자인 v2 끝 ▲▲▲
+ * ================================= */
+
 /* =============================
    Page Padding / Layout Locks
 ============================= */

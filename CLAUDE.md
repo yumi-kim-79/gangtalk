@@ -45,7 +45,7 @@ firebase deploy --only hosting
 - [ ] 구글플레이 등록
 - [ ] 애플 앱스토어 등록
 
-**현재 단계**: 현황판 로고 이미지화 + 카드형 드롭다운 메뉴 + 도움말 전체 삭제 완료
+**현재 단계**: 가게찾기 전면 디자인 개편 + 현황판 CTA Auth 타이밍 수정 완료
 
 ---
 
@@ -59,6 +59,25 @@ firebase deploy --only hosting
 ---
 
 ## 작업 로그
+
+### 2026-05-14: 가게찾기 디자인 개편 v2 + CTA Auth 타이밍 수정 (`feat/storefinder-redesign-v2`)
+- **MainPage CTA 타이밍 수정**: Firebase Auth 초기화 직후 `currentUser` 가 잠시 `null` 로 읽혀 CTA 가 깜빡이던 문제 해결
+  - `currentUser` 초기값 `null` → `undefined`
+  - `isAuthReady` ref 신규, `onAuthStateChanged` 첫 발화 시 `true`
+  - CTA 조건: `v-if="!isLoggedIn"` → `v-if="isAuthReady && !isLoggedIn"`
+- **App.vue**: `isDashboard` → `hideTopBar` 로 확장 (`dashboard` + `finder` 둘 다 자체 헤더 사용). `body.has-fixed-topbar` 제거 watcher 도 동일 적용
+- **StoreFinder 헤더 추가**: MainPage 와 동일한 헤더
+  - 좌측: `/icons/icon-192.png` 48×48 로고 + "강남톡방" 핑크 20px + "강남의 모든 공간, 한눈에." 회색 12px
+  - 우측: 알림벨(notifBadge 뱃지) + 햄버거 카드 드롭다운 (일정/달력·고객센터·즐겨찾기·로그인/로그아웃, 외부·ESC 닫힘, scale+opacity 애니메이션)
+  - `signOut` import, `notifBadge / isAuthReady / currentUser / menuOpen / menuItems / onMenuItem` 신규
+- **검색창**: SearchBar 컴포넌트는 유지, `sf-search-shell` 래퍼로 둥근 카드 + box-shadow 스타일
+- **실시간 순위 티커**: 기존 `hotRanks10 / tickerStyle / openHotSheet` 기능 유지, 새 마크업으로 1줄 가로 + 핑크 원형 순위 뱃지 + "더보기 ›"
+- **광고 배너**: 기존 oneBanner/onBannerClick 그대로 유지, 하단 핑크 인디케이터 점 3개 추가
+- **카테고리 탭**: 기존 cat-grid + 지역 드롭다운 기능 유지, `sf-cat-scroll` 가로 스크롤 + `:deep(.cat .ico)` 원형 48px + 선택 시 핑크 그라디언트
+- **Top5 섹션**: 기존 topLists 기능 유지, "✨ {{ label }} Top 5" + "더보기 ›" 헤더 추가
+- **목록 헤드/툴**: 기존 정렬/뷰토글/다크모드/새로고침 그대로, `sf-list-head` 톤 정리
+- **모든 모달/시트 유지**: 담당자 드롭다운, 액션시트, BizManagerTabs 등록 패널, Top10 시트
+- **다크모드 보정**: 새 sf-* 클래스 전부 다크 테마 대응
 
 ### 2026-05-14: 로고 이미지화 + 카드형 드롭다운 + 도움말 삭제 + CTA 정리 (`feat/mainpage-logo-menu-cta`)
 - **헤더 로고**: `BrandLogo` SVG → `<img src="/icons/icon-192.png">` (48×48px, border-radius 12px)
