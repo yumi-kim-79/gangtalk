@@ -61,7 +61,7 @@ firebase deploy --only hosting
 - [ ] 구글플레이 등록
 - [ ] 애플 앱스토어 등록
 
-**현재 단계**: 페이지 전환 시 가로 크기 불일치 수정 완료 — `--page-h-pad: 16px` 변수로 전 페이지 좌우 패딩 통일
+**현재 단계**: 강톡 탭 AppHeader 적용 + 실사 이미지 배너 + 커뮤니티 4카드 개편 완료
 
 ---
 
@@ -69,12 +69,37 @@ firebase deploy --only hosting
 1. 알림벨 클릭 시 별도 알림 페이지 연결 (현재 AppHeader 내부에서 mypage로 폴백)
 2. 핫이슈 텍스트를 Firestore config에서 가져오도록 연동
 3. 별점/리뷰 카운트 실제 데이터 연동
-4. 다른 페이지(채팅/제휴관/마이페이지 등)도 `AppHeader` 적용 + `--page-h-pad` 사용
-5. Capacitor 적용 전 웹앱 완성도 점검
+4. 제휴관/마이페이지도 `AppHeader` 적용 + `--page-h-pad` 사용
+5. 힐링톡/우리가게/이벤트톡 실 서비스 오픈 준비
+6. Capacitor 적용 전 웹앱 완성도 점검
 
 ---
 
 ## 작업 로그
+
+### 2026-05-14: 강톡 탭 AppHeader + 실사 배너 + 커뮤니티 카드 개편 v2 (`feat/gangtalk-page-redesign-v2`)
+- **App.vue `hideTopBar`** 에 `'gangtalk' / 'chat'` 라우트 추가 → 강톡 탭 진입 시 전역 TopBar 숨김
+- **GangTalkPage 헤더 적용**:
+  - 자체 헤더 없이 TopBar 의존하던 구조 → `<AppHeader :show-search="false" />` 사용 (검색창 미노출)
+  - 루트 `<section class="wrap compact">` → `<main class="page gt-page">` 로 교체
+  - `.wrap.compact { margin-top: var(--gt-topbar-h, 56px) }` 제거 (TopBar 없으니 불필요)
+  - `.gt-page` 좌우 패딩 `var(--page-h-pad)` 적용 — 전 페이지 일관성
+- **광고 배너 슬라이더**: REJURAN 스타일 CSS 그라디언트 → **실사 이미지 슬라이더**
+  - `sliderItems` 데이터: `{ theme/logo/brand/tagline/circleColor }` → `{ image: '/img/banners/banner-01~03.png' }`
+  - 마크업: `<div class="slide-content">` + `<div class="slide-circle">` → `<img class="gt-slide-img" object-fit:cover>`
+  - 높이 200 → 180, radius 16
+  - **좌하단 카운트 인디케이터**: `<div class="gt-slider-count">1 / 3</div>` (검정 반투명 pill)
+  - **우하단 핑크 점 인디케이터**: `.gt-dot.on { background:#ff4d8d, width:18px, radius:999 }` (active 시 pill 형태)
+  - 4초 자동 전환 유지 (`setInterval` 그대로)
+- **주제별 커뮤니티 카드 개편** (4개 모두 새 구조):
+  - 섹션 헤더에 "전체보기 ›" 버튼 추가 (`gt-section-more`)
+  - 인라인 스타일 카드 → `.gc-card / .gc-bg-img / .gc-overlay / .gc-badge / .gc-body / .gc-title / .gc-sub / .gc-arrow / .gc-soon` 클래스 기반
+  - **강톡**: 배경 이미지 유지 + 좌상단 💬 핑크 사각 뱃지 + 중앙 "강톡" + 하단 "100% 비공개 게시판" + 우하단 ›
+  - **힐링톡**: 배경 이미지 유지 + 강한 오버레이(`gc-overlay--strong`) + 좌상단 ❤️ 뱃지 + "힐링톡" 흰색 + "명언·건강·여행·다이어트" + "서비스 준비중" pill
+  - **우리 가게 게시판**: 배경 이미지 제거, `#F5EFE8` 연베이지 + 🏪 뱃지 + 핑크 굵은 타이틀 + 회색 서브 + "서비스 준비중" pill
+  - **이벤트톡**: `#FFF0F5` 연핑크 + 🎉 뱃지 + 핑크 굵은 타이틀 + "서비스 준비중" pill
+  - 카드 공통 `border-radius:16px; height:130px; overflow:hidden`
+- **이미지 프리로드 정리**: 사용하지 않는 cat-store/cat-event 제거, cat-gangtok/cat-healing 만 유지
 
 ### 2026-05-14: 페이지 전환 시 가로 크기 불일치 수정 (`fix/page-horizontal-padding`)
 - **분석 결과** (페이지마다 좌우 패딩이 모두 달랐음):

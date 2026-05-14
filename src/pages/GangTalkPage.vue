@@ -1,29 +1,37 @@
 <template>
-  <!-- 커뮤니티 카드 이미지 프리로드 -->
+  <!-- 커뮤니티 카드 이미지 프리로드 (강톡/힐링 만 사용) -->
   <teleport to="head">
     <link rel="preload" as="image" href="/img/community/cat-gangtok.jpg" />
     <link rel="preload" as="image" href="/img/community/cat-healing.jpg" />
-    <link rel="preload" as="image" href="/img/community/cat-store.jpg" />
-    <link rel="preload" as="image" href="/img/community/cat-event.jpg" />
   </teleport>
-  <section class="wrap compact">
-    <!-- ✅ 상단 배너 슬라이더 (REJURAN 스타일 CSS 배너) -->
+  <main class="page gt-page">
+    <!-- ===== 공통 AppHeader (검색창 없이) ===== -->
+    <AppHeader :show-search="false" />
+
+    <!-- ✅ 상단 배너 슬라이더 (실사 이미지) -->
     <section class="gt-slider-bar">
       <div class="gt-slider-track" :style="{ transform: `translateX(-${sliderIdx * 100}%)` }">
         <div
           v-for="(slide, i) in sliderItems"
           :key="i"
           class="gt-slide"
-          :class="slide.theme"
         >
-          <div class="slide-content">
-            <div class="slide-logo">{{ slide.logo }}</div>
-            <div class="slide-brand">{{ slide.brand }}</div>
-            <div class="slide-tagline">{{ slide.tagline }}</div>
-          </div>
-          <div class="slide-circle" :style="{ background: slide.circleColor }"></div>
+          <img
+            :src="slide.image"
+            :alt="`배너 ${i + 1}`"
+            class="gt-slide-img"
+            loading="lazy"
+            decoding="async"
+          />
         </div>
       </div>
+
+      <!-- 좌하단 카운트 인디케이터 -->
+      <div class="gt-slider-count" aria-hidden="true">
+        {{ sliderIdx + 1 }} / {{ sliderItems.length }}
+      </div>
+
+      <!-- 하단 핑크 점 인디케이터 -->
       <div class="gt-slider-dots">
         <span
           v-for="(_, i) in sliderItems"
@@ -36,26 +44,56 @@
     </section>
 
     <!-- ===== 섹션 타이틀 ===== -->
-    <h2 class="section-title">🔥 주제 별 커뮤니티</h2>
+    <header class="gt-section-head">
+      <h2 class="section-title">🔥 주제 별 커뮤니티</h2>
+      <button type="button" class="gt-section-more" @click="openCategoryPage('all')">전체보기 ›</button>
+    </header>
 
     <!-- ===== 커뮤니티 2x2 그리드 ===== -->
     <section class="community-grid">
-      <div style="position:relative;overflow:hidden;border-radius:16px;height:130px;cursor:pointer" @click="openCategoryPage('all')">
-        <img src="/img/community/cat-gangtok.jpg" alt="강톡" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;display:block">
-        <div style="position:absolute;top:0;left:0;width:100%;height:100%;background:linear-gradient(to bottom, rgba(0,0,0,0.15) 0%, transparent 40%, transparent 60%, rgba(0,0,0,0.25) 100%);border-radius:16px;"></div>
-      </div>
-      <div style="position:relative;overflow:hidden;border-radius:16px;height:130px;cursor:pointer" @click="openHealing">
-        <img src="/img/community/cat-healing.jpg" alt="힐링톡" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;display:block">
-        <div style="position:absolute;top:0;left:0;width:100%;height:100%;background:linear-gradient(to bottom, rgba(0,0,0,0.15) 0%, transparent 40%, transparent 60%, rgba(0,0,0,0.25) 100%);border-radius:16px;"></div>
-      </div>
-      <div style="position:relative;overflow:hidden;border-radius:16px;height:130px;cursor:pointer" @click="openFirstBiz">
-        <img src="/img/community/cat-store.jpg" alt="우리가게" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;display:block">
-        <div style="position:absolute;top:0;left:0;width:100%;height:100%;background:linear-gradient(to bottom, rgba(0,0,0,0.15) 0%, transparent 40%, transparent 60%, rgba(0,0,0,0.25) 100%);border-radius:16px;"></div>
-      </div>
-      <div style="position:relative;overflow:hidden;border-radius:16px;height:130px;cursor:pointer" @click="openCategoryPage('event')">
-        <img src="/img/community/cat-event.jpg" alt="이벤트" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;display:block">
-        <div style="position:absolute;top:0;left:0;width:100%;height:100%;background:linear-gradient(to bottom, rgba(0,0,0,0.15) 0%, transparent 40%, transparent 60%, rgba(0,0,0,0.25) 100%);border-radius:16px;"></div>
-      </div>
+      <!-- 1) 강톡 — 배경 이미지 + 아이콘 + 텍스트 -->
+      <button type="button" class="gc-card gc-gangtok" @click="openCategoryPage('all')">
+        <img src="/img/community/cat-gangtok.jpg" alt="" class="gc-bg-img" />
+        <div class="gc-overlay"></div>
+        <div class="gc-badge"><span aria-hidden="true">💬</span></div>
+        <svg class="gc-arrow" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
+        <div class="gc-body">
+          <div class="gc-title white">강톡</div>
+          <div class="gc-sub white">100% 비공개 게시판</div>
+        </div>
+      </button>
+
+      <!-- 2) 힐링톡 — 배경 이미지 + 강한 오버레이 + 서비스 준비중 -->
+      <button type="button" class="gc-card gc-healing" @click="openHealing">
+        <img src="/img/community/cat-healing.jpg" alt="" class="gc-bg-img" />
+        <div class="gc-overlay gc-overlay--strong"></div>
+        <div class="gc-badge"><span aria-hidden="true">❤️</span></div>
+        <div class="gc-body">
+          <div class="gc-title white">힐링톡</div>
+          <div class="gc-sub white">명언·건강·여행·다이어트</div>
+        </div>
+        <span class="gc-soon">서비스 준비중</span>
+      </button>
+
+      <!-- 3) 우리 가게 게시판 — 연베이지 + 서비스 준비중 -->
+      <button type="button" class="gc-card gc-store" @click="openFirstBiz">
+        <div class="gc-badge"><span aria-hidden="true">🏪</span></div>
+        <div class="gc-body">
+          <div class="gc-title pink">우리 가게 게시판</div>
+          <div class="gc-sub muted">공지·소식·가게 이야기</div>
+        </div>
+        <span class="gc-soon">서비스 준비중</span>
+      </button>
+
+      <!-- 4) 이벤트톡 — 연핑크 + 서비스 준비중 -->
+      <button type="button" class="gc-card gc-event" @click="openCategoryPage('event')">
+        <div class="gc-badge"><span aria-hidden="true">🎉</span></div>
+        <div class="gc-body">
+          <div class="gc-title pink">이벤트톡</div>
+          <div class="gc-sub muted">이벤트·혜택·참여</div>
+        </div>
+        <span class="gc-soon">서비스 준비중</span>
+      </button>
     </section>
 
     <!-- ===== 베스트 탭 (pill 스타일, 작은 크기) ===== -->
@@ -488,12 +526,13 @@
         </form>
       </section>
     </div>
-  </section>
+  </main>
 </template>
 
 <script setup>
 import { ref, computed, onMounted, onBeforeMount, watch, nextTick, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import AppHeader from '@/components/common/AppHeader.vue'
 import { db as fbDb } from '@/firebase'
 import { getApp } from 'firebase/app'
 
@@ -522,12 +561,12 @@ const emoji = ref({ open:false, target:'', style:{ right:'16px', bottom:'126px' 
 // 👇 힐링톡/강톡 아래의 “여러 카테고리 버튼”을 보일지 여부
 const SHOW_INLINE_CATS = false
 
-// ✅ 상단 이미지 슬라이더 (광고 배너 대체)
+// ✅ 상단 이미지 슬라이더 (실사 광고 배너)
 const sliderIdx = ref(0)
 const sliderItems = ref([
-  { theme: 'slide-rejuran', logo: 'ℜ REJURAN', brand: 'COSMETIC', tagline: 'REWRITE YOUR STORY', circleColor: 'rgba(0,180,180,0.35)' },
-  { theme: 'slide-dark', logo: '강남톡방', brand: '강톡', tagline: '100% 비공개 커뮤니티', circleColor: 'rgba(255,107,157,0.3)' },
-  { theme: 'slide-blue', logo: '힐링톡', brand: '명언·건강·여행', tagline: '일상에 쉼표를 더하다', circleColor: 'rgba(100,149,237,0.3)' },
+  { image: '/img/banners/banner-01.png' },
+  { image: '/img/banners/banner-02.png' },
+  { image: '/img/banners/banner-03.png' },
 ])
 let sliderTimer = null
 function startSlider() {
@@ -2609,27 +2648,35 @@ console.log('[sim-templates] loaded v2025-09-30-01')
 </script>
 
 <style scoped>
-/* 페이지 여백 — 좌우는 전역 --page-h-pad 변수 사용으로 모든 페이지와 통일 */
+/* 페이지 여백 — 좌우는 전역 --page-h-pad, 상단은 AppHeader 가 책임 */
 .wrap{ padding: 14px var(--page-h-pad, 16px); }
 
-/* 이 페이지에서만 사용할 레이아웃 변수 (TopBar 높이) */
-.wrap.compact{
-  --gt-topbar-h: 56px;
-  --gt-ad-h: 0px;
-  padding: 10px var(--page-h-pad, 16px);
-  margin-top: var(--gt-topbar-h);
+.gt-page{
+  padding-top: 0;
+  padding-left:  max(var(--page-h-pad, 16px), env(safe-area-inset-left));
+  padding-right: max(var(--page-h-pad, 16px), env(safe-area-inset-right));
+  padding-bottom: calc(92px + env(safe-area-inset-bottom));
   background: var(--bg);
   color: var(--fg);
 }
 
-/* ===== 상단 배너 슬라이더 ===== */
+/* (레거시) 카테고리/힐링 풀스크린 시트 안에서만 사용되는 .wrap.compact */
+.wrap.compact{
+  --gt-topbar-h: 0px;
+  --gt-ad-h: 0px;
+  padding: 10px var(--page-h-pad, 16px);
+  background: var(--bg);
+  color: var(--fg);
+}
+
+/* ===== 상단 배너 슬라이더 (실사 이미지) ===== */
 .gt-slider-bar{
   position: relative;
   border-radius: 16px;
   overflow: hidden;
   margin-bottom: 16px;
-  height: 200px;
-  background: #1a1a2e;
+  height: 180px;
+  background: #f0f0f0;
 }
 .gt-slider-track{
   display: flex;
@@ -2644,89 +2691,199 @@ console.log('[sim-templates] loaded v2025-09-30-01')
   position: relative;
   overflow: hidden;
 }
-.gt-slide.slide-rejuran{ background: linear-gradient(135deg, #1a1a2e 0%, #2d1b3d 50%, #1a1a2e 100%); }
-.gt-slide.slide-dark{ background: linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 100%); }
-.gt-slide.slide-blue{ background: linear-gradient(135deg, #0d1b2a 0%, #1b2838 100%); }
+.gt-slide-img{
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
 
-.slide-content{
-  position: relative;
-  z-index: 2;
-  padding: 28px 24px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-.slide-logo{
-  font-size: 20px;
-  font-weight: 300;
-  color: #fff;
-  letter-spacing: 0.08em;
-}
-.slide-brand{
-  font-size: 13px;
-  font-weight: 400;
-  color: rgba(255,255,255,0.7);
-  letter-spacing: 0.15em;
-  text-transform: uppercase;
-}
-.slide-tagline{
-  font-size: 12px;
-  font-weight: 400;
-  color: rgba(255,255,255,0.55);
-  letter-spacing: 0.05em;
-  font-style: italic;
-  margin-top: 4px;
-}
-.slide-circle{
+/* 좌하단 카운트 인디케이터 */
+.gt-slider-count{
   position: absolute;
-  right: -30px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 200px;
-  height: 200px;
-  border-radius: 50%;
-  z-index: 1;
+  left: 12px;
+  bottom: 12px;
+  z-index: 3;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(0,0,0,.55);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .02em;
 }
 
+/* 하단 핑크 점 인디케이터 */
 .gt-slider-dots{
   position: absolute;
   bottom: 12px;
-  left: 50%;
-  transform: translateX(-50%);
+  right: 12px;
   display: flex;
   gap: 6px;
   z-index: 3;
 }
 .gt-dot{
-  width: 7px;
-  height: 7px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
-  background: rgba(255,255,255,0.4);
+  background: rgba(255,255,255,0.55);
   cursor: pointer;
-  transition: background 0.2s;
+  transition: background .2s, width .2s;
 }
 .gt-dot.on{
-  background: #fff;
+  background: #ff4d8d;
+  width: 18px;
+  border-radius: 999px;
 }
 
 /* ===== 섹션 타이틀 ===== */
+.gt-section-head{
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0 0 12px 2px;
+}
 .section-title{
   font-size: 17px;
   font-weight: 900;
-  margin: 0 0 12px 2px;
+  margin: 0;
   color: var(--fg);
+}
+.gt-section-more{
+  background: transparent;
+  border: none;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted, #888);
+  cursor: pointer;
+  padding: 4px 6px;
 }
 
 /* ===== 2x2 커뮤니티 그리드 ===== */
 .community-grid{
   display: grid;
   grid-template-columns: 1fr 1fr;
-  column-gap: 6px;
-  row-gap: 4px;
+  column-gap: 8px;
+  row-gap: 8px;
   margin-bottom: 18px;
   background-color: var(--bg);
 }
-/* grid-card 스타일은 인라인으로 이동 */
+
+/* 카드 공통 */
+.gc-card{
+  position: relative;
+  height: 130px;
+  border-radius: 16px;
+  overflow: hidden;
+  cursor: pointer;
+  appearance: none;
+  border: none;
+  padding: 0;
+  text-align: left;
+  display: block;
+  background: #fff;
+  color: inherit;
+}
+.gc-card:active{ transform: scale(.98); }
+
+/* 배경 이미지 (강톡/힐링) */
+.gc-bg-img{
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.gc-overlay{
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to bottom, rgba(0,0,0,0.20) 0%, rgba(0,0,0,0.10) 40%, rgba(0,0,0,0.20) 70%, rgba(0,0,0,0.45) 100%);
+}
+.gc-overlay--strong{
+  background: linear-gradient(to bottom, rgba(0,0,0,0.45) 0%, rgba(0,0,0,0.55) 100%);
+}
+
+/* 좌상단 핑크 사각 아이콘 뱃지 */
+.gc-badge{
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 2;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #ff6b9d, #ff4d8d);
+  display: grid;
+  place-items: center;
+  font-size: 16px;
+  box-shadow: 0 2px 8px rgba(255,77,141,.35);
+}
+.gc-badge > span{ line-height: 1; }
+
+/* 우측 하단 화살표 (강톡 카드 전용) */
+.gc-arrow{
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  z-index: 2;
+  color: rgba(255,255,255,.9);
+}
+
+/* 본문 텍스트 영역 — 카드 중앙 정렬 */
+.gc-body{
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  text-align: center;
+}
+.gc-title{
+  font-size: 18px;
+  font-weight: 900;
+  letter-spacing: -0.3px;
+  line-height: 1.1;
+}
+.gc-title.white{ color: #fff; text-shadow: 0 2px 6px rgba(0,0,0,.35); }
+.gc-title.pink{ color: #ff2e7e; }
+.gc-sub{
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+.gc-sub.white{ color: rgba(255,255,255,.92); text-shadow: 0 1px 4px rgba(0,0,0,.35); }
+.gc-sub.muted{ color: #888; }
+
+/* 카드 하단 중앙 "서비스 준비중" pill */
+.gc-soon{
+  position: absolute;
+  left: 50%;
+  bottom: 10px;
+  transform: translateX(-50%);
+  z-index: 2;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(255,77,141,.12);
+  color: #ff2e7e;
+  font-size: 11px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+/* 카드별 배경 */
+.gc-store{
+  background: #F5EFE8;
+}
+.gc-event{
+  background: #FFF0F5;
+}
+/* 강톡/힐링은 이미지 위에 오버레이 */
+.gc-gangtok, .gc-healing{ background: #1a1a2e; }
 
 /* ===== 헤더 & 타이틀 ===== */
 .title{ margin:0; font-size:18px; font-weight:900 }
