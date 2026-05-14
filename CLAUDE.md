@@ -61,7 +61,7 @@ firebase deploy --only hosting
 - [ ] 구글플레이 등록
 - [ ] 애플 앱스토어 등록
 
-**현재 단계**: 검색창 input 스타일 단일 톤 강제 + 페이지별 :deep(input) 덮어쓰기 룰 제거 완료
+**현재 단계**: 5개 탭(현황판/가게찾기/강톡/제휴관/마이페이지) AppHeader 적용 완료 — 전 탭 헤더 통일 완성
 
 ---
 
@@ -69,13 +69,21 @@ firebase deploy --only hosting
 1. 알림벨 클릭 시 별도 알림 페이지 연결 (현재 AppHeader 내부에서 mypage로 폴백)
 2. 핫이슈 텍스트를 Firestore config에서 가져오도록 연동
 3. 별점/리뷰 카운트 실제 데이터 연동
-4. 마이페이지도 `AppHeader` 적용 + `--page-h-pad` 사용
-5. 힐링톡/우리가게/이벤트톡 실 서비스 오픈 준비
-6. Capacitor 적용 전 웹앱 완성도 점검
+4. 힐링톡/우리가게/이벤트톡 실 서비스 오픈 준비
+5. Capacitor 적용 전 웹앱 완성도 점검
 
 ---
 
 ## 작업 로그
+
+### 2026-05-14: 마이페이지 상단 AppHeader 적용 (`feat/mypage-appheader`)
+- **App.vue `hideTopBar`** 에 `'mypage'` 라우트 추가 → 마이페이지 진입 시 TopBar 자동 숨김
+- **MyPage.vue**: `import AppHeader from '@/components/common/AppHeader.vue'` 추가
+- 루트 `<main class="page-flat">` → `<main class="page-flat mypage-page">` 로 식별 클래스 추가
+- 헤더 위치에 `<AppHeader :show-search="false" />` 삽입 (검색창 없이 헤더만)
+- **`.page-flat.mypage-page` 룰**: `padding-top: 0 + padding-left/right: max(var(--page-h-pad, 16px), env(...))` 강제로 외부 `mypage.css` 의 `.page-flat{ padding:12px 16px 96px }` 좌우 16 을 var 로 통일 (하단 96 은 그대로)
+- 기존 달력/헤드폰/하트/다크모드 버튼은 AppHeader 햄버거 카드 드롭다운에 포함되어 있어 별도 추가 없음
+- **결과**: 5개 바텀탭 모두 동일한 AppHeader + `--page-h-pad: 16px` 사용. TopBar 의존 페이지 0개
 
 ### 2026-05-14: 검색창 input 스타일 페이지 통일 (`fix/mainpage-search-input-style`)
 - **원인 진단**: MainPage `:deep(input[type="search"])` 룰이 `font-size:16px !important; font-weight:300 !important;` + placeholder opacity 0.65 로 AppHeader 의 `.app-search-input` (font-size:14, weight:500) 을 덮어써 현황판에서만 검색창 글씨가 다르게 보였음
