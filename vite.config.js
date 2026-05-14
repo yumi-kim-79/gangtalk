@@ -121,10 +121,16 @@ export default defineConfig({
           const ext = name ? name.split('.').pop() : 'asset'
           return `assets/[name]-[hash].${ext}`
         },
-        // ✅ Firebase를 별도 chunk로 분리
+        // ✅ Firebase 를 기능별 chunk 로 분리 — 큰 firestore 번들을 페이지가
+        //    실제 필요로 할 때만 로드해 초기 진입 부담을 줄임.
         manualChunks(id) {
           if (id.includes('node_modules/firebase') || id.includes('node_modules/@firebase')) {
-            return 'firebase'
+            if (id.includes('firestore')) return 'firebase-firestore'
+            if (id.includes('/auth')) return 'firebase-auth'
+            if (id.includes('storage')) return 'firebase-storage'
+            if (id.includes('functions')) return 'firebase-functions'
+            if (id.includes('app-check') || id.includes('analytics') || id.includes('performance')) return 'firebase-extras'
+            return 'firebase-core'
           }
           if (id.includes('node_modules/vue') || id.includes('node_modules/@vue')) {
             return 'vue-vendor'

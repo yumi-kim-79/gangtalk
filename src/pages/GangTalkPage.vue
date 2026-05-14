@@ -196,7 +196,6 @@
           </button>
           <strong class="v2-head-title">{{ catLabel }}</strong>
           <span class="spacer"></span>
-          <button v-if="isAdmin" class="btn-mini" type="button" @click.stop="toggleAutoSeed">{{ AUTO_SEED ? '자동글 OFF' : '자동글 ON' }}</button>
           <button class="v2-write-btn" type="button" @click="openCreate">
             <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
             글쓰기
@@ -271,7 +270,6 @@
           </button>
           <strong class="v2-head-title">힐링톡 · {{ healLabel }}</strong>
           <span class="spacer"></span>
-          <button v-if="isAdmin" class="btn-mini" type="button" @click.stop="toggleAutoSeed">{{ AUTO_SEED ? '자동글 OFF' : '자동글 ON' }}</button>
           <button class="v2-write-btn" type="button" @click="openCreate">
             <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
             글쓰기
@@ -539,7 +537,6 @@ import { sanitizeUserPayload } from '@/lib/author'
 import { safeAdd, safeUpdate, safeDelete } from '@/lib/firestoreSafe'
 
 import { getAuth, onAuthStateChanged, setPersistence, browserLocalPersistence } from 'firebase/auth'
-import { CATEGORY_TEMPLATES, BOT_NAMES } from '@/data/sim-templates'
 
 const AUTO_OPEN_CAT = false
 const EMOJIS = ['😀','😁','😂','🤣','😊','😍','😘','😎','🤔','😮','😢','😡','👍','👎','🙏','👏','🔥','✨','🎉','💯','🥹','🤝','🫶','💪','😴','🤩','😇','🙌']
@@ -1083,13 +1080,6 @@ let systemHello = null
 let firstSnapDone = false
 let unsubChat = null
 const chatNoAccess = ref(false)
-
-function toggleAutoSeed(){
-  if (!isAdmin.value) return
-  // 화면 상태 먼저 바꾸고(즉시 반영), 동작 이어가기
-  if (AUTO_SEED.value) stopAutoSeed()
-  else startAutoSeed()
-}
 
 function handleChatNoAccess(){
   if (typeof unsubChat === 'function') unsubChat()
@@ -2424,217 +2414,7 @@ const filteredBizRooms = computed(() => {
 
 const FALLBACK_BIZ_IMG = 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?q=80&w=1200&auto=format&fit=crop'
 
-/* ================== 자동 시더(랜덤 글/댓글/대댓글) ================== */
-import { nanoid } from 'nanoid'
-
-/* ==== 자동 시더 토글 개선: 로컬스토리지 유지 + 즉시 반영 ==== */
-const AUTO_SEED = ref(localStorage.getItem('gt_auto_seed') === '1')
-let seedTimer = null
-
-watch(AUTO_SEED, v => {
-  localStorage.setItem('gt_auto_seed', v ? '1' : '0')
-})
-
-// ▶ 템플릿에서 안전하게 뽑아오는 유틸
-function pickTemplate(cat, key) {
-  const t = CATEGORY_TEMPLATES?.[cat] || {}
-  const arr = Array.isArray(t[key]) ? t[key] : []
-  return arr.length ? arr[Math.floor(Math.random() * arr.length)] : ''
-}
-function pickVoteAB() {
-  const ab = CATEGORY_TEMPLATES?.vote?.ab || []
-  return ab.length ? ab[Math.floor(Math.random() * ab.length)] : ['A','B']
-}
-
-// ▶ 글 카테고리 풀(투표 포함)
-const SEED_CATS = ['daily','suggest','pledge','travel','health','quote','event','quiz','vote']
-
-
-function randPick(arr){ return arr[Math.floor(Math.random()*arr.length)] }
-function randDelayMs(){ return 12000 + Math.floor(Math.random()*15000) }
-
-function makeSeedId(){ try{ return nanoid(10) } catch(_){ return Math.random().toString(36).slice(2,12) } }
-
-const SEED_LOCK_KEY = 'gt_seed_lock'
-function tryAcquireLock(){
-  const now = Date.now()
-  const raw = localStorage.getItem(SEED_LOCK_KEY)
-  const beat = raw ? Number(raw) : 0
-  if (now - beat < 10000) return false
-  localStorage.setItem(SEED_LOCK_KEY, String(now))
-  return true
-}
-function heartbeat(){ localStorage.setItem(SEED_LOCK_KEY, String(Date.now())) }
-
-async function seedPost(){
-  const user = await requireAuth().catch(()=>null)
-  if (!user) return
-
-  const cat = randPick(SEED_CATS)
-  const seedId = makeSeedId()
-
-  // 투표 전용 포맷
-  if (cat === 'vote') {
-    const [aText, bText] = pickVoteAB()
-    const title = pickTemplate('vote', 'titles') || `오늘의 선택!`
-
-    await safeAdd(
-      collection(fbDb, 'board_posts'),
-      {
-        seedId,
-        category: 'vote',
-        title,
-        subtitle: `${aText} vs ${bText}`,
-        optA: aText,
-        optB: bText,
-        votesA: 0,
-        votesB: 0,
-        views: 0,
-        likes: 0,
-        cmtCount: 0,
-        author: '익명',
-        authorUid: user.uid,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      },
-      'seedPost:vote'
-    )
-    return
-  }
-
-  // 일반/힐링/이벤트/퀴즈
-  const title = pickTemplate(cat, 'titles') || `새 글 #${(Date.now()%100000).toString(36)}`
-  const body  = pickTemplate(cat, 'bodies') || pickTemplate('daily', 'bodies') || ''
-
-  await safeAdd(
-    collection(fbDb, 'board_posts'),
-    {
-      seedId,
-      category: cat,
-      title,
-      subtitle: '',
-      body,
-      content: body,
-      views: 0,
-      likes: 0,
-      cmtCount: 0,
-      author: '익명',
-      authorUid: user.uid,
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    },
-    'seedPost:general'
-  )
-}
-
-async function seedComment(){
-  const user = await requireAuth().catch(()=>null)
-  if (!user) return
-
-  const pool = posts.value.filter(p => !p.isNotice)
-  if (!pool.length){ await seedPost(); return }
-
-  const target = pool[Math.floor(Math.random()*pool.length)]
-  const cat = normalizeCategory(target.category)
-  const isReply = Math.random() < 0.45 && comments.value.some(c => !c.parentId)
-  const seedId = makeSeedId()
-
-  const cText = pickTemplate(cat, 'comments') || pickTemplate('daily', 'comments') || '좋은 글이네요!'
-  const rText = pickTemplate(cat, 'replies')  || pickTemplate('daily', 'replies')  || '동감합니다!'
-
-  if (!isReply){
-    await safeAdd(
-      collection(fbDb, 'board_posts', String(target.id), 'comments'),
-      {
-        seedId,
-        body: cText,
-        parentId: null,
-        author: '익명',
-        authorUid: user.uid,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      },
-      'seedComment:add'
-    )
-
-    await updateDoc(
-      doc(fbDb, 'board_posts', String(target.id)),
-      { cmtCount: increment(1), updatedAt: serverTimestamp() },
-    )
-
-    if (detail.value.open && detail.value.post?.id === target.id) subscribeComments(target.id)
-  } else {
-    const tops = comments.value.filter(c => !c.parentId)
-    const parent = tops[Math.floor(Math.random()*tops.length)]
-    if (!parent) return
-
-    await safeAdd(
-      collection(fbDb, 'board_posts', String(target.id), 'comments'),
-      {
-        seedId,
-        body: rText,
-        parentId: String(parent.id),
-        author: '익명',
-        authorUid: user.uid,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      },
-      'seedReply:add'
-    )
-
-    await updateDoc(
-      doc(fbDb, 'board_posts', String(target.id)),
-      { cmtCount: increment(1), updatedAt: serverTimestamp() },
-    )
-  }
-}
-
-async function seedLoop(){
-  if (!AUTO_SEED.value) return
-  if (!tryAcquireLock()){ seedTimer = setTimeout(seedLoop, randDelayMs()); return }
-  heartbeat()
-  try{
-    if (Math.random() < 0.6) await seedPost()
-    else await seedComment()
-  }catch(_){ /* noop */ }
-  heartbeat()
-  seedTimer = setTimeout(seedLoop, randDelayMs())
-}
-
-function startAutoSeed(){
-  if (!isAdmin.value) return
-  if (AUTO_SEED.value) return
-  AUTO_SEED.value = true
-  console.log('[seed] ▶ start')
-  seedLoop()
-}
-function stopAutoSeed(){
-  if (!AUTO_SEED.value && !seedTimer) return
-  AUTO_SEED.value = false
-  if (seedTimer){ clearTimeout(seedTimer); seedTimer = null }
-  console.log('[seed] ■ stop')
-}
-
-/* mount 시 관리자면 저장된 상태에 맞춰 실행 (힐링/야호 어디서 눌러도 동일 상태 유지) */
-onMounted(()=>{
-  try{
-    const auth = getAuth()
-    onAuthStateChanged(auth, u => {
-      userEmail.value = u?.email || ''
-      if (isAdmin.value) {
-        if (AUTO_SEED.value) startAutoSeed()
-        else stopAutoSeed()
-      } else {
-        stopAutoSeed()
-      }
-    })
-  }catch(_){}
-})
-
-
-onBeforeUnmount(()=> stopAutoSeed())
-
-console.log('[sim-templates] loaded v2025-09-30-01')
+/* (제거됨) 자동 시더(랜덤 글/댓글/대댓글) 기능 — 마크업/스크립트/sim-templates 전부 삭제 */
 
 </script>
 

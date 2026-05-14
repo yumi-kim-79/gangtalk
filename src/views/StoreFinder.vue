@@ -78,6 +78,8 @@
           class="banner-img"
           :src="bannerImage(b)"
           alt=""
+          loading="lazy"
+          decoding="async"
         />
         <div class="banner-left" v-if="b.title || b.desc">
           <h3 v-if="b.title">{{ b.title }}</h3>
