@@ -61,7 +61,7 @@ firebase deploy --only hosting
 - [ ] 구글플레이 등록
 - [ ] 애플 앱스토어 등록
 
-**현재 단계**: 강톡 카테고리/상세 시트 CSS 변수 미정의 멈춤 현상 수정 완료
+**현재 단계**: 자동 글 시더 완전 삭제 + Firebase 청크 5분할 + index 번들 19% 감량 완료
 
 ---
 
@@ -76,6 +76,33 @@ firebase deploy --only hosting
 ---
 
 ## 작업 로그
+
+### 2026-05-15: 자동 글 시더 완전 삭제 + 전체 성능 최적화 (`perf/remove-autoseed-and-optimize`)
+
+#### 작업 1: 자동 글 시더 완전 삭제
+- **GangTalkPage.vue 마크업**: 카테고리/힐링 시트 헤더의 "자동글 ON/OFF" 버튼 2곳 제거
+- **GangTalkPage.vue 스크립트** 일괄 삭제:
+  - `import { CATEGORY_TEMPLATES, BOT_NAMES } from '@/data/sim-templates'`
+  - `import { nanoid } from 'nanoid'`
+  - `const AUTO_SEED = ref(...)`, `let seedTimer = null`, `watch(AUTO_SEED, ...)`
+  - `toggleAutoSeed / startAutoSeed / stopAutoSeed / seedLoop / seedPost / seedComment`
+  - `pickTemplate / pickVoteAB / makeSeedId / tryAcquireLock / heartbeat / randPick / randDelayMs`
+  - `SEED_CATS / SEED_LOCK_KEY` 상수
+  - 자동 시더 전용 `onMounted` (userEmail 갱신은 기존 다른 onMounted 에 이미 존재 → 정상)
+  - `onBeforeUnmount(() => stopAutoSeed())` 제거
+  - `console.log('[sim-templates] ...')` 제거
+- **`src/data/sim-templates.js` 파일 삭제** (1350라인)
+- localStorage 키 `gt_auto_seed / gt_seed_lock` 더 이상 쓰지 않음 (기존 값은 그대로 남되 무해)
+
+#### 작업 2: 전체 성능 최적화
+- **`vite.config.js` Firebase 청크 5분할**:
+  - 이전: `firebase` 단일 833KB
+  - 이후: `firebase-firestore` 397KB · `firebase-auth` 205KB · `firebase-core` 137KB · `firebase-storage` 43KB · `firebase-extras` 32KB · `firebase-functions` 18KB
+  - 페이지가 실제 필요로 하는 모듈만 로드 → 초기 진입 부담 ↓
+- **`index` 번들**: 261KB → **212KB** (-19%) — sim-templates 1350라인 + 자동 시더 200라인 + nanoid 의존성 제거 효과
+- **`StoreFinder.vue`** 배너 `<img>` 에 `loading="lazy" + decoding="async"` 추가
+- **이미지 lazy loading 점검**: GangTalkPage `pc-thumb / v2-pc-thumb / v2-detail-img / gt-slide-img` 이미 적용됨, PartnersPage `banner-img` 이미 적용됨
+- **리스너 점검**: 모든 페이지(MainPage / StoreFinder / PartnersPage / GangTalkPage / AppHeader) 가 `onUnmounted` 또는 `onBeforeUnmount` 에서 unsubscribe 정상 처리 중 — 추가 누수 없음
 
 ### 2026-05-15: 강톡 카테고리/상세 시트 CSS 변수 미정의 멈춤 수정 (`fix/gangtalk-sheet-mask-top`)
 - **원인 (진짜 멈춤 범인)**: `.cat-mask` 와 `.detail-mask` 의 `top: var(--gt-topbar-h)` 가 미정의 변수 참조
