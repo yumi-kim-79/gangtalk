@@ -1,7 +1,7 @@
 <!-- src/App.vue -->
 <template>
   <div class="app-root">
-    <TopBar v-if="!isDashboard" />
+    <TopBar v-if="!hideTopBar" />
 
     <!-- 전환/캐싱 없이 안전하게 렌더링 (흰 화면 방지) -->
     <RouterView :key="$route.fullPath" />
@@ -27,18 +27,25 @@ import NearbyMapModal from '@/components/map/NearbyMapModal.vue'
 import { applyThemeToDom, getTheme, attachThemeSync } from '@/store/theme.js'
 
 const route = useRoute()
-const isDashboard = computed(() => route.name === 'dashboard' || route.path === '/' || route.path === '/dashboard')
 
-// dashboard 라우트에서는 TopBar가 부착한 body 클래스도 제거해
-// .page 의 padding-top(60px) 보정이 새 헤더 위에 겹쳐 보이지 않도록 함
-watch(isDashboard, (on) => {
+// 자체 헤더를 사용하는 라우트들 (현황판/가게찾기)
+const hideTopBar = computed(() => {
+  const n = route.name
+  if (n === 'dashboard' || n === 'finder') return true
+  const p = route.path
+  return p === '/' || p === '/dashboard' || p === '/find'
+})
+
+// 해당 라우트에서는 TopBar 가 부착한 body 클래스도 제거해
+// .page padding-top(60px) 보정이 새 헤더 위에 겹쳐 보이지 않도록 함
+watch(hideTopBar, (on) => {
   if (on) document.body.classList.remove('has-fixed-topbar')
 }, { immediate: true })
 
 onMounted(() => {
   applyThemeToDom(getTheme())
   attachThemeSync()
-  if (isDashboard.value) document.body.classList.remove('has-fixed-topbar')
+  if (hideTopBar.value) document.body.classList.remove('has-fixed-topbar')
 })
 </script>
 

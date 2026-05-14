@@ -211,8 +211,8 @@
       </div>
     </section>
 
-    <!-- ===== CTA Banner (비로그인 시) ===== -->
-    <section v-if="!isLoggedIn" class="mp-cta" @click="goLogin">
+    <!-- ===== CTA Banner (Auth 준비 + 비로그인 시) ===== -->
+    <section v-if="isAuthReady && !isLoggedIn" class="mp-cta" @click="goLogin">
       <div class="mp-cta-text">
         <div class="mp-cta-spark" aria-hidden="true">✨</div>
         <div class="mp-cta-small">지금 가입하면</div>
@@ -1033,11 +1033,19 @@ function wifiText(s){
   return '보통'
 }
 
-/* ===== 로그인 상태 ===== */
-const currentUser = ref(null)
+/* ===== 로그인 상태 =====
+ * Firebase Auth 가 초기화되기 전에는 currentUser 가 잠시 null 로 읽힐 수 있어
+ * CTA 가 깜빡임. onAuthStateChanged 가 한 번 발화한 뒤에만 isAuthReady 를 true 로 두고
+ * 그 이후에야 비로그인 UI(CTA) 를 렌더한다.
+ */
+const currentUser = ref(undefined)
+const isAuthReady = ref(false)
 onMounted(() => {
-  currentUser.value = auth.currentUser
-  onAuthStateChanged(auth, (u)=>{ currentUser.value = u })
+  // 콜백이 처음 호출되는 시점이 Auth 가 준비된 시점
+  onAuthStateChanged(auth, (u) => {
+    currentUser.value = u || null
+    if (!isAuthReady.value) isAuthReady.value = true
+  })
 })
 const isLoggedIn = computed(() => !!currentUser.value)
 
