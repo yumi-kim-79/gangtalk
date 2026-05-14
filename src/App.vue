@@ -1,7 +1,7 @@
 <!-- src/App.vue -->
 <template>
   <div class="app-root">
-    <TopBar />
+    <TopBar v-if="!isDashboard" />
 
     <!-- 전환/캐싱 없이 안전하게 렌더링 (흰 화면 방지) -->
     <RouterView :key="$route.fullPath" />
@@ -18,16 +18,27 @@
 </template>
 
 <script setup>
-import { onMounted } from 'vue'
+import { onMounted, computed, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import TopBar from '@/components/TopBar.vue'
 import BottomNav from '@/components/BottomNav.vue'
 // import LeftConsultRibbon from '@/components/LeftConsultRibbon.vue'
 import NearbyMapModal from '@/components/map/NearbyMapModal.vue'
 import { applyThemeToDom, getTheme, attachThemeSync } from '@/store/theme.js'
 
+const route = useRoute()
+const isDashboard = computed(() => route.name === 'dashboard' || route.path === '/' || route.path === '/dashboard')
+
+// dashboard 라우트에서는 TopBar가 부착한 body 클래스도 제거해
+// .page 의 padding-top(60px) 보정이 새 헤더 위에 겹쳐 보이지 않도록 함
+watch(isDashboard, (on) => {
+  if (on) document.body.classList.remove('has-fixed-topbar')
+}, { immediate: true })
+
 onMounted(() => {
   applyThemeToDom(getTheme())
   attachThemeSync()
+  if (isDashboard.value) document.body.classList.remove('has-fixed-topbar')
 })
 </script>
 
