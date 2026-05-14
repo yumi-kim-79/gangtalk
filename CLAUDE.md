@@ -45,19 +45,31 @@ firebase deploy --only hosting
 - [ ] 구글플레이 등록
 - [ ] 애플 앱스토어 등록
 
-**현재 단계**: 강톡 탭 디자인 개편 완료, 웹앱 코드 점검 진행 중
+**현재 단계**: 현황판(MainPage) 전면 디자인 개편 완료
 
 ---
 
 ## 다음 작업
-1. 상단 슬라이더 배너 이미지 교체 (banner1~3.jpg → 실제 광고 이미지)
-2. 전체 코드 구조 분석 및 문제점 파악
-3. Capacitor 적용 전 웹앱 완성도 점검
-4. 모바일 대응 UI/UX 검토
+1. 알림벨/햄버거 메뉴 페이지 연결 (현재 mypage로 폴백)
+2. 핫이슈 텍스트를 Firestore config에서 가져오도록 연동
+3. 별점/리뷰 카운트 실제 데이터 연동
+4. Capacitor 적용 전 웹앱 완성도 점검
+5. 모바일 대응 UI/UX 검토
 
 ---
 
 ## 작업 로그
+
+### 2026-05-14: 현황판 메인페이지 전면 디자인 개편 (`feat/mainpage-redesign`)
+- **헤더**: 로고+타이틀+서브타이틀 / 알림벨(빨간 뱃지) + 햄버거 메뉴
+- **검색창**: 둥근 흰색 카드형, 좌측 돋보기 + 우측 필터 아이콘
+- **핫이슈 배너**: 핑크 그라디언트 pill 라벨 + 텍스트 + 화살표
+- **카테고리 탭**: 가로 스크롤, SVG 아이콘+텍스트 세로 배치, 선택시 핑크 원형 배경
+- **인기 업소 카드**: 정사각 썸네일+🔥인기 뱃지 / 업체명+지역업종+하트 / ⭐별점+리뷰 / 맞출방·필요인원·와이파이 3칸 그리드
+- **CTA 배너**: 비로그인 시 연핑크 카드(가입 유도 + 로그인 버튼)
+- **레거시 제거**: 뉴스 한줄, type-chip row, view-tools (다크모드/내주변/뷰모드/새로고침), 한줄/두칸 뷰 분기, 액션 칩(초톡/담당/채팅/게시판)
+- **보존**: 스크립트의 stores 구독/rooms_biz/vendors/auth/admin 편집 모드 로직 + 하단 액션시트/포털 모달
+- **새 헬퍼**: mpCategories(아이콘 SVG 포함), notifBadge, hotIssue, openNotif/openMenu/goEventDetail/goAllStores/goLogin/openFilter, favSet(localStorage), ratingOf/reviewCountOf/wifiText, isLoggedIn(computed)
 
 ### 2026-04-02: 커뮤니티 카드 이미지 상하단 어둡게 편집 (`fix/community-card-image-darkening`)
 - Pillow로 4개 이미지 상단 30%, 하단 30% 검정 그라디언트 적용 (최대 alpha 160)

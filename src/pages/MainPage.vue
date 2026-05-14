@@ -11,516 +11,194 @@
 
     <!-- ▲▲ 이벤트 오버레이 끝 ▲▲ -->
 
-    <!-- 상단: 검색 -->
-    <section class="top search-wrap search-lock">
-      <SearchBar v-model="q" @search="doSearch" />
-
-      <!-- 👇 기사 한줄 (검색창과 동일 세로폭) -->
-      <section class="news">
-        <div class="news-bar">
-          <div class="news-left">
-            <span class="news-ttl">기사한줄</span>
-            <!-- ✅ 자동 순환되는 currentNews 사용 + NEW 뱃지 제거 -->
-            <span class="news-headline ellip" @click="openNews(currentNews)">
-              {{ currentNews.title }}
-            </span>
-          </div>
-
-          <!-- 오른쪽 소형 더보기 -->
-          <div class="news-more in-bar">
-            <button class="more-btn" type="button" @click="newsOpen = !newsOpen">
-              {{ newsOpen ? '접기' : '더' }}
-            </button>
-          </div>
-        </div>
-
-        <!-- 더보기 클릭 시, 아래로 이전 기사 목록 펼침 -->
-        <ul v-if="newsOpen" class="news-list">
-          <li
-            v-for="(n, i) in olderNews"
-            :key="n.id || i"
-            class="news-item"
-            @click="openNews(n)"
-          >
-            <span class="dot">•</span>
-            <span class="txt ellip">{{ n.title }}</span>
-            <!-- ✅ NEW 뱃지 제거 -->
-          </li>
-        </ul>
-      </section>
-
-      <!-- 유형 칩(전체/하퍼/…) : '전체' 칩 안에 지역 드롭다운 포함 -->
-      <div class="type-row" aria-label="유형 선택">
-        <button
-          ref="allChipRef"
-          class="type-chip all-chip"
-          :class="{ on: type==='all' }"
-          type="button"
-          @click="openMacroMenu"
-        >
-          <span class="label">지역</span>
-          <span v-if="macro !== 'all'" class="macro-mini">{{ macroLabel(macro) }}</span>
-          <svg class="caret" viewBox="0 0 24 24" width="12" height="12" aria-hidden="true">
-            <path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-        </button>
-
-        <button
-          v-for="t in typeChips"
-          :key="t.key"
-          class="type-chip"
-          :class="{ on: type===t.key }"
-          type="button"
-          @click="setType(t.key)"
-        >{{ t.label }}</button>
-      </div>
-
-      <!-- 전체 칩 지역 드롭다운: portal -->
-      <teleport to="body">
-        <div
-          v-if="macroOpen"
-          class="macro-portal"
-          tabindex="-1"
-          @keydown.esc="macroOpen=false"
-        >
-          <div class="macro-backdrop" @click="macroOpen=false"></div>
-          <div class="macro-pop" :style="macroMenuStyle">
-            <button
-              v-for="m in macroOptions"
-              :key="m.key"
-              class="macro-item"
-              type="button"
-              :class="{ active: macro===m.key }"
-              @click="selectMacro(m.key)"
-            >{{ m.label }}</button>
-          </div>
-        </div>
-      </teleport>
-    </section>
-
-    <!-- ▽ 운영자 전용: 순서 편집 툴바 -->
-    <section v-if="canEdit" class="orders-head">
-      <div class="rank-tools">
-        <label class="toggle">
-          <input type="checkbox" v-model="editMode" @change="onEnterEdit" />
-          <span class="toggle-label">현황판 순서 편집</span>
-        </label>
-
-        <div class="tools-right">
-          <!-- 새로고침(왼쪽) -->
-          <button
-            class="icon-btn"
-            :disabled="savingOrders"
-            @click="refresh"
-            title="새로고침"
-            aria-label="새로고침"
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-              <path d="M21 12a9 9 0 1 1-2.64-6.36"/>
-              <path d="M21 3v6h-6"/>
-            </svg>
-          </button>
-          <!-- 저장(오른쪽) -->
-          <button
-            class="btn primary save-btn"
-            :disabled="!editMode || savingOrders"
-            @click="saveOrders"
-          >
-            {{ savingOrders ? '저장 중…' : '저장' }}
-          </button>
+    <!-- ===== Header ===== -->
+    <header class="mp-header">
+      <div class="mp-brand">
+        <span class="mp-brand-logo" aria-hidden="true">강톡</span>
+        <div class="mp-brand-text">
+          <h1 class="mp-brand-title">강남톡방</h1>
+          <p class="mp-brand-sub">강남의 모든 공간, 한눈에.</p>
         </div>
       </div>
-    </section>
-
-    <!-- ▼▼▼ 업체 현황판 ▼▼▼ -->
-    <section class="list-head" id="list">
-      <!-- (정렬 드롭다운이 있다면 여기 유지) -->
-
-      <!-- ▼ 가게찾기와 100% 동일한 아이콘 바 ▼ -->
-      <div class="view-tools" @click.stop>
-        <!-- 🌗 다크/화이트 모드 -->
-        <button
-          class="tool"
-          :title="isDark ? '라이트 모드' : '다크 모드'"
-          :aria-label="isDark ? '라이트 모드' : '다크 모드'"
-          type="button"
-          @click.stop.prevent="toggleTheme"
-          @touchstart.stop.prevent="toggleTheme"
-        >
-          <svg v-if="!isDark" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-            <circle cx="12" cy="12" r="4"></circle>
-            <path d="M12 2v2M12 20v2M4 12H2M22 12h-2M5 5l-1.5-1.5M20.5 20.5L19 19M5 19l-1.5 1.5M20.5 3.5L19 5"/>
+      <div class="mp-header-actions">
+        <button class="mp-icon-btn" type="button" aria-label="알림" @click="openNotif">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M18 16v-5a6 6 0 1 0-12 0v5l-2 3h16z"/>
+            <path d="M10 21a2 2 0 0 0 4 0"/>
           </svg>
-          <svg v-else viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-            <path d="M21 12.79A9 9 0 1 1 11.21 3a7 7 0 0 0 9.79 9.79z"></path>
-          </svg>
+          <span v-if="notifBadge > 0" class="mp-bell-badge">{{ notifBadge }}</span>
         </button>
-
-        <!-- 📍 내 주변(10km) -->
-        <button
-          class="tool"
-          :class="{ on: near.enabled }"
-          title="내 주변 보기(10km)"
-          aria-label="내 주변 보기(10km)"
-          type="button"
-          @click.stop.prevent="openNearby"
-          @touchstart.stop.prevent="openNearby"
-        >
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-            <circle cx="12" cy="10" r="3"></circle>
-            <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>
-            <path d="M7 10c0 5 5 12 5 12s5-7 5-12a5 5 0 1 0-10 0z"/>
-          </svg>
-        </button>
-
-        <!-- 📋/🗂 한줄/두칸 토글 (단일 버튼) -->
-        <button
-          class="tool"
-          :class="{ on: isListView }"
-          :title="isListView ? '두칸보기' : '한줄보기'"
-          :aria-label="isListView ? '두칸보기로 전환' : '한줄보기로 전환'"
-          type="button"
-          @click.stop.prevent="toggleViewMode"
-          @touchstart.stop.prevent="toggleViewMode"
-        >
-          <!-- 현재 한줄보기일 때: 리스트 아이콘 -->
-          <svg v-if="isListView" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+        <button class="mp-icon-btn" type="button" aria-label="메뉴" @click="openMenu">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
             <path d="M4 7h16M4 12h16M4 17h16"/>
           </svg>
-          <!-- 현재 두칸보기일 때: 그리드 아이콘 -->
-          <svg v-else viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
-            <rect x="4" y="4" width="7" height="7" rx="1"></rect>
-            <rect x="13" y="4" width="7" height="7" rx="1"></rect>
-            <rect x="4" y="13" width="7" height="7" rx="1"></rect>
-            <rect x="13" y="13" width="7" height="7" rx="1"></rect>
-          </svg>
         </button>
+      </div>
+    </header>
 
-        <!-- 🔄 새로고침 -->
-        <button
-          class="tool"
-          title="새로고침"
-          aria-label="새로고침"
-          type="button"
-          @click.stop.prevent="refresh"
-          @touchstart.stop.prevent="refresh"
-        >
+    <!-- ===== Search ===== -->
+    <section class="mp-search">
+      <div class="mp-search-box">
+        <svg class="mp-search-ic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <circle cx="11" cy="11" r="7"/>
+          <path d="M21 21l-4.3-4.3"/>
+        </svg>
+        <input v-model="q" type="search" class="mp-search-input" placeholder="업체명, 지역, 업종을 검색해보세요" @keyup.enter="doSearch" />
+        <button class="mp-search-filter" type="button" aria-label="필터" @click="openFilter">
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-            <path d="M21 12a9 9 0 1 1-2.64-6.36"/>
-            <path d="M21 3v6h-6"/>
+            <path d="M4 6h12"/>
+            <path d="M4 12h8"/>
+            <path d="M4 18h14"/>
+            <circle cx="18" cy="6" r="2" fill="currentColor"/>
+            <circle cx="14" cy="12" r="2" fill="currentColor"/>
+            <circle cx="20" cy="18" r="2" fill="currentColor"/>
           </svg>
         </button>
       </div>
     </section>
 
-    <!-- ▽ 편집 리스트(드래그) -->
-    <section v-if="canEdit && editMode" class="reorder-sec">
-      <h4 class="sec-ttl">현황판 노출 순서 편집</h4>
-      <ul class="reorder-list">
+    <!-- ===== Hot Issue Banner ===== -->
+    <section class="mp-hot" @click="goEventDetail">
+      <span class="mp-hot-pill">🔥 핫이슈</span>
+      <span class="mp-hot-text">{{ hotIssue }}</span>
+      <svg class="mp-hot-arrow" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+        <path d="M9 18l6-6-6-6"/>
+      </svg>
+    </section>
+
+    <!-- ===== Category Tabs ===== -->
+    <section class="mp-cat">
+      <div class="mp-cat-scroll">
+        <button
+          v-for="c in mpCategories"
+          :key="c.key"
+          class="mp-cat-item"
+          :class="{ on: type === c.key }"
+          type="button"
+          @click="setType(c.key)"
+        >
+          <span class="mp-cat-ic" :class="{ on: type === c.key }" aria-hidden="true" v-html="c.iconSvg"></span>
+          <span class="mp-cat-label">{{ c.label }}</span>
+        </button>
+        <button class="mp-cat-expand" type="button" aria-label="더 보기" @click="expandCategories = !expandCategories">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" :style="expandCategories ? 'transform:rotate(180deg)' : ''">
+            <path d="M6 9l6 6 6-6"/>
+          </svg>
+        </button>
+      </div>
+    </section>
+
+    <!-- ===== 강남 인기 업소 ===== -->
+    <section class="mp-section">
+      <header class="mp-section-head">
+        <h2 class="mp-section-title">✨ 강남 인기 업소</h2>
+        <button class="mp-section-more" type="button" @click="goAllStores">더보기 ›</button>
+      </header>
+
+      <!-- 운영자 전용 편집 토글 -->
+      <div v-if="canEdit" class="mp-admin-row">
+        <label class="mp-admin-toggle">
+          <input type="checkbox" v-model="editMode" @change="onEnterEdit" />
+          <span>순서 편집</span>
+        </label>
+        <button
+          v-if="editMode"
+          class="mp-admin-save"
+          type="button"
+          :disabled="savingOrders"
+          @click="saveOrders"
+        >{{ savingOrders ? '저장 중…' : '저장' }}</button>
+      </div>
+
+      <!-- 편집 리스트 -->
+      <ul v-if="canEdit && editMode" class="mp-reorder">
         <li
           v-for="(s,i) in editableList"
           :key="s.id"
-          class="re-item"
+          class="mp-re-item"
           draggable="true"
           @dragstart="onListDragStart(i, $event)"
           @dragover="onListDragOver(i, $event)"
           @drop="onListDrop"
           @dragend="onListDragEnd"
         >
-          <span class="re-handle" title="드래그해서 이동">☰</span>
-          <span class="re-rank">{{ i+1 }}</span>
-          <span class="re-name ellip">{{ s.name }}</span>
-          <span class="re-sub ellip">{{ s.region }} · {{ mapCat[s.category] || s.category }}</span>
+          <span class="mp-re-handle">☰</span>
+          <span class="mp-re-rank">{{ i+1 }}</span>
+          <span class="mp-re-name">{{ s.name }}</span>
         </li>
       </ul>
-      <div class="re-hint muted small">
-        * 현재 보기의 상위 {{ EDITABLE_LIMIT }}개 항목만 편집합니다. 저장하면 모든 사용자에게 적용됩니다.
+
+      <!-- 업소 카드 리스트 -->
+      <div v-if="!editMode" class="mp-stores">
+        <article
+          v-for="s in filtered.slice(0, 20)"
+          :key="s.id"
+          class="mp-store"
+          @click="openStore(s)"
+        >
+          <div class="mp-store-img" :style="bgStyle(thumbOf(s))">
+            <span class="mp-store-badge">🔥 인기</span>
+          </div>
+          <div class="mp-store-body">
+            <div class="mp-store-head">
+              <div class="mp-store-name-wrap">
+                <div class="mp-store-name">{{ s.name }}</div>
+                <div class="mp-store-sub">{{ s.region }} · {{ mapCat[s.category] || s.category }}</div>
+              </div>
+              <button class="mp-heart" type="button" @click.stop="toggleFav(s)" :class="{ on: isFav(s) }" aria-label="찜">
+                <svg viewBox="0 0 24 24" width="20" height="20" :fill="isFav(s) ? '#ff4d8d' : 'none'" :stroke="isFav(s) ? '#ff4d8d' : 'currentColor'" stroke-width="2" stroke-linejoin="round">
+                  <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+                </svg>
+              </button>
+            </div>
+
+            <div class="mp-store-rating">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="#ffb800" aria-hidden="true">
+                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87L18.18 22 12 18.56 5.82 22 7 14.14 2 9.27l6.91-1.01z"/>
+              </svg>
+              <span class="mp-rate">{{ ratingOf(s) }}</span>
+              <span class="mp-rcount">리뷰 {{ reviewCountOf(s) }}</span>
+            </div>
+
+            <div class="mp-store-metrics">
+              <div class="mp-metric">
+                <div class="mp-metric-num pink">{{ isRoomsBizReady ? s.match : '—' }}</div>
+                <div class="mp-metric-label">맞출방</div>
+              </div>
+              <div class="mp-metric">
+                <div class="mp-metric-num pink">{{ isRoomsBizReady ? s.persons : '—' }}</div>
+                <div class="mp-metric-label">필요인원</div>
+              </div>
+              <div class="mp-metric">
+                <div class="mp-metric-wifi" :class="wifiColor(s)">
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                    <path d="M5 12.55a11 11 0 0 1 14.08 0"/>
+                    <path d="M8.5 16a6 6 0 0 1 7 0"/>
+                    <path d="M12 20h.01"/>
+                  </svg>
+                  <span>{{ wifiText(s) }}</span>
+                </div>
+                <div class="mp-metric-label">와이파이</div>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <div v-if="!filtered.length" class="mp-empty">표시할 업소가 없습니다.</div>
       </div>
     </section>
 
-    <!-- ===== 한줄 보기 ===== -->
-    <section v-if="isListView" class="list">
-      <article v-for="s in filtered" :key="s.id" class="row-card">
-        <div class="r-left">
-          <!-- 왼쪽: 사진만 -->
-          <div class="thumb-wrap">
-            <div
-              class="thumb wide click"
-              :style="bgStyle(thumbOf(s))"
-              @click.stop.prevent="noop"
-              @touchstart.passive="tapStart"
-              @touchmove.passive="tapMove"
-              @touchend.stop.prevent="tapEnd(() => openStore(s))"
-              @mousedown="mouseStart"
-              @mousemove="mouseMove"
-              @mouseup="mouseEnd(() => openStore(s))"
-            ></div>
-          </div>
-        </div>
-
-        <!-- 오른쪽: 정보 헤더 + 3개 지표 (단일 .r-right 안에 모두 배치) -->
-        <div class="r-right tight">
-          <!-- 정보 헤더 (같은 줄) -->
-          <div class="info-line">
-            <div
-              class="info-name ellip click"
-              @click.stop.prevent="noop"
-              @touchstart.passive="tapStart"
-              @touchmove.passive="tapMove"
-              @touchend.stop.prevent="tapEnd(() => openStore(s))"
-              @mousedown="mouseStart"
-              @mousemove="mouseMove"
-              @mouseup="mouseEnd(() => openStore(s))"
-            >{{ s.name }}</div>
-            <div class="info-sub nowrap">
-              {{ s.region }} · {{ mapCat[s.category] || s.category }}
-            </div>
-          </div>
-
-          <!-- 3개 지표(맞출방/필요인원/혼잡도) -->
-          <div class="metric-wide" v-match-thumb>
-            <button class="metric big"
-                    type="button"
-                    :class="{ editable: canEditStore(s) }"
-                    @click="canEditStore(s) && openMetricEditor(s, 'rooms')">
-              <!-- 🔹 rooms_biz 준비 전에는 숫자 대신 대시(—) -->
-              <div class="num">{{ isRoomsBizReady ? s.match : '—' }}</div>
-              <div class="lbl">맞출방</div>
-            </button>
-
-            <button class="metric big"
-                    type="button"
-                    :class="{ editable: canEditStore(s) }"
-                    @click="canEditStore(s) && openMetricEditor(s, 'persons')">
-              <div class="num">{{ isRoomsBizReady ? s.persons : '—' }}</div>
-              <div class="lbl">필요인원</div>
-            </button>
-
-            <div class="metric big demand" :class="wifiColor(s)">
-              <div class="wifi-dot mini-wifi" :class="wifiColor(s)" aria-label="혼잡도">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-                  <path d="M5 12.55a11 11 0 0 1 14.08 0"/>
-                  <path d="M8.5 16a6 6 0 0 1 7 0"/>
-                  <path d="M12 20h.01"/>
-                </svg>
-              </div>
-              <!-- ✅ 혼잡도 텍스트도 준비 전에는 감춤 -->
-              <div class="lbl">{{ isRoomsBizReady ? statusLabel(s) : '—' }}</div>
-            </div>
-          </div>
-        </div>
-
-        <!-- 하단 액션 4개(초톡/담당/채팅/게시판) -->
-        <div class="r-actions chip-row actions" @click.stop>
-          <!-- 초톡 -->
-          <button class="chip action" type="button"
-                  @click.stop.prevent="noop"
-                  @touchstart.stop.passive="chotokTouchStart($event, s)"
-                  @touchmove.stop.passive="chotokTouchMove($event)"
-                  @touchend.stop.prevent="(cancelChotokHold(), tapEnd(() => openChotok(s)))"
-                  @mousedown.stop="chotokMouseStart($event, s)"
-                  @mousemove.stop="chotokMouseMove($event)"
-                  @mouseup.stop="(cancelChotokHold(), mouseEnd(() => openChotok(s)))"
-                  @mouseleave.stop="cancelChotokHold">
-            <i class="icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-                <rect x="2" y="2" width="20" height="20" rx="6" ry="6"></rect>
-                <text x="12" y="15" text-anchor="middle" font-size="10" fill="#fff" font-weight="900">강</text>
-              </svg>
-            </i>
-            <span class="txt">초톡</span>
-          </button>
-
-          <!-- 담당 -->
-          <!-- (한줄 보기 r-actions 안) 담당 버튼 - 담당자 리스트 시트 열기 -->
-          <button class="chip action" type="button"
-                  @click.stop="openManagerList(s)"
-                  @touchend.stop.prevent="openManagerList(s)">
-            <i class="icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-                <path d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5z"/>
-                <path d="M2 21a10 10 0 0 1 20 0z"/>
-              </svg>
-            </i>
-            <span class="txt">담당</span>
-          </button>
-
-          <!-- 채팅(오픈채팅) -->
-          <button class="chip action" type="button"
-                  @click.stop.prevent="noop"
-                  @touchstart.passive="tapStart"
-                  @touchmove.passive="tapMove"
-                  @touchend.stop.prevent="tapEnd(() => openOpenChat(s))"
-                  @mousedown="mouseStart"
-                  @mousemove="mouseMove"
-                  @mouseup="mouseEnd(() => openOpenChat(s))">
-            <i class="icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M22 2L11 13"/>
-                <path d="M22 2l-7 20-4-9-9-4 20-7z"/>
-              </svg>
-            </i>
-            <span class="txt">채팅</span>
-          </button>
-
-          <!-- (list 뷰) -->
-          <button class="chip action" type="button"
-                  @click.stop.prevent="noop"
-                  @touchstart.passive="tapStart"
-                  @touchmove.passive="tapMove"
-                  @touchend.stop.prevent="tapEnd(() => openStoreBoard(s))"
-                  @mousedown="mouseStart"
-                  @mousemove="mouseMove"
-                  @mouseup="mouseEnd(() => openStoreBoard(s))">
-            <i class="icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-                <path d="M5 2h10l4 4v16H5z"/>
-                <path d="M15 2v4h4"/>
-                <rect x="7" y="10" width="10" height="2" rx="1"/>
-                <rect x="7" y="14" width="10" height="2" rx="1"/>
-              </svg>
-            </i>
-            <span class="txt">게시판</span>
-          </button>
-        </div>
-      </article>
+    <!-- ===== CTA Banner (비로그인) ===== -->
+    <section v-if="!isLoggedIn" class="mp-cta" @click="goLogin">
+      <div class="mp-cta-text">
+        <div class="mp-cta-small">지금 가입하면</div>
+        <div class="mp-cta-title">맞춤 업소 추천을 받아보세요! <span class="mp-cta-spark">✨</span></div>
+        <div class="mp-cta-desc">내 취향에 딱 맞는 공간을 찾아드립니다.</div>
+      </div>
+      <button class="mp-cta-btn" type="button" @click.stop="goLogin">로그인 / 회원가입</button>
     </section>
 
-    <!-- ===== 두칸 보기 ===== -->
-    <section v-else class="grid">
-      <article v-for="s in filtered" :key="s.id" class="grid-card">
-        <!-- grid 뷰: 카드 우상단 핀 (상태 클래스 연결) -->
-        <div class="wifi-pin grid-pin" :class="wifiColor(s)" aria-label="혼잡도">
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-            <path d="M5 12.55a11 11 0 0 1 14.08 0"/>
-            <path d="M8.5 16a6 6 0 0 1 7 0"/>
-            <path d="M12 20h.01"/>
-          </svg>
-        </div>
 
-        <div class="row-top">
-          <div
-            class="thumb small click"
-            :style="bgStyle(thumbOf(s))"
-            @click.stop.prevent="noop"
-            @touchstart.passive="tapStart"
-            @touchmove.passive="tapMove"
-            @touchend.stop.prevent="tapEnd(() => openStore(s))"
-            @mousedown="mouseStart"
-            @mousemove="mouseMove"
-            @mouseup="mouseEnd(() => openStore(s))"
-          ></div>
-
-          <div class="meta">
-            <div
-              class="g-name ellip click"
-              @click.stop.prevent="noop"
-              @touchstart.passive="tapStart"
-              @touchmove.passive="tapMove"
-              @touchend.stop.prevent="tapEnd(() => openStore(s))"
-              @mousedown="mouseStart"
-              @mousemove="mouseMove"
-              @mouseup="mouseEnd(() => openStore(s))"
-            >{{ s.name }}</div>
-            <div class="g-sub ellip">{{ s.region }} · {{ mapCat[s.category] || s.category }}</div>
-            <!-- 담당 표시 제거 -->
-          </div>
-        </div>
-
-        <!-- ▶ 두칸보기 지표: 맞출방 / 필요인원  (폭 축소 + 중앙 배치) -->
-        <div class="mini-stats g-mini-stats">
-          <button class="mini"
-                  type="button"
-                  :class="{ editable: canEditStore(s) }"
-                  @click="canEditStore(s) && openMetricEditor(s, 'rooms')">
-            <div class="num">{{ isRoomsBizReady ? s.match : '—' }}</div>
-            <div class="lbl">맞출방</div>
-          </button>
-          <button class="mini"
-                  type="button"
-                  :class="{ editable: canEditStore(s) }"
-                  @click="canEditStore(s) && openMetricEditor(s, 'persons')">
-            <div class="num">{{ isRoomsBizReady ? s.persons : '—' }}</div>
-            <div class="lbl">필요인원</div>
-          </button>
-        </div>
-
-        <!-- 액션(아이콘만 + 중앙 정렬) -->
-        <div class="chip-row actions" @click.stop>
-          <button class="chip action" type="button"
-                  aria-label="초톡"
-                  @click.stop.prevent="noop"
-                  @touchstart.stop.passive="chotokTouchStart($event, s)"
-                  @touchmove.stop.passive="chotokTouchMove($event)"
-                  @touchend.stop.prevent="chotokTouchEnd(s)"
-                  @mousedown.stop="chotokMouseStart($event, s)"
-                  @mousemove.stop="chotokMouseMove($event)"
-                  @mouseup.stop="chotokMouseEnd(s)"
-                  @mouseleave.stop="cancelChotokHold">
-            <i class="icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-                <rect x="2" y="2" width="20" height="20" rx="6" ry="6"></rect>
-                <text x="12" y="15" text-anchor="middle" font-size="10" fill="#fff" font-weight="900">강</text>
-              </svg>
-            </i>
-            <span class="txt">초톡</span>
-          </button>
-
-          <!-- (두칸 보기 grid-card 안) 담당 버튼 - 담당자 리스트 시트 열기 -->
-          <button class="chip action" type="button"
-                  aria-label="담당"
-                  @click.stop="openManagerList(s)"
-                  @touchend.stop.prevent="openManagerList(s)">
-            <i class="icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-                <path d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5z"/>
-                <path d="M2 21a10 10 0 0 1 20 0z"/>
-              </svg>
-            </i>
-            <span class="txt">담당</span>
-          </button>
-
-          <button class="chip action" type="button"
-                  aria-label="채팅"
-                  @click.stop.prevent="noop"
-                  @touchstart.passive="tapStart"
-                  @touchmove.passive="tapMove"
-                  @touchend.stop.prevent="tapEnd(() => openOpenChat(s))"
-                  @mousedown="mouseStart"
-                  @mousemove="mouseMove"
-                  @mouseup="mouseEnd(() => openOpenChat(s))">
-            <i class="icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M22 2L11 13"/>
-                <path d="M22 2l-7 20-4-9-9-4 20-7z"/>
-              </svg>
-            </i>
-            <span class="txt">채팅</span>
-          </button>
-
-          <!-- (grid 뷰) -->
-          <button class="chip action" type="button"
-                  @click.stop.prevent="noop"
-                  @touchstart.passive="tapStart"
-                  @touchmove.passive="tapMove"
-                  @touchend.stop.prevent="tapEnd(() => openStoreBoard(s))"
-                  @mousedown="mouseStart"
-                  @mousemove="mouseMove"
-                  @mouseup="mouseEnd(() => openStoreBoard(s))">
-            <i class="icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-                <path d="M5 2h10l4 4v16H5z"/>
-                <path d="M15 2v4h4"/>
-                <rect x="7" y="10" width="10" height="2" rx="1"/>
-                <rect x="7" y="14" width="10" height="2" rx="1"/>
-              </svg>
-            </i>
-            <span class="txt">게시판</span>
-          </button>
-        </div>
-      </article>
-    </section>
-    <!-- ▲▲▲ 업체 현황판 끝 ▲▲▲ -->
 
     <!-- ====== 담당 드롭다운 포털 ====== -->
     <teleport to="body">
@@ -1206,6 +884,96 @@ const typeChips = [
   { key:'kara',   label:'가라오케' },
   { key:'etc',    label:'기타' },
 ]
+
+/* ===== 새 디자인용 카테고리 (아이콘 포함) ===== */
+const mpCategories = [
+  { key:'all',    label:'전체',   iconSvg:'<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg>' },
+  { key:'hopper', label:'하퍼',   iconSvg:'<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h14l-2 6a5 5 0 0 1-10 0z"/><path d="M12 10v8"/><path d="M8 21h8"/></svg>' },
+  { key:'point5', label:'쩜오',   iconSvg:'<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9 13c0 1.5 1.3 2.5 3 2.5s3-1 3-2.5-1.3-2.5-3-2.5h-1l1-3h3"/></svg>' },
+  { key:'ten',    label:'텐카페', iconSvg:'<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11h14a4 4 0 0 1 0 8H3z"/><path d="M17 13h2a2 2 0 0 1 0 4h-2"/><path d="M7 4v3M11 4v3M15 4v3"/></svg>' },
+  { key:'tenpro', label:'텐프로', iconSvg:'<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87L18.18 22 12 18.56 5.82 22 7 14.14 2 9.27l6.91-1.01z"/></svg>' },
+  { key:'bar',    label:'바(Bar)', iconSvg:'<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3h14l-7 9z"/><path d="M12 12v8"/><path d="M8 21h8"/></svg>' },
+  { key:'onep',   label:'일프로', iconSvg:'<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 6h2v12"/><path d="M8 18h6"/></svg>' },
+  { key:'nrb',    label:'노래방', iconSvg:'<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="3" width="4" height="11" rx="2"/><path d="M5 11a5 5 0 0 0 10 0"/><path d="M10 16v4"/><path d="M7 20h6"/></svg>' },
+  { key:'kara',   label:'가라오케', iconSvg:'<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>' },
+  { key:'etc',    label:'기타',   iconSvg:'<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>' },
+]
+const expandCategories = ref(false)
+
+/* ===== 새 디자인용 헤더 액션 ===== */
+const notifBadge = ref(3)
+const hotIssue = ref('강남톡방 그랜드오픈 이벤트 진행중!')
+
+function openNotif(){
+  router.push({ name: 'mypage' }).catch(()=>{})
+}
+function openMenu(){
+  router.push({ name: 'mypage' }).catch(()=>{})
+}
+function goEventDetail(){
+  router.push({ name: 'EventDetail' }).catch(()=>{})
+}
+function goAllStores(){
+  router.push({ name: 'finder' }).catch(()=>{})
+}
+function goLogin(){
+  router.push({ name: 'auth' }).catch(()=>{})
+}
+function openFilter(){
+  // 토글식 필터: 카테고리 전체로 리셋
+  type.value = 'all'
+}
+
+/* ===== 찜(로컬 저장) ===== */
+const favSet = ref(new Set())
+function _loadFavs(){
+  try {
+    const raw = localStorage.getItem('mp:favs')
+    const arr = raw ? JSON.parse(raw) : []
+    favSet.value = new Set(Array.isArray(arr) ? arr.map(String) : [])
+  } catch { favSet.value = new Set() }
+}
+function _saveFavs(){
+  try { localStorage.setItem('mp:favs', JSON.stringify(Array.from(favSet.value))) } catch {}
+}
+_loadFavs()
+function isFav(s){ return s?.id ? favSet.value.has(String(s.id)) : false }
+function toggleFav(s){
+  if (!s?.id) return
+  const id = String(s.id)
+  const next = new Set(favSet.value)
+  if (next.has(id)) next.delete(id); else next.add(id)
+  favSet.value = next
+  _saveFavs()
+}
+
+/* ===== 별점/리뷰 (스토어 데이터 우선, 폴백 기본값) ===== */
+function ratingOf(s){
+  const r = Number(s?.rating ?? s?.stars ?? s?.score)
+  if (Number.isFinite(r) && r > 0) return r.toFixed(1)
+  return '4.8'
+}
+function reviewCountOf(s){
+  const n = Number(s?.reviewCount ?? s?.reviews ?? s?.reviewsCount)
+  if (Number.isFinite(n) && n >= 0) return n
+  return 128
+}
+
+/* ===== 와이파이 상태 텍스트 ===== */
+function wifiText(s){
+  const c = wifiColor(s)
+  if (c === 'ok')   return '좋음'
+  if (c === 'busy') return '나쁨'
+  return '보통'
+}
+
+/* ===== 로그인 상태 ===== */
+const currentUser = ref(null)
+onMounted(() => {
+  currentUser.value = auth.currentUser
+  onAuthStateChanged(auth, (u)=>{ currentUser.value = u })
+})
+const isLoggedIn = computed(() => !!currentUser.value)
 
 /* 지역 드롭다운 */
 const macroOptions = [
@@ -2551,13 +2319,507 @@ onUnmounted(() => {
 }
 
 .page{
-  /* ⬇️ 가게찾기 페이지와 상단 여백(검색창 높이) 맞추기 */
+  /* 새 디자인: 페이지 배경/여백 */
+  background: var(--bg, #fafafa);
   padding-top: 8px;
   padding-left:  max(12px, env(safe-area-inset-left));
   padding-right: max(12px, env(safe-area-inset-right));
-  /* 하단 탭 + 홈인디케이터 만큼 여유 */
   padding-bottom: calc(var(--tabbar-height) + env(safe-area-inset-bottom));
 }
+
+/* =================================
+ * ▼▼▼ 새 디자인 (MainPage v3) ▼▼▼
+ * ================================= */
+
+/* ===== Header ===== */
+.mp-header{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  padding:8px 4px 12px;
+}
+.mp-brand{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  min-width:0;
+}
+.mp-brand-logo{
+  flex:none;
+  width:38px; height:38px;
+  border-radius:12px;
+  background:linear-gradient(135deg, #ff6b9d 0%, #ff4d8d 100%);
+  color:#fff;
+  font-weight:900;
+  font-size:14px;
+  display:grid; place-items:center;
+  letter-spacing:-0.5px;
+  box-shadow:0 4px 10px rgba(255,77,141,.25);
+}
+.mp-brand-text{ min-width:0; line-height:1.1; }
+.mp-brand-title{
+  margin:0;
+  font-size:18px;
+  font-weight:900;
+  color:var(--fg, #111);
+  letter-spacing:-0.3px;
+}
+.mp-brand-sub{
+  margin:2px 0 0;
+  font-size:11px;
+  color:var(--muted, #888);
+  font-weight:500;
+}
+.mp-header-actions{
+  display:flex;
+  align-items:center;
+  gap:4px;
+}
+.mp-icon-btn{
+  position:relative;
+  width:38px; height:38px;
+  border-radius:50%;
+  background:transparent;
+  border:none;
+  display:grid; place-items:center;
+  color:var(--fg, #222);
+  cursor:pointer;
+}
+.mp-icon-btn:active{ background:rgba(0,0,0,.05); }
+.mp-bell-badge{
+  position:absolute;
+  top:4px; right:4px;
+  min-width:16px; height:16px;
+  padding:0 4px;
+  border-radius:999px;
+  background:#ff4d8d;
+  color:#fff;
+  font-size:10px;
+  font-weight:800;
+  line-height:16px;
+  text-align:center;
+  border:2px solid var(--bg, #fafafa);
+  box-sizing:content-box;
+}
+
+/* ===== Search ===== */
+.mp-search{
+  padding:0 4px 10px;
+}
+.mp-search-box{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  height:48px;
+  padding:0 14px;
+  background:var(--surface, #fff);
+  border-radius:14px;
+  box-shadow:0 2px 10px rgba(0,0,0,.05);
+  border:1px solid var(--line, #f0f0f0);
+}
+.mp-search-ic{
+  flex:none;
+  color:var(--muted, #999);
+}
+.mp-search-input{
+  flex:1;
+  min-width:0;
+  border:none;
+  outline:none;
+  background:transparent;
+  font-size:14px;
+  color:var(--fg, #222);
+  font-weight:500;
+}
+.mp-search-input::placeholder{ color:var(--muted, #bbb); font-weight:400; }
+.mp-search-filter{
+  flex:none;
+  background:transparent;
+  border:none;
+  width:28px; height:28px;
+  display:grid; place-items:center;
+  color:var(--muted, #999);
+  cursor:pointer;
+  padding:0;
+}
+.mp-search-filter:active{ color:var(--accent, #ff4d8d); }
+
+/* ===== Hot Issue ===== */
+.mp-hot{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  padding:12px 14px;
+  background:var(--surface, #fff);
+  border-radius:14px;
+  margin:0 4px 14px;
+  box-shadow:0 2px 10px rgba(0,0,0,.04);
+  cursor:pointer;
+}
+.mp-hot:active{ transform:scale(0.99); }
+.mp-hot-pill{
+  flex:none;
+  padding:4px 10px;
+  background:linear-gradient(135deg, #ff6b9d, #ff4d8d);
+  color:#fff;
+  font-size:11px;
+  font-weight:800;
+  border-radius:999px;
+  white-space:nowrap;
+}
+.mp-hot-text{
+  flex:1;
+  min-width:0;
+  font-size:13px;
+  font-weight:600;
+  color:var(--fg, #222);
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.mp-hot-arrow{
+  flex:none;
+  color:var(--muted, #aaa);
+}
+
+/* ===== Category Tabs ===== */
+.mp-cat{
+  padding:4px 0 12px;
+  position:relative;
+}
+.mp-cat-scroll{
+  display:flex;
+  align-items:flex-start;
+  gap:14px;
+  overflow-x:auto;
+  padding:4px 4px 8px;
+  scrollbar-width:none;
+  -webkit-overflow-scrolling:touch;
+}
+.mp-cat-scroll::-webkit-scrollbar{ display:none; }
+.mp-cat-item{
+  flex:none;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:6px;
+  background:none;
+  border:none;
+  padding:0;
+  cursor:pointer;
+  min-width:54px;
+}
+.mp-cat-ic{
+  width:48px; height:48px;
+  border-radius:50%;
+  display:grid; place-items:center;
+  border:1.5px solid var(--line, #e8e8e8);
+  background:var(--surface, #fff);
+  color:var(--muted, #999);
+  transition:all .15s ease;
+}
+.mp-cat-ic.on{
+  background:linear-gradient(135deg, #ff6b9d, #ff4d8d);
+  border-color:transparent;
+  color:#fff;
+  box-shadow:0 4px 12px rgba(255,77,141,.3);
+}
+.mp-cat-label{
+  font-size:11px;
+  font-weight:600;
+  color:var(--muted, #999);
+}
+.mp-cat-item.on .mp-cat-label{
+  color:#ff4d8d;
+  font-weight:800;
+}
+.mp-cat-expand{
+  flex:none;
+  width:32px; height:48px;
+  border:none;
+  background:none;
+  display:grid; place-items:center;
+  color:var(--muted, #bbb);
+  cursor:pointer;
+  align-self:flex-start;
+  margin-top:0;
+}
+
+/* ===== 강남 인기 업소 섹션 ===== */
+.mp-section{
+  padding:8px 4px 16px;
+}
+.mp-section-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  margin-bottom:14px;
+  padding:0 2px;
+}
+.mp-section-title{
+  margin:0;
+  font-size:17px;
+  font-weight:900;
+  color:var(--fg, #111);
+  letter-spacing:-0.3px;
+}
+.mp-section-more{
+  background:none;
+  border:none;
+  font-size:13px;
+  font-weight:600;
+  color:var(--muted, #888);
+  cursor:pointer;
+  padding:4px 6px;
+}
+
+/* admin */
+.mp-admin-row{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  margin-bottom:10px;
+  padding:0 4px;
+}
+.mp-admin-toggle{ display:inline-flex; align-items:center; gap:6px; font-size:12px; color:var(--muted, #888); }
+.mp-admin-save{
+  padding:6px 12px;
+  background:linear-gradient(135deg, #ff6b9d, #ff4d8d);
+  color:#fff;
+  border:none;
+  border-radius:999px;
+  font-weight:800;
+  font-size:12px;
+  cursor:pointer;
+}
+.mp-admin-save:disabled{ opacity:.5; }
+.mp-reorder{
+  list-style:none;
+  margin:0 0 12px;
+  padding:0;
+  display:flex; flex-direction:column; gap:6px;
+}
+.mp-re-item{
+  display:flex; align-items:center; gap:10px;
+  padding:8px 12px; background:var(--surface, #fff); border-radius:10px;
+  border:1px solid var(--line, #f0f0f0); font-size:13px;
+}
+.mp-re-handle{ color:var(--muted, #bbb); }
+.mp-re-rank{ font-weight:800; color:var(--accent, #ff4d8d); min-width:18px; }
+.mp-re-name{ flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
+/* Store cards */
+.mp-stores{
+  display:flex;
+  flex-direction:column;
+}
+.mp-store{
+  display:flex;
+  gap:12px;
+  padding:14px 4px;
+  border-bottom:1px solid var(--line, #f0f0f0);
+  cursor:pointer;
+  align-items:stretch;
+}
+.mp-store:last-child{ border-bottom:none; }
+.mp-store:active{ background:rgba(0,0,0,.02); }
+
+.mp-store-img{
+  flex:none;
+  width:96px; height:96px;
+  border-radius:12px;
+  background-color:#f0f0f0;
+  background-size:cover;
+  background-position:center;
+  background-repeat:no-repeat;
+  position:relative;
+  overflow:hidden;
+}
+.mp-store-badge{
+  position:absolute;
+  top:6px; left:6px;
+  padding:3px 7px;
+  background:linear-gradient(135deg, #ff6b9d, #ff4d8d);
+  color:#fff;
+  font-size:10px;
+  font-weight:800;
+  border-radius:999px;
+  white-space:nowrap;
+  box-shadow:0 2px 6px rgba(255,77,141,.4);
+}
+
+.mp-store-body{
+  flex:1;
+  min-width:0;
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+}
+.mp-store-head{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:8px;
+}
+.mp-store-name-wrap{ min-width:0; flex:1; }
+.mp-store-name{
+  font-size:15px;
+  font-weight:800;
+  color:var(--fg, #111);
+  letter-spacing:-0.2px;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.mp-store-sub{
+  margin-top:2px;
+  font-size:12px;
+  color:var(--muted, #999);
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.mp-heart{
+  flex:none;
+  width:28px; height:28px;
+  border:none;
+  background:transparent;
+  display:grid; place-items:center;
+  color:var(--muted, #ccc);
+  cursor:pointer;
+  padding:0;
+}
+.mp-heart.on{ color:#ff4d8d; }
+
+.mp-store-rating{
+  display:flex;
+  align-items:center;
+  gap:4px;
+  font-size:12px;
+  color:var(--muted, #888);
+}
+.mp-rate{ font-weight:700; color:var(--fg, #222); margin-left:2px; }
+.mp-rcount{ margin-left:4px; color:var(--muted, #aaa); }
+
+.mp-store-metrics{
+  display:grid;
+  grid-template-columns:repeat(3, 1fr);
+  gap:6px;
+  margin-top:2px;
+}
+.mp-metric{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:2px;
+  padding:6px 2px;
+  background:var(--surface, #fafafa);
+  border-radius:8px;
+}
+.mp-metric-num{
+  font-size:15px;
+  font-weight:900;
+  line-height:1.1;
+}
+.mp-metric-num.pink{ color:#ff4d8d; }
+.mp-metric-label{
+  font-size:10px;
+  color:var(--muted, #999);
+  font-weight:500;
+}
+.mp-metric-wifi{
+  display:inline-flex;
+  align-items:center;
+  gap:3px;
+  font-size:11px;
+  font-weight:700;
+  line-height:1.1;
+}
+.mp-metric-wifi.ok   { color:#22c55e; }
+.mp-metric-wifi.mid  { color:#f59e0b; }
+.mp-metric-wifi.busy { color:#ff4d8d; }
+
+.mp-empty{
+  padding:32px 0;
+  text-align:center;
+  color:var(--muted, #aaa);
+  font-size:13px;
+}
+
+/* ===== CTA Banner ===== */
+.mp-cta{
+  margin:14px 4px 8px;
+  padding:16px 18px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  background:linear-gradient(135deg, #fff0f6, #ffe4ed);
+  border-radius:16px;
+  box-shadow:0 4px 14px rgba(255,77,141,.10);
+  cursor:pointer;
+}
+.mp-cta-text{ min-width:0; flex:1; }
+.mp-cta-small{
+  font-size:11px;
+  color:var(--muted, #888);
+  font-weight:600;
+}
+.mp-cta-title{
+  margin-top:4px;
+  font-size:15px;
+  font-weight:900;
+  color:var(--fg, #222);
+  letter-spacing:-0.3px;
+}
+.mp-cta-spark{ margin-left:2px; }
+.mp-cta-desc{
+  margin-top:4px;
+  font-size:11px;
+  color:var(--muted, #999);
+}
+.mp-cta-btn{
+  flex:none;
+  padding:10px 14px;
+  background:#fff;
+  color:#ff4d8d;
+  border:none;
+  border-radius:999px;
+  font-size:12px;
+  font-weight:800;
+  white-space:nowrap;
+  box-shadow:0 2px 8px rgba(0,0,0,.06);
+  cursor:pointer;
+}
+
+/* ===== 다크모드 토큰 ===== */
+:root[data-theme="dark"] .mp-search-box,
+:root[data-theme="black"] .mp-search-box,
+:root[data-theme="dark"] .mp-hot,
+:root[data-theme="black"] .mp-hot,
+:root[data-theme="dark"] .mp-cat-ic,
+:root[data-theme="black"] .mp-cat-ic{
+  background:var(--surface, #1c1c1c);
+  border-color:var(--line, #2a2a2a);
+}
+:root[data-theme="dark"] .mp-metric,
+:root[data-theme="black"] .mp-metric{
+  background:var(--surface, #1c1c1c);
+}
+:root[data-theme="dark"] .mp-cta,
+:root[data-theme="black"] .mp-cta{
+  background:linear-gradient(135deg, #2a1721, #1f1318);
+}
+:root[data-theme="dark"] .mp-bell-badge,
+:root[data-theme="black"] .mp-bell-badge{
+  border-color:var(--bg, #111);
+}
+
+/* =================================
+ * ▲▲▲ 새 디자인 끝 ▲▲▲
+ * 아래는 기존 액션시트/모달 등 보존
+ * ================================= */
 
 /* ======= 글로벌: 하단 네비게이션 고정 ======= */
 :global(.bottom-nav),
