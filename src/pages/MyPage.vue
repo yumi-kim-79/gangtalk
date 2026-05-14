@@ -9,13 +9,7 @@
 
     <!-- 로그인 상태(정식 회원만) -->
     <template v-else>
-      <section
-        class="section"
-        style="display:flex; align-items:center; justify-content:space-between; gap:8px;"
-      >
-        <HeaderBar :type="uiType" @edit="goProfileEdit" @logout="onLogout" />
-        <AdminNotifyBell v-if="isAdmin" />
-      </section>
+      <HeaderBar :type="uiType" @edit="goProfileEdit" @logout="onLogout" />
 
       <!-- 개인 회원 -->
       <UserSection
@@ -244,7 +238,7 @@ import UserSection from '@/components/mypage/UserSection.vue'
 import CompanySection from '@/components/mypage/CompanySection.vue'
 import ProfileEditSheet from '@/components/mypage/ProfileEditSheet.vue'
 import AdminTools from '@/components/mypage/AdminTools.vue'
-import AdminNotifyBell from '@/components/common/AdminNotifyBell.vue'
+// AdminNotifyBell 은 AppHeader 알림벨과 중복이라 import/마운트 제거
 import BizManagerTabs from '@/components/biz/BizManagerTabs.vue'
 import GuideOverlay from '@/components/GuideOverlay.vue'
 import PointRuleModal from '@/components/mypage/PointRuleModal.vue'
@@ -642,11 +636,17 @@ const onLogout = async () => {
 <style src="@/styles/mypage.css"></style>
 
 <style scoped>
-/* AppHeader 적용에 따른 .page-flat 패딩 통일 — 좌우 var(--page-h-pad), 상단 0 */
+/* 마이페이지 톤 — 밝은 연핑크 흰색 배경 + 좌우 var(--page-h-pad) */
 .page-flat.mypage-page{
   padding-top: 0 !important;
   padding-left:  max(var(--page-h-pad, 16px), env(safe-area-inset-left)) !important;
   padding-right: max(var(--page-h-pad, 16px), env(safe-area-inset-right)) !important;
+  background: #fdf8fa !important;
+}
+
+/* 섹션 간 간격 통일 (16px) */
+.page-flat.mypage-page :deep(.section){
+  margin: 0 0 16px;
 }
 
 :root[data-theme='white'] .page-flat {
