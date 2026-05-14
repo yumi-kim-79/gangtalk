@@ -19,15 +19,19 @@ firebase deploy --only hosting
 ```
 
 ## 공통 스타일 기준 (전사 통일)
-- **모든 페이지의 헤더 / 검색창 / 카테고리 탭은 현황판(`src/pages/MainPage.vue`) 스타일을 단일 기준으로 통일한다.**
-- 기준 컴포넌트 마크업 / 토큰
-  - 헤더: `mp-header` / `mp-brand`(로고+타이틀+서브) / `mp-icon-btn`(알림벨+햄버거) / `mp-bell-badge` / `mp-menu-card` 카드 드롭다운
-  - 검색: `mp-search > mp-search-box`(돋보기 + input + 필터 SVG), height 48, radius 14, `box-shadow:0 2px 10px`, placeholder `업체명, 지역, 업종을 검색해보세요`
-  - 카테고리: `mp-cat > mp-cat-scroll > mp-cat-item`(원형 48 아이콘 + 텍스트), 선택 시 핑크 그라디언트 + 라벨 핑크 800, 가로 스크롤 1줄 + expand 버튼
-- 페이지별 적용 규칙
-  - 다른 페이지는 **클래스 prefix 만** 페이지 식별자로 변경 (`sf-*`, `gt-*` 등)
-  - **CSS 값 / 마크업 구조는 MainPage 와 완전 동일**하게 유지
-  - 페이지 고유 섹션(실시간 순위, 광고 배너, Top5 등)은 그대로 유지하되 헤더·검색·카테고리만 통일
+- **헤더 + 검색창은 `src/components/common/AppHeader.vue` 공통 컴포넌트 사용으로 단일화.**
+  - 모든 페이지가 `<AppHeader v-model="검색어" @search="..." @filter-click="..." />` 형태로 사용
+  - props: `modelValue` / `searchPlaceholder` / `showSearch`
+  - emits: `update:modelValue` / `search` / `filterClick`
+  - 헤더 = 로고(48×48) + 타이틀(핑크 20px) + 서브(회색 12px) + 알림벨 + 햄버거 카드 드롭다운
+  - 검색창 = 돋보기 + input + 필터 SVG, height 48, radius 14, `box-shadow:0 2px 10px`
+  - 햄버거 메뉴: 일정/달력 · 고객센터 · 즐겨찾기 · 로그인/로그아웃 (Firebase signOut)
+- **고정 높이 토큰** (App.vue `<style>` 전역, 페이지 전환 시 점프 방지):
+  - `--app-header-height: 64px;`
+  - `--app-search-height: 48px;`
+  - `--app-header-total:  130px;`
+- **카테고리 탭**은 페이지마다 데이터/로직이 달라 컴포넌트화하지 않음. 단 마크업·CSS 톤은 MainPage `mp-cat` 기준을 따른다 (페이지별 `sf-*` 등 prefix만 변경, 값은 동일).
+- 페이지 고유 섹션(실시간 순위, 광고 배너, Top5 등)은 그대로 유지하되 헤더·검색은 반드시 AppHeader 사용.
 
 ## 작업 규칙 (반드시 준수)
 
@@ -56,20 +60,44 @@ firebase deploy --only hosting
 - [ ] 구글플레이 등록
 - [ ] 애플 앱스토어 등록
 
-**현재 단계**: 가게찾기 헤더/검색/카테고리를 현황판 스타일로 완전 통일 완료 — 공통 스타일 기준 = MainPage 확정
+**현재 단계**: 공통 `AppHeader.vue` 추출 + MainPage/StoreFinder 마이그레이션 완료 — 페이지 전환 시 헤더/검색창 레이아웃 점프 차단
 
 ---
 
 ## 다음 작업
-1. 알림벨 클릭 시 별도 알림 페이지 연결 (현재 mypage로 폴백)
+1. 알림벨 클릭 시 별도 알림 페이지 연결 (현재 AppHeader 내부에서 mypage로 폴백)
 2. 핫이슈 텍스트를 Firestore config에서 가져오도록 연동
 3. 별점/리뷰 카운트 실제 데이터 연동
-4. 다른 페이지(채팅/제휴관 등)도 동일 기준으로 헤더/검색/카테고리 통일
+4. 다른 페이지(채팅/제휴관/마이페이지 등)도 `AppHeader` 적용 (TopBar 의존성 제거)
 5. Capacitor 적용 전 웹앱 완성도 점검
 
 ---
 
 ## 작업 로그
+
+### 2026-05-14: 공통 AppHeader 컴포넌트 추출 (`refactor/common-app-header`)
+- **신규 `src/components/common/AppHeader.vue`**: 헤더 + 검색창 + 햄버거 카드 드롭다운 단일 컴포넌트
+  - props: `modelValue` / `searchPlaceholder` (기본 `업체명, 지역, 업종을 검색해보세요`) / `showSearch` (기본 true)
+  - emits: `update:modelValue` / `search` / `filterClick`
+  - 내부 상태: `notifBadge`, `currentUser`, `isAuthReady`, `menuOpen`, `menuItems`, `signOut` 등 — Firebase Auth 구독 자체 보유
+  - 마크업 prefix: `.app-header / .app-brand / .app-icon-btn / .app-bell-badge / .app-search-box / .app-menu-card`
+  - 다크모드 자체 대응
+- **App.vue 전역 토큰** 추가 (페이지 전환 점프 차단용):
+  - `--app-header-height: 64px;`
+  - `--app-search-height: 48px;`
+  - `--app-header-total:  130px;`
+  - AppHeader 내부 `.app-header-wrap{ min-height: var(--app-header-total) }` 로 항상 동일 면적 점유
+- **MainPage.vue 마이그레이션**:
+  - 기존 `<header class="mp-header">` + `<section class="mp-search">` 마크업 제거 → `<AppHeader v-model="q" @search="doSearch" @filter-click="openFilter" />`
+  - `notifBadge / openNotif / menuOpen / toggleMenu / menuItems / onMenuItem / menuOpen watch / signOut` import 모두 제거 (AppHeader 가 담당)
+  - `mp-header / mp-search / mp-icon-btn / mp-bell-badge / mp-menu-* / mp-dd-*` CSS 블록 일괄 제거
+  - CTA 배너용 별도 auth 구독 (currentUser/isAuthReady/isLoggedIn) 은 유지
+- **StoreFinder.vue 마이그레이션**:
+  - 기존 `<header class="sf-header">` + `<section class="sf-search">` 마크업 제거 → `<AppHeader v-model="q" @search="doSearch" @filter-click="openFilter" />`
+  - `notifBadge / goNotif / menuOpen / toggleMenu / menuItems / onMenuItem / menuOpen watch / signOut / currentUser / isAuthReady / isLoggedIn` 모두 제거
+  - `sf-header / sf-search / sf-icon-btn / sf-bell-badge / sf-menu-* / sf-dd-* / sf-search-box / sf-search-ic / sf-search-input / sf-search-filter` CSS 일괄 제거
+  - 다크모드 보정 셀렉터에서도 헤더·검색·메뉴 항목 제거 (페이지 고유 sf-hot / sf-cat-ic 만 유지)
+- **공통 스타일 기준 갱신**: CLAUDE.md "공통 스타일 기준" 섹션을 AppHeader 사용 강제 + 고정 높이 토큰 명시로 재작성
 
 ### 2026-05-14: 가게찾기 헤더/검색/카테고리 현황판 스타일로 통일 (`feat/storefinder-unify-with-mainpage`)
 - **공통 스타일 기준 확정**: 모든 페이지의 헤더 / 검색창 / 카테고리는 `MainPage.vue` 의 마크업 + CSS 값을 그대로 따른다 (CLAUDE.md 상단에 명시)

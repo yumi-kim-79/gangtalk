@@ -51,6 +51,15 @@ onMounted(() => {
 
 <!-- ▼ 전역 스타일 (scoped 아님): 자식 컴포넌트까지 적용됨 -->
 <style>
+/* ▼▼▼ 전사 공통 헤더/검색 높이 토큰 (페이지 전환 시 레이아웃 점프 방지) ▼▼▼
+ *   AppHeader.vue 가 이 토큰을 그대로 사용하므로, 모든 페이지의 헤더+검색 영역
+ *   총 높이가 동일하게 잠긴다. 값을 바꾸려면 여기서만 수정. */
+:root{
+  --app-header-height: 64px;   /* 헤더 영역 최소 높이 (로고+타이틀+버튼 한 줄) */
+  --app-search-height: 48px;   /* 검색창 박스 높이 */
+  --app-header-total:  130px;  /* 헤더 + 검색창 + 위·아래 패딩 합계 */
+}
+
 /* 앱 루트 최소 높이 */
 .app-root { min-height: 100dvh; min-height: calc(var(--vh, 1vh) * 100); }
 
