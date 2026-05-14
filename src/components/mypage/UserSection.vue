@@ -74,24 +74,24 @@
           </div>
         </li>
 
-        <!-- 추천코드 + 복사 + 내 추천인 보기 -->
-        <li class="row">
+        <!-- 추천코드 — 세로 3행 레이아웃: 레이블 / 코드+복사 / 추천인 보기 링크 -->
+        <li class="row row-stack ref-row">
           <span class="key">내 추천코드</span>
-          <span class="val code">
-            <b>{{ myCode || '-' }}</b>
-            <span class="spacer"></span>
-            <button class="btn xs" type="button" @click="onCopyCode">
-              복사
+          <div class="ref-code-row">
+            <code class="ref-code-box">{{ myCode || '-' }}</code>
+            <button class="ref-copy-btn" type="button" @click="onCopyCode" aria-label="추천코드 복사" title="복사">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="9" y="9" width="13" height="13" rx="2"/>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+              </svg>
             </button>
-            <button
-              v-if="onShowReferralList"
-              class="btn xs ghost"
-              type="button"
-              @click="handleShowReferralList"
-            >
-              내 추천인 보기
-            </button>
-          </span>
+          </div>
+          <button
+            v-if="onShowReferralList"
+            class="ref-show-link"
+            type="button"
+            @click="handleShowReferralList"
+          >내 추천인 보기 ›</button>
         </li>
       </ul>
     </div>
@@ -704,7 +704,8 @@ function ymd(ts) {
 
 /* ===== 프로필 카드 ===== */
 .profile-card {
-  padding: 20px;
+  /* 상단 여유를 더 줘서 첫 행("보유 포인트") 잘림 방지 */
+  padding: 24px 20px;
 }
 .profile {
   display: flex;
@@ -743,7 +744,7 @@ function ymd(ts) {
 .rows {
   list-style: none;
   padding: 0;
-  margin: 16px 0 0 0;
+  margin: 20px 0 0 0;     /* 프로필 ~ 첫 행 사이 여유 확보 */
 }
 .row {
   display: flex;
@@ -754,7 +755,7 @@ function ymd(ts) {
 }
 .row:first-of-type {
   border-top: none;
-  padding-top: 6px;
+  padding-top: 14px;       /* 다른 행과 동일 패딩 → 첫 행 잘림 해소 */
 }
 .row.row-clickable {
   cursor: pointer;
@@ -795,6 +796,81 @@ function ymd(ts) {
   border-radius: 10px;
   background: #fff5f8;
   letter-spacing: 0.5px;
+}
+
+/* ===== 추천코드 행 (세로 3행 레이아웃) ===== */
+.row.row-stack{
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+}
+.row.ref-row .key{
+  font-size: 13px;
+}
+
+.ref-code-row{
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.ref-code-box{
+  flex: 1;
+  min-width: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color: #ff4d8d;
+  font-size: 15px;
+  font-weight: 800;
+  padding: 10px 14px;
+  border: 1.5px solid #ffd6e4;
+  border-radius: 12px;
+  background: #fff5f8;
+  letter-spacing: 1px;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ref-copy-btn{
+  flex: none;
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  border-radius: 10px;
+  border: 1px solid #eee;
+  background: #fff;
+  color: #666;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: background .15s ease, color .15s ease, border-color .15s ease;
+}
+.ref-copy-btn:hover{
+  background: #fff5f8;
+  color: #ff4d8d;
+  border-color: #ffd6e4;
+}
+.ref-copy-btn:active{ transform: scale(.96); }
+
+.ref-show-link{
+  align-self: flex-end;
+  background: transparent;
+  border: none;
+  padding: 4px 2px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #ff4d8d;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.ref-show-link:hover{ text-decoration: underline; }
+
+/* 다크모드 보정 */
+:root[data-theme="dark"] .ref-copy-btn,
+:root[data-theme="black"] .ref-copy-btn{
+  background: var(--surface, #1c1c1c);
+  border-color: var(--line, #2a2a2a);
+  color: #bbb;
 }
 
 /* 포인트 숫자만 핑크 강조 — '보유 포인트' 행의 .val.strong 첫 텍스트 노드 */
