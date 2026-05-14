@@ -55,32 +55,32 @@
         </div>
       </button>
 
-      <!-- 2) 힐링톡 — 연핑크 배경 + 서비스 준비중 -->
-      <button type="button" class="gc-card gc-healing" @click="openHealing">
+      <!-- 2) 힐링톡 — 서비스 준비중 (클릭 비활성) -->
+      <div class="gc-card gc-healing gc-disabled" aria-disabled="true">
         <div class="gc-body">
           <div class="gc-title pink">힐링톡</div>
           <div class="gc-sub muted">명언·건강·여행·다이어트</div>
         </div>
         <span class="gc-soon">서비스 준비중</span>
-      </button>
+      </div>
 
-      <!-- 3) 우리 가게 게시판 — 연베이지 + 서비스 준비중 -->
-      <button type="button" class="gc-card gc-store" @click="openFirstBiz">
+      <!-- 3) 우리 가게 게시판 — 서비스 준비중 (클릭 비활성) -->
+      <div class="gc-card gc-store gc-disabled" aria-disabled="true">
         <div class="gc-body">
           <div class="gc-title pink">우리 가게 게시판</div>
           <div class="gc-sub muted">공지·소식·가게 이야기</div>
         </div>
         <span class="gc-soon">서비스 준비중</span>
-      </button>
+      </div>
 
-      <!-- 4) 이벤트톡 — 연핑크 + 서비스 준비중 -->
-      <button type="button" class="gc-card gc-event" @click="openCategoryPage('event')">
+      <!-- 4) 이벤트톡 — 서비스 준비중 (클릭 비활성) -->
+      <div class="gc-card gc-event gc-disabled" aria-disabled="true">
         <div class="gc-body">
           <div class="gc-title pink">이벤트톡</div>
           <div class="gc-sub muted">이벤트·혜택·참여</div>
         </div>
         <span class="gc-soon">서비스 준비중</span>
-      </button>
+      </div>
     </section>
 
     <!-- ===== 베스트 탭 (pill 스타일, 작은 크기) ===== -->
@@ -1897,6 +1897,10 @@ function stopListTicker(){
 
 function startListTicker(getVisiblePosts, opts = {}){
   stopListTicker()
+  // ✅ board_posts write 권한이 없는 일반 사용자가 호출하면 Firestore 보안 규칙이
+  //    매 tick 마다 거부 → 콘솔 에러 폭주 + 응답성 저하 → 화면이 "멈춘" 것처럼 보임.
+  //    관리자에게만 ticker 를 시작한다.
+  if (!isAdmin.value) return
   const minMs = opts.minMs ?? 5000
   const maxMs = opts.maxMs ?? 12000
 
@@ -2774,6 +2778,14 @@ console.log('[sim-templates] loaded v2025-09-30-01')
   color: inherit;
 }
 .gc-card:active{ transform: scale(.98); }
+
+/* 비활성 카드 (힐링/우리가게/이벤트) — 클릭 무반응 */
+.gc-card.gc-disabled{
+  cursor: default;
+}
+.gc-card.gc-disabled:active{
+  transform: none;
+}
 
 /* (배경 이미지/오버레이/뱃지 룰은 제거됨 — 솔리드 배경만 사용) */
 

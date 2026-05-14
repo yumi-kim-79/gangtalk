@@ -61,7 +61,7 @@ firebase deploy --only hosting
 - [ ] 구글플레이 등록
 - [ ] 애플 앱스토어 등록
 
-**현재 단계**: 마이페이지 포인트 잘림 + 추천코드 정렬 수정 완료
+**현재 단계**: 강톡 카드 클릭 멈춤 원인 차단 + 힐링톡/우리가게/이벤트톡 카드 클릭 비활성화 완료
 
 ---
 
@@ -69,13 +69,26 @@ firebase deploy --only hosting
 1. 일반 사용자용 알림 컬렉션(user_inbox 등) 신설 검토 — 현재는 관리자 전용
 2. 핫이슈 텍스트를 Firestore config에서 가져오도록 연동
 3. 별점/리뷰 카운트 실제 데이터 연동
-4. 힐링톡/우리가게/이벤트톡 실 서비스 오픈 준비
+4. 힐링톡/우리가게/이벤트톡 실 서비스 오픈 (오픈 시 gc-disabled 제거 + 클릭 핸들러 부착)
 5. CompanySection / AdminTools / ProfileEditSheet 톤도 동일하게 정리
 6. Capacitor 적용 전 웹앱 완성도 점검
 
 ---
 
 ## 작업 로그
+
+### 2026-05-15: 강톡 카드 클릭 멈춤 차단 + 3개 카드 클릭 비활성 (`fix/gangtalk-community-click`)
+- **원인 진단 — 강톡 카드 클릭 시 화면 멈춤**:
+  - `openCategoryPage('all')` 함수 자체는 정상
+  - 원인은 함수 안에서 호출하는 `startListTicker(...)`. 이 ticker 는 `setTimeout` 으로 `updateDoc(board_posts/{id}, { views: increment(1), likes: increment(1), updatedAt: serverTimestamp() })` 를 반복 호출
+  - board_posts 의 write 권한이 없는 **일반 사용자**가 카드 클릭 시 Firestore Security Rules 가 매번 거부 → 콘솔 에러 폭주 + 응답성 저하 → 사용자 입장에서 "멈춤"으로 인식
+  - 활동성 시뮬레이션 목적인 ticker 는 관리자에게만 의미가 있으므로 가드 추가
+- **수정 1 (`startListTicker`)**: 함수 진입부에 `if (!isAdmin.value) return` 가드 → 일반 사용자/비로그인 사용자에게는 ticker 시작 안 함
+- **수정 2 (3개 카드 클릭 비활성화)**:
+  - 마크업 `<button @click="openHealing">` / `<button @click="openFirstBiz">` / `<button @click="openCategoryPage('event')">` → 클릭 핸들러 제거하고 `<div class="gc-card ... gc-disabled" aria-disabled="true">` 로 교체
+  - CSS `.gc-card.gc-disabled { cursor: default }`, `.gc-card.gc-disabled:active { transform: none }` 추가
+  - 클릭해도 토스트 없이 완전 무반응 (서비스 준비중 pill 만 시각적으로 안내)
+- **강톡 카드**는 그대로 유지 — 클릭 시 정상적으로 카테고리 풀스크린 시트 진입
 
 ### 2026-05-15: 마이페이지 포인트 잘림 + 추천코드 정렬 수정 (`fix/mypage-points-referral-layout`)
 - **문제 1 — 보유 포인트 상단 잘림** 원인: `.row:first-of-type { padding-top: 6px }` 가 다른 행 14 보다 부족해 첫 행이 비좁게 잘려 보임
