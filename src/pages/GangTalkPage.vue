@@ -2661,8 +2661,8 @@ console.log('[sim-templates] loaded v2025-09-30-01')
   position: relative;
   border-radius: 16px;
   overflow: hidden;
-  /* AppHeader (no-search 모드) 바로 아래에 붙도록 상단 마진 0 */
-  margin-top: 0;
+  /* AppHeader 와 살짝의 숨 공간 */
+  margin-top: 8px;
   margin-bottom: 16px;
   height: 180px;
   background: #f0f0f0;
@@ -2832,7 +2832,7 @@ console.log('[sim-templates] loaded v2025-09-30-01')
 }
 
 /* 카드별 솔리드 배경 */
-.gc-gangtok{ background: #1a1a2e; }
+.gc-gangtok{ background: #7C6B9E; }
 .gc-healing{ background: #FFF0F5; }
 .gc-store  { background: #F5EFE8; }
 .gc-event  { background: #FFF0F5; }

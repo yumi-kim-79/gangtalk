@@ -61,7 +61,7 @@ firebase deploy --only hosting
 - [ ] 구글플레이 등록
 - [ ] 애플 앱스토어 등록
 
-**현재 단계**: 강톡 카드 솔리드화 + 뱃지 제거 + 헤더-배너 간격 제거 완료
+**현재 단계**: 배너 상단 여백 8px + 강톡 카드 배경색 연보라(#7C6B9E)로 변경 완료
 
 ---
 
@@ -76,6 +76,10 @@ firebase deploy --only hosting
 ---
 
 ## 작업 로그
+
+### 2026-05-14: 배너 상단 여백 + 강톡 카드 연보라 (`fix/gangtalk-spacing-color`)
+- **`.gt-slider-bar margin-top: 0 → 8px`**: AppHeader 와 배너 사이에 작은 숨 공간 확보
+- **강톡 카드 배경**: `#1a1a2e` (진한 네이비) → `#7C6B9E` (연보라). 흰 텍스트/우하단 화살표는 유지
 
 ### 2026-05-14: 강톡 카드 정리 + 헤더-배너 간격 제거 (`fix/gangtalk-card-and-spacing`)
 - **AppHeader `showSearch=false` 모드 보강**: 검색창 없는 페이지에서 wrap min-height 가 130 으로 남아 헤더 아래 공백이 컸음
