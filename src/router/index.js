@@ -305,13 +305,6 @@ const routes = [
     component: EventDetail,
   },
 
-  // 헬프 페이지
-  {
-    path: '/help',
-    name: 'help',
-    component: () => import('@/pages/HelpPage.vue'),
-  },
-
   // 상담 도움말
   { path: '/consult', redirect: '/consult/legal' },
   {
@@ -407,7 +400,7 @@ router.beforeEach(async (to, from) => {
   const toName = String(to.name || '')
 
   // 게스트 허용 페이지
-  const publicForGuests = new Set(['auth', 'help', 'support'])
+  const publicForGuests = new Set(['auth', 'support'])
 
   // 바텀 탭 루트 페이지(현황판/가게찾기/강톡/제휴관/마이페이지)는
   // 비로그인이어도 "페이지 진입"은 허용
@@ -429,7 +422,7 @@ router.beforeEach(async (to, from) => {
     }
   }
 
-  // 2) 그 외 페이지: 비로그인 상태면 /auth 로 보냄 (auth/help/support/탭루트 제외)
+  // 2) 그 외 페이지: 비로그인 상태면 /auth 로 보냄 (auth/support/탭루트 제외)
   if (!logged && !publicForGuests.has(toName) && !isTabRoot) {
     return {
       path: '/auth',

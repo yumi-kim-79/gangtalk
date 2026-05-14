@@ -33,27 +33,6 @@
       <nav class="actions" aria-label="상단 작업">
         <!-- 🔔 관리자 알림 버튼 제거됨 -->
 
-        <!-- ❓ 헬프 아이콘 추가 -->
-        <button
-          class="round-icon help"
-          title="도움말"
-          aria-label="도움말"
-          type="button"
-          @click="router.push('/help')"
-        >
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="1.8"/>
-            <path
-              d="M9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.9.4-1.5 1.1-1.5 2v1"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="1.8"
-              stroke-linecap="round"
-            />
-            <circle cx="12" cy="17" r="1" fill="currentColor"/>
-          </svg>
-        </button>
-
         <!-- 📒 마이 다이어리 -->
         <button
           class="round-icon diary"
@@ -216,7 +195,6 @@ onMounted(()=>{
 
 /* 개별 아이콘 색상 */
 .round-icon.heart{ color: var(--accent); }
-.round-icon.help{ color: var(--fg); }
 
 .container{ width:100%; max-width:960px; margin:0 auto; padding:0 14px; }
 

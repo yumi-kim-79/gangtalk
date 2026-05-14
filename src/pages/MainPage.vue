@@ -14,7 +14,7 @@
     <!-- ===== Header ===== -->
     <header class="mp-header">
       <div class="mp-brand">
-        <BrandLogo :size="40" :showSquare="true" glyph="강톡" />
+        <img class="mp-brand-logo-img" src="/icons/icon-192.png" alt="강톡" width="48" height="48" decoding="async" />
         <div class="mp-brand-text">
           <h1 class="mp-brand-title">강남톡방</h1>
           <p class="mp-brand-sub">강남의 모든 공간, 한눈에.</p>
@@ -28,42 +28,36 @@
           </svg>
           <span v-if="notifBadge > 0" class="mp-bell-badge">{{ notifBadge }}</span>
         </button>
-        <button class="mp-icon-btn" type="button" aria-label="메뉴" @click="openMenu">
-          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-            <path d="M4 7h16M4 12h16M4 17h16"/>
-          </svg>
-        </button>
-      </div>
-    </header>
+        <div class="mp-menu-anchor">
+          <button class="mp-icon-btn" type="button" aria-label="메뉴" aria-haspopup="true" :aria-expanded="menuOpen" @click.stop="toggleMenu">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+              <path d="M4 7h16M4 12h16M4 17h16"/>
+            </svg>
+          </button>
 
-    <!-- ===== 햄버거 슬라이드 메뉴 ===== -->
-    <teleport to="body">
-      <transition name="mp-menu-fade">
-        <div v-if="menuOpen" class="mp-menu-mask" @click.self="closeMenu" aria-hidden="true"></div>
-      </transition>
-      <transition name="mp-menu-slide">
-        <aside v-if="menuOpen" class="mp-menu-panel" role="dialog" aria-modal="true" aria-label="메뉴">
-          <header class="mp-menu-head">
-            <button class="mp-menu-close" type="button" aria-label="닫기" @click="closeMenu">
-              <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-                <path d="M6 6l12 12M18 6L6 18"/>
-              </svg>
-            </button>
-          </header>
-          <ul class="mp-menu-list">
-            <li v-for="m in menuItems" :key="m.key">
-              <button class="mp-menu-item" type="button" @click="onMenuItem(m)">
+          <!-- 카드형 드롭다운 메뉴 -->
+          <transition name="mp-dd">
+            <div v-if="menuOpen" class="mp-menu-card" role="menu" @click.stop>
+              <button
+                v-for="(m, i) in menuItems"
+                :key="m.key"
+                class="mp-menu-row"
+                :class="{ divider: i > 0 }"
+                type="button"
+                role="menuitem"
+                @click="onMenuItem(m)"
+              >
                 <span class="mp-menu-emoji" aria-hidden="true">{{ m.emoji }}</span>
                 <span class="mp-menu-label">{{ m.label }}</span>
-                <svg class="mp-menu-arrow" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                <svg class="mp-menu-arrow" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
                   <path d="M9 6l6 6-6 6"/>
                 </svg>
               </button>
-            </li>
-          </ul>
-        </aside>
-      </transition>
-    </teleport>
+            </div>
+          </transition>
+        </div>
+      </div>
+    </header>
 
     <!-- ===== Search ===== -->
     <section class="mp-search">
@@ -217,11 +211,12 @@
       </div>
     </section>
 
-    <!-- ===== CTA Banner (비로그인) ===== -->
+    <!-- ===== CTA Banner (비로그인 시) ===== -->
     <section v-if="!isLoggedIn" class="mp-cta" @click="goLogin">
       <div class="mp-cta-text">
+        <div class="mp-cta-spark" aria-hidden="true">✨</div>
         <div class="mp-cta-small">지금 가입하면</div>
-        <div class="mp-cta-title">맞춤 업소 추천을 받아보세요! <span class="mp-cta-spark">✨</span></div>
+        <div class="mp-cta-title">맞춤 업소 추천을 받아보세요!</div>
         <div class="mp-cta-desc">내 취향에 딱 맞는 공간을 찾아드립니다.</div>
       </div>
       <button class="mp-cta-btn" type="button" @click.stop="goLogin">로그인 / 회원가입</button>
@@ -369,7 +364,6 @@ import { computed, ref, onMounted, onBeforeMount, onUnmounted, watch, nextTick }
 import { useRouter, useRoute } from 'vue-router'
 import SearchBar from '@/components/SearchBar.vue'
 import GuideOverlay from '@/components/GuideOverlay.vue'
-import BrandLogo from '@/components/BrandLogo.vue'
 import { db, firebaseReady } from '@/firebase'
 import {
   collection, onSnapshot, query, orderBy, doc,
@@ -950,14 +944,14 @@ function openFilter(){
   type.value = 'all'
 }
 
-/* ===== 햄버거 슬라이드 메뉴 ===== */
+/* ===== 햄버거 카드형 드롭다운 메뉴 ===== */
 const menuOpen = ref(false)
 function openMenu(){ menuOpen.value = true }
 function closeMenu(){ menuOpen.value = false }
+function toggleMenu(){ menuOpen.value = !menuOpen.value }
 
 const menuItems = computed(() => {
   const base = [
-    { key:'help',     emoji:'❓', label:'도움말',   to:{ name:'help' } },
     { key:'diary',    emoji:'📅', label:'일정/달력', to:{ path:'/diary' } },
     { key:'support',  emoji:'🎧', label:'고객센터', to:{ name:'support' } },
     { key:'favorites',emoji:'❤️', label:'즐겨찾기', to:{ name:'favorites' } },
@@ -979,20 +973,20 @@ async function onMenuItem(m){
   if (m.to) router.push(m.to).catch(()=>{})
 }
 
-// ESC 키로 메뉴 닫기 + 메뉴 열렸을 때 body scroll lock
+/* 외부 클릭 / ESC 로 드롭다운 닫기 */
 watch(menuOpen, (on) => {
   if (on) {
-    document.body.style.overflow = 'hidden'
-    const esc = (e) => { if (e.key === 'Escape') closeMenu() }
-    window.addEventListener('keydown', esc)
-    // 상태에 보관해서 닫힐 때 제거
-    menuOpen._esc = esc
-  } else {
-    document.body.style.overflow = ''
-    if (menuOpen._esc) {
-      window.removeEventListener('keydown', menuOpen._esc)
-      menuOpen._esc = null
+    const onDocClick = () => closeMenu()
+    const onEsc = (e) => { if (e.key === 'Escape') closeMenu() }
+    document.addEventListener('click', onDocClick)
+    window.addEventListener('keydown', onEsc)
+    menuOpen._cleanup = () => {
+      document.removeEventListener('click', onDocClick)
+      window.removeEventListener('keydown', onEsc)
     }
+  } else if (menuOpen._cleanup) {
+    menuOpen._cleanup()
+    menuOpen._cleanup = null
   }
 })
 
@@ -2417,19 +2411,25 @@ onUnmounted(() => {
   gap:10px;
   min-width:0;
 }
-/* BrandLogo 컴포넌트 컨테이너 보정 */
-.mp-brand :deep(.logo){ flex:none; }
+.mp-brand-logo-img{
+  flex:none;
+  width:48px; height:48px;
+  border-radius:12px;
+  object-fit:cover;
+  display:block;
+  box-shadow:0 4px 10px rgba(255,77,141,.18);
+}
 .mp-brand-text{ min-width:0; line-height:1.15; }
 .mp-brand-title{
   margin:0;
-  font-size:18px;
+  font-size:20px;
   font-weight:900;
   color:#ff2e7e;
   letter-spacing:-0.3px;
 }
 .mp-brand-sub{
   margin:2px 0 0;
-  font-size:11px;
+  font-size:12px;
   color:var(--muted, #888);
   font-weight:500;
 }
@@ -2812,17 +2812,22 @@ onUnmounted(() => {
 /* ===== CTA Banner ===== */
 .mp-cta{
   margin:14px 4px 8px;
-  padding:16px 18px;
+  padding:18px 20px;
   display:flex;
   align-items:center;
   justify-content:space-between;
   gap:12px;
-  background:linear-gradient(135deg, #fff0f6, #ffe4ed);
+  background:#FFE4EF;
   border-radius:16px;
   box-shadow:0 4px 14px rgba(255,77,141,.10);
   cursor:pointer;
 }
 .mp-cta-text{ min-width:0; flex:1; }
+.mp-cta-spark{
+  font-size:18px;
+  line-height:1;
+  margin-bottom:4px;
+}
 .mp-cta-small{
   font-size:11px;
   color:var(--muted, #888);
@@ -2832,10 +2837,9 @@ onUnmounted(() => {
   margin-top:4px;
   font-size:15px;
   font-weight:900;
-  color:var(--fg, #222);
+  color:#1a1a1a;
   letter-spacing:-0.3px;
 }
-.mp-cta-spark{ margin-left:2px; }
 .mp-cta-desc{
   margin-top:4px;
   font-size:11px;
@@ -2878,90 +2882,67 @@ onUnmounted(() => {
   border-color:var(--bg, #111);
 }
 
-/* ===== 햄버거 슬라이드 메뉴 ===== */
-.mp-menu-mask{
-  position:fixed; inset:0;
-  background:rgba(0,0,0,.45);
-  z-index:9998;
-}
-.mp-menu-panel{
-  position:fixed;
-  top:0; right:0; bottom:0;
-  width:min(320px, 84vw);
+/* ===== 햄버거 카드형 드롭다운 메뉴 ===== */
+.mp-menu-anchor{ position:relative; }
+.mp-menu-card{
+  position:absolute;
+  top:calc(100% + 8px);
+  right:0;
+  width:200px;
   background:var(--surface, #fff);
-  z-index:9999;
-  display:flex;
-  flex-direction:column;
-  box-shadow:-8px 0 24px rgba(0,0,0,.12);
-  padding-top:env(safe-area-inset-top);
-  padding-bottom:env(safe-area-inset-bottom);
+  border-radius:16px;
+  box-shadow:0 4px 20px rgba(0,0,0,.15);
+  z-index:1000;
+  overflow:hidden;
+  transform-origin:top right;
 }
-.mp-menu-head{
-  display:flex;
-  align-items:center;
-  justify-content:flex-end;
-  padding:14px 12px 6px;
-}
-.mp-menu-close{
-  width:36px; height:36px;
-  border:none;
-  background:transparent;
-  border-radius:50%;
-  display:grid; place-items:center;
-  color:var(--fg, #222);
-  cursor:pointer;
-}
-.mp-menu-close:active{ background:rgba(0,0,0,.05); }
-.mp-menu-list{
-  list-style:none;
-  margin:0;
-  padding:8px 8px 16px;
-}
-.mp-menu-list li{ margin:0; }
-.mp-menu-item{
+.mp-menu-row{
   width:100%;
   display:flex;
   align-items:center;
-  gap:14px;
-  padding:14px 14px;
+  gap:10px;
+  padding:14px 16px;
   background:transparent;
   border:none;
-  border-radius:12px;
-  font-size:15px;
+  font-size:14px;
   font-weight:600;
   color:var(--fg, #222);
   cursor:pointer;
   text-align:left;
 }
-.mp-menu-item:active{ background:rgba(0,0,0,.04); }
+.mp-menu-row.divider{
+  border-top:1px solid var(--line, #f0f0f0);
+}
+.mp-menu-row:active{ background:rgba(0,0,0,.04); }
 .mp-menu-emoji{
-  width:32px; height:32px;
+  width:22px;
   display:grid; place-items:center;
-  font-size:18px;
+  font-size:16px;
   flex:none;
 }
 .mp-menu-label{ flex:1; min-width:0; }
 .mp-menu-arrow{ color:var(--muted, #bbb); flex:none; }
 
-/* 슬라이드 인 애니메이션 */
-.mp-menu-slide-enter-from{ transform:translateX(100%); }
-.mp-menu-slide-leave-to{   transform:translateX(100%); }
-.mp-menu-slide-enter-active,
-.mp-menu-slide-leave-active{
-  transition:transform .26s cubic-bezier(.4,0,.2,1);
+/* 드롭다운 진입/이탈 애니메이션 */
+.mp-dd-enter-from,
+.mp-dd-leave-to{
+  opacity:0;
+  transform:scale(.92) translateY(-4px);
 }
-.mp-menu-fade-enter-from,
-.mp-menu-fade-leave-to{ opacity:0; }
-.mp-menu-fade-enter-active,
-.mp-menu-fade-leave-active{
-  transition:opacity .22s ease;
+.mp-dd-enter-active,
+.mp-dd-leave-active{
+  transition:opacity .14s ease, transform .14s ease;
 }
 
 /* 다크모드 메뉴 */
-:root[data-theme="dark"] .mp-menu-panel,
-:root[data-theme="black"] .mp-menu-panel{
+:root[data-theme="dark"] .mp-menu-card,
+:root[data-theme="black"] .mp-menu-card{
   background:var(--surface, #1c1c1c);
-  border-left:1px solid var(--line, #2a2a2a);
+  box-shadow:0 4px 20px rgba(0,0,0,.5);
+}
+:root[data-theme="dark"] .mp-menu-row.divider,
+:root[data-theme="black"] .mp-menu-row.divider{
+  border-top-color:var(--line, #2a2a2a);
 }
 
 /* =================================
