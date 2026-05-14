@@ -11,74 +11,8 @@
 
     <!-- ▲▲ 이벤트 오버레이 끝 ▲▲ -->
 
-    <!-- ===== Header ===== -->
-    <header class="mp-header">
-      <div class="mp-brand">
-        <img class="mp-brand-logo-img" src="/icons/icon-192.png" alt="강톡" width="48" height="48" decoding="async" />
-        <div class="mp-brand-text">
-          <h1 class="mp-brand-title">강남톡방</h1>
-          <p class="mp-brand-sub">강남의 모든 공간, 한눈에.</p>
-        </div>
-      </div>
-      <div class="mp-header-actions">
-        <button class="mp-icon-btn" type="button" aria-label="알림" @click="openNotif">
-          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M18 16v-5a6 6 0 1 0-12 0v5l-2 3h16z"/>
-            <path d="M10 21a2 2 0 0 0 4 0"/>
-          </svg>
-          <span v-if="notifBadge > 0" class="mp-bell-badge">{{ notifBadge }}</span>
-        </button>
-        <div class="mp-menu-anchor">
-          <button class="mp-icon-btn" type="button" aria-label="메뉴" aria-haspopup="true" :aria-expanded="menuOpen" @click.stop="toggleMenu">
-            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-              <path d="M4 7h16M4 12h16M4 17h16"/>
-            </svg>
-          </button>
-
-          <!-- 카드형 드롭다운 메뉴 -->
-          <transition name="mp-dd">
-            <div v-if="menuOpen" class="mp-menu-card" role="menu" @click.stop>
-              <button
-                v-for="(m, i) in menuItems"
-                :key="m.key"
-                class="mp-menu-row"
-                :class="{ divider: i > 0 }"
-                type="button"
-                role="menuitem"
-                @click="onMenuItem(m)"
-              >
-                <span class="mp-menu-emoji" aria-hidden="true">{{ m.emoji }}</span>
-                <span class="mp-menu-label">{{ m.label }}</span>
-                <svg class="mp-menu-arrow" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-                  <path d="M9 6l6 6-6 6"/>
-                </svg>
-              </button>
-            </div>
-          </transition>
-        </div>
-      </div>
-    </header>
-
-    <!-- ===== Search ===== -->
-    <section class="mp-search">
-      <div class="mp-search-box">
-        <svg class="mp-search-ic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-          <circle cx="11" cy="11" r="7"/>
-          <path d="M21 21l-4.3-4.3"/>
-        </svg>
-        <input v-model="q" type="search" class="mp-search-input" placeholder="업체명, 지역, 업종을 검색해보세요" @keyup.enter="doSearch" />
-        <button class="mp-search-filter" type="button" aria-label="필터" @click="openFilter">
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-            <path d="M4 6h12"/>
-            <path d="M4 12h8"/>
-            <path d="M4 18h14"/>
-            <circle cx="18" cy="6" r="2" fill="currentColor"/>
-            <circle cx="14" cy="12" r="2" fill="currentColor"/>
-            <circle cx="20" cy="18" r="2" fill="currentColor"/>
-          </svg>
-        </button>
-      </div>
-    </section>
+    <!-- ===== 공통 AppHeader (헤더 + 검색창) ===== -->
+    <AppHeader v-model="q" @search="doSearch" @filter-click="openFilter" />
 
     <!-- ===== Hot Issue Banner ===== -->
     <section class="mp-hot" @click="goEventDetail">
@@ -364,13 +298,14 @@ import { computed, ref, onMounted, onBeforeMount, onUnmounted, watch, nextTick }
 import { useRouter, useRoute } from 'vue-router'
 import SearchBar from '@/components/SearchBar.vue'
 import GuideOverlay from '@/components/GuideOverlay.vue'
+import AppHeader from '@/components/common/AppHeader.vue'
 import { db, firebaseReady } from '@/firebase'
 import {
   collection, onSnapshot, query, orderBy, doc,
   getDoc, setDoc, updateDoc, serverTimestamp, getDocs, limit
 } from 'firebase/firestore'
 import { getStorage, ref as sRef, getDownloadURL } from 'firebase/storage'
-import { getAuth, onAuthStateChanged, signOut } from 'firebase/auth'
+import { getAuth, onAuthStateChanged } from 'firebase/auth'
 import EventOverlay from '@/components/EventOverlay.vue'
 // [디버그] Firestore 내부 로그를 상세하게
 import { setLogLevel } from 'firebase/firestore'
@@ -924,13 +859,9 @@ const mpCategories = [
 ]
 const expandCategories = ref(false)
 
-/* ===== 새 디자인용 헤더 액션 ===== */
-const notifBadge = ref(3)
+/* ===== 페이지 고유 액션 (AppHeader 미관여) ===== */
 const hotIssue = ref('강남톡방 그랜드오픈 이벤트 진행중!')
 
-function openNotif(){
-  router.push({ name: 'mypage' }).catch(()=>{})
-}
 function goEventDetail(){
   router.push({ name: 'EventDetail' }).catch(()=>{})
 }
@@ -943,52 +874,6 @@ function goLogin(){
 function openFilter(){
   type.value = 'all'
 }
-
-/* ===== 햄버거 카드형 드롭다운 메뉴 ===== */
-const menuOpen = ref(false)
-function openMenu(){ menuOpen.value = true }
-function closeMenu(){ menuOpen.value = false }
-function toggleMenu(){ menuOpen.value = !menuOpen.value }
-
-const menuItems = computed(() => {
-  const base = [
-    { key:'diary',    emoji:'📅', label:'일정/달력', to:{ path:'/diary' } },
-    { key:'support',  emoji:'🎧', label:'고객센터', to:{ name:'support' } },
-    { key:'favorites',emoji:'❤️', label:'즐겨찾기', to:{ name:'favorites' } },
-  ]
-  base.push(
-    isLoggedIn.value
-      ? { key:'logout', emoji:'🚪', label:'로그아웃', action:'logout' }
-      : { key:'login',  emoji:'🔑', label:'로그인',   to:{ name:'auth' } }
-  )
-  return base
-})
-
-async function onMenuItem(m){
-  closeMenu()
-  if (m.action === 'logout') {
-    try { await signOut(auth) } catch (e) { console.warn('signOut error:', e) }
-    return
-  }
-  if (m.to) router.push(m.to).catch(()=>{})
-}
-
-/* 외부 클릭 / ESC 로 드롭다운 닫기 */
-watch(menuOpen, (on) => {
-  if (on) {
-    const onDocClick = () => closeMenu()
-    const onEsc = (e) => { if (e.key === 'Escape') closeMenu() }
-    document.addEventListener('click', onDocClick)
-    window.addEventListener('keydown', onEsc)
-    menuOpen._cleanup = () => {
-      document.removeEventListener('click', onDocClick)
-      window.removeEventListener('keydown', onEsc)
-    }
-  } else if (menuOpen._cleanup) {
-    menuOpen._cleanup()
-    menuOpen._cleanup = null
-  }
-})
 
 /* ===== 찜(로컬 저장) ===== */
 const favSet = ref(new Set())
@@ -2405,115 +2290,8 @@ onUnmounted(() => {
  * ▼▼▼ 새 디자인 (MainPage v3) ▼▼▼
  * ================================= */
 
-/* ===== Header ===== */
-.mp-header{
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  gap:10px;
-  padding:8px 4px 12px;
-}
-.mp-brand{
-  display:flex;
-  align-items:center;
-  gap:10px;
-  min-width:0;
-}
-.mp-brand-logo-img{
-  flex:none;
-  width:48px; height:48px;
-  border-radius:12px;
-  object-fit:cover;
-  display:block;
-  box-shadow:0 4px 10px rgba(255,77,141,.18);
-}
-.mp-brand-text{ min-width:0; line-height:1.15; }
-.mp-brand-title{
-  margin:0;
-  font-size:20px;
-  font-weight:900;
-  color:#ff2e7e;
-  letter-spacing:-0.3px;
-}
-.mp-brand-sub{
-  margin:2px 0 0;
-  font-size:12px;
-  color:var(--muted, #888);
-  font-weight:500;
-}
-.mp-header-actions{
-  display:flex;
-  align-items:center;
-  gap:4px;
-}
-.mp-icon-btn{
-  position:relative;
-  width:38px; height:38px;
-  border-radius:50%;
-  background:transparent;
-  border:none;
-  display:grid; place-items:center;
-  color:var(--fg, #222);
-  cursor:pointer;
-}
-.mp-icon-btn:active{ background:rgba(0,0,0,.05); }
-.mp-bell-badge{
-  position:absolute;
-  top:4px; right:4px;
-  min-width:16px; height:16px;
-  padding:0 4px;
-  border-radius:999px;
-  background:#ff4d8d;
-  color:#fff;
-  font-size:10px;
-  font-weight:800;
-  line-height:16px;
-  text-align:center;
-  border:2px solid var(--bg, #fafafa);
-  box-sizing:content-box;
-}
-
-/* ===== Search ===== */
-.mp-search{
-  padding:0 4px 10px;
-}
-.mp-search-box{
-  display:flex;
-  align-items:center;
-  gap:8px;
-  height:48px;
-  padding:0 14px;
-  background:var(--surface, #fff);
-  border-radius:14px;
-  box-shadow:0 2px 10px rgba(0,0,0,.05);
-  border:1px solid var(--line, #f0f0f0);
-}
-.mp-search-ic{
-  flex:none;
-  color:var(--muted, #999);
-}
-.mp-search-input{
-  flex:1;
-  min-width:0;
-  border:none;
-  outline:none;
-  background:transparent;
-  font-size:14px;
-  color:var(--fg, #222);
-  font-weight:500;
-}
-.mp-search-input::placeholder{ color:var(--muted, #bbb); font-weight:400; }
-.mp-search-filter{
-  flex:none;
-  background:transparent;
-  border:none;
-  width:28px; height:28px;
-  display:grid; place-items:center;
-  color:var(--muted, #999);
-  cursor:pointer;
-  padding:0;
-}
-.mp-search-filter:active{ color:var(--accent, #ff4d8d); }
+/* ===== Header / Search ===== */
+/* AppHeader 공통 컴포넌트로 이관됨 — 관련 CSS 제거 */
 
 /* ===== Hot Issue ===== */
 .mp-hot{
@@ -2891,67 +2669,7 @@ onUnmounted(() => {
 }
 
 /* ===== 햄버거 카드형 드롭다운 메뉴 ===== */
-.mp-menu-anchor{ position:relative; }
-.mp-menu-card{
-  position:absolute;
-  top:calc(100% + 8px);
-  right:0;
-  width:200px;
-  background:var(--surface, #fff);
-  border-radius:16px;
-  box-shadow:0 4px 20px rgba(0,0,0,.15);
-  z-index:1000;
-  overflow:hidden;
-  transform-origin:top right;
-}
-.mp-menu-row{
-  width:100%;
-  display:flex;
-  align-items:center;
-  gap:10px;
-  padding:14px 16px;
-  background:transparent;
-  border:none;
-  font-size:14px;
-  font-weight:600;
-  color:var(--fg, #222);
-  cursor:pointer;
-  text-align:left;
-}
-.mp-menu-row.divider{
-  border-top:1px solid var(--line, #f0f0f0);
-}
-.mp-menu-row:active{ background:rgba(0,0,0,.04); }
-.mp-menu-emoji{
-  width:22px;
-  display:grid; place-items:center;
-  font-size:16px;
-  flex:none;
-}
-.mp-menu-label{ flex:1; min-width:0; }
-.mp-menu-arrow{ color:var(--muted, #bbb); flex:none; }
-
-/* 드롭다운 진입/이탈 애니메이션 */
-.mp-dd-enter-from,
-.mp-dd-leave-to{
-  opacity:0;
-  transform:scale(.92) translateY(-4px);
-}
-.mp-dd-enter-active,
-.mp-dd-leave-active{
-  transition:opacity .14s ease, transform .14s ease;
-}
-
-/* 다크모드 메뉴 */
-:root[data-theme="dark"] .mp-menu-card,
-:root[data-theme="black"] .mp-menu-card{
-  background:var(--surface, #1c1c1c);
-  box-shadow:0 4px 20px rgba(0,0,0,.5);
-}
-:root[data-theme="dark"] .mp-menu-row.divider,
-:root[data-theme="black"] .mp-menu-row.divider{
-  border-top-color:var(--line, #2a2a2a);
-}
+/* AppHeader 공통 컴포넌트로 이관됨 — 관련 CSS 제거 */
 
 /* =================================
  * ▲▲▲ 새 디자인 끝 ▲▲▲

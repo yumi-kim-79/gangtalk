@@ -1,81 +1,8 @@
 <!-- views/StoreFinder.vue -->
 <template>
   <main class="page sf-page">
-    <!-- =================== Header (MainPage 와 동일 톤) =================== -->
-    <header class="sf-header">
-      <div class="sf-brand">
-        <img class="sf-brand-logo-img" src="/icons/icon-192.png" alt="강톡" width="48" height="48" decoding="async" />
-        <div class="sf-brand-text">
-          <h1 class="sf-brand-title">강남톡방</h1>
-          <p class="sf-brand-sub">강남의 모든 공간, 한눈에.</p>
-        </div>
-      </div>
-      <div class="sf-header-actions">
-        <button class="sf-icon-btn" type="button" aria-label="알림" @click="goNotif">
-          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M18 16v-5a6 6 0 1 0-12 0v5l-2 3h16z"/>
-            <path d="M10 21a2 2 0 0 0 4 0"/>
-          </svg>
-          <span v-if="notifBadge > 0" class="sf-bell-badge">{{ notifBadge }}</span>
-        </button>
-        <div class="sf-menu-anchor">
-          <button class="sf-icon-btn" type="button" aria-label="메뉴" aria-haspopup="true" :aria-expanded="menuOpen" @click.stop="toggleMenu">
-            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-              <path d="M4 7h16M4 12h16M4 17h16"/>
-            </svg>
-          </button>
-          <transition name="sf-dd">
-            <div v-if="menuOpen" class="sf-menu-card" role="menu" @click.stop>
-              <button
-                v-for="(m, i) in menuItems"
-                :key="m.key"
-                class="sf-menu-row"
-                :class="{ divider: i > 0 }"
-                type="button"
-                role="menuitem"
-                @click="onMenuItem(m)"
-              >
-                <span class="sf-menu-emoji" aria-hidden="true">{{ m.emoji }}</span>
-                <span class="sf-menu-label">{{ m.label }}</span>
-                <svg class="sf-menu-arrow" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-                  <path d="M9 6l6 6-6 6"/>
-                </svg>
-              </button>
-            </div>
-          </transition>
-        </div>
-      </div>
-    </header>
-
-    <!-- =================== Search (현황판과 동일 톤) =================== -->
-    <section class="sf-search">
-      <div class="sf-search-box">
-        <svg class="sf-search-ic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-          <circle cx="11" cy="11" r="7"/>
-          <path d="M21 21l-4.3-4.3"/>
-        </svg>
-        <input
-          v-model="q"
-          type="search"
-          class="sf-search-input"
-          placeholder="업체명, 지역, 업종을 검색해보세요"
-          @keyup.enter="doSearch"
-          autocomplete="off"
-          spellcheck="false"
-          aria-label="검색어"
-        />
-        <button class="sf-search-filter" type="button" aria-label="필터" @click="openFilter">
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-            <path d="M4 6h12"/>
-            <path d="M4 12h8"/>
-            <path d="M4 18h14"/>
-            <circle cx="18" cy="6" r="2" fill="currentColor"/>
-            <circle cx="14" cy="12" r="2" fill="currentColor"/>
-            <circle cx="20" cy="18" r="2" fill="currentColor"/>
-          </svg>
-        </button>
-      </div>
-    </section>
+    <!-- =================== 공통 AppHeader (헤더 + 검색창) =================== -->
+    <AppHeader v-model="q" @search="doSearch" @filter-click="openFilter" />
 
     <!-- =================== 실시간 순위 (가게찾기 고유, 디자인 톤만 통일) =================== -->
     <section class="sf-search-wrap" v-if="hotRanks10.length">
@@ -646,7 +573,7 @@ import { db } from '@/firebase'
 import { collection, onSnapshot, doc, query, orderBy, setDoc, serverTimestamp, getDoc } from 'firebase/firestore'
 
 import { getStorage, ref as sRef, getDownloadURL } from 'firebase/storage'
-import { getAuth, onAuthStateChanged, signOut } from 'firebase/auth'
+import { getAuth, onAuthStateChanged } from 'firebase/auth'
 import { useMarketingBanners } from '@/composables/useMarketingBanners'   // ⬅️ 추가
 import { useNearby } from '@/composables/useNearby'
 import StoreQuickCreate from '@/components/biz/StoreQuickCreate.vue'
@@ -654,25 +581,14 @@ import StoreQuickCreate from '@/components/biz/StoreQuickCreate.vue'
 import StoreListView from '@/components/finder/StoreListView.vue'
 import StoreGridView from '@/components/finder/StoreGridView.vue'
 import BizManagerTabs from '@/components/biz/BizManagerTabs.vue'
+import AppHeader from '@/components/common/AppHeader.vue'
 
 const router = useRouter()
 const route  = useRoute()
 const storage = getStorage()
 const auth = getAuth()
 
-/* ───────────────────────── 새 헤더(MainPage 톤) ───────────────────────── */
-const notifBadge = ref(0)
-const currentUser = ref(undefined)
-const isAuthReady = ref(false)
-onMounted(() => {
-  onAuthStateChanged(auth, (u) => {
-    currentUser.value = u || null
-    if (!isAuthReady.value) isAuthReady.value = true
-  })
-})
-const isLoggedIn = computed(() => !!currentUser.value)
-
-function goNotif(){ router.push({ name: 'mypage' }).catch(()=>{}) }
+/* (헤더/검색 관련 상태는 AppHeader 공통 컴포넌트로 이관됨 — notifBadge/menuOpen/menuItems/onMenuItem/auth 구독 모두 제거) */
 
 /* ===== Category (MainPage 와 동일 톤) ===== */
 const mpCategories = [
@@ -694,49 +610,7 @@ function openFilter(){
   if (type.value !== 'all') setType('all')
 }
 
-const menuOpen = ref(false)
-function openMenu(){ menuOpen.value = true }
-function closeMenu(){ menuOpen.value = false }
-function toggleMenu(){ menuOpen.value = !menuOpen.value }
-
-const menuItems = computed(() => {
-  const base = [
-    { key:'diary',     emoji:'📅', label:'일정/달력', to:{ path:'/diary' } },
-    { key:'support',   emoji:'🎧', label:'고객센터', to:{ name:'support' } },
-    { key:'favorites', emoji:'❤️', label:'즐겨찾기', to:{ name:'favorites' } },
-  ]
-  base.push(
-    isLoggedIn.value
-      ? { key:'logout', emoji:'🚪', label:'로그아웃', action:'logout' }
-      : { key:'login',  emoji:'🔑', label:'로그인',   to:{ name:'auth' } }
-  )
-  return base
-})
-
-async function onMenuItem(m){
-  closeMenu()
-  if (m.action === 'logout') {
-    try { await signOut(auth) } catch (e) { console.warn('signOut error:', e) }
-    return
-  }
-  if (m.to) router.push(m.to).catch(()=>{})
-}
-
-watch(menuOpen, (on) => {
-  if (on) {
-    const onDocClick = () => closeMenu()
-    const onEsc = (e) => { if (e.key === 'Escape') closeMenu() }
-    document.addEventListener('click', onDocClick)
-    window.addEventListener('keydown', onEsc)
-    menuOpen._cleanup = () => {
-      document.removeEventListener('click', onDocClick)
-      window.removeEventListener('keydown', onEsc)
-    }
-  } else if (menuOpen._cleanup) {
-    menuOpen._cleanup()
-    menuOpen._cleanup = null
-  }
-})
+/* (햄버거 드롭다운 로직은 AppHeader 로 이관됨 — 관련 ref/함수/watch 제거) */
 
 /* ───────────────────────── 실시간순위 Top10 시트 ───────────────────────── */
 const hotSheet = ref({ open:false })
@@ -1863,118 +1737,8 @@ function toggleSort(){ ui.value.sortOpen = !ui.value.sortOpen; if(ui.value.sortO
 
 .sf-page{ background:#fdf8fa; }
 
-/* ===== Header ===== */
-.sf-header{
-  display:flex; align-items:center; justify-content:space-between;
-  gap:12px; padding:16px 20px;
-  position:sticky;
-  top:env(safe-area-inset-top, 0);
-  z-index:100;
-  background:#fdf8fa;
-}
-.sf-brand{ display:flex; align-items:center; gap:12px; min-width:0; }
-.sf-brand-logo-img{
-  flex:none; width:52px; height:52px; border-radius:14px;
-  object-fit:cover; display:block;
-  box-shadow:0 4px 12px rgba(255,77,141,.22);
-}
-.sf-brand-text{ min-width:0; line-height:1.2; }
-.sf-brand-title{
-  margin:0; font-size:22px; font-weight:900;
-  color:#ff2e7e; letter-spacing:-0.4px;
-}
-.sf-brand-sub{
-  margin:3px 0 0; font-size:13px;
-  color:#8a8a8a; font-weight:500;
-}
-.sf-header-actions{ display:flex; align-items:center; gap:8px; }
-.sf-icon-btn{
-  position:relative; width:40px; height:40px; border-radius:50%;
-  background:#fff; border:1.5px solid #eee;
-  display:grid; place-items:center;
-  color:#333; cursor:pointer;
-}
-.sf-icon-btn:active{ background:#f7f7f7; }
-.sf-bell-badge{
-  position:absolute; top:-2px; right:-2px;
-  min-width:18px; height:18px; padding:0 4px;
-  border-radius:999px; background:#ff3d3d; color:#fff;
-  font-size:11px; font-weight:800; line-height:18px;
-  text-align:center; border:2px solid #fdf8fa;
-  box-sizing:content-box;
-}
-
-/* ===== Header 카드형 드롭다운 ===== */
-.sf-menu-anchor{ position:relative; }
-.sf-menu-card{
-  position:absolute; top:calc(100% + 8px); right:0;
-  width:200px; background:var(--surface, #fff);
-  border-radius:16px; box-shadow:0 4px 20px rgba(0,0,0,.15);
-  z-index:1000; overflow:hidden; transform-origin:top right;
-}
-.sf-menu-row{
-  width:100%; display:flex; align-items:center; gap:10px;
-  padding:14px 16px; background:transparent; border:none;
-  font-size:14px; font-weight:600; color:var(--fg, #222);
-  cursor:pointer; text-align:left;
-}
-.sf-menu-row.divider{ border-top:1px solid var(--line, #f0f0f0); }
-.sf-menu-row:active{ background:rgba(0,0,0,.04); }
-.sf-menu-emoji{
-  width:22px; display:grid; place-items:center;
-  font-size:16px; flex:none;
-}
-.sf-menu-label{ flex:1; min-width:0; }
-.sf-menu-arrow{ color:var(--muted, #bbb); flex:none; }
-.sf-dd-enter-from, .sf-dd-leave-to{
-  opacity:0; transform:scale(.92) translateY(-4px);
-}
-.sf-dd-enter-active, .sf-dd-leave-active{
-  transition:opacity .14s ease, transform .14s ease;
-}
-
-/* ===== Search (MainPage .mp-search 와 동일 톤) ===== */
-.sf-search{
-  padding:0 4px 10px;
-  margin:0 16px;
-}
-.sf-search-box{
-  display:flex;
-  align-items:center;
-  gap:8px;
-  height:48px;
-  padding:0 14px;
-  background:var(--surface, #fff);
-  border-radius:14px;
-  box-shadow:0 2px 10px rgba(0,0,0,.05);
-  border:1px solid var(--line, #f0f0f0);
-}
-.sf-search-ic{
-  flex:none;
-  color:var(--muted, #999);
-}
-.sf-search-input{
-  flex:1;
-  min-width:0;
-  border:none;
-  outline:none;
-  background:transparent;
-  font-size:14px;
-  color:var(--fg, #222);
-  font-weight:500;
-}
-.sf-search-input::placeholder{ color:var(--muted, #bbb); font-weight:400; }
-.sf-search-filter{
-  flex:none;
-  background:transparent;
-  border:none;
-  width:28px; height:28px;
-  display:grid; place-items:center;
-  color:var(--muted, #999);
-  cursor:pointer;
-  padding:0;
-}
-.sf-search-filter:active{ color:var(--accent, #ff4d8d); }
+/* ===== Header / Search / Hamburger Dropdown ===== */
+/* 모두 AppHeader 공통 컴포넌트로 이관됨 — sf-* 헤더/검색/메뉴 CSS 제거 */
 
 /* 실시간 순위 섹션 컨테이너(좌우 여백만 통일) */
 .sf-search-wrap{ margin:0 16px 14px; padding:0 !important; }
@@ -2193,40 +1957,17 @@ function toggleSort(){ ui.value.sortOpen = !ui.value.sortOpen; if(ui.value.sortO
   font-size:12px; font-weight:700;
 }
 
-/* ===== 다크모드 보정 ===== */
+/* ===== 다크모드 보정 (페이지 고유 섹션만 — 헤더/검색/메뉴는 AppHeader 내부) ===== */
 :root[data-theme="dark"] .sf-page,
-:root[data-theme="black"] .sf-page,
-:root[data-theme="dark"] .sf-header,
-:root[data-theme="black"] .sf-header{
+:root[data-theme="black"] .sf-page{
   background:var(--bg, #111);
 }
-:root[data-theme="dark"] .sf-icon-btn,
-:root[data-theme="black"] .sf-icon-btn{
-  background:var(--surface, #1c1c1c);
-  border-color:var(--line, #2a2a2a);
-  color:var(--fg, #eee);
-}
-:root[data-theme="dark"] .sf-search-box,
-:root[data-theme="black"] .sf-search-box,
 :root[data-theme="dark"] .sf-hot,
 :root[data-theme="black"] .sf-hot,
 :root[data-theme="dark"] .sf-cat-ic,
 :root[data-theme="black"] .sf-cat-ic{
   background:var(--surface, #1c1c1c);
   border-color:var(--line, #2a2a2a);
-}
-:root[data-theme="dark"] .sf-menu-card,
-:root[data-theme="black"] .sf-menu-card{
-  background:var(--surface, #1c1c1c);
-  box-shadow:0 4px 20px rgba(0,0,0,.5);
-}
-:root[data-theme="dark"] .sf-menu-row.divider,
-:root[data-theme="black"] .sf-menu-row.divider{
-  border-top-color:var(--line, #2a2a2a);
-}
-:root[data-theme="dark"] .sf-bell-badge,
-:root[data-theme="black"] .sf-bell-badge{
-  border-color:var(--bg, #111);
 }
 
 /* =================================
