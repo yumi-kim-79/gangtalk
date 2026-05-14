@@ -1,9 +1,4 @@
 <template>
-  <!-- 커뮤니티 카드 이미지 프리로드 (강톡/힐링 만 사용) -->
-  <teleport to="head">
-    <link rel="preload" as="image" href="/img/community/cat-gangtok.jpg" />
-    <link rel="preload" as="image" href="/img/community/cat-healing.jpg" />
-  </teleport>
   <main class="page gt-page">
     <!-- ===== 공통 AppHeader (검색창 없이) ===== -->
     <AppHeader :show-search="false" />
@@ -51,11 +46,8 @@
 
     <!-- ===== 커뮤니티 2x2 그리드 ===== -->
     <section class="community-grid">
-      <!-- 1) 강톡 — 배경 이미지 + 아이콘 + 텍스트 -->
+      <!-- 1) 강톡 — 솔리드 다크 배경 + 텍스트 + 화살표 -->
       <button type="button" class="gc-card gc-gangtok" @click="openCategoryPage('all')">
-        <img src="/img/community/cat-gangtok.jpg" alt="" class="gc-bg-img" />
-        <div class="gc-overlay"></div>
-        <div class="gc-badge"><span aria-hidden="true">💬</span></div>
         <svg class="gc-arrow" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
         <div class="gc-body">
           <div class="gc-title white">강톡</div>
@@ -63,21 +55,17 @@
         </div>
       </button>
 
-      <!-- 2) 힐링톡 — 배경 이미지 + 강한 오버레이 + 서비스 준비중 -->
+      <!-- 2) 힐링톡 — 연핑크 배경 + 서비스 준비중 -->
       <button type="button" class="gc-card gc-healing" @click="openHealing">
-        <img src="/img/community/cat-healing.jpg" alt="" class="gc-bg-img" />
-        <div class="gc-overlay gc-overlay--strong"></div>
-        <div class="gc-badge"><span aria-hidden="true">❤️</span></div>
         <div class="gc-body">
-          <div class="gc-title white">힐링톡</div>
-          <div class="gc-sub white">명언·건강·여행·다이어트</div>
+          <div class="gc-title pink">힐링톡</div>
+          <div class="gc-sub muted">명언·건강·여행·다이어트</div>
         </div>
         <span class="gc-soon">서비스 준비중</span>
       </button>
 
       <!-- 3) 우리 가게 게시판 — 연베이지 + 서비스 준비중 -->
       <button type="button" class="gc-card gc-store" @click="openFirstBiz">
-        <div class="gc-badge"><span aria-hidden="true">🏪</span></div>
         <div class="gc-body">
           <div class="gc-title pink">우리 가게 게시판</div>
           <div class="gc-sub muted">공지·소식·가게 이야기</div>
@@ -87,7 +75,6 @@
 
       <!-- 4) 이벤트톡 — 연핑크 + 서비스 준비중 -->
       <button type="button" class="gc-card gc-event" @click="openCategoryPage('event')">
-        <div class="gc-badge"><span aria-hidden="true">🎉</span></div>
         <div class="gc-body">
           <div class="gc-title pink">이벤트톡</div>
           <div class="gc-sub muted">이벤트·혜택·참여</div>
@@ -2674,6 +2661,8 @@ console.log('[sim-templates] loaded v2025-09-30-01')
   position: relative;
   border-radius: 16px;
   overflow: hidden;
+  /* AppHeader (no-search 모드) 바로 아래에 붙도록 상단 마진 0 */
+  margin-top: 0;
   margin-bottom: 16px;
   height: 180px;
   background: #f0f0f0;
@@ -2786,40 +2775,7 @@ console.log('[sim-templates] loaded v2025-09-30-01')
 }
 .gc-card:active{ transform: scale(.98); }
 
-/* 배경 이미지 (강톡/힐링) */
-.gc-bg-img{
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-}
-.gc-overlay{
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(to bottom, rgba(0,0,0,0.20) 0%, rgba(0,0,0,0.10) 40%, rgba(0,0,0,0.20) 70%, rgba(0,0,0,0.45) 100%);
-}
-.gc-overlay--strong{
-  background: linear-gradient(to bottom, rgba(0,0,0,0.45) 0%, rgba(0,0,0,0.55) 100%);
-}
-
-/* 좌상단 핑크 사각 아이콘 뱃지 */
-.gc-badge{
-  position: absolute;
-  top: 12px;
-  left: 12px;
-  z-index: 2;
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
-  background: linear-gradient(135deg, #ff6b9d, #ff4d8d);
-  display: grid;
-  place-items: center;
-  font-size: 16px;
-  box-shadow: 0 2px 8px rgba(255,77,141,.35);
-}
-.gc-badge > span{ line-height: 1; }
+/* (배경 이미지/오버레이/뱃지 룰은 제거됨 — 솔리드 배경만 사용) */
 
 /* 우측 하단 화살표 (강톡 카드 전용) */
 .gc-arrow{
@@ -2875,15 +2831,11 @@ console.log('[sim-templates] loaded v2025-09-30-01')
   white-space: nowrap;
 }
 
-/* 카드별 배경 */
-.gc-store{
-  background: #F5EFE8;
-}
-.gc-event{
-  background: #FFF0F5;
-}
-/* 강톡/힐링은 이미지 위에 오버레이 */
-.gc-gangtok, .gc-healing{ background: #1a1a2e; }
+/* 카드별 솔리드 배경 */
+.gc-gangtok{ background: #1a1a2e; }
+.gc-healing{ background: #FFF0F5; }
+.gc-store  { background: #F5EFE8; }
+.gc-event  { background: #FFF0F5; }
 
 /* ===== 헤더 & 타이틀 ===== */
 .title{ margin:0; font-size:18px; font-weight:900 }

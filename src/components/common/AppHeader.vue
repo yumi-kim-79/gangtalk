@@ -8,8 +8,8 @@
   - 모든 페이지가 이 컴포넌트를 그대로 사용해 페이지 전환 시 레이아웃 점프를 차단한다.
 -->
 <template>
-  <div class="app-header-wrap">
-    <header class="app-header">
+  <div class="app-header-wrap" :class="{ 'no-search': !showSearch }">
+    <header class="app-header" :class="{ 'no-search': !showSearch }">
       <div class="app-brand">
         <img class="app-brand-logo-img" src="/icons/icon-192.png" alt="강톡" width="48" height="48" decoding="async" />
         <div class="app-brand-text">
@@ -169,6 +169,10 @@ watch(menuOpen, (on) => {
 .app-header-wrap{
   min-height: var(--app-header-total, 130px);
 }
+/* 검색창이 없는 페이지(예: 강톡)는 헤더만 점유 + 아래 콘텐츠가 바로 붙도록 */
+.app-header-wrap.no-search{
+  min-height: var(--app-header-height, 64px);
+}
 
 /* ===== Header ===== */
 .app-header{
@@ -180,6 +184,10 @@ watch(menuOpen, (on) => {
   padding:16px 0 12px;
   min-height: var(--app-header-height, 64px);
   box-sizing:border-box;
+}
+/* 검색창 없는 모드: 하단 패딩 축소해 다음 콘텐츠가 바짝 붙도록 */
+.app-header.no-search{
+  padding-bottom: 0;
 }
 .app-brand{
   display:flex;
