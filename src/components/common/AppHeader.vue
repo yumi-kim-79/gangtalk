@@ -176,7 +176,8 @@ watch(menuOpen, (on) => {
   align-items:center;
   justify-content:space-between;
   gap:10px;
-  padding:8px 4px 12px;
+  /* 상단 16: 페이지의 .page padding-top 차이를 흡수해 모든 페이지 동일 시작점 */
+  padding:16px 4px 12px;
   min-height: var(--app-header-height, 64px);
   box-sizing:border-box;
 }

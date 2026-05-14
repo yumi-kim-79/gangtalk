@@ -4,9 +4,10 @@
     <!-- =================== 공통 AppHeader (헤더 + 검색창) =================== -->
     <AppHeader v-model="q" @search="doSearch" @filter-click="openFilter" />
 
-    <!-- =================== 실시간 순위 (가게찾기 고유, 디자인 톤만 통일) =================== -->
-    <section class="sf-search-wrap" v-if="hotRanks10.length">
+    <!-- =================== 실시간 순위 (v-if 점프 방지 — v-show + min-height 사용) =================== -->
+    <section class="sf-search-wrap">
       <div
+        v-show="hotRanks10.length"
         class="sf-hot"
         role="button"
         tabindex="0"
@@ -31,6 +32,8 @@
         </div>
         <button class="sf-hot-more" type="button" @click.stop="openHotSheet">더보기 ›</button>
       </div>
+      <!-- 데이터 로딩 전 동일 높이의 빈 카드 자리(점프 방지용 스켈레톤) -->
+      <div v-show="!hotRanks10.length" class="sf-hot sf-hot--skeleton" aria-hidden="true"></div>
     </section>
 
     <!-- ✅ 배너 등록 버튼: 티커 아래, 배너 위 -->
@@ -49,6 +52,16 @@
         <!-- 패널이 열려 있을 때는 닫기 -->
         <span v-else>닫기</span>
       </button>
+    </section>
+
+    <!-- 데이터 로딩 전 배너 스켈레톤 (높이/마진 동일하게 유지) -->
+    <section v-if="!oneBanner.length" class="sf-banners sf-banners--skeleton" aria-hidden="true">
+      <div class="banner sf-banner-skeleton"></div>
+      <div class="sf-banner-dots">
+        <span class="dot active"></span>
+        <span class="dot"></span>
+        <span class="dot"></span>
+      </div>
     </section>
 
     <!-- =================== 배너(실사) =================== -->
@@ -1740,18 +1753,29 @@ function toggleSort(){ ui.value.sortOpen = !ui.value.sortOpen; if(ui.value.sortO
 /* ===== Header / Search / Hamburger Dropdown ===== */
 /* 모두 AppHeader 공통 컴포넌트로 이관됨 — sf-* 헤더/검색/메뉴 CSS 제거 */
 
-/* 실시간 순위 섹션 컨테이너(좌우 여백만 통일) */
-.sf-search-wrap{ margin:0 16px 14px; padding:0 !important; }
+/* 실시간 순위 섹션 컨테이너 (좌우 여백을 wrap 에서만 관리, 카드는 마진 제거) */
+.sf-search-wrap{ margin:0 16px; padding:0 !important; }
 
-/* ===== 실시간 순위 (카드형) ===== */
+/* ===== 실시간 순위 (MainPage .mp-hot 과 패딩/마진/radius 통일) ===== */
 .sf-hot{
   display:flex; align-items:center; gap:10px;
-  padding:12px 16px; margin:0 16px 14px;
+  padding:12px 16px;
+  margin:0 0 14px;
   background:#fff;
   border:none;
-  border-radius:12px;
+  border-radius:14px;
   box-shadow:0 2px 10px rgba(0,0,0,.05);
   cursor:pointer; overflow:hidden;
+  min-height:62px;
+  box-sizing:border-box;
+}
+
+/* 점프 방지용 빈 스켈레톤(데이터 로딩 전) — 같은 높이/마진/배경 */
+.sf-hot--skeleton{
+  cursor:default;
+  pointer-events:none;
+  background:#fff;
+  box-shadow:0 2px 10px rgba(0,0,0,.04);
 }
 .sf-hot-label{
   flex:none; font-size:13px; font-weight:800;
@@ -1803,6 +1827,14 @@ function toggleSort(){ ui.value.sortOpen = !ui.value.sortOpen; if(ui.value.sortO
 .sf-banners :deep(.banner-img){
   width:100%; height:180px; min-height:180px;
   object-fit:cover; display:block;
+}
+
+/* 점프 방지용 배너 스켈레톤 — 동일 높이/모서리 */
+.sf-banner-skeleton{
+  width:100%;
+  height:180px;
+  border-radius:16px;
+  background:linear-gradient(135deg, #ffe4ef, #fff0f6);
 }
 .sf-banner-dots{
   display:flex; justify-content:center; gap:6px;
