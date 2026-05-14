@@ -1,6 +1,9 @@
 <!-- src/pages/MyPage.vue -->
 <template>
-  <main class="page-flat">
+  <main class="page-flat mypage-page">
+    <!-- ===== 공통 AppHeader (검색창 없이) ===== -->
+    <AppHeader :show-search="false" />
+
     <!-- ✅ 비로그인/게스트/익명 계정: 항상 LoggedOutSection -->
     <LoggedOutSection v-if="!effectiveLoggedIn" @auth="goAuth" />
 
@@ -234,6 +237,7 @@ import { db as fbDb } from '@/firebase'
 import { collection, query, where, getDocs } from 'firebase/firestore'
 import { getFunctions, httpsCallable } from 'firebase/functions'
 
+import AppHeader from '@/components/common/AppHeader.vue'
 import LoggedOutSection from '@/components/mypage/LoggedOutSection.vue'
 import HeaderBar from '@/components/mypage/HeaderBar.vue'
 import UserSection from '@/components/mypage/UserSection.vue'
@@ -638,6 +642,13 @@ const onLogout = async () => {
 <style src="@/styles/mypage.css"></style>
 
 <style scoped>
+/* AppHeader 적용에 따른 .page-flat 패딩 통일 — 좌우 var(--page-h-pad), 상단 0 */
+.page-flat.mypage-page{
+  padding-top: 0 !important;
+  padding-left:  max(var(--page-h-pad, 16px), env(safe-area-inset-left)) !important;
+  padding-right: max(var(--page-h-pad, 16px), env(safe-area-inset-right)) !important;
+}
+
 :root[data-theme='white'] .page-flat {
   --auth-pink: #ff2c8a;
   --auth-pink-soft: #ff6aa8;

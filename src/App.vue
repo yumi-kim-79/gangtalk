@@ -28,12 +28,12 @@ import { applyThemeToDom, getTheme, attachThemeSync } from '@/store/theme.js'
 
 const route = useRoute()
 
-// 자체 헤더(AppHeader)를 사용하는 라우트들 (현황판/가게찾기/강톡/제휴관)
+// 자체 헤더(AppHeader)를 사용하는 라우트들 (현황판/가게찾기/강톡/제휴관/마이페이지)
 const hideTopBar = computed(() => {
   const n = route.name
-  if (n === 'dashboard' || n === 'finder' || n === 'gangtalk' || n === 'chat' || n === 'partners') return true
+  if (n === 'dashboard' || n === 'finder' || n === 'gangtalk' || n === 'chat' || n === 'partners' || n === 'mypage') return true
   const p = route.path
-  return p === '/' || p === '/dashboard' || p === '/find' || p === '/chat' || p === '/partners'
+  return p === '/' || p === '/dashboard' || p === '/find' || p === '/chat' || p === '/partners' || p === '/mypage'
 })
 
 // 해당 라우트에서는 TopBar 가 부착한 body 클래스도 제거해
