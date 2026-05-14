@@ -26,10 +26,11 @@ firebase deploy --only hosting
   - 헤더 = 로고(48×48) + 타이틀(핑크 20px) + 서브(회색 12px) + 알림벨 + 햄버거 카드 드롭다운
   - 검색창 = 돋보기 + input + 필터 SVG, height 48, radius 14, `box-shadow:0 2px 10px`
   - 햄버거 메뉴: 일정/달력 · 고객센터 · 즐겨찾기 · 로그인/로그아웃 (Firebase signOut)
-- **고정 높이 토큰** (App.vue `<style>` 전역, 페이지 전환 시 점프 방지):
+- **고정 높이/패딩 토큰** (App.vue `<style>` 전역, 페이지 전환 시 점프 방지):
   - `--app-header-height: 64px;`
   - `--app-search-height: 48px;`
   - `--app-header-total:  130px;`
+  - `--page-h-pad:        16px;` — **모든 페이지의 좌우 패딩은 `.page` (또는 `.wrap`) 에서 이 변수로 단일 적용**. 자식(AppHeader, 섹션 카드)은 자체 좌우 마진/패딩을 두지 않음.
 - **카테고리 탭**은 페이지마다 데이터/로직이 달라 컴포넌트화하지 않음. 단 마크업·CSS 톤은 MainPage `mp-cat` 기준을 따른다 (페이지별 `sf-*` 등 prefix만 변경, 값은 동일).
 - 페이지 고유 섹션(실시간 순위, 광고 배너, Top5 등)은 그대로 유지하되 헤더·검색은 반드시 AppHeader 사용.
 
@@ -60,7 +61,7 @@ firebase deploy --only hosting
 - [ ] 구글플레이 등록
 - [ ] 애플 앱스토어 등록
 
-**현재 단계**: 페이지 전환 점프 4대 원인 모두 수정 완료 (padding 통일, v-if→v-show+스켈레톤, 카드 통일, has-fixed-topbar nextTick)
+**현재 단계**: 페이지 전환 시 가로 크기 불일치 수정 완료 — `--page-h-pad: 16px` 변수로 전 페이지 좌우 패딩 통일
 
 ---
 
@@ -68,12 +69,34 @@ firebase deploy --only hosting
 1. 알림벨 클릭 시 별도 알림 페이지 연결 (현재 AppHeader 내부에서 mypage로 폴백)
 2. 핫이슈 텍스트를 Firestore config에서 가져오도록 연동
 3. 별점/리뷰 카운트 실제 데이터 연동
-4. 다른 페이지(채팅/제휴관/마이페이지 등)도 `AppHeader` 적용 (TopBar 의존성 제거)
+4. 다른 페이지(채팅/제휴관/마이페이지 등)도 `AppHeader` 적용 + `--page-h-pad` 사용
 5. Capacitor 적용 전 웹앱 완성도 점검
 
 ---
 
 ## 작업 로그
+
+### 2026-05-14: 페이지 전환 시 가로 크기 불일치 수정 (`fix/page-horizontal-padding`)
+- **분석 결과** (페이지마다 좌우 패딩이 모두 달랐음):
+  - MainPage `.page`: 좌우 12px
+  - StoreFinder `.page`: 좌우 0 + 섹션별 `margin:0 16px` 중복
+  - GangTalkPage `.wrap.compact`: 좌우 14px
+  - AppHeader `.app-header / .app-search`: 좌우 4px
+- **신규 전역 토큰**: `App.vue :root { --page-h-pad: 16px; }`
+- **단일 책임 원칙**: 좌우 패딩은 `.page` (또는 `.wrap`) 가 책임, 자식(AppHeader / 섹션 / 카드)은 자체 좌우 마진/패딩 두지 않음
+- **변경 파일**:
+  - `App.vue`: `--page-h-pad: 16px` 추가
+  - `MainPage.vue`: `.page padding-left/right: max(12px,...)` → `max(var(--page-h-pad,16px), env(...))` 로 통일
+  - `StoreFinder.vue`:
+    - `.page padding-left/right: var(--page-h-pad)` 로 통일
+    - `.sf-search-wrap margin:0 16px` → `0`
+    - `.sf-banners margin:0 16px 8px` → `0 0 8px`
+    - `.sf-cat margin:0 16px` → `0`
+    - `.sf-tops padding:20px 16px` → `20px 0`
+    - `.sf-list-head padding:8px 16px` → `8px 0`
+  - `GangTalkPage.vue`: `.wrap padding:14px` → `14px var(--page-h-pad)`, `.wrap.compact padding:10px 14px` → `10px var(--page-h-pad)`
+  - `AppHeader.vue`: `.app-header padding:16px 4px 12px` → `16px 0 12px`, `.app-search padding:0 4px 10px` → `0 0 10px`
+- **결과**: 모든 페이지의 콘텐츠 좌우 시작점이 정확히 16px 로 잠겨 페이지 전환 시 가로 이동 없음
 
 ### 2026-05-14: 페이지 전환 시 화면 점프 4가지 원인 수정 (`fix/page-transition-jump`)
 - **수정 1: `.page padding-top` 통일** — 상단 여백 책임을 AppHeader 로 일원화

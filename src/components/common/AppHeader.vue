@@ -176,8 +176,8 @@ watch(menuOpen, (on) => {
   align-items:center;
   justify-content:space-between;
   gap:10px;
-  /* 상단 16: 페이지의 .page padding-top 차이를 흡수해 모든 페이지 동일 시작점 */
-  padding:16px 4px 12px;
+  /* 좌우는 페이지의 .page padding (var(--page-h-pad)) 가 단일 책임 → 여기선 0 */
+  padding:16px 0 12px;
   min-height: var(--app-header-height, 64px);
   box-sizing:border-box;
 }
@@ -243,7 +243,8 @@ watch(menuOpen, (on) => {
 
 /* ===== Search ===== */
 .app-search{
-  padding:0 4px 10px;
+  /* 좌우는 .page 가 책임 */
+  padding:0 0 10px;
 }
 .app-search-box{
   display:flex;
