@@ -61,7 +61,7 @@ firebase deploy --only hosting
 - [ ] 구글플레이 등록
 - [ ] 애플 앱스토어 등록
 
-**현재 단계**: 마이페이지 심플 디자인 개편 (HeaderBar/UserSection 카드 톤, 페이지 배경 #fdf8fa) 완료
+**현재 단계**: 마이페이지 포인트 잘림 + 추천코드 정렬 수정 완료
 
 ---
 
@@ -76,6 +76,19 @@ firebase deploy --only hosting
 ---
 
 ## 작업 로그
+
+### 2026-05-15: 마이페이지 포인트 잘림 + 추천코드 정렬 수정 (`fix/mypage-points-referral-layout`)
+- **문제 1 — 보유 포인트 상단 잘림** 원인: `.row:first-of-type { padding-top: 6px }` 가 다른 행 14 보다 부족해 첫 행이 비좁게 잘려 보임
+  - `.profile-card padding: 20px → 24px 20px` (상단 여유 +4)
+  - `.rows margin: 16px → 20px` (프로필↔행 간격 +4)
+  - `.row:first-of-type padding-top: 6px → 14px` (다른 행과 동일)
+- **문제 2 — 내 추천코드 버튼 정렬**: 단일 row 안에 코드+복사+추천인보기 가로 3개라 좁은 화면에서 어색
+  - 마크업을 `<li class="row row-stack ref-row">` 세로 3행으로 변경
+    1. `.key` 레이블 (좌)
+    2. `.ref-code-row` = `<code class="ref-code-box">` (flex:1, 핑크 테두리, monospace) + `<button class="ref-copy-btn">` (40×40 아이콘 SVG 복사)
+    3. `<button class="ref-show-link">내 추천인 보기 ›</button>` (우측 정렬, 핑크 텍스트 링크, white-space:nowrap)
+  - `.row-stack { display:flex; flex-direction:column; align-items:stretch; gap:10px }`
+  - 다크모드 보정 추가
 
 ### 2026-05-15: 마이페이지 심플 디자인 개편 (`feat/mypage-redesign`)
 - **MyPage.vue**:
