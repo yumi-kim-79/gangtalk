@@ -1,46 +1,8 @@
 <!-- src/pages/PartnersPage.vue -->
 <template>
-  <main class="page">
-    <section class="top">
-      <SearchBar v-model="q" :placeholder="searchPH" @search="doSearch" />
-
-      <!-- ✅ 실시간 순위 (상단 티커: 1줄 세로 스크롤) -->
-      <div
-        class="hot-box"
-        v-if="hotRanks10.length"
-        role="button"
-        tabindex="0"
-        aria-label="실시간 순위 보기"
-        @click="openHotSheet"
-        @keydown.enter.prevent="openHotSheet"
-        @keydown.space.prevent="openHotSheet"
-      >
-        <div class="hot-ticker nowrap">
-          <span class="hot-label">실시간순위</span>
-          <span class="hot-sep">:</span>
-          <div
-            class="ticker-window"
-            aria-label="실시간 순위"
-            ref="tickerWinRef"
-            :style="{ '--ticker-item-h': tickerItemH + 'px' }"
-          >
-            <ul class="ticker-list" :style="tickerStyle">
-              <li
-                v-for="(s, i) in loopedRanks"
-                :key="`hr_${i}_${s.id || s.name}`"
-                class="ticker-item"
-                @click.stop="openHotSheet"
-              >
-                <span class="badge-rank" :data-rank="displayRank(i)">{{ displayRank(i) }}</span>
-                <span class="name">{{ s.name }}</span>
-                <span class="dot">·</span>
-                <span class="intro ellip1">{{ s.intro }}</span>
-              </li>
-            </ul>
-          </div>
-        </div>
-      </div>
-    </section>
+  <main class="page pp-page">
+    <!-- ===== 공통 AppHeader (헤더 + 검색창) ===== -->
+    <AppHeader v-model="q" :search-placeholder="searchPH" @search="doSearch" @filter-click="openFilter" />
 
     <!-- 🔸 배너 등록 버튼 (실시간 순위 아래, 배너 위) -->
     <section v-if="isEnterprise || canEdit" class="banner-cta">
@@ -60,8 +22,8 @@
       </button>
     </section>
 
-    <!-- 프로모션 배너 -->
-    <section class="banners" v-if="bannersReady && bannersToShow.length">
+    <!-- 프로모션 배너 — 가게찾기 sf-banners 톤 -->
+    <section class="banners pp-banners" v-if="bannersReady && bannersToShow.length">
       <article
         v-for="b in bannersToShow"
         :key="b.id"
@@ -76,13 +38,17 @@
           :style="tagPosStyle(b, tIdx)"
         >{{ t }}</span>
       </article>
+      <!-- 핑크 인디케이터 -->
+      <div class="pp-banner-dots" aria-hidden="true">
+        <span class="dot active"></span>
+        <span class="dot"></span>
+        <span class="dot"></span>
+      </div>
     </section>
 
-    <!-- 카테고리 -->
-    <section class="cats">
-      <!-- 텍스트만 제거, 여백/레이아웃 유지를 위해 h3는 남겨둠 -->
-      <h3 class="sec-ttl"></h3>
-      <div class="cat-grid">
+    <!-- ===== Category (가게찾기 톤: 가로 스크롤 1줄) ===== -->
+    <section class="cats pp-cat">
+      <div class="cat-grid pp-cat-scroll">
         <!-- 지역 드롭다운 트리거 -->
         <button
           type="button"
@@ -92,9 +58,8 @@
           aria-haspopup="listbox"
           ref="regionBtnRef"
         >
-          <div class="ico">📍</div>
-          <div class="lbl">{{ regionLabel }}</div>
-          <span class="chev">🔽</span>
+          <div class="cat-ico-circle">📍</div>
+          <div class="lbl">{{ regionLabel }} 🔽</div>
         </button>
 
         <ul
@@ -118,7 +83,7 @@
           </li>
         </ul>
 
-        <!-- 카테고리 버튼들 (PNG 이미지 아이콘 버전) -->
+        <!-- 카테고리 버튼들 — PNG 이미지 아이콘 유지, 원형 컨테이너만 새 톤 -->
         <button
           v-for="c in categories"
           :key="c.key"
@@ -127,10 +92,9 @@
           @click="toggleCat(c.key)"
           type="button"
         >
-          <!-- 아이콘: data-type 에 맞는 PNG를 background-image로 표시 -->
-          <div class="cat-icon" :data-type="c.key"></div>
-
-          <!-- 아래 라벨 텍스트 -->
+          <div class="cat-ico-circle">
+            <span class="cat-icon" :data-type="c.key"></span>
+          </div>
           <div class="lbl">{{ c.label }}</div>
         </button>
       </div>
@@ -160,24 +124,23 @@
       </div>
     </section>
 
-    <!-- 카테고리 인기 (배너 카드형) -->
-    <section class="rank-sections">
-      <!-- 텍스트만 제거 -->
-      <h3 class="sec-ttl"></h3>
-
-      <div v-for="sec in visibleCategories" :key="sec.key" class="rank-sec">
-        <div class="rs-head">
-          <strong>{{ sec.label }} Top 5</strong>
-
-          <!-- ✅ Top5 등록 버튼: 제목 오른쪽 (기업회원 + 관리자) -->
-          <button
-            v-if="isEnterprise || canEdit"
-            class="pink-cta top5-btn"
-            type="button"
-            @click="toggleBizCreate($event)"
-          >
-            Top5 등록
-          </button>
+    <!-- 카테고리 인기 (배너 카드형) — 가게찾기 sf-tops 톤 -->
+    <section class="rank-sections pp-tops">
+      <div v-for="sec in visibleCategories" :key="sec.key" class="rank-sec pp-top-sec">
+        <div class="rs-head pp-top-head">
+          <strong class="pp-top-ttl"><span class="spark" aria-hidden="true">✨</span> {{ sec.label }} Top 5</strong>
+          <div class="pp-top-actions">
+            <!-- ✅ Top5 등록 버튼: 제목 오른쪽 (기업회원 + 관리자) -->
+            <button
+              v-if="isEnterprise || canEdit"
+              class="pink-cta top5-btn"
+              type="button"
+              @click="toggleBizCreate($event)"
+            >
+              Top5 등록
+            </button>
+            <button class="pp-top-more" type="button" @click="cat = sec.key">더보기 ›</button>
+          </div>
         </div>
 
         <div class="rs-scroller">
@@ -208,8 +171,8 @@
       </div>
     </section>
 
-    <!-- 목록 헤드 -->
-    <section class="list-head" id="list">
+    <!-- 목록 헤드 — 가게찾기 sf-list-head 톤 -->
+    <section class="list-head pp-list-head" id="list">
       <div class="count-row">
         <div class="count">총 {{ filtered.length }}개</div>
 
@@ -372,7 +335,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import SearchBar from '@/components/SearchBar.vue'
+import AppHeader from '@/components/common/AppHeader.vue'
 import BizManagerTabs from '@/components/biz/BizManagerTabs.vue'
 import { db } from '@/firebase'
 
@@ -906,54 +869,16 @@ onUnmounted(() => {
 /* ---------- 점수/정렬 ---------- */
 const score = (p)=> Math.round((Number(p.rating||0))*100 + (p.tags?.length||0)*3)
 
-/* 실시간 순위 */
+/* 실시간 순위 (티커 마크업은 제거됨 — Top10 시트에서만 사용) */
 const hotRanks10 = computed(() => {
   const base = partners.value.slice().sort((a,b)=> score(b)-score(a)).slice(0,10)
   return base.map(p => ({ id: p.id, name: p.name, intro: p.intro || (Array.isArray(p.tags) ? p.tags.join(' · ') : '') }))
 })
-const loopedRanks = computed(() => {
-  const list = hotRanks10.value
-  return list.length ? [...list, list[0]] : []
-})
-function displayRank(i){
-  const n = hotRanks10.value.length
-  if (!n) return ''
-  return ((i % n) + 1).toString()
-}
 
-/* 티커 */
-const tickerWinRef   = ref(null)
-const tickerItemH    = ref(30)
-const tickerIndex    = ref(0)
-const useTransition  = ref(true)
-const tickerMs       = 1400
-function measureTickerItemH(){
-  const win = tickerWinRef.value
-  const li = win?.querySelector('.ticker-item')
-  const h  = li?.offsetHeight || 30
-  tickerItemH.value = Math.max(28, h)
+/* 검색창 필터 버튼 — 카테고리 전체로 리셋 */
+function openFilter(){
+  if (cat.value !== 'all') cat.value = 'all'
 }
-const tickerStyle = computed(() => ({
-  transform: `translate3d(0, -${tickerIndex.value * tickerItemH.value}px, 0)`,
-  transition: useTransition.value ? 'transform 420ms ease-in' : 'none'
-}))
-let tickerTimer = null
-function startTicker(){
-  if (tickerTimer) clearInterval(tickerTimer)
-  tickerTimer = setInterval(() => {
-    const n = hotRanks10.value.length
-    if (!n) return
-    if (tickerIndex.value < n) { useTransition.value = true; tickerIndex.value += 1 }
-    else { useTransition.value = false; tickerIndex.value = 0 }
-  }, tickerMs)
-}
-onMounted(async () => {
-  await nextTick(); measureTickerItemH(); startTicker(); window.addEventListener('resize', measureTickerItemH)
-})
-onUnmounted(() => {
-  if (tickerTimer) clearInterval(tickerTimer)
-  window.removeEventListener('resize', measureTickerItemH)
-})
 
 /* 바텀시트 */
 const hotSheet = ref({ open:false })
@@ -1330,73 +1255,208 @@ function refresh(){ loadPartners() }
 </script>
 
 <style scoped>
-/* 전체 패딩/간격 */
-.page{ padding:8px 12px 92px }
+/* 전체 패딩/간격 — 좌우는 전역 --page-h-pad, 상단은 AppHeader 가 책임 */
+.page{
+  padding-top: 0;
+  padding-left:  max(var(--page-h-pad, 16px), env(safe-area-inset-left));
+  padding-right: max(var(--page-h-pad, 16px), env(safe-area-inset-right));
+  padding-bottom: calc(92px + env(safe-area-inset-bottom));
+}
 
-/* 상단 */
-.top{ display:flex; flex-direction:column; gap:8px; margin-bottom:10px }
-
-/* =============================
-   HOT Ticker (상단: 세로 1줄)
-============================= */
-:root{ --ticker-item-h:28px; }
-.nowrap{ white-space:nowrap; }
-.hot-box{
-  display:flex; align-items:center; height:32px;
-  border:1px solid var(--line); border-radius:14px;
-  background:var(--surface); color:var(--fg); padding:0 10px;
-  box-shadow:0 4px 10px var(--shadow);
-  overflow:hidden; cursor:pointer; user-select:none;
-}
-.hot-box .hot-label{ font-weight:900; font-size:12px; white-space:nowrap; }
-.hot-box .hot-sep{ margin:0 6px; opacity:.6; font-weight:900; }
-.hot-box .hot-ticker{ flex:1 1 auto; min-width:0; display:flex; align-items:center; }
-
-.ticker-window{ position:relative; height:var(--ticker-item-h); overflow:hidden; flex:1 1 auto; min-width:0; }
-.ticker-list{
-  margin:0; padding:0; list-style:none;
-  will-change: transform;
-}
-.ticker-item{
-  height:var(--ticker-item-h);
-  line-height: var(--ticker-item-h);
-  display:flex; align-items:center; gap:6px;
-  white-space:nowrap; width:100%; max-width:100%; min-width:0;
-  padding:0;
-}
-.ticker-item .name{ font-weight:900; font-size:12px; flex:0 0 auto; min-width:auto; }
-.ticker-item .dot{ opacity:.55; font-weight:900; }
-.ticker-item .intro{
-  font-size:12px; flex:1 1 auto; min-width:0;
-  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
-}
 .ellip1{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 
-/* 배너 */
+/* =================================
+ * ▼▼▼ PartnersPage 새 디자인 (가게찾기 톤) ▼▼▼
+ * ================================= */
+
+/* ===== 배너 (sf-banners 톤) ===== */
+.pp-banners{
+  position:relative;
+  margin:0 0 12px;
+}
+.pp-banners .banner{
+  position:relative;
+  display:block;
+  border-radius:16px;
+  overflow:hidden;
+  background:transparent;
+  box-shadow:0 4px 14px rgba(0,0,0,.06);
+}
+.pp-banners .banner-img{
+  width:100%;
+  height:180px;
+  min-height:180px;
+  object-fit:cover;
+  display:block;
+}
+.pp-banner-dots{
+  display:flex; justify-content:center; gap:6px;
+  margin-top:10px;
+}
+.pp-banner-dots .dot{
+  width:6px; height:6px; border-radius:50%;
+  background:#e8e8e8;
+}
+.pp-banner-dots .dot.active{
+  background:#ff4d8d;
+  width:18px; border-radius:999px;
+}
+
+/* ===== Category 가로 스크롤 (sf-cat-scroll 톤) ===== */
+.pp-cat{ padding:4px 0 12px; position:relative; }
+.pp-cat-scroll{
+  display:flex !important;
+  align-items:flex-start;
+  gap:14px;
+  overflow-x:auto;
+  padding:4px 4px 8px;
+  scrollbar-width:none;
+  -webkit-overflow-scrolling:touch;
+  grid-template-columns:none !important;
+}
+.pp-cat-scroll::-webkit-scrollbar{ display:none; }
+.pp-cat-scroll .cat{
+  flex:none !important;
+  display:flex !important;
+  flex-direction:column !important;
+  align-items:center !important;
+  gap:6px;
+  background:none !important;
+  border:none !important;
+  padding:0 !important;
+  min-width:60px;
+  box-shadow:none !important;
+  outline:none !important;
+}
+.pp-cat-scroll .cat-ico-circle{
+  width:48px; height:48px;
+  border-radius:50%;
+  display:grid; place-items:center;
+  border:1.5px solid var(--line, #e8e8e8);
+  background:var(--surface, #fff);
+  color:var(--muted, #999);
+  transition:all .15s ease;
+  font-size:18px;
+}
+.pp-cat-scroll .cat.active .cat-ico-circle{
+  background:linear-gradient(135deg, #ff6b9d, #ff4d8d);
+  border-color:transparent;
+  color:#fff;
+  box-shadow:0 4px 12px rgba(255,77,141,.3);
+}
+.pp-cat-scroll .cat .lbl{
+  font-size:11px !important;
+  font-weight:600 !important;
+  color:var(--muted, #999) !important;
+  margin:0 !important;
+}
+.pp-cat-scroll .cat.active .lbl{
+  color:#ff4d8d !important;
+  font-weight:800 !important;
+}
+/* 기존 .cat-icon (PNG 배경) 을 .cat-ico-circle 내부 32×32 로 표시 */
+.pp-cat-scroll .cat-icon{
+  display:block;
+  width:32px; height:32px;
+  background-size:contain;
+  background-repeat:no-repeat;
+  background-position:center;
+}
+/* active 시 PNG 아이콘 위에 흰색 필터 (없으면 그대로) */
+.pp-cat-scroll .cat.active .cat-icon{
+  filter: brightness(0) invert(1);
+}
+
+/* ===== Top5 섹션 (sf-tops 톤) ===== */
+.pp-tops{ padding:14px 0; }
+.pp-top-head{
+  display:flex; align-items:center; justify-content:space-between;
+  margin:0 0 12px; padding:0 2px;
+}
+.pp-top-ttl{
+  font-size:17px; font-weight:900; color:#111;
+  letter-spacing:-0.2px;
+}
+.pp-top-ttl .spark{ margin-right:4px; }
+.pp-top-actions{ display:flex; align-items:center; gap:8px; }
+.pp-top-more{
+  background:none; border:none; cursor:pointer;
+  font-size:13px; font-weight:600; color:#888;
+  padding:4px 6px;
+}
+.pp-top-sec{ margin:0 0 18px; }
+/* Top5 카드 — sf-tops 카드 톤 */
+.pp-top-sec .rs-scroller{
+  gap:12px;
+  padding-bottom:6px;
+}
+.pp-top-sec .rs-card{
+  min-width:200px;
+  border:none !important;
+  border-radius:14px !important;
+  box-shadow:0 4px 14px rgba(0,0,0,.08) !important;
+  overflow:hidden;
+  background:#fff;
+}
+.pp-top-sec .rs-thumb{
+  height:140px !important;
+  padding-top:0 !important;
+}
+.pp-top-sec .rs-badge{
+  left:10px; top:10px;
+  width:24px; height:24px;
+  font-size:12px;
+}
+.pp-top-sec .rs-info{
+  padding:12px !important;
+  gap:4px;
+}
+.pp-top-sec .rs-title{
+  font-size:16px !important;
+  font-weight:800 !important;
+}
+.pp-top-sec .rs-sub{
+  font-size:12px;
+  color:#888;
+}
+.pp-top-sec .rs-intro{
+  font-size:13px;
+  color:#444;
+}
+.pp-top-sec .rs-price{
+  font-size:14px !important;
+  color:#ff2e7e !important;
+  font-weight:900 !important;
+}
+
+/* ===== List Head (sf-list-head 톤) ===== */
+.pp-list-head{ padding:8px 0; }
+.pp-list-head .count-row{ display:flex; align-items:center; gap:8px; }
+.pp-list-head .count{
+  font-size:13px; font-weight:700; color:var(--fg);
+}
+
+/* ===== 다크모드 보정 ===== */
+:root[data-theme="dark"] .pp-cat-scroll .cat-ico-circle,
+:root[data-theme="black"] .pp-cat-scroll .cat-ico-circle{
+  background:var(--surface, #1c1c1c);
+  border-color:var(--line, #2a2a2a);
+}
+:root[data-theme="dark"] .pp-top-sec .rs-card,
+:root[data-theme="black"] .pp-top-sec .rs-card{
+  background:var(--surface, #1c1c1c);
+}
+
+/* =================================
+ * ▲▲▲ PartnersPage 새 디자인 끝 ▲▲▲
+ * ================================= */
+
+/* (레거시) 기존 .banners 호환 — 새 .pp-banners 가 우선 적용됨 */
 .banners{
   display:flex;
   flex-direction:column;
   gap:10px;
   margin:4px 0 12px;
-}
-
-/* 배너 한 장 */
-.banner{
-  position:relative;
-  overflow:hidden;
-  display:block;
-  padding:0;
-  background:transparent;
-  box-shadow:none;
-  border-radius:0;
-  aspect-ratio:auto;
-  min-height:0;
-}
-.banner-img{
-  display:block;
-  width:100%;
-  height:auto;
-  object-fit:contain;
 }
 
 /* 🔸 배너 등록 버튼 영역: 실시간 순위 아래, 배너 위 */
