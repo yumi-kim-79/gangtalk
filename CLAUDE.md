@@ -18,6 +18,17 @@ npm run build
 firebase deploy --only hosting
 ```
 
+## 공통 스타일 기준 (전사 통일)
+- **모든 페이지의 헤더 / 검색창 / 카테고리 탭은 현황판(`src/pages/MainPage.vue`) 스타일을 단일 기준으로 통일한다.**
+- 기준 컴포넌트 마크업 / 토큰
+  - 헤더: `mp-header` / `mp-brand`(로고+타이틀+서브) / `mp-icon-btn`(알림벨+햄버거) / `mp-bell-badge` / `mp-menu-card` 카드 드롭다운
+  - 검색: `mp-search > mp-search-box`(돋보기 + input + 필터 SVG), height 48, radius 14, `box-shadow:0 2px 10px`, placeholder `업체명, 지역, 업종을 검색해보세요`
+  - 카테고리: `mp-cat > mp-cat-scroll > mp-cat-item`(원형 48 아이콘 + 텍스트), 선택 시 핑크 그라디언트 + 라벨 핑크 800, 가로 스크롤 1줄 + expand 버튼
+- 페이지별 적용 규칙
+  - 다른 페이지는 **클래스 prefix 만** 페이지 식별자로 변경 (`sf-*`, `gt-*` 등)
+  - **CSS 값 / 마크업 구조는 MainPage 와 완전 동일**하게 유지
+  - 페이지 고유 섹션(실시간 순위, 광고 배너, Top5 등)은 그대로 유지하되 헤더·검색·카테고리만 통일
+
 ## 작업 규칙 (반드시 준수)
 
 ### 시작할 때
@@ -45,7 +56,7 @@ firebase deploy --only hosting
 - [ ] 구글플레이 등록
 - [ ] 애플 앱스토어 등록
 
-**현재 단계**: 가게찾기 전체 UI 톤 일괄 업그레이드 완료 (배경/헤더/검색/순위/배너/카테고리 2줄/Top5)
+**현재 단계**: 가게찾기 헤더/검색/카테고리를 현황판 스타일로 완전 통일 완료 — 공통 스타일 기준 = MainPage 확정
 
 ---
 
@@ -53,12 +64,32 @@ firebase deploy --only hosting
 1. 알림벨 클릭 시 별도 알림 페이지 연결 (현재 mypage로 폴백)
 2. 핫이슈 텍스트를 Firestore config에서 가져오도록 연동
 3. 별점/리뷰 카운트 실제 데이터 연동
-4. Capacitor 적용 전 웹앱 완성도 점검
-5. 모바일 대응 UI/UX 검토
+4. 다른 페이지(채팅/제휴관 등)도 동일 기준으로 헤더/검색/카테고리 통일
+5. Capacitor 적용 전 웹앱 완성도 점검
 
 ---
 
 ## 작업 로그
+
+### 2026-05-14: 가게찾기 헤더/검색/카테고리 현황판 스타일로 통일 (`feat/storefinder-unify-with-mainpage`)
+- **공통 스타일 기준 확정**: 모든 페이지의 헤더 / 검색창 / 카테고리는 `MainPage.vue` 의 마크업 + CSS 값을 그대로 따른다 (CLAUDE.md 상단에 명시)
+- **헤더**: `sf-header` HTML 은 이전부터 `mp-header` 와 동일 구조, 이번에 CSS 값까지 완전 동일하게 정렬
+  - padding `8px 4px 12px`, 로고 48×48 radius 12, 타이틀 20 핑크 `#ff2e7e`, 서브 12 `var(--muted)`, 아이콘 버튼 38×38 투명/border-none, 뱃지 16×16 `#ff4d8d` `+2px solid var(--bg)`
+  - sticky 제거 (MainPage 와 일관)
+- **검색**: `SearchBar.vue` 컴포넌트 사용 제거, MainPage 와 동일한 직접 마크업 사용
+  - `sf-search > sf-search-box`: height 48, padding `0 14px`, radius 14, `box-shadow:0 2px 10px rgba(0,0,0,.05)`, border `1px solid var(--line)`
+  - 좌측 돋보기 SVG `.sf-search-ic`, 가운데 `<input class="sf-search-input">` placeholder `업체명, 지역, 업종을 검색해보세요`, 우측 필터 SVG `.sf-search-filter`
+  - 실시간 순위 카드는 별도 `<section class="sf-search-wrap">` 으로 분리 유지
+- **카테고리**: 기존 `.cats > .cat-grid > .cat` 마크업/CSS 전체 제거 → `<section class="sf-cat"> > .sf-cat-scroll > .sf-cat-item` 으로 교체
+  - `mpCategories` 배열(SVG 아이콘 포함, 10개) StoreFinder 에도 동일하게 추가
+  - 'all' 카테고리는 setType 대신 **`openRegionMenuFromCat($event)`** 호출 — 지역 드롭다운 기능 유지
+  - 라벨 표시: 'all' = `{지역명} 🔽`, 그 외 = `c.label`
+  - 원형 아이콘 48 + 라벨, 선택 시 핑크 그라디언트 + 라벨 핑크 800
+  - `expandCategories` ref + 펼치기 버튼(현황판과 동일)
+- **레거시 제거**: `.cat-grid` / `.cat` / `.cat[data-key="all"]` / `.ico .badge` / `.lbl-region` / `.cat[data-key="kara"] .lbl` 전부 제거
+- **다크모드**: `.sf-search-shell` / `.cat-grid .cat ... .ico` 셀렉터 → `.sf-search-box` / `.sf-cat-ic` 로 갱신
+- **import 정리**: `SearchBar` import 제거 (코멘트로 사유 명시)
+- **유지**: 실시간 순위 (`sf-hot`), 광고 배너 (`sf-banners`), Top5 (`sf-tops`), 업소 목록, 모든 모달/시트/편집 모드/기업회원 CTA — 그대로
 
 ### 2026-05-14: 가게찾기 전체 UI 톤 업그레이드 (`feat/storefinder-ui-polish`)
 - **배경**: `var(--bg)` → `#fdf8fa` 밝은 연핑크 흰색
