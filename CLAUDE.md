@@ -61,7 +61,7 @@ firebase deploy --only hosting
 - [ ] 구글플레이 등록
 - [ ] 애플 앱스토어 등록
 
-**현재 단계**: 배너 상단 여백 8px + 강톡 카드 배경색 연보라(#7C6B9E)로 변경 완료
+**현재 단계**: 제휴관(PartnersPage)을 가게찾기 스타일로 통일 + 실시간순위 티커 제거 완료
 
 ---
 
@@ -69,13 +69,28 @@ firebase deploy --only hosting
 1. 알림벨 클릭 시 별도 알림 페이지 연결 (현재 AppHeader 내부에서 mypage로 폴백)
 2. 핫이슈 텍스트를 Firestore config에서 가져오도록 연동
 3. 별점/리뷰 카운트 실제 데이터 연동
-4. 제휴관/마이페이지도 `AppHeader` 적용 + `--page-h-pad` 사용
+4. 마이페이지도 `AppHeader` 적용 + `--page-h-pad` 사용
 5. 힐링톡/우리가게/이벤트톡 실 서비스 오픈 준비
 6. Capacitor 적용 전 웹앱 완성도 점검
 
 ---
 
 ## 작업 로그
+
+### 2026-05-14: 제휴관 가게찾기 스타일로 통일 + 실시간순위 제거 (`feat/partners-redesign`)
+- **App.vue `hideTopBar`** 에 `'partners'` 라우트 추가 → 제휴관 진입 시 TopBar 자동 숨김
+- **`<AppHeader>` 적용**: 기존 `<section class="top"><SearchBar>` + 티커 마크업 전체 제거 → `<AppHeader v-model="q" :search-placeholder="searchPH" @search="doSearch" @filter-click="openFilter" />`
+- **실시간 순위 티커 제거**: `.hot-box / .hot-ticker / .ticker-list / .ticker-item / .ticker-window` 마크업·CSS 전부 제거
+- **티커 JS 정리**: `loopedRanks / displayRank / tickerWinRef / tickerItemH / tickerIndex / useTransition / tickerMs / measureTickerItemH / tickerStyle / tickerTimer / startTicker / onMounted+onUnmounted (티커용)` 전부 삭제
+- **`hotRanks10 / hotSheet / openHotSheet / closeHotSheet / openPartnerFromHot / openHotDetail` 유지** — Top10 바텀시트는 그대로
+- **`openFilter` 신규** (`cat='all'` 리셋) — AppHeader 의 필터 버튼 이벤트 핸들러
+- **`.page` 패딩**: `8px 12px 92px` → `padding-top:0 + padding-left/right: max(var(--page-h-pad,16), env(...))` + bottom 유지
+- **카테고리 (`sf-cat-scroll` 톤)**: `<section class="cats pp-cat">` + `<div class="cat-grid pp-cat-scroll">`, 기존 PNG 아이콘 유지 (`.cat-icon`) but 원형 컨테이너(`.cat-ico-circle` 48×48) 안에 포함, 가로 스크롤 1줄, active 시 핑크 그라디언트 + 흰 텍스트 (PNG 아이콘에 `filter: brightness(0) invert(1)`)
+- **지역 드롭다운**: `.region-cat` 카테고리 첫 칸에 유지, 라벨 `{지역명} 🔽` 으로 통일
+- **배너 (`sf-banners` 톤)**: `<section class="banners pp-banners">` + 핑크 인디케이터 3점 (active 시 18px pill)
+- **Top5 (`sf-tops` 톤)**: 섹션 헤더 `<strong class="pp-top-ttl"><span class="spark">✨</span> {label} Top 5</strong>` + "더보기 ›" 버튼, 카드 `min-width:200, radius:14, shadow, thumb height:140, name 16/800, sub 12 muted, price 14/900 #ff2e7e`
+- **List Head (`sf-list-head` 톤)**: `padding:8px 0`, 카운트/등록 버튼 정렬
+- **다크모드 보정** 추가: `.pp-cat-scroll .cat-ico-circle`, `.pp-top-sec .rs-card` 다크 surface
 
 ### 2026-05-14: 배너 상단 여백 + 강톡 카드 연보라 (`fix/gangtalk-spacing-color`)
 - **`.gt-slider-bar margin-top: 0 → 8px`**: AppHeader 와 배너 사이에 작은 숨 공간 확보
