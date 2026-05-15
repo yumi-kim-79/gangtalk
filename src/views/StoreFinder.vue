@@ -1,6 +1,16 @@
 <!-- views/StoreFinder.vue -->
 <template>
   <main class="page sf-page">
+    <!-- 첫 배너 이미지 preload — 데이터 준비되면 즉시 head 에 link rel=preload -->
+    <teleport to="head">
+      <link
+        v-if="firstBannerUrl"
+        rel="preload"
+        as="image"
+        :href="firstBannerUrl"
+      />
+    </teleport>
+
     <!-- =================== 공통 AppHeader (헤더 + 검색창) =================== -->
     <AppHeader v-model="q" @search="doSearch" @filter-click="openFilter" />
 
@@ -219,7 +229,7 @@
             @mousemove="editMode ? noop() : mouseMove"
             @mouseup="editMode ? noop() : mouseEnd(() => openStore(s))"
           >
-            <div class="m-thumb" :style="bgStyle(thumbOf(s))">
+            <div class="m-thumb" v-lazy-bg="thumbOf(s) || ''">
               <span class="rank">{{ i+1 }}</span>
             </div>
             <div class="m-meta">
@@ -585,7 +595,7 @@ import { computed, ref, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 // SearchBar 컴포넌트 미사용 (현황판과 동일하게 직접 input 마크업으로 통일)
 import { db } from '@/firebase'
-import { collection, onSnapshot, doc, query, orderBy, setDoc, serverTimestamp, getDoc } from 'firebase/firestore'
+import { collection, onSnapshot, doc, query, orderBy, setDoc, serverTimestamp, getDoc, limit } from 'firebase/firestore'
 
 import { getStorage, ref as sRef, getDownloadURL } from 'firebase/storage'
 import { getAuth, onAuthStateChanged } from 'firebase/auth'
@@ -672,6 +682,10 @@ const oneBanner = computed(() => {
   // 실제 이미지가 있는 배너만 걸러서 최신 1장만
   const withImg = arr.filter(b => !!bannerImage(b))
   return withImg.slice(-1)
+})
+const firstBannerUrl = computed(() => {
+  const b = oneBanner.value && oneBanner.value[0]
+  return b ? bannerImage(b) : ''
 })
 
 function onBannerClick(){ scrollToList() }
@@ -1039,9 +1053,9 @@ function rebuildStores(){
 // Firestore 구독
 onMounted(() => {
   applyThemeToDom(getTheme())
-  // 1) stores 컬렉션
+  // 1) stores 컬렉션 (limit 100 — 초기 진입 부담 ↓)
   try{
-    const qRef = query(collection(db, 'stores'), orderBy('updatedAt','desc'))
+    const qRef = query(collection(db, 'stores'), orderBy('updatedAt','desc'), limit(100))
     unsubsStores = onSnapshot(qRef, async (snap)=>{
       const rows = await Promise.all(
         snap.docs.map(async d => {
@@ -1063,9 +1077,9 @@ onMounted(() => {
     console.warn('stores 구독 실패', e)
   }
 
-  // 2) rooms_biz 컬렉션 (초톡과 같은 소스)
+  // 2) rooms_biz 컬렉션 (limit 100 — 초톡과 같은 소스)
   try{
-    const rRef = collection(db, 'rooms_biz')
+    const rRef = query(collection(db, 'rooms_biz'), limit(100))
     unsubsRoomsBiz = onSnapshot(rRef, snap => {
       const map = new Map()
       snap.forEach(d => {

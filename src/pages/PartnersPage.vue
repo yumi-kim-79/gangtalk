@@ -1,6 +1,16 @@
 <!-- src/pages/PartnersPage.vue -->
 <template>
   <main class="page pp-page">
+    <!-- 첫 배너 이미지 preload — 데이터 준비되면 즉시 head 에 link rel=preload -->
+    <teleport to="head">
+      <link
+        v-if="firstBannerUrl"
+        rel="preload"
+        as="image"
+        :href="firstBannerUrl"
+      />
+    </teleport>
+
     <!-- ===== 공통 AppHeader (헤더 + 검색창) ===== -->
     <AppHeader v-model="q" @search="doSearch" @filter-click="openFilter" />
 
@@ -154,8 +164,8 @@
             @keydown.enter.prevent="openPartner(p)"
             @keydown.space.prevent="openPartner(p)"
           >
-            <!-- 썸네일 -->
-            <div class="rs-thumb" :class="{ noimg: !p.thumb }" :style="thumbStyle(p.thumb)">
+            <!-- 썸네일 (viewport 진입 시에만 배경 이미지 로드) -->
+            <div class="rs-thumb" :class="{ noimg: !p.thumb }" v-lazy-bg="p.thumb || ''">
               <span class="rs-badge" :data-rank="idx+1">{{ idx+1 }}</span>
             </div>
 
@@ -735,6 +745,10 @@ const bannersToShow = computed(() => {
   const withImage = arr.filter(b => !!bannerImage(b))
   return withImage.slice(0, 1)
 })
+const firstBannerUrl = computed(() => {
+  const b = bannersToShow.value && bannersToShow.value[0]
+  return b ? bannerImage(b) : ''
+})
 function onBannerClick(){ scrollToList() }
 
 /* ---------- 파트너 데이터 ---------- */
@@ -822,9 +836,18 @@ async function loadPartners(){
   }
 }
 
-/* 초기 로드 */
-onMounted(async ()=>{ await loadPartners() })
-onMounted(() => onAuthStateChanged(auth, () => loadPartners()))
+/* 초기 로드 — onMounted 1회 + onAuthStateChanged 는 uid 변경 시에만 재로드 */
+let _lastAuthUid = null
+onMounted(async ()=>{
+  _lastAuthUid = auth.currentUser?.uid || null
+  await loadPartners()
+})
+onMounted(() => onAuthStateChanged(auth, (u) => {
+  const uid = u?.uid || null
+  if (uid === _lastAuthUid) return   // 같은 유저(또는 첫 발화) 면 중복 로드 스킵
+  _lastAuthUid = uid
+  loadPartners()
+}))
 
 /* ---------- 상세 → 목록 반영 ---------- */
 const flashId = ref(null)
@@ -858,7 +881,9 @@ function bindRatingEvents(add=true){
   fn.call(window, 'partner:rating', onPartnerRating)
   fn.call(window, 'favorite-changed', onFavoriteChanged)
 }
-onMounted(() => bindRatingEvents(true))
+// 별점/찜 이벤트 리스너는 첫 페인트 이후에 등록 (idle 지연)
+const _ric = window.requestIdleCallback || ((cb) => setTimeout(cb, 1))
+onMounted(() => _ric(() => bindRatingEvents(true)))
 onUnmounted(() => {
   bindRatingEvents(false)
   if (flashTimer) clearTimeout(flashTimer)
