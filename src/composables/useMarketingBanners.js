@@ -5,6 +5,8 @@ import {
   doc,
   collection,
   onSnapshot,
+  getDoc,
+  getDocs,
   query,
   orderBy,
 } from 'firebase/firestore'
@@ -32,15 +34,25 @@ function pickFromDocFields(d, type /* 'P' | 'F' */) {
   return d.adBannersP ?? d.adBanners ?? d.banners ?? d.ads ?? []
 }
 
-/** gs:// → https 변환 (그 외는 그대로 통과) */
+/* ===== 성능 최적화 =====
+ * 같은 gs:// URL 에 대해 getDownloadURL 을 매번 새로 호출하면 Storage 토큰 발급
+ * 추가 라운드트립이 누적됨. 모듈 스코프 Map 으로 https URL 을 캐시한다.
+ */
+const urlCache = new Map()
+
+/** gs:// → https 변환 (그 외는 그대로 통과) — 모듈 캐시 사용 */
 async function resolveImg(u) {
   const url = String(u || '').trim()
   if (!url) return ''
   if (/^https?:\/\//i.test(url) || url.startsWith('/')) return url
   if (url.startsWith('gs://')) {
+    if (urlCache.has(url)) return urlCache.get(url)
     try {
-      return await getDownloadURL(sRef(fbStorage, url))
+      const https = await getDownloadURL(sRef(fbStorage, url))
+      urlCache.set(url, https)
+      return https
     } catch {
+      urlCache.set(url, '')
       return ''
     }
   }
@@ -77,12 +89,19 @@ async function normalizeBanner(raw, idFallback) {
  * - type: 'P' (제휴관), 'F' (가게찾기)
  * - items: [{ id, img, ... }]
  * - ready: 데이터 준비 완료 여부
+ *
+ * 소스 전략 (이전: 3개 모두 onSnapshot → 변경):
+ *  1) fixedDoc (config/marketing/<subcoll>/prod): 운영 미러로 자주 갱신되므로 onSnapshot 유지 — 최우선
+ *  2) subcollection (config/marketing/<subcoll>): fixedDoc 이 비어있을 때만 1회 getDocs 폴백
+ *  3) rootDoc (config/marketing): 마지막 폴백 — 1회 getDoc
+ *
+ * 실시간 구독을 1개로 줄여 진입 직후 onSnapshot 폭주를 차단.
  */
 export function useMarketingBanners(type /* 'P' | 'F' */ = 'P') {
   const items = ref([])
   const ready = ref(false)
 
-  // 소스 우선순위: fixedDoc(3) > subcollection(2) > rootDoc(1)
+  // 소스 우선순위: fixedDoc(3) > subcoll(2) > rootDoc(1)
   const PRIORITY = { rootDoc: 1, subcoll: 2, fixedDoc: 3 }
   let currentPriority = 0
 
@@ -115,9 +134,9 @@ export function useMarketingBanners(type /* 'P' | 'F' */ = 'P') {
   }
 
   onMounted(() => {
-    // 1) 고정 문서(production 미러) 실시간 구독 — 최우선 소스
+    // 1) fixedDoc — 유일한 실시간 구독 (가장 자주 갱신되는 소스)
     try {
-      const p = fixedDocPath(type) // ['config','marketing','<subcoll>','prod']
+      const p = fixedDocPath(type)
       const u0 = onSnapshot(
         doc(fbDb, p[0], p[1], p[2], p[3]),
         async (ss) => {
@@ -126,7 +145,7 @@ export function useMarketingBanners(type /* 'P' | 'F' */ = 'P') {
           await applyList(arr, 'fixedDoc', PRIORITY.fixedDoc)
         },
         () => {
-          // 에러는 무시하고 다른 소스에 맡김
+          // 에러는 무시하고 폴백에 맡김
         }
       )
       unsubs.push(u0)
@@ -134,51 +153,37 @@ export function useMarketingBanners(type /* 'P' | 'F' */ = 'P') {
       // ignore
     }
 
-    // 2) 서브컬렉션을 실시간으로 구독 (백업 소스)
-    try {
-      const col = collection(
-        fbDb,
-        'config',
-        'marketing',
-        subcollName(type)
-      )
-      let qy = null
+    // 2) subcollection — 1회 getDocs 폴백 (실시간 불필요)
+    ;(async () => {
       try {
-        // createdAt 없는 문서가 있을 수 있으므로 orderBy는 실패 가능 → 그냥 컬렉션 전체로 구독
-        qy = query(col, orderBy('createdAt', 'desc'))
-      } catch {
-        qy = col
-      }
-
-      const u1 = onSnapshot(
-        qy,
-        async (snap) => {
-          const list = await Promise.all(
-            snap.docs.map((d) => normalizeBanner(d.data(), d.id))
-          )
-          await applyList(list, 'subcoll', PRIORITY.subcoll)
-        },
-        () => {
-          // 에러 시엔 폴백에 맡김
+        const col = collection(fbDb, 'config', 'marketing', subcollName(type))
+        let qy
+        try {
+          qy = query(col, orderBy('createdAt', 'desc'))
+        } catch {
+          qy = col
         }
-      )
-      unsubs.push(u1)
-    } catch {
-      // 무시하고 폴백으로
-    }
+        const snap = await getDocs(qy)
+        const list = await Promise.all(
+          snap.docs.map((d) => normalizeBanner(d.data(), d.id))
+        )
+        await applyList(list, 'subcoll', PRIORITY.subcoll)
+      } catch {
+        // 폴백 실패 시 무시
+      }
+    })()
 
-    // 3) 루트 문서 필드 폴백을 동시에 구독 (가장 낮은 우선순위)
-    try {
-      const u2 = onSnapshot(doc(fbDb, 'config', 'marketing'), async (s) => {
-        const d = s.exists() ? s.data() || {} : {}
+    // 3) rootDoc — 1회 getDoc 폴백 (실시간 불필요)
+    ;(async () => {
+      try {
+        const snap = await getDoc(doc(fbDb, 'config', 'marketing'))
+        const d = snap.exists() ? snap.data() || {} : {}
         const arr = pickFromDocFields(d, type)
         await applyList(arr, 'rootDoc', PRIORITY.rootDoc)
-      })
-      unsubs.push(u2)
-    } catch {
-      // ignore
-      ready.value = true
-    }
+      } catch {
+        ready.value = true
+      }
+    })()
   })
 
   onBeforeUnmount(() => {

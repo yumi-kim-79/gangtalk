@@ -61,7 +61,7 @@ firebase deploy --only hosting
 - [ ] 구글플레이 등록
 - [ ] 애플 앱스토어 등록
 
-**현재 단계**: 자동 글 시더 완전 삭제 + Firebase 청크 5분할 + index 번들 19% 감량 완료
+**현재 단계**: 가게찾기/제휴관 배너 지연 + 버벅거림 6대 원인 모두 수정 완료
 
 ---
 
@@ -76,6 +76,25 @@ firebase deploy --only hosting
 ---
 
 ## 작업 로그
+
+### 2026-05-15: 배너 로딩 지연 및 버벅거림 6가지 원인 수정 (`perf/banner-loading-optimization`)
+1. **`useMarketingBanners` 단일 소스화 + getDownloadURL 캐시**:
+   - 모듈 스코프 `const urlCache = new Map()` 추가, `resolveImg(gs://)` 가 캐시 우선 조회 → 같은 URL 의 토큰 재발급 차단
+   - fixedDoc 1개만 onSnapshot 유지, subcoll/rootDoc 폴백은 `getDocs`/`getDoc` 1회로 변경 → 동시 onSnapshot 3개 → 1개
+2. **PartnersPage `loadPartners` 중복 호출 차단**:
+   - `let _lastAuthUid = null` 가드 추가
+   - onMounted 초기 로드 후 `onAuthStateChanged` 콜백은 uid 변경 시에만 재로드 → 200개 partners 가 1회로 단축
+3. **StoreFinder stores/rooms_biz `limit(100)` 추가**:
+   - 기존 무제한 onSnapshot → 100개로 한정 → 초기 진입 데이터/네트워크 부담 ↓
+4. **`v-lazy-bg` 커스텀 디렉티브 신규** (`src/directives/lazyBg.js`):
+   - IntersectionObserver(rootMargin: 100px) 로 viewport 진입 시에만 `background-image` 설정
+   - `main.js` 에서 `app.directive('lazy-bg', lazyBg)` 등록
+   - StoreFinder `.m-thumb` + PartnersPage `.rs-thumb` 에 `v-lazy-bg="thumbUrl"` 적용 → 화면 밖 Top5 카드 썸네일 즉시 다운로드 차단
+5. **첫 배너 이미지 preload `<teleport to="head">`**:
+   - StoreFinder/PartnersPage 에 `firstBannerUrl` computed 추가
+   - `<link rel="preload" as="image" :href="firstBannerUrl">` 가 데이터 준비되면 head 에 자동 삽입 → 첫 페인트 직후 즉시 표시 가능
+6. **PartnersPage onMounted 우선순위 조정**:
+   - `bindRatingEvents(true)` 를 `requestIdleCallback` (폴백 setTimeout) 으로 지연 → 첫 페인트 부담 ↓
 
 ### 2026-05-15: 자동 글 시더 완전 삭제 + 전체 성능 최적화 (`perf/remove-autoseed-and-optimize`)
 

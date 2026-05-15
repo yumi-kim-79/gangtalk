@@ -45,6 +45,8 @@ import './styles/pwa.css'
 
 // 안전 탭 지시자
 import safeTap from '@/directives/safeTap'
+// 배경 이미지 lazy 디렉티브 (Top5 등 CSS background 카드용)
+import lazyBg from '@/directives/lazyBg'
 
 // ===============================
 // Service Worker 관리
@@ -157,6 +159,7 @@ async function ensureAdminProvision() {
 const app = createApp(App)
 app.use(router)
 app.directive('safe-tap', safeTap)
+app.directive('lazy-bg', lazyBg)
 
 // 앱 마운트 전, 현재 라우트/로컬의 테마를 DOM에 반영
 router.isReady().then(async () => {
