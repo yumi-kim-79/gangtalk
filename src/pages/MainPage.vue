@@ -1,9 +1,9 @@
 <!-- src/pages/MainPage.vue -->
 <template>
   <main class="page">
-    <!-- ▼▼ 이벤트 오버레이 (gangtox.com 접속 & 미해제 & 스위치 ON 일 때만) ▼▼ -->
+    <!-- ▼▼ 이벤트 오버레이 (임시 비활성화 — 이벤트 진행 시 EVENT_OVERLAY_ENABLED 를 true 로) ▼▼ -->
     <EventOverlay
-      v-if="showEvent"
+      v-if="showEvent && EVENT_OVERLAY_ENABLED"
       @close="onCloseEvent"
       @dismiss-day="onDismissDay"
       @open-detail="goEventDetail"
@@ -511,6 +511,8 @@ function onQuerySnap(qRef, onOk) {
   }
 }
 
+// 🔕 EventOverlay 임시 비활성화 스위치 (이벤트 진행 시 true 로 바꾸면 즉시 활성화)
+const EVENT_OVERLAY_ENABLED = false
 const showEvent = ref(false)
 const showGuide = ref(false)
 const openGuide = () => {
