@@ -61,7 +61,7 @@ firebase deploy --only hosting
 - [ ] 구글플레이 등록
 - [ ] 애플 앱스토어 등록
 
-**현재 단계**: 가게찾기/제휴관 배너 지연 + 버벅거림 6대 원인 모두 수정 완료
+**현재 단계**: EventOverlay 임시 비활성화 (코드 보존, 스위치만 false) 완료
 
 ---
 
@@ -72,10 +72,17 @@ firebase deploy --only hosting
 4. 힐링톡/우리가게/이벤트톡 실 서비스 오픈 (오픈 시 gc-disabled 제거 + 클릭 핸들러 부착)
 5. CompanySection / AdminTools / ProfileEditSheet 톤도 동일하게 정리
 6. Capacitor 적용 전 웹앱 완성도 점검
+7. 이벤트 진행 시 `EVENT_OVERLAY_ENABLED = true` 로 복귀
 
 ---
 
 ## 작업 로그
+
+### 2026-05-17: EventOverlay 임시 비활성화 (`feat/disable-event-overlay`)
+- **MainPage.vue 마크업**: `<EventOverlay v-if="showEvent">` → `v-if="showEvent && EVENT_OVERLAY_ENABLED"`
+- **상수 추가**: `const EVENT_OVERLAY_ENABLED = false` (스크립트, showEvent 정의 직전)
+- **코드 보존**: 컴포넌트 (`src/components/EventOverlay.vue`), 상태 (`showEvent`, `decideShowEvent`, `openEventSafely`, `onCloseEvent`, `onDismissDay`, `EVENT_ENABLED`, `EVENT_KEY`, `EVENT_SESSION_KEY`, `EVENT_IMAGE`, `isHiddenByUser`) 전부 그대로 — 재활성화 시 추가 작업 없이 스위치 true 만 변경
+- **CLAUDE.md "활성/비활성 스위치 메모" 섹션 추가**: 활성화 방법 / 위치 / 보존된 코드 명시
 
 ### 2026-05-15: 배너 로딩 지연 및 버벅거림 6가지 원인 수정 (`perf/banner-loading-optimization`)
 1. **`useMarketingBanners` 단일 소스화 + getDownloadURL 캐시**:
@@ -599,3 +606,10 @@ GangTalk/
 - `.env` 파일에 Firebase 설정 키가 있으므로 외부 노출 금지
 - `GangTalkMacro/.venv/` 는 용량이 크므로 git에서 제외 필요
 - `dist/` 폴더는 빌드 결과물이므로 직접 수정 금지
+
+## 활성/비활성 스위치 메모
+- **EventOverlay 비활성화 상태** — 이벤트 있을 때 활성화 필요
+  - 위치: `src/pages/MainPage.vue` 의 `const EVENT_OVERLAY_ENABLED = false`
+  - 활성화 방법: 위 상수를 `true` 로 변경
+  - 컴포넌트 코드 (`src/components/EventOverlay.vue`) / 상태 (`showEvent`, `decideShowEvent`, `onCloseEvent`, `onDismissDay`) 는 그대로 보존
+  - localStorage 키: `event:open202510:hideUntil`, `event:open202510:seenSession`
