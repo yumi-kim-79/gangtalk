@@ -2339,6 +2339,19 @@ exports.dailyReset0700 = onSchedule(
 ========================================================= */
 const ADMIN_EMAIL = "gangtalk815@gmail.com";
 
+// 관리자 도메인에서 호출될 수 있는 origin 목록. v2 onCall 은 기본 CORS 처리하지만,
+// 신규 호스팅 도메인(gangtalk815.web.app / gangtalk815.com) 을 명시해 둠.
+const ADMIN_CORS = [
+  "https://gangtalk815.web.app",
+  "https://gangtalk815.firebaseapp.com",
+  "https://gangtalk815.com",
+  "https://gangtalk-b8eb8.web.app",
+  "https://gangtalk-b8eb8.firebaseapp.com",
+  "https://gangtox.com",
+  "http://localhost:4173",
+  "http://localhost:5173",
+];
+
 function assertCallerIsAdmin(req) {
   const callerEmail = String(req?.auth?.token?.email || "").toLowerCase();
   if (callerEmail !== ADMIN_EMAIL) {
@@ -2358,7 +2371,7 @@ function assertCallerIsAdmin(req) {
  *   3) storeId 있으면 stores/{storeId}.ownerId / ownerEmail 업데이트
  * 반환: { uid, email }
  */
-exports.createBizAccount = onCall(async (req) => {
+exports.createBizAccount = onCall({ cors: ADMIN_CORS }, async (req) => {
   assertCallerIsAdmin(req);
 
   const email = safeStr(req?.data?.email).toLowerCase();
@@ -2453,7 +2466,7 @@ exports.createBizAccount = onCall(async (req) => {
  * 입력: { uid, newPassword }
  * 관리자만 호출 가능
  */
-exports.resetBizPassword = onCall(async (req) => {
+exports.resetBizPassword = onCall({ cors: ADMIN_CORS }, async (req) => {
   assertCallerIsAdmin(req);
 
   const uid = safeStr(req?.data?.uid);
@@ -2483,7 +2496,7 @@ exports.resetBizPassword = onCall(async (req) => {
  * 입력: { storeId, bizUid, bizEmail }
  * stores/{storeId} 의 ownerId / ownerEmail 만 갱신.
  */
-exports.linkStoreToBiz = onCall(async (req) => {
+exports.linkStoreToBiz = onCall({ cors: ADMIN_CORS }, async (req) => {
   assertCallerIsAdmin(req);
 
   const storeId = safeStr(req?.data?.storeId);

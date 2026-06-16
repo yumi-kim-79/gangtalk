@@ -1,5 +1,13 @@
 // firebase.js — Web2 구성 + App Check(Enterprise) + 로컬 디버그 토큰 고정 + 안전 대기(firebaseReady)
 
+// ✅ 빌드 타겟 분기:
+//   gangtalk815.com (관리자) 빌드는 reCAPTCHA Enterprise 사이트 키에
+//   도메인이 등록돼 있지 않아 AppCheck 초기화가 항상 실패한다 (appCheck/recaptcha-error).
+//   관리자 페이지는 본인 인증된 사용자만 사용하므로 AppCheck 가 필요 없음 → 초기화 자체를 스킵.
+const IS_ADMIN_BUILD =
+  (typeof import.meta !== 'undefined' &&
+    import.meta?.env?.VITE_BUILD_TARGET === 'admin')
+
 import { initializeApp, getApps, getApp } from 'firebase/app'
 import {
   getAuth,
@@ -92,12 +100,17 @@ const ENTERPRISE_SITE_KEY =
 const V3_SITE_KEY =
   (import.meta?.env?.VITE_RECAPTCHA_V3_SITE_KEY) || ''
 
-const appCheckProvider = ENTERPRISE_SITE_KEY
-  ? new ReCaptchaEnterpriseProvider(ENTERPRISE_SITE_KEY)
-  : (V3_SITE_KEY ? new ReCaptchaV3Provider(V3_SITE_KEY) : null)
+const appCheckProvider = IS_ADMIN_BUILD
+  ? null  // ✅ 관리자 빌드는 AppCheck 초기화 스킵
+  : (ENTERPRISE_SITE_KEY
+      ? new ReCaptchaEnterpriseProvider(ENTERPRISE_SITE_KEY)
+      : (V3_SITE_KEY ? new ReCaptchaV3Provider(V3_SITE_KEY) : null))
 
-if (!appCheckProvider) {
+if (!appCheckProvider && !IS_ADMIN_BUILD) {
   console.warn('[AppCheck] No provider key configured. Add ENTERPRISE or V3 site key.')
+}
+if (IS_ADMIN_BUILD) {
+  console.info('[AppCheck] disabled in admin build (gangtalk815)')
 }
 
 const appCheck = appCheckProvider
