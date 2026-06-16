@@ -69,7 +69,8 @@
         />
 
         <!-- 운영자 전용(AdminTools) -->
-        <section v-if="isAdmin" class="section" style="margin-top:16px;">
+        <!-- [1단계 gangtox.com 정리] 관리자 블록 숨김 — 2단계에서 /admin/* 라우트로 이동 예정. v-if="false" 로 잠시 차단 (원조건: isAdmin) -->
+        <section v-if="false && isAdmin" class="section" style="margin-top:16px;">
           <div style="margin-top:12px;" ref="appsSection" id="apps">
             <BizManagerTabs kind="all" :category="defaultCategory" />
           </div>

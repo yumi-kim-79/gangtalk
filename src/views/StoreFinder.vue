@@ -47,7 +47,8 @@
     </section>
 
     <!-- ✅ 배너 등록 버튼: 티커 아래, 배너 위 -->
-    <section v-if="isEnterprise" class="banner-cta">
+    <!-- [1단계 gangtox.com 정리] 기업회원/관리자 전용 — 2단계 /admin/* 로 이전 예정 (원조건: isEnterprise) -->
+    <section v-if="false && isEnterprise" class="banner-cta">
       <button
         class="ad-btn pink-cta"
         type="button"
@@ -154,7 +155,8 @@
     <!-- ❌ 인라인 마운트 제거: BizManagerTabs는 아래 오버레이 안에서 렌더링 -->
 
         <!-- ▽ 운영자 전용: 순위 편집 툴바 (기준 페이지와 동일 UI) -->
-        <section v-if="canEdit" class="orders-head">
+        <!-- [1단계 gangtox.com 정리] 관리자 편집 툴바 숨김 (원조건: canEdit) -->
+        <section v-if="false && canEdit" class="orders-head">
           <div class="rank-tools">
             <label class="toggle">
               <input type="checkbox" v-model="editMode" @change="onToggleEdit" />
@@ -198,8 +200,9 @@
           <span class="ttl sf-top-ttl"><span class="spark" aria-hidden="true">✨</span> {{ sec.label }} Top 5</span>
           <div class="sf-top-actions">
             <!-- ✅ Top5 등록 버튼: 제목 오른쪽 (기업회원만 보임) -->
+            <!-- [1단계 gangtox.com 정리] 기업회원 전용 (원조건: isEnterprise) -->
             <button
-              v-if="isEnterprise"
+              v-if="false && isEnterprise"
               class="pink-cta top5-btn"
               type="button"
               @click="toggleBizCreate($event)"
@@ -244,14 +247,16 @@
                 <div class="ad-mgr" v-if="managerName(s)">담당: {{ managerName(s) }}</div>
               </div>
             </div>
-            <span v-if="canEdit && editMode" class="drag-handle" title="드래그로 이동">☰</span>
+            <!-- [1단계 gangtox.com 정리] 드래그 핸들 숨김 (원조건: canEdit && editMode) -->
+            <span v-if="false && canEdit && editMode" class="drag-handle" title="드래그로 이동">☰</span>
           </button>
         </div>
       </div>
     </section>
 
     <!-- =================== 하단 순서 편집 =================== -->
-    <section v-if="canEdit && editMode" class="reorder-sec">
+    <!-- [1단계 gangtox.com 정리] 관리자 편집 영역 숨김 (원조건: canEdit && editMode) -->
+    <section v-if="false && canEdit && editMode" class="reorder-sec">
       <h4 class="sec-ttl">하단 업체 순서 편집</h4>
       <ul class="reorder-list">
         <li
@@ -288,8 +293,9 @@
        </div>
 
        <!-- ✅ 일반등록 버튼: 정렬 오른쪽 -->
+       <!-- [1단계 gangtox.com 정리] 기업회원 전용 (원조건: isEnterprise) -->
        <button
-         v-if="isEnterprise"
+         v-if="false && isEnterprise"
          class="pink-cta list-reg-btn"
          type="button"
          @click="toggleBizCreate($event)"

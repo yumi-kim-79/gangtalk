@@ -61,22 +61,59 @@ firebase deploy --only hosting
 - [ ] 구글플레이 등록
 - [ ] 애플 앱스토어 등록
 
-**현재 단계**: EventOverlay 임시 비활성화 (코드 보존, 스위치만 false) 완료
+**현재 단계**: 도메인 분리 1단계 완료 — gangtox.com (여성회원 전용) 정리, 관리자 UI 전 페이지에서 숨김 (코드는 `v-if="false && ..."` 패턴으로 보존)
 
 ---
 
 ## 다음 작업
-1. 일반 사용자용 알림 컬렉션(user_inbox 등) 신설 검토 — 현재는 관리자 전용
-2. 핫이슈 텍스트를 Firestore config에서 가져오도록 연동
-3. 별점/리뷰 카운트 실제 데이터 연동
-4. 힐링톡/우리가게/이벤트톡 실 서비스 오픈 (오픈 시 gc-disabled 제거 + 클릭 핸들러 부착)
-5. CompanySection / AdminTools / ProfileEditSheet 톤도 동일하게 정리
-6. Capacitor 적용 전 웹앱 완성도 점검
-7. 이벤트 진행 시 `EVENT_OVERLAY_ENABLED = true` 로 복귀
+1. **도메인 분리 2단계** — gangtalk815.com (관리자/업체용) `/admin/*` 라우트 신설
+   - `useMyPageCore.js` 를 `useUserCore.js`(회원) + `useAdminCore.js`(관리자)로 분리
+   - `AdminTools / AdminPendingLists / BizManagerTabs` 를 `/admin/*` 페이지로 이동
+   - 관리자 전용 로그인 플로우, 통합 대시보드, 모더레이션/포인트 지급/등급 조정 UI 신규 제작
+   - 별도 Vite 빌드 또는 모노레포 셋업, Firestore Security Rules 도메인별 분리
+2. 일반 사용자용 알림 컬렉션(user_inbox 등) 신설 검토 — 현재는 관리자 전용
+3. 핫이슈 텍스트를 Firestore config에서 가져오도록 연동
+4. 별점/리뷰 카운트 실제 데이터 연동
+5. 힐링톡/우리가게/이벤트톡 실 서비스 오픈 (오픈 시 gc-disabled 제거 + 클릭 핸들러 부착)
+6. CompanySection / AdminTools / ProfileEditSheet 톤도 동일하게 정리
+7. Capacitor 적용 전 웹앱 완성도 점검
+8. 이벤트 진행 시 `EVENT_OVERLAY_ENABLED = true` 로 복귀
 
 ---
 
 ## 작업 로그
+
+### 2026-06-16: 도메인 분리 1단계 — gangtox.com 여성회원 전용 정리 (`refactor/remove-admin-from-user-site`)
+- **목적**: 전체 프로젝트를 gangtox.com (여성회원) + gangtalk815.com (관리자/업체) 두 도메인으로 분리. 1단계는 회원 사이트에서 관리자 UI 만 숨기고 코드는 보존 (2단계에서 `/admin/*` 라우트로 이전)
+- **패턴**: 모든 변경은 `v-if="false && (기존조건)"` 형태로 통일 — 2단계 복원 시 `false &&` 만 제거하면 원래 동작 복귀
+- **MyPage.vue** (`:72`):
+  - 운영자 전용 섹션 (`<section v-if="isAdmin">`) → `v-if="false && isAdmin"` — BizManagerTabs + AdminTools 통째로 차단
+  - AdminNotifyBell import 는 이전부터 제거되어 있어 추가 작업 없음
+- **AppHeader.vue** (`:171-188`):
+  - `watch(currentUser, watchAdmin)` 호출 블록 주석 처리 → `admins/{uid}` 와 `adminInbox` 구독 더 이상 시작 안 함
+  - `notifBadge` computed 를 `() => 0` 으로 교체 (원본은 주석 보존) — 알림벨 뱃지 항상 0
+- **StoreFinder.vue** 6곳:
+  - `:50` 배너 등록 CTA (원조건 `isEnterprise`)
+  - `:157` 인기 순위 편집 툴바 (원조건 `canEdit`)
+  - `:202` Top5 등록 버튼 (원조건 `isEnterprise`)
+  - `:247` 드래그 핸들 (원조건 `canEdit && editMode`)
+  - `:254` 하단 순서 편집 섹션 (원조건 `canEdit && editMode`)
+  - `:292` 일반등록 버튼 (원조건 `isEnterprise`)
+- **PartnersPage.vue** 4곳:
+  - `:18` 배너 등록 CTA (원조건 `isEnterprise || canEdit`)
+  - `:117` 현황판 순서 편집 툴바 (원조건 `canEdit`)
+  - `:145` Top5 등록 버튼 (원조건 `isEnterprise || canEdit`)
+  - `:191` 일반등록 버튼 (원조건 `isEnterprise || canEdit`)
+- **GangTalkPage.vue** 5곳:
+  - `:227, :252` 강톡 공지 카드/게시글 카드의 관리자 수정/삭제 버튼 (원조건 `isAdmin`)
+  - `:299, :323` 힐링톡 공지/게시글 카드 동일 (원조건 `isAdmin`)
+  - `:2307` 글쓰기 모달의 `composeCats` 에서 '공지' 카테고리 prepend 차단 (원조건 `isAdmin.value`)
+  - 게시글/댓글 삭제/공지 작성 같은 **함수 자체는 유지** — 어차피 트리거 UI 가 숨겨져 호출 불가, 2단계에서 그대로 admin 페이지로 이전
+- **router/index.js** (`:459`):
+  - `requiredRole === 'admin'` 분기를 `/auth` 리다이렉트 → `/` (대시보드) 리다이렉트 로 변경
+  - 원본 코드는 같은 블록에 주석으로 보존
+  - 현재 코드베이스에 `meta.role === 'admin'` 라우트는 없음 (방어적 차단)
+- **보존되는 코드**: `isAdmin / canEdit / isEnterprise` ref/computed, admin 데이터 구독 로직 (`useMyPageCore.js` 의 watchAdminDoc), AdminTools / AdminPendingLists / BizManagerTabs 컴포넌트 자체 — 모두 2단계에서 admin 도메인으로 그대로 이동 예정
 
 ### 2026-05-17: EventOverlay 임시 비활성화 (`feat/disable-event-overlay`)
 - **MainPage.vue 마크업**: `<EventOverlay v-if="showEvent">` → `v-if="showEvent && EVENT_OVERLAY_ENABLED"`
@@ -613,3 +650,14 @@ GangTalk/
   - 활성화 방법: 위 상수를 `true` 로 변경
   - 컴포넌트 코드 (`src/components/EventOverlay.vue`) / 상태 (`showEvent`, `decideShowEvent`, `onCloseEvent`, `onDismissDay`) 는 그대로 보존
   - localStorage 키: `event:open202510:hideUntil`, `event:open202510:seenSession`
+
+- **관리자 UI 전 페이지 숨김 (도메인 분리 1단계)** — 2단계에서 `/admin/*` 라우트 신설 시 복귀
+  - 패턴: `v-if="false && (기존조건)"` — `false &&` 만 제거하면 원래 동작
+  - 위치:
+    - `src/pages/MyPage.vue:72` (운영자 섹션 전체)
+    - `src/views/StoreFinder.vue:50,157,202,247,254,292` (배너/Top5/일반등록/편집 툴바)
+    - `src/pages/PartnersPage.vue:18,117,145,191` (배너/Top5/일반등록/편집 툴바)
+    - `src/pages/GangTalkPage.vue:227,252,299,323` (공지/게시글 수정·삭제 버튼)
+    - `src/pages/GangTalkPage.vue:2307` (글쓰기 모달 '공지' 카테고리)
+  - 관련 데이터/함수 (`isAdmin`, `canEdit`, `isEnterprise`, watchAdmin, AdminTools, BizManagerTabs 컴포넌트) 는 모두 보존
+  - AppHeader 알림벨: `src/components/common/AppHeader.vue:171-188` — `watchAdmin` 호출 주석, `notifBadge = computed(() => 0)` 으로 임시 처리

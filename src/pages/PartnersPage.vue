@@ -15,7 +15,8 @@
     <AppHeader v-model="q" @search="doSearch" @filter-click="openFilter" />
 
     <!-- 🔸 배너 등록 버튼 (실시간 순위 아래, 배너 위) -->
-    <section v-if="isEnterprise || canEdit" class="banner-cta">
+    <!-- [1단계 gangtox.com 정리] 기업회원/관리자 전용 — 2단계 /admin/* 로 이전 예정 (원조건: isEnterprise || canEdit) -->
+    <section v-if="false && (isEnterprise || canEdit)" class="banner-cta">
       <button
         class="ad-btn pink-cta"
         type="button"
@@ -114,7 +115,8 @@
     <!-- partner-cta 섹션 삭제 -->
 
     <!-- ✅ 운영자 전용 툴바 -->
-    <section v-if="canEdit" class="orders-head">
+    <!-- [1단계 gangtox.com 정리] 관리자 편집 툴바 숨김 (원조건: canEdit) -->
+    <section v-if="false && canEdit" class="orders-head">
       <div class="rank-tools">
         <label class="toggle">
           <input type="checkbox" v-model="editMode" @change="onEnterEdit" />
@@ -141,8 +143,9 @@
           <strong class="pp-top-ttl"><span class="spark" aria-hidden="true">✨</span> {{ sec.label }} Top 5</strong>
           <div class="pp-top-actions">
             <!-- ✅ Top5 등록 버튼: 제목 오른쪽 (기업회원 + 관리자) -->
+            <!-- [1단계 gangtox.com 정리] 기업회원/관리자 전용 (원조건: isEnterprise || canEdit) -->
             <button
-              v-if="isEnterprise || canEdit"
+              v-if="false && (isEnterprise || canEdit)"
               class="pink-cta top5-btn"
               type="button"
               @click="toggleBizCreate($event)"
@@ -187,8 +190,9 @@
         <div class="count">총 {{ filtered.length }}개</div>
 
         <!-- ✅ 일반등록 버튼: 개수 오른쪽 (기업회원 + 관리자) -->
+        <!-- [1단계 gangtox.com 정리] 기업회원/관리자 전용 (원조건: isEnterprise || canEdit) -->
         <button
-          v-if="isEnterprise || canEdit"
+          v-if="false && (isEnterprise || canEdit)"
           class="pink-cta list-reg-btn"
           type="button"
           @click="toggleBizCreate($event)"
