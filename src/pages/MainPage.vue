@@ -1698,9 +1698,15 @@ const isApproved = (s)=>{
   return false
 }
 
-// 광고 기간(adStart/adEnd) 필터를 더 이상 사용하지 않는다.
-// 문서에 adStart/adEnd가 있어도, 메인 현황판에서는 무조건 통과.
+// 광고 기간(adStart/adEnd) 필터 — 관리자가 노출기간을 설정한 업소만 기간 내 통과.
+// adStart/adEnd 가 모두 비어 있으면 (기간 미설정 = 무기한) 통과.
 const isActiveAd = (s)=> {
+  if (!s?.adStart && !s?.adEnd) return true
+  const now = Date.now()
+  const start = Number(s.adStart || 0)
+  const end   = Number(s.adEnd   || 0)
+  if (start && now < start) return false
+  if (end   && now >= end)  return false
   return true
 }
 
