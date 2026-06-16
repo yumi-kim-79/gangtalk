@@ -2,6 +2,38 @@
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import { fileURLToPath, URL } from 'node:url'
+import fs from 'node:fs'
+import path from 'node:path'
+
+// ✅ gangtalk815.com (관리자) 별도 빌드 여부.
+//   `VITE_BUILD_TARGET=admin vite build --outDir dist-admin` 형태로 호출.
+const IS_ADMIN_BUILD = process.env.VITE_BUILD_TARGET === 'admin'
+
+/**
+ * admin 빌드 시 입력 HTML 은 `index-admin.html` 이지만 산출물 파일명은
+ * `dist-admin/index.html` 이어야 Firebase Hosting rewrite 가 정상 동작한다.
+ * Vite 가 HTML 산출 후(=closeBundle) fs.rename 으로 직접 교체.
+ */
+function adminHtmlRenamePlugin() {
+  if (!IS_ADMIN_BUILD) return null
+  return {
+    name: 'admin-html-rename',
+    apply: 'build',
+    enforce: 'post',
+    closeBundle() {
+      // outDir 은 CLI --outDir 또는 config 기본값 (dist-admin)
+      const outDir = path.resolve(process.cwd(), 'dist-admin')
+      const src = path.join(outDir, 'index-admin.html')
+      const dst = path.join(outDir, 'index.html')
+      if (fs.existsSync(src)) {
+        // 기존 index.html 이 있다면 덮어쓰기
+        if (fs.existsSync(dst)) fs.unlinkSync(dst)
+        fs.renameSync(src, dst)
+        console.log('[admin-html-rename] renamed → dist-admin/index.html')
+      }
+    },
+  }
+}
 
 /**
  * 배포 후 오래된 화면이 보이는 문제 대응:
@@ -44,7 +76,7 @@ const API_PROXY_TARGET =
   'http://localhost:3000' // ← 백엔드 서버 주소(예: PASS 연동 서버 또는 Functions 에뮬 URL)
 
 export default defineConfig({
-  plugins: [vue(), htmlHardRefreshPlugin()],
+  plugins: [vue(), htmlHardRefreshPlugin(), adminHtmlRenamePlugin()].filter(Boolean),
 
   // Firebase Hosting 루트 기준 고정
   base: '/',
@@ -105,7 +137,8 @@ export default defineConfig({
   },
 
   build: {
-    outDir: 'dist',
+    // admin 빌드는 CLI `--outDir dist-admin` 로 덮어쓰지만, 안전망으로 여기서도 분기.
+    outDir: IS_ADMIN_BUILD ? 'dist-admin' : 'dist',
     assetsDir: 'assets',
     target: 'es2019',
     sourcemap: false,
@@ -113,6 +146,8 @@ export default defineConfig({
     manifest: true,
     chunkSizeWarningLimit: 1200,
     rollupOptions: {
+      // admin 빌드는 별도 HTML 진입점 사용 (generateBundle 에서 index.html 로 rename)
+      input: IS_ADMIN_BUILD ? 'index-admin.html' : 'index.html',
       output: {
         // ✅ 해시 파일명으로 강력 캐시 무효화
         entryFileNames: 'assets/[name]-[hash].js',
