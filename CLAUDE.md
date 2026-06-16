@@ -101,6 +101,14 @@ firebase deploy --only hosting:admin
 
 ## 작업 로그
 
+### 2026-06-16: functions/index.js 문법 오류 수정 (`fix/functions-syntax-error`)
+- **증상**: `firebase deploy --only functions` 실패. `node -e "require('./index.js')"` 실행 시 `SyntaxError: Identifier 'ADMIN_EMAIL' has already been declared`
+- **원인**: 이전 PR(`feat/biz-account-system`) 에서 업체 계정 콜러블 섹션을 추가하며 `const ADMIN_EMAIL = "gangtalk815@gmail.com";` (2340 라인) 을 새로 선언. 그러나 `ADMIN_EMAIL` 은 이미 파일 상단(683 라인)에 `const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || "gangtalk815@gmail.com").trim();` 로 선언돼 있어 const 중복 선언 → 전체 파일 파싱 실패
+- **수정**: `functions/index.js:2340` 의 중복 `const ADMIN_EMAIL` 선언만 제거 (주석 헤더는 유지, 기존 683 라인의 선언을 재사용). 683 라인 버전이 env 변수 폴백까지 지원하므로 그대로 두는 게 더 견고
+- **검증**:
+  - `node -e "require('./index.js')"` 정상 (오류 출력 없음)
+  - exports 카운트 39 개, `createBizAccount` / `resetBizPassword` / `linkStoreToBiz` 모두 function 으로 export 확인
+
 ### 2026-06-16: 관리자 페이지 CORS + AppCheck 에러 수정 (`fix/admin-cors-appcheck`)
 - **증상**: `gangtalk815.web.app` 에서 BizAccountsPage 의 Cloud Function 호출 시 두 에러 동시 발생
   - `Access to fetch ... has been blocked by CORS policy`

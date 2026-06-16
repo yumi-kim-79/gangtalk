@@ -2332,12 +2332,12 @@ exports.dailyReset0700 = onSchedule(
 );
 /* =========================================================
    ★ 업체(Biz) 계정 관리 — 관리자 전용 콜러블 3종
-   - gangtalk815@gmail.com 만 호출 가능
+   - gangtalk815@gmail.com (또는 ADMIN_EMAIL env) 만 호출 가능
    - createBizAccount  : 새 업체 Auth 계정 + users 문서 + 가게 연결
    - resetBizPassword  : 업체 계정 비번 변경
    - linkStoreToBiz    : 기존 가게에 업체 ownerId/ownerEmail 설정
+   - ADMIN_EMAIL 은 파일 상단(683 라인 근방) 에 이미 선언됨 — 재사용
 ========================================================= */
-const ADMIN_EMAIL = "gangtalk815@gmail.com";
 
 // 관리자 도메인에서 호출될 수 있는 origin 목록. v2 onCall 은 기본 CORS 처리하지만,
 // 신규 호스팅 도메인(gangtalk815.web.app / gangtalk815.com) 을 명시해 둠.
