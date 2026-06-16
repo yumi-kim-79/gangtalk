@@ -101,6 +101,37 @@ firebase deploy --only hosting:admin
 
 ## 작업 로그
 
+### 2026-06-17: 관리자 드래그 / rooms_biz rules / 혼잡도 / 노출기간 수정 (`fix/admin-drag-rules-period`)
+- **문제 1: 드래그 안 됨 (3 페이지)** — `@drop.prevent` 만 작성됨. `.prevent` 는 Vue modifier 일뿐 핸들러 함수가 없음 → HTML5 spec 상 drop 이벤트가 등록 안 됨. 동작하는 `StoreFinder.vue:1451` 은 `@drop="onDrop"` 패턴
+  - 수정: 세 페이지 모두 `@dragover.prevent` + `@drop="onDropXxx($event, i)"` 로 변경 (drop 핸들러에서 dataTransfer 로 fromIdx 읽어 reorder)
+  - 모바일 fallback: 각 항목에 ▲/▼ 버튼 추가 (HTML5 native drag 는 모바일 미지원)
+  - `StoresManagePage.vue:onDropStore` + `moveStore`
+  - `Top5ManagePage.vue:onDropTop5` + `moveTop5`
+  - `BannersManagePage.vue:onDropBanner` + `moveBanner`
+  - 공통 함수 `reorderXxx(from, to)` 로 분리해 드래그/버튼 양쪽 재사용
+- **문제 2: 수동 지표 저장 0/13 실패** — `firestore.rules` 에 `rooms_biz` 매치 0건 → default deny → 모든 setDoc 실패. catch 가 console.warn 만 호출해 사용자에게 미노출
+  - 수정 1: `firestore.rules` 에 `rooms_biz/{storeId}` 규칙 추가 — read public, write 는 `isAdmin()` 또는 stores 의 `ownerId`/`ownerEmail` 일치 시 허용
+  - 서브컬렉션 `rooms_biz/{storeId}/{sub=**}` 은 admin only (메시지/참여자는 Cloud Functions 처리)
+  - 수정 2: `saveAllMetrics` 의 catch 에서 `errors[]` 에 코드/메시지 수집해 alert 에 처음 3건 노출 → 디버깅 즉시 가능
+- **문제 3: 혼잡도 표시** — `MainPage.vue` 의 `computeStatus()` 는 자동 계산 가능하지만 admin UI 가 데이터(특히 `totalRooms`)를 입력하지 않아 항상 폴백 ('좋음'). 수동 override 도 UI 부재
+  - 수정: `StoresManagePage.vue` Tab 2 에 컬럼 추가
+    - 맞출방 / **전체방** / 필요인원 / **최대인원** / 와이파이 / **혼잡도 (자동/수동 라디오 + 자동 미리보기 또는 수동 dropdown)** / 최근 수정
+    - 자동 계산: `match/totalRooms` 비율 — `≥0.6 좋음 (초록)` · `≥0.3 보통 (주황)` · `<0.3 나쁨 (핑크)`
+    - `saveAllMetrics` 가 stores 에 `totalRooms`, `maxPersons`, `statusMode`, `status` 추가 저장
+- **문제 4: 노출 기간 (adStart/adEnd)** — `MainPage.vue:1703` `isActiveAd` 가 무조건 true 반환 (CLAUDE.md "사용 안 함" 주석). 입력 UI 도 없음
+  - 수정 1: `MainPage.vue` `isActiveAd` 복원 — `adStart`/`adEnd` 가 모두 빈 경우는 무기한 통과, 둘 중 하나라도 있으면 `now >= start && now < end` 체크
+  - 수정 2: `StoresManagePage.vue` Tab 1 각 카드 하단에 노출 기간 UI 추가:
+    - 상태 pill: `기간 미설정 (무기한)` / `D-N` / `D-N (만료 임박, ≤7일)` / `만료`
+    - 프리셋 버튼: 15일 / 30일 / 60일 / 90일 → `adStart=now`, `adEnd=now + days*86400000` 즉시 저장 (확인 alert 후)
+    - `+30일 연장` 버튼: `adEnd += 30*86400000`
+    - `해제` 버튼: `adStart=null, adEnd=null` (무기한 복귀)
+- **빌드 검증**: `npm run build:admin` ✓ (StoresManagePage 9.5KB → 15KB, 새 UI 반영) · `npm run build` ✓ (회원 사이트 회귀 없음)
+- **사용자 액션 (배포)**:
+  ```
+  firebase deploy --only firestore:rules,hosting:prod,hosting:admin
+  ```
+  rules 함께 배포해야 rooms_biz 쓰기 가능 — 빠뜨리면 또 0/N 실패
+
 ### 2026-06-16: 업체 계정 생성 후 데이터 연동 문제 수정 (`fix/biz-account-data-sync`)
 - **증상**: BizAccountsPage 에서 "새 업체 계정 생성" 후 alert("업체 계정 생성 완료") 가 떴지만 목록에 새 계정이 나타나지 않음. Firebase Console 에서는 Auth 사용자와 users/{uid} 문서 정상 생성 확인됨 → 쓰기는 됐지만 읽기가 막힘
 - **근본 원인**: `firestore.rules:61-64` 의 users 규칙이 본인 소유자만 read 허용

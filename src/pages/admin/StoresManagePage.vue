@@ -29,35 +29,54 @@
     <!-- ===== 탭 1: 노출 업소 관리 ===== -->
     <section v-show="tab === 'expose'" class="adm-section">
       <header class="adm-section-head">
-        <h3>승인 업소 노출/순서</h3>
+        <h3>승인 업소 노출/순서/기간</h3>
         <button class="adm-btn primary" type="button" :disabled="savingExpose" @click="saveExposeAndOrder">
           {{ savingExpose ? '저장 중…' : '저장' }}
         </button>
       </header>
-      <p class="adm-hint">드래그 핸들(☰)을 잡고 위/아래로 옮겨 현황판 순서를 정렬하세요. 토글로 노출/숨김을 결정합니다.</p>
+      <p class="adm-hint">드래그(☰) 또는 위/아래 버튼으로 순서 변경 · 토글로 노출/숨김 · 15/30/60/90일 버튼으로 노출 기간 설정 (즉시 저장)</p>
 
       <ul class="adm-store-list" v-if="approvedStores.length">
         <li
           v-for="(s, i) in orderedApproved"
           :key="s.id"
-          class="adm-store-row"
+          class="adm-store-row period-row"
           draggable="true"
           @dragstart="onDragStart(i, $event)"
-          @dragover="onDragOver(i, $event)"
-          @drop.prevent
+          @dragover.prevent
+          @drop="onDropStore($event, i)"
           @dragend="onDragEnd"
         >
-          <span class="adm-drag-handle" title="드래그로 이동">☰</span>
-          <span class="adm-rank">{{ i + 1 }}</span>
-          <div class="adm-store-meta">
-            <strong>{{ s.name || '(이름 없음)' }}</strong>
-            <span class="adm-store-sub">{{ s.region || '-' }} · {{ s.category || '-' }}</span>
+          <div class="adm-store-top">
+            <span class="adm-drag-handle" title="드래그로 이동">☰</span>
+            <span class="adm-rank">{{ i + 1 }}</span>
+            <div class="adm-store-meta">
+              <strong>{{ s.name || '(이름 없음)' }}</strong>
+              <span class="adm-store-sub">{{ s.region || '-' }} · {{ s.category || '-' }}</span>
+            </div>
+            <div class="adm-move-btns">
+              <button class="adm-move-btn" type="button" :disabled="i===0" @click="moveStore(i, -1)" aria-label="위로">▲</button>
+              <button class="adm-move-btn" type="button" :disabled="i===orderedApproved.length-1" @click="moveStore(i, 1)" aria-label="아래로">▼</button>
+            </div>
+            <label class="adm-toggle">
+              <input type="checkbox" :checked="effExposed(s)" @change="toggleExposed(s, $event.target.checked)" />
+              <span class="adm-toggle-track"><span class="adm-toggle-thumb"></span></span>
+              <span class="adm-toggle-label">{{ effExposed(s) ? '노출' : '숨김' }}</span>
+            </label>
           </div>
-          <label class="adm-toggle">
-            <input type="checkbox" :checked="isExposed(s)" @change="toggleExposed(s, $event.target.checked)" />
-            <span class="adm-toggle-track"><span class="adm-toggle-thumb"></span></span>
-            <span class="adm-toggle-label">{{ isExposed(s) ? '노출' : '숨김' }}</span>
-          </label>
+
+          <!-- 노출 기간 UI -->
+          <div class="adm-period-row">
+            <span class="adm-period-status" :class="periodClassOf(s)">{{ periodLabelOf(s) }}</span>
+            <div class="adm-period-presets">
+              <button type="button" class="adm-period-btn" @click="setPeriod(s, 15)" :disabled="periodBusy[s.id]">15일</button>
+              <button type="button" class="adm-period-btn" @click="setPeriod(s, 30)" :disabled="periodBusy[s.id]">30일</button>
+              <button type="button" class="adm-period-btn" @click="setPeriod(s, 60)" :disabled="periodBusy[s.id]">60일</button>
+              <button type="button" class="adm-period-btn" @click="setPeriod(s, 90)" :disabled="periodBusy[s.id]">90일</button>
+              <button type="button" class="adm-period-btn extend" @click="extendPeriod(s, 30)" :disabled="periodBusy[s.id] || !s.adEnd">+30일 연장</button>
+              <button v-if="s.adStart || s.adEnd" type="button" class="adm-period-btn clear" @click="clearPeriod(s)" :disabled="periodBusy[s.id]">해제</button>
+            </div>
+          </div>
         </li>
       </ul>
       <p v-else class="adm-empty">승인된 업소가 없습니다.</p>
@@ -73,29 +92,57 @@
       </header>
       <p class="adm-hint">stores 와 rooms_biz 양쪽에 동기화됩니다.</p>
 
+      <p class="adm-hint">맞출방/전체방으로 혼잡도 자동 계산(좋음 ≥0.6 · 보통 ≥0.3 · 나쁨 &lt;0.3). 수동 모드 선택 시 직접 지정 가능.</p>
+
       <table class="adm-table" v-if="exposedStores.length">
         <thead>
           <tr>
             <th>업체명</th>
-            <th>지역/카테고리</th>
             <th>맞출방</th>
+            <th>전체방</th>
             <th>필요인원</th>
+            <th>최대인원</th>
             <th>와이파이</th>
+            <th>혼잡도</th>
             <th>최근 수정</th>
           </tr>
         </thead>
         <tbody>
           <tr v-for="s in exposedStores" :key="s.id">
-            <td><strong>{{ s.name || '(이름 없음)' }}</strong></td>
-            <td class="muted">{{ s.region || '-' }} / {{ s.category || '-' }}</td>
+            <td>
+              <strong>{{ s.name || '(이름 없음)' }}</strong>
+              <span class="adm-cell-sub">{{ s.region || '-' }} / {{ s.category || '-' }}</span>
+            </td>
             <td><input class="adm-num-input" type="number" min="0" v-model.number="metricEdits[s.id].match" /></td>
+            <td><input class="adm-num-input" type="number" min="0" v-model.number="metricEdits[s.id].totalRooms" /></td>
             <td><input class="adm-num-input" type="number" min="0" v-model.number="metricEdits[s.id].persons" /></td>
+            <td><input class="adm-num-input" type="number" min="0" v-model.number="metricEdits[s.id].maxPersons" /></td>
             <td>
               <select class="adm-num-input" v-model="metricEdits[s.id].wifi">
                 <option value="">-</option>
                 <option value="O">O</option>
                 <option value="X">X</option>
               </select>
+            </td>
+            <td>
+              <div class="adm-status-cell">
+                <div class="adm-status-mode">
+                  <label><input type="radio" :name="`mode-${s.id}`" value="auto" v-model="metricEdits[s.id].statusMode" /> 자동</label>
+                  <label><input type="radio" :name="`mode-${s.id}`" value="manual" v-model="metricEdits[s.id].statusMode" /> 수동</label>
+                </div>
+                <template v-if="metricEdits[s.id].statusMode === 'manual'">
+                  <select class="adm-num-input" v-model="metricEdits[s.id].status">
+                    <option value="좋음">좋음</option>
+                    <option value="보통">보통</option>
+                    <option value="나쁨">나쁨</option>
+                  </select>
+                </template>
+                <template v-else>
+                  <span class="adm-status-badge" :class="statusBadgeClass(autoStatusOf(metricEdits[s.id].match, metricEdits[s.id].totalRooms))">
+                    {{ autoStatusOf(metricEdits[s.id].match, metricEdits[s.id].totalRooms) }}
+                  </span>
+                </template>
+              </div>
             </td>
             <td class="muted">{{ fmtTime(s.updatedAt) }}</td>
           </tr>
@@ -220,29 +267,100 @@ function effExposed(s){
 
 function onDragStart(i, e){
   drag.value.from = i
-  try { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain','d') } catch {}
+  try {
+    e.dataTransfer.effectAllowed = 'move'
+    e.dataTransfer.setData('text/plain', String(i))
+  } catch {}
 }
-function onDragOver(i, e){
+function reorderApproved(fromIdx, toIdx){
+  if (fromIdx < 0 || toIdx < 0 || fromIdx === toIdx) return
+  const displayIds = orderedApproved.value.map(s => String(s.id))
+  if (fromIdx >= displayIds.length || toIdx >= displayIds.length) return
+  const [moved] = displayIds.splice(fromIdx, 1)
+  displayIds.splice(toIdx, 0, moved)
+  // 현재 카테고리(승인)에 속하지 않는 잔존 ID 는 뒤로 유지
+  const approvedIdSet = new Set(approvedStores.value.map(s => String(s.id)))
+  const others = homeOrder.value.filter(id => !approvedIdSet.has(String(id)))
+  homeOrder.value = [...displayIds, ...others]
+}
+function onDropStore(e, targetIdx){
   e.preventDefault()
-  const from = drag.value.from
-  if (from < 0 || from === i) return
-  const ids = orderedApproved.value.map(s => String(s.id))
-  const seen = new Set(ids)
-  const baseOrder = homeOrder.value.length
-    ? homeOrder.value.filter(id => seen.has(String(id)))
-    : ids.slice()
-  for (const id of ids) {
-    if (!baseOrder.includes(id)) baseOrder.push(id)
-  }
-  if (from < 0 || from >= baseOrder.length || i < 0 || i >= baseOrder.length) return
-  const [moved] = baseOrder.splice(from, 1)
-  baseOrder.splice(i, 0, moved)
-  // 다른(non-approved) ID 는 뒤로 유지
-  const others = homeOrder.value.filter(id => !seen.has(String(id)))
-  homeOrder.value = [...baseOrder, ...others]
-  drag.value.from = i
+  const dt = Number(e.dataTransfer?.getData('text/plain'))
+  const fromIdx = Number.isFinite(dt) ? dt : drag.value.from
+  reorderApproved(fromIdx, targetIdx)
 }
 function onDragEnd(){ drag.value.from = -1 }
+
+/* === 모바일 fallback === */
+function moveStore(i, dir){ reorderApproved(i, i + dir) }
+
+/* === 노출 기간 (adStart / adEnd, ms) — 즉시 저장 === */
+const periodBusy = ref({})
+const DAY_MS = 86400000
+
+function periodLabelOf(s){
+  if (!s?.adStart && !s?.adEnd) return '기간 미설정 (무기한)'
+  const now = Date.now()
+  const end = Number(s.adEnd || 0)
+  if (!end) return '시작일만 설정'
+  if (now >= end) return '만료'
+  const diff = end - now
+  const days = Math.ceil(diff / DAY_MS)
+  return `D-${days}` + (days <= 7 ? ' (만료 임박)' : '')
+}
+function periodClassOf(s){
+  if (!s?.adStart && !s?.adEnd) return 'none'
+  const now = Date.now()
+  const end = Number(s.adEnd || 0)
+  if (end && now >= end) return 'expired'
+  if (end && end - now <= 7 * DAY_MS) return 'warning'
+  return 'ok'
+}
+async function setPeriod(s, days){
+  if (periodBusy.value[s.id]) return
+  if (!confirm(`'${s.name || '(이름 없음)'}' 노출 기간을 ${days}일로 설정하시겠습니까?`)) return
+  periodBusy.value = { ...periodBusy.value, [s.id]: true }
+  try {
+    const now = Date.now()
+    const end = now + days * DAY_MS
+    await updateDoc(doc(fbDb, 'stores', s.id), {
+      adStart: now, adEnd: end, updatedAt: serverTimestamp(),
+    })
+  } catch (e) {
+    alert('기간 설정 실패: ' + (e?.message || e))
+  } finally {
+    periodBusy.value = { ...periodBusy.value, [s.id]: false }
+  }
+}
+async function extendPeriod(s, days){
+  if (periodBusy.value[s.id]) return
+  const cur = Number(s.adEnd || Date.now())
+  const newEnd = cur + days * DAY_MS
+  periodBusy.value = { ...periodBusy.value, [s.id]: true }
+  try {
+    await updateDoc(doc(fbDb, 'stores', s.id), {
+      adEnd: newEnd, updatedAt: serverTimestamp(),
+    })
+  } catch (e) {
+    alert('기간 연장 실패: ' + (e?.message || e))
+  } finally {
+    periodBusy.value = { ...periodBusy.value, [s.id]: false }
+  }
+}
+async function clearPeriod(s){
+  if (periodBusy.value[s.id]) return
+  if (!confirm('노출 기간을 해제하시겠습니까? (무기한 노출로 전환)')) return
+  periodBusy.value = { ...periodBusy.value, [s.id]: true }
+  try {
+    await updateDoc(doc(fbDb, 'stores', s.id), {
+      adStart: null, adEnd: null, updatedAt: serverTimestamp(),
+    })
+  } catch (e) {
+    alert('기간 해제 실패: ' + (e?.message || e))
+  } finally {
+    periodBusy.value = { ...periodBusy.value, [s.id]: false }
+  }
+}
 
 async function saveExposeAndOrder(){
   if (savingExpose.value) return
@@ -289,28 +407,58 @@ watch(exposedStores, (list) => {
       next[s.id] = {
         match: Number(s.match || 0),
         persons: Number(s.persons || 0),
+        totalRooms: Number(s.totalRooms || 0),
+        maxPersons: Number(s.maxPersons || 0),
         wifi: String(s.wifi || ''),
+        statusMode: String(s.statusMode || 'auto'),
+        status: String(s.status || '좋음'),
       }
     }
   }
   metricEdits.value = next
 }, { immediate: true })
 
+/* 자동 혼잡도 계산 (admin Tab2 미리보기 + saveAllMetrics 자동 모드 저장값) */
+function autoStatusOf(match, totalRooms){
+  const m = Number(match || 0)
+  const t = Number(totalRooms || 0)
+  if (!t || t <= 0) return '-'
+  const ratio = m / t
+  if (ratio >= 0.6) return '좋음'
+  if (ratio >= 0.3) return '보통'
+  return '나쁨'
+}
+function statusBadgeClass(label){
+  if (label === '좋음') return 'good'
+  if (label === '보통') return 'mid'
+  if (label === '나쁨') return 'bad'
+  return ''
+}
+
 async function saveAllMetrics(){
   if (savingMetrics.value) return
   savingMetrics.value = true
   let okCount = 0, failCount = 0
+  const errors = []
   try {
     for (const s of exposedStores.value) {
       const e = metricEdits.value[s.id]
       if (!e) continue
-      const match = Number(e.match || 0)
-      const persons = Number(e.persons || 0)
-      const wifi = String(e.wifi || '')
+      const match      = Number(e.match || 0)
+      const persons    = Number(e.persons || 0)
+      const totalRooms = Number(e.totalRooms || 0)
+      const maxPersons = Number(e.maxPersons || 0)
+      const wifi       = String(e.wifi || '')
+      const statusMode = String(e.statusMode || 'auto')
+      const status     = statusMode === 'manual'
+        ? String(e.status || '좋음')
+        : autoStatusOf(match, totalRooms)
+
       try {
         // stores 업데이트 (현황판 표시용)
         await updateDoc(doc(fbDb, 'stores', s.id), {
-          match, persons, wifi,
+          match, persons, totalRooms, maxPersons,
+          wifi, statusMode, status,
           updatedAt: serverTimestamp(),
         })
         // rooms_biz 미러 (ChatBiz 와 동일 키 — store.id)
@@ -319,17 +467,22 @@ async function saveAllMetrics(){
           needPeople: persons,
           need: persons,
           totalNeeded: persons,
-          totalRooms: match,
+          totalRooms,
           wifi,
           updatedAt: serverTimestamp(),
         }, { merge: true })
         okCount++
       } catch (err) {
         console.warn('metric save fail', s.id, err)
+        errors.push(`${s.name || s.id}: ${err?.code || err?.message || err}`)
         failCount++
       }
     }
-    alert(`저장 완료: 성공 ${okCount} / 실패 ${failCount}`)
+    if (failCount > 0) {
+      alert(`저장 완료: 성공 ${okCount} / 실패 ${failCount}\n\n실패 사유:\n${errors.slice(0,3).join('\n')}`)
+    } else {
+      alert(`저장 완료: ${okCount}건`)
+    }
   } finally {
     savingMetrics.value = false
   }
@@ -485,6 +638,62 @@ function fmtTime(v){
   font-size:13px; background:#fff;
 }
 .adm-num-input:focus{ outline:none; border-color:#ff2e7e; }
+
+/* Tab 1: 노출 업소 카드 — 위/아래 2단 레이아웃 */
+.adm-store-row.period-row{ flex-direction:column; align-items:stretch; gap:8px; }
+.adm-store-top{ display:flex; align-items:center; gap:12px; }
+
+.adm-move-btns{ display:flex; flex-direction:column; gap:2px; flex:none; }
+.adm-move-btn{
+  width:28px; height:18px;
+  border:1px solid #eee; background:#fff; color:#888;
+  border-radius:4px; cursor:pointer;
+  font-size:10px; line-height:1; padding:0;
+}
+.adm-move-btn:disabled{ opacity:.3; cursor:not-allowed; }
+.adm-move-btn:active:not(:disabled){ background:#ffe4ef; color:#ff2e7e; }
+
+/* 노출 기간 UI */
+.adm-period-row{
+  display:flex; align-items:center; gap:8px; flex-wrap:wrap;
+  padding:8px 0 0 40px;
+  border-top:1px dashed #f0f0f0;
+}
+.adm-period-status{
+  font-size:11px; font-weight:800;
+  padding:3px 9px; border-radius:999px;
+  background:#f5f5f5; color:#888;
+}
+.adm-period-status.ok{ background:#e9f7ef; color:#21c36b; }
+.adm-period-status.warning{ background:#fff3e0; color:#f2a100; }
+.adm-period-status.expired{ background:#ffeaea; color:#ff4d4d; }
+.adm-period-status.none{ background:#f5f5f5; color:#888; }
+
+.adm-period-presets{ display:flex; gap:4px; flex-wrap:wrap; }
+.adm-period-btn{
+  height:24px; padding:0 10px;
+  border:1px solid #eee; background:#fff; color:#666;
+  border-radius:6px; font-size:11px; font-weight:700; cursor:pointer;
+}
+.adm-period-btn:hover:not(:disabled){ background:#ffe4ef; color:#ff2e7e; }
+.adm-period-btn:disabled{ opacity:.5; cursor:not-allowed; }
+.adm-period-btn.extend{ background:#fff8fb; color:#ff2e7e; border-color:#ffd6e4; }
+.adm-period-btn.clear{ color:#aaa; }
+
+/* Tab 2: 혼잡도 셀 */
+.adm-cell-sub{ display:block; font-size:11px; color:#aaa; margin-top:2px; }
+.adm-status-cell{ display:flex; flex-direction:column; gap:4px; min-width:120px; }
+.adm-status-mode{ display:flex; gap:8px; font-size:11px; color:#666; }
+.adm-status-mode label{ cursor:pointer; }
+.adm-status-mode input{ margin-right:2px; }
+.adm-status-badge{
+  display:inline-block; padding:3px 10px; border-radius:999px;
+  font-size:11px; font-weight:800;
+  background:#f5f5f5; color:#888; text-align:center;
+}
+.adm-status-badge.good{ background:#e9f7ef; color:#21c36b; }
+.adm-status-badge.mid{ background:#fff3e0; color:#f2a100; }
+.adm-status-badge.bad{ background:#ffeaea; color:#ff4d4d; }
 
 .adm-empty{ color:#aaa; font-size:13px; padding:20px 0; text-align:center; }
 

@@ -59,8 +59,8 @@
           class="adm-banner-row"
           draggable="true"
           @dragstart="onDragStart(i, $event)"
-          @dragover="onDragOver(i, $event)"
-          @drop.prevent
+          @dragover.prevent
+          @drop="onDropBanner($event, i)"
           @dragend="onDragEnd"
         >
           <span class="adm-drag-handle">☰</span>
@@ -86,7 +86,14 @@
             </label>
           </div>
 
-          <button class="adm-btn ghost small" type="button" @click="removeBanner(i)">삭제</button>
+          <div class="adm-banner-actions">
+            <!-- 모바일 fallback -->
+            <div class="adm-move-btns">
+              <button class="adm-move-btn" type="button" :disabled="i===0" @click="moveBanner(i, -1)" aria-label="위로">▲</button>
+              <button class="adm-move-btn" type="button" :disabled="i===currentList.length-1" @click="moveBanner(i, 1)" aria-label="아래로">▼</button>
+            </div>
+            <button class="adm-btn ghost small" type="button" @click="removeBanner(i)">삭제</button>
+          </div>
         </li>
       </ul>
       <p v-else class="adm-empty">아직 등록된 배너가 없습니다. '이미지 업로드' 로 추가하세요.</p>
@@ -189,13 +196,33 @@ async function onPickFile(e){
   }
 }
 
-/* === 드래그 === */
+/* === 드래그 (드롭 기반) + 모바일 화살표 fallback === */
 const drag = ref({ from: -1 })
 function onDragStart(i, e){
   drag.value.from = i
-  try { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain','d') } catch {}
+  try {
+    e.dataTransfer.effectAllowed = 'move'
+    e.dataTransfer.setData('text/plain', String(i))
+  } catch {}
 }
-function onDragOver(i, e){
+function reorderBanners(fromIdx, toIdx){
+  if (fromIdx < 0 || toIdx < 0 || fromIdx === toIdx) return
+  const arr = banners.value[group.value].slice()
+  if (fromIdx >= arr.length || toIdx >= arr.length) return
+  const [moved] = arr.splice(fromIdx, 1)
+  arr.splice(toIdx, 0, moved)
+  banners.value[group.value] = arr
+}
+function onDropBanner(e, targetIdx){
+  e.preventDefault()
+  const dt = Number(e.dataTransfer?.getData('text/plain'))
+  const fromIdx = Number.isFinite(dt) ? dt : drag.value.from
+  reorderBanners(fromIdx, targetIdx)
+}
+function moveBanner(i, dir){ reorderBanners(i, i + dir) }
+
+/* === legacy dragover (지금은 사용 안 함, 호환용) === */
+function onDragOverLegacy(i, e){
   e.preventDefault()
   const from = drag.value.from
   if (from < 0 || from === i) return
@@ -324,6 +351,22 @@ async function saveBanners(){
 .adm-banner-row:last-child{ border-bottom:none; }
 .adm-banner-row[draggable="true"]{ cursor:grab; }
 .adm-drag-handle{ color:#bbb; margin-top:30px; }
+
+.adm-banner-actions{
+  display:flex; flex-direction:column; gap:6px; flex:none; align-items:flex-end;
+}
+.adm-move-btns{
+  display:flex; flex-direction:column; gap:2px;
+}
+.adm-move-btn{
+  width:28px; height:18px;
+  border:1px solid #eee; background:#fff; color:#888;
+  border-radius:4px; cursor:pointer;
+  font-size:10px; line-height:1;
+  padding:0;
+}
+.adm-move-btn:disabled{ opacity:.3; cursor:not-allowed; }
+.adm-move-btn:active:not(:disabled){ background:#ffe4ef; color:#ff2e7e; }
 .adm-banner-thumb{
   width:120px; height:80px; border-radius:10px;
   object-fit:cover; background:#f5f5f5; flex:none;

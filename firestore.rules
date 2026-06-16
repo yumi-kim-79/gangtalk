@@ -85,6 +85,24 @@ service cloud.firestore {
                     );
     }
 
+    /* ===== rooms_biz (현황판 지표 미러 + 초톡) =====
+     * 읽기: 누구나 (현황판 표시)
+     * 쓰기: 관리자(isAdmin) 또는 해당 stores 의 소유자(ownerId/ownerEmail)
+     * 서브컬렉션: 관리자만 쓰기 (참여자/메시지는 Cloud Functions 가 처리)
+     */
+    match /rooms_biz/{storeId} {
+      allow read: if true;
+      allow write: if isAdmin()
+        || (signedIn() && (
+             get(/databases/$(database)/documents/stores/$(storeId)).data.ownerId == request.auth.uid
+             || get(/databases/$(database)/documents/stores/$(storeId)).data.ownerEmail == request.auth.token.email
+           ));
+    }
+    match /rooms_biz/{storeId}/{sub=**} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
     /* ===== 등록신청(connectRequests) ===== */
     match /connectRequests/{rid} {
       allow create: if signedIn()
