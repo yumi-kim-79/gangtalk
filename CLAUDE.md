@@ -76,14 +76,15 @@ firebase deploy --only hosting:admin
 - [ ] 구글플레이 등록
 - [ ] 애플 앱스토어 등록
 
-**현재 단계**: 도메인 분리 3단계 완료 — `gangtalk815.com` 전용 빌드(`dist-admin/`) + Firebase Hosting 멀티 사이트 설정 완료. 이제 회원/관리자 두 호스팅 사이트에 별도 배포 가능.
+**현재 단계**: 도메인 분리 4단계(업체 계정 시스템) 완료 — 관리자가 업체용 Auth 계정을 생성하고, 업체가 로그인해 본인 가게의 현황판 지표/정보를 직접 수정 가능. role 계층(platform/biz/null) 추가.
 
 ---
 
 ## 다음 작업
-1. **Firebase Hosting 사이트 생성** — Firebase 콘솔에서 `gangtalk815` 호스팅 사이트 추가 후 도메인 연결 (`firebase hosting:sites:create gangtalk815` 또는 콘솔에서 직접)
-2. **Firestore Security Rules** — `config/marketing`, `adminInbox`, `stores`(write) 는 관리자 이메일만 허용하도록 강화
-3. **Storage Rules** — `marketing/adBanners*` 는 관리자 UID 만 쓰기 허용
+1. **Firebase Hosting 사이트 생성** — Firebase 콘솔에서 `gangtalk815` 호스팅 사이트 추가 후 도메인 연결
+2. **Cloud Functions 배포** — `cd functions && firebase deploy --only functions:createBizAccount,functions:resetBizPassword,functions:linkStoreToBiz`
+3. **Firestore Security Rules** — `config/marketing`, `adminInbox`, `stores`(write) / `rooms_biz`(write) 는 관리자 + 본인 소유 업체만 허용하도록 강화
+4. **Storage Rules** — `marketing/adBanners*` 는 관리자 UID 만 쓰기 허용
 2. 관리자 페이지 보강 (필요 시)
    - 게시판 모더레이션 (board_posts 삭제/공지 고정) — `useMyPageCore` 에 함수 보존됨
    - 포인트 수동 지급 / 등급 수동 조정 UI
@@ -99,6 +100,41 @@ firebase deploy --only hosting:admin
 ---
 
 ## 작업 로그
+
+### 2026-06-16: 업체 계정 시스템 구축 (`feat/biz-account-system`)
+- **목적**: 관리자가 업체용 Auth 계정을 생성/관리하고, 업체가 로그인해 본인 가게의 현황판(맞출방·필요인원·와이파이)과 기본 정보를 셀프 관리할 수 있게 함
+- **신규 Cloud Functions** (`functions/index.js` 끝부분 추가, v2 onCall):
+  - `createBizAccount({email, password, storeName, storeId?})` — Admin SDK 로 ① `auth.createUser` ② `users/{uid}` 생성 (`type='company'`, `accountKind='storeOwner'`, `profile.{email,nickname,nick,nicknameLower}`, `company.name`, `createdBy='admin'`) ③ storeId 있으면 `stores/{storeId}.{ownerId, ownerEmail}` 매핑
+  - `resetBizPassword({uid, newPassword})` — `auth.updateUser` 로 비번 변경
+  - `linkStoreToBiz({storeId, bizUid, bizEmail})` — 기존 가게에 ownerId/ownerEmail 부여
+  - 모두 `request.auth.token.email === 'gangtalk815@gmail.com'` 검증 (`assertCallerIsAdmin`)
+- **Role 계층 도입** (`src/router/admin.js`):
+  - `platform` = `gangtalk815@gmail.com`
+  - `biz`      = `users/{uid}.type==='company' && accountKind==='storeOwner'`
+  - `null`     = 그 외
+  - `meta.requiresAdmin` → platform만, `meta.requiresBiz` → platform+biz
+  - role 캐시 (`cachedRole`, `cachedRoleUid`) + `invalidateRoleCache()` export
+  - 루트(`/`) 진입 시 role 따라 분기 (`platform` → `/admin/dashboard`, `biz` → `/biz/dashboard`, 그 외 → `/biz/login`)
+- **신규 라우트**:
+  - `/biz/login` (BizLogin) — 공용 진입점. 로그인 후 role 판별해 자동 라우팅
+  - `/admin/biz-accounts` (BizAccountsPage)
+  - `/biz/dashboard` (BizDashboard) / `/biz/metrics` (BizMetrics) / `/biz/my-store` (BizMyStore)
+  - 기존 `/login` (AdminLogin) 도 유지 (관리자 직접 진입용)
+- **신규 페이지** (모두 `src/pages/admin/`):
+  - `BizAccountsPage.vue` — 플랫폼 전용. `users where type='company' & accountKind='storeOwner'` 구독, "새 업체 생성 / 비번 재설정 / 가게 연결" 3 모달, 각각 Cloud Function 호출
+  - `BizLoginPage.vue` — role 자동 라우팅 (platform → `/admin/dashboard`, biz → `/biz/dashboard`, 그 외 강제 signOut + 에러)
+  - `BizDashboardPage.vue` — `stores where ownerId==uid` + `where ownerEmail==email` 합집합 구독, 카드별 현재 맞출방/필요인원/와이파이 표시, 빠른 메뉴 (`/biz/metrics`, `/biz/my-store`)
+  - `BizMetricsPage.vue` ⭐ — 본인 가게 현황판 수동 업데이트. +/- 버튼 카운터 (맞출방·필요인원), O/X/- 라디오 (와이파이). 저장 시 `stores/{id}.{match, persons, wifi}` + `rooms_biz/{id}.{needRooms, needPeople, need, totalNeeded, totalRooms, wifi}` 양방향 동기 → gangtox.com 현황판 즉시 반영
+  - `BizMyStorePage.vue` — 본인 가게 기본 정보 수정 (name, phone, desc, detailDesc, address, hours, closed, thumb) → `stores/{id}` 업데이트
+- **AdminLayout 역할별 메뉴** (`src/layouts/AdminLayout.vue`):
+  - role 감지 (`resolveRole`) 후 `platformMenus` (7개) 또는 `bizMenus` (3개) 표시
+  - 사이드바 상단에 role pill (`플랫폼 관리자` 핑크 / `업체 계정` 연핑크)
+  - 로그아웃 시 `invalidateRoleCache()` 호출 후 `/biz/login` 으로
+  - "gangtox.com 바로가기" 링크는 `https://gangtox.com` 으로 수정
+- **빌드 검증**:
+  - `npm run build:admin` → `dist-admin/index.html` ✓ (8개 페이지 chunk + Firebase Functions chunk 신규 18KB)
+  - `npm run build` → `dist/` 영향 없음
+- **gangtox.com 영향**: 없음. 회원 사이트에는 `/biz/*` 진입 경로가 없고, `users/{uid}.accountKind='storeOwner'` 는 이미 회원 사이트에서 인식되는 기존 분류 (1단계 작업 이전부터 존재)
 
 ### 2026-06-16: 도메인 분리 3단계 — gangtalk815.com 별도 빌드 + 멀티 호스팅 (`feat/admin-separate-build`)
 - **목적**: 같은 코드베이스에서 두 호스팅 사이트(회원 `dist/` + 관리자 `dist-admin/`)를 별도로 빌드·배포할 수 있게 인프라 구성

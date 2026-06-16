@@ -2331,6 +2331,187 @@ exports.dailyReset0700 = onSchedule(
   }
 );
 /* =========================================================
+   ★ 업체(Biz) 계정 관리 — 관리자 전용 콜러블 3종
+   - gangtalk815@gmail.com 만 호출 가능
+   - createBizAccount  : 새 업체 Auth 계정 + users 문서 + 가게 연결
+   - resetBizPassword  : 업체 계정 비번 변경
+   - linkStoreToBiz    : 기존 가게에 업체 ownerId/ownerEmail 설정
+========================================================= */
+const ADMIN_EMAIL = "gangtalk815@gmail.com";
+
+function assertCallerIsAdmin(req) {
+  const callerEmail = String(req?.auth?.token?.email || "").toLowerCase();
+  if (callerEmail !== ADMIN_EMAIL) {
+    throw new HttpsError(
+      "permission-denied",
+      "관리자(gangtalk815@gmail.com)만 호출할 수 있습니다.",
+    );
+  }
+}
+
+/**
+ * createBizAccount
+ * 입력: { email, password, storeName, storeId? }
+ * 처리:
+ *   1) Firebase Auth 사용자 생성 (createUser)
+ *   2) users/{uid} 문서 생성 (type='company', accountKind='storeOwner')
+ *   3) storeId 있으면 stores/{storeId}.ownerId / ownerEmail 업데이트
+ * 반환: { uid, email }
+ */
+exports.createBizAccount = onCall(async (req) => {
+  assertCallerIsAdmin(req);
+
+  const email = safeStr(req?.data?.email).toLowerCase();
+  const password = safeStr(req?.data?.password);
+  const storeName = safeStr(req?.data?.storeName);
+  const storeId = safeStr(req?.data?.storeId);
+
+  if (!email || !/^\S+@\S+\.\S+$/.test(email)) {
+    throw new HttpsError("invalid-argument", "유효한 이메일을 입력해 주세요.");
+  }
+  if (!password || password.length < 6) {
+    throw new HttpsError("invalid-argument", "비밀번호는 6자 이상이어야 합니다.");
+  }
+  if (!storeName) {
+    throw new HttpsError("invalid-argument", "업체명을 입력해 주세요.");
+  }
+
+  // 1) Auth 사용자 생성
+  let userRecord;
+  try {
+    userRecord = await admin.auth().createUser({
+      email,
+      password,
+      displayName: storeName,
+      emailVerified: false,
+      disabled: false,
+    });
+  } catch (e) {
+    const code = String(e?.code || "");
+    if (code.includes("email-already-exists")) {
+      throw new HttpsError("already-exists", "이미 가입된 이메일입니다.");
+    }
+    if (code.includes("invalid-password")) {
+      throw new HttpsError("invalid-argument", "비밀번호 형식이 올바르지 않습니다.");
+    }
+    console.error("[createBizAccount] createUser error:", e);
+    throw new HttpsError("internal", "사용자 생성 실패: " + (e?.message || code));
+  }
+
+  const uid = userRecord.uid;
+
+  // 2) Firestore users 문서 생성
+  try {
+    await db.collection("users").doc(uid).set(
+      {
+        type: "company",
+        accountKind: "storeOwner",
+        profile: {
+          email,
+          nickname: storeName,
+          nick: storeName,
+          nicknameLower: storeName.toLowerCase(),
+        },
+        company: {
+          name: storeName,
+        },
+        createdBy: "admin",
+        createdByEmail: ADMIN_EMAIL,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      },
+      { merge: true },
+    );
+  } catch (e) {
+    console.error("[createBizAccount] users write error:", e);
+    // Auth 사용자는 살아있지만 Firestore 가 실패 — 호출 측에서 재시도 가능
+    throw new HttpsError("internal", "Firestore 사용자 문서 생성 실패");
+  }
+
+  // 3) storeId 가 주어지면 stores 에 ownerId / ownerEmail 매핑
+  if (storeId) {
+    try {
+      await db.collection("stores").doc(storeId).set(
+        {
+          ownerId: uid,
+          ownerEmail: email,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+        { merge: true },
+      );
+    } catch (e) {
+      console.warn("[createBizAccount] stores link warn:", e?.message || e);
+      // 가게 링크 실패는 계정 생성 자체를 무효화하지 않음 — 경고만
+    }
+  }
+
+  return { ok: true, uid, email };
+});
+
+/**
+ * resetBizPassword
+ * 입력: { uid, newPassword }
+ * 관리자만 호출 가능
+ */
+exports.resetBizPassword = onCall(async (req) => {
+  assertCallerIsAdmin(req);
+
+  const uid = safeStr(req?.data?.uid);
+  const newPassword = safeStr(req?.data?.newPassword);
+
+  if (!uid) throw new HttpsError("invalid-argument", "uid 가 필요합니다.");
+  if (!newPassword || newPassword.length < 6) {
+    throw new HttpsError("invalid-argument", "비밀번호는 6자 이상이어야 합니다.");
+  }
+
+  try {
+    await admin.auth().updateUser(uid, { password: newPassword });
+  } catch (e) {
+    const code = String(e?.code || "");
+    if (code.includes("user-not-found")) {
+      throw new HttpsError("not-found", "사용자를 찾을 수 없습니다.");
+    }
+    console.error("[resetBizPassword] updateUser error:", e);
+    throw new HttpsError("internal", "비밀번호 변경 실패");
+  }
+
+  return { ok: true };
+});
+
+/**
+ * linkStoreToBiz
+ * 입력: { storeId, bizUid, bizEmail }
+ * stores/{storeId} 의 ownerId / ownerEmail 만 갱신.
+ */
+exports.linkStoreToBiz = onCall(async (req) => {
+  assertCallerIsAdmin(req);
+
+  const storeId = safeStr(req?.data?.storeId);
+  const bizUid = safeStr(req?.data?.bizUid);
+  const bizEmail = safeStr(req?.data?.bizEmail).toLowerCase();
+
+  if (!storeId) throw new HttpsError("invalid-argument", "storeId 가 필요합니다.");
+  if (!bizUid && !bizEmail) {
+    throw new HttpsError("invalid-argument", "bizUid 또는 bizEmail 중 하나는 필요합니다.");
+  }
+
+  const patch = {
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  };
+  if (bizUid) patch.ownerId = bizUid;
+  if (bizEmail) patch.ownerEmail = bizEmail;
+
+  try {
+    await db.collection("stores").doc(storeId).set(patch, { merge: true });
+  } catch (e) {
+    console.error("[linkStoreToBiz] write error:", e);
+    throw new HttpsError("internal", "가게 연결 실패");
+  }
+
+  return { ok: true };
+});
+
+/* =========================================================
    ★ 매일 07:05 이전 날짜 다이제스트 메시지 정리
    - 대상: meta.source === 'vendor-digest' 인 messages
    - 기준: createdAtMs < 오늘 00:00 (Asia/Seoul)
