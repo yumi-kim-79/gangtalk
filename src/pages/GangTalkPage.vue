@@ -224,7 +224,8 @@
             <div class="v2-notice-title ellip">{{ recentNotice.title }}</div>
             <div class="v2-notice-meta">{{ authorName(recentNotice) }} · {{ timeAgo(recentNotice.updatedAt || recentNotice.createdAt) }}</div>
           </div>
-          <template v-if="isAdmin">
+          <!-- [1단계 gangtox.com 정리] 관리자 공지 수정/삭제 버튼 숨김 (원조건: isAdmin) -->
+          <template v-if="false && isAdmin">
             <div class="v2-notice-admin" @click.stop>
               <button class="btn-mini" type="button" @click="startNoticeEdit(recentNotice)">수정</button>
               <button class="btn-mini danger" type="button" @click="deleteNotice(recentNotice)">삭제</button>
@@ -249,7 +250,8 @@
                 <span>❤️ {{ Number(p.likes||0).toLocaleString() }}</span>
                 <span>💬 {{ Number(p.cmtCount||0).toLocaleString() }}</span>
               </div>
-              <div class="v2-pc-admin" v-if="isAdmin" @click.stop>
+              <!-- [1단계 gangtox.com 정리] 관리자 게시글 수정/삭제 버튼 숨김 (원조건: isAdmin) -->
+              <div class="v2-pc-admin" v-if="false && isAdmin" @click.stop>
                 <button class="btn-mini" type="button" @click="startEdit(p)">수정</button>
                 <button class="btn-mini danger" type="button" @click="deletePost(p)">삭제</button>
               </div>
@@ -296,7 +298,8 @@
             <div class="v2-notice-title ellip">{{ recentHealNotice.title }}</div>
             <div class="v2-notice-meta">{{ authorName(recentHealNotice) }} · {{ timeAgo(recentHealNotice.updatedAt || recentHealNotice.createdAt) }}</div>
           </div>
-          <template v-if="isAdmin">
+          <!-- [1단계 gangtox.com 정리] 관리자 공지 수정/삭제 버튼 숨김 (원조건: isAdmin) -->
+          <template v-if="false && isAdmin">
             <div class="v2-notice-admin" @click.stop>
               <button class="btn-mini" type="button" @click="startNoticeEdit(recentHealNotice)">수정</button>
               <button class="btn-mini danger" type="button" @click="deleteNotice(recentHealNotice)">삭제</button>
@@ -320,7 +323,8 @@
                 <span>❤️ {{ Number(p.likes||0).toLocaleString() }}</span>
                 <span>💬 {{ Number(p.cmtCount||0).toLocaleString() }}</span>
               </div>
-              <div class="v2-pc-admin" v-if="isAdmin" @click.stop>
+              <!-- [1단계 gangtox.com 정리] 관리자 게시글 수정/삭제 버튼 숨김 (원조건: isAdmin) -->
+              <div class="v2-pc-admin" v-if="false && isAdmin" @click.stop>
                 <button class="btn-mini" type="button" @click="startEdit(p)">수정</button>
                 <button class="btn-mini danger" type="button" @click="deletePost(p)">삭제</button>
               </div>
@@ -2304,7 +2308,9 @@ const composeCats = computed(() => {
     { key:'quote',  label:'명언.동기부여' },
   ]
   // 강톡 관리자일 때만 '공지' 카테고리 맨 앞에 추가
-  if (isAdmin.value) {
+  // [1단계 gangtox.com 정리] 여성회원 사이트에서는 '공지' 카테고리 미노출
+  //   원조건: isAdmin.value — 2단계 /admin/* 헤더 글쓰기로 이전 예정
+  if (false && isAdmin.value) {
     return [{ key:'notice', label:'공지' }, ...base]
   }
   return base

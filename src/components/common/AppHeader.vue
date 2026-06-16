@@ -168,10 +168,15 @@ function watchAdmin(uid){
     () => { isAdmin.value = false; stopInbox() },
   )
 }
+// [1단계 gangtox.com 정리] 관리자 알림벨 로직 임시 비활성화
+// — admins/{uid} 구독 + adminInbox unread 카운트는 2단계 /admin/* 헤더로 이동 예정
+// 아래 watch 와 notifBadge 의 실제 동작 로직은 주석으로 보존
+/*
 watch(currentUser, (u) => {
   if (u?.uid) watchAdmin(u.uid)
   else stopAdmin()
 }, { immediate: false })
+*/
 
 onBeforeUnmount(() => { stopAdmin() })
 
@@ -180,12 +185,19 @@ const isLoggedIn = computed(() => !!currentUser.value)
  *  - 비로그인이면 0 (템플릿 v-if 로 숨김)
  *  - 관리자면 실제 unreadCount
  *  - 비관리자면 0
+ *
+ * [1단계 gangtox.com 정리]
+ *   여성회원 사이트에서는 알림벨이 항상 0 (관리자 알림은 2단계로 이전)
+ *   원본 로직은 아래 주석으로 보존
  */
+/*
 const notifBadge = computed(() => {
   if (!isLoggedIn.value) return 0
   if (!isAdmin.value) return 0
   return Number(unreadCount.value || 0)
 })
+*/
+const notifBadge = computed(() => 0)
 
 async function markAllRead(){
   try {

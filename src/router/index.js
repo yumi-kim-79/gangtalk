@@ -456,11 +456,15 @@ router.beforeEach(async (to, from) => {
         query: { next: to.fullPath, mode: 'login', who: 'biz' },
       }
     }
-    if (requiredRole === 'admin' && myType !== 'admin') {
-      return {
-        path: '/auth',
-        query: { next: to.fullPath, mode: 'login' },
-      }
+    // [1단계 gangtox.com 정리]
+    //   여성회원 사이트에서는 관리자 전용 라우트 접근 시도를 메인으로 리다이렉트.
+    //   2단계에서 gangtalk815.com 으로 분리 후 admin 경로 신설 예정.
+    //   원본 동작은 아래 주석으로 보존:
+    //   if (requiredRole === 'admin' && myType !== 'admin') {
+    //     return { path: '/auth', query: { next: to.fullPath, mode: 'login' } }
+    //   }
+    if (requiredRole === 'admin') {
+      return { path: '/' }
     }
   }
 
