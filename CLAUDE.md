@@ -101,6 +101,26 @@ firebase deploy --only hosting:admin
 
 ## 작업 로그
 
+### 2026-06-16: 관리자 페이지 CORS + AppCheck 에러 수정 (`fix/admin-cors-appcheck`)
+- **증상**: `gangtalk815.web.app` 에서 BizAccountsPage 의 Cloud Function 호출 시 두 에러 동시 발생
+  - `Access to fetch ... has been blocked by CORS policy`
+  - `AppCheck: ReCAPTCHA error (appCheck/recaptcha-error)`
+- **근본 원인**: AppCheck 가 root cause. reCAPTCHA Enterprise 사이트 키(`6LcrdwgsAAAAAKuZv6l9kYvnyS83LED3cNz_Qsoz`) 의 허용 도메인 화이트리스트에 `gangtalk815.web.app` 미등록 → AppCheck 토큰 발급 실패 → Firebase 클라이언트 SDK 가 httpsCallable 요청을 중단 → 브라우저가 "CORS 에러" 로 표시 (오해 유발)
+- **수정 1: 관리자 빌드에서 AppCheck 초기화 스킵** (`src/firebase.js`):
+  - `IS_ADMIN_BUILD = import.meta.env.VITE_BUILD_TARGET === 'admin'` 추가
+  - `appCheckProvider` 결정 시 admin 빌드면 `null` 로 단락 → `initializeAppCheck` 자체를 호출 안 함
+  - 결과: admin 빌드에서 `appCheck` export 는 `null`, `firebaseReady` 는 그대로 동작 (`_appCheckReady` 가 null 반환)
+  - `firebase-core` 청크 137KB → 89KB (48KB 감소) — AppCheck/reCAPTCHA 코드 tree-shake 확인
+  - admin 빌드는 본인 인증된 운영자/업체만 사용하므로 AppCheck 가 사실상 불필요
+- **수정 2: Cloud Function 명시적 CORS** (`functions/index.js`):
+  - `ADMIN_CORS` 상수 신설 (gangtalk815.web.app / .firebaseapp.com / .com, gangtalk-b8eb8.web.app / .firebaseapp.com, gangtox.com, localhost 4173/5173)
+  - `createBizAccount / resetBizPassword / linkStoreToBiz` 3 개 모두 `onCall({ cors: ADMIN_CORS }, ...)` 로 변경
+  - v2 onCall 은 기본 CORS 처리가 있지만, 신규 호스팅 도메인에 대비해 명시
+- **검증 사항 (변경 없음)**:
+  - `BizAccountsPage.vue` 는 이미 `httpsCallable` 정상 사용 중 (`getFunctions(undefined, 'asia-northeast3')` + `httpsCallable(fns, '...')`)
+  - `main-admin.js` 는 AppCheck 직접 호출 없음 (`@/firebase` 가 처리) → 추가 수정 불필요
+- **회원 빌드 영향 없음**: `IS_ADMIN_BUILD` 가 false 이므로 reCAPTCHA Enterprise + AppCheck 로직 그대로 동작
+
 ### 2026-06-16: 업체 계정 시스템 구축 (`feat/biz-account-system`)
 - **목적**: 관리자가 업체용 Auth 계정을 생성/관리하고, 업체가 로그인해 본인 가게의 현황판(맞출방·필요인원·와이파이)과 기본 정보를 셀프 관리할 수 있게 함
 - **신규 Cloud Functions** (`functions/index.js` 끝부분 추가, v2 onCall):
