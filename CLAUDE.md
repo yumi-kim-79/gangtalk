@@ -61,17 +61,21 @@ firebase deploy --only hosting
 - [ ] 구글플레이 등록
 - [ ] 애플 앱스토어 등록
 
-**현재 단계**: 도메인 분리 1단계 완료 — gangtox.com (여성회원 전용) 정리, 관리자 UI 전 페이지에서 숨김 (코드는 `v-if="false && ..."` 패턴으로 보존)
+**현재 단계**: 도메인 분리 2단계 완료 — `/admin/*` 임시 라우트 + 전용 페이지 6개 구축 (`gangtalk815@gmail.com` 만 접근). 향후 `gangtalk815.com` 으로 도메인 분리 시 그대로 이전 가능.
 
 ---
 
 ## 다음 작업
-1. **도메인 분리 2단계** — gangtalk815.com (관리자/업체용) `/admin/*` 라우트 신설
-   - `useMyPageCore.js` 를 `useUserCore.js`(회원) + `useAdminCore.js`(관리자)로 분리
-   - `AdminTools / AdminPendingLists / BizManagerTabs` 를 `/admin/*` 페이지로 이동
-   - 관리자 전용 로그인 플로우, 통합 대시보드, 모더레이션/포인트 지급/등급 조정 UI 신규 제작
-   - 별도 Vite 빌드 또는 모노레포 셋업, Firestore Security Rules 도메인별 분리
-2. 일반 사용자용 알림 컬렉션(user_inbox 등) 신설 검토 — 현재는 관리자 전용
+1. **도메인 분리 3단계** — gangtalk815.com 별도 호스팅 분리
+   - 별도 Vite entry 또는 모노레포 셋업 (admin 만 빌드)
+   - Firebase Hosting 사이트 2개 (gangtox / gangtalk815)
+   - Firestore Security Rules: `config/marketing`, `adminInbox`, `stores`(write) 는 admin 도메인 만 허용
+   - Storage Rules: `marketing/adBanners*` 는 admin 만 쓰기
+2. 관리자 페이지 보강 (필요 시)
+   - 게시판 모더레이션 (board_posts 삭제/공지 고정) — `useMyPageCore` 에 함수 보존됨
+   - 포인트 수동 지급 / 등급 수동 조정 UI
+   - 배너 태그(tagPos) 드래그 편집 — 기존 AdminTools.vue 코드 재활용
+3. 일반 사용자용 알림 컬렉션(user_inbox 등) 신설 검토 — 현재는 관리자 전용
 3. 핫이슈 텍스트를 Firestore config에서 가져오도록 연동
 4. 별점/리뷰 카운트 실제 데이터 연동
 5. 힐링톡/우리가게/이벤트톡 실 서비스 오픈 (오픈 시 gc-disabled 제거 + 클릭 핸들러 부착)
@@ -82,6 +86,33 @@ firebase deploy --only hosting
 ---
 
 ## 작업 로그
+
+### 2026-06-16: 도메인 분리 2단계 — 관리자 페이지 `/admin/*` 구축 (`feat/admin-pages`)
+- **목적**: 향후 `gangtalk815.com` 으로 분리할 관리자 사이트의 페이지 6종 + 공통 레이아웃을 같은 코드베이스 안에 임시 구축. 라우터 가드(`gangtalk815@gmail.com` 만 통과)로 일반 회원 접근 차단
+- **신규 파일**:
+  - `src/layouts/AdminLayout.vue` — 핑크 그라디언트 상단바 + 좌측 사이드바(6 메뉴 + gangtox 바로가기 + 로그아웃) + 모바일 햄버거 드로어
+  - `src/pages/admin/DashboardPage.vue` — 통계 카드 4개(노출 업소·Top5·활성 배너·승인 대기) + 최근 메시지 5건
+  - `src/pages/admin/StoresManagePage.vue` — 3 탭
+    - **노출 업소 관리**: `stores` 승인 업소 리스트 + `exposure.gangtalk` 토글 스위치 + 드래그 정렬 → `config/marketing.homeOrder` 저장
+    - **수동 지표 업데이트**: 노출 업소별 `match` / `persons` / `wifi` 일괄 편집 → `stores/{id}` + `rooms_biz/{id}` 양방향 동기 (`needRooms / needPeople / need / totalNeeded / totalRooms / wifi`)
+    - **승인 대기**: `applyStatus === 'pending'` 목록 + 승인(approved=true, applyStatus='approved', exposure.gangtalk=true) / 거절 버튼
+  - `src/pages/admin/Top5ManagePage.vue` — 9개 카테고리 탭(하퍼/쩜오/텐카페/텐프로/바/일프로/노래방/가라오케/기타) + 드래그 정렬 + 검색 모달에서 업소 추가 + 제거 → `config/marketing.topRanks` 저장
+  - `src/pages/admin/BannersManagePage.vue` — F(가게찾기) / P(제휴관) 두 그룹 탭 + 이미지 업로드(Firebase Storage `marketing/adBanners{Finder|P}/{ts}_{rand}.{ext}`) + 제목/설명/링크/배경색 편집 + 드래그 정렬 + 삭제 → `config/marketing/adBanners{Finder|P}/prod.adBanners` + 루트 `config/marketing.adBanners{Finder|P}` 인덱스 동시 저장
+  - `src/pages/admin/NewsManagePage.vue` — 한줄 뉴스 CRUD (텍스트 + NEW 뱃지 + 위/아래 이동) → `config/marketing.newsline` 저장
+  - `src/pages/admin/InboxPage.vue` — `adminInbox` 200건 리스트 + 클릭 토글 읽음 + 모두 읽음 처리
+- **라우터** (`src/router/index.js`):
+  - `/admin` (AdminLayout) 부모 라우트 + 6개 자식 (`/admin/dashboard|stores|top5|banners|news|inbox`) 추가
+  - 모든 `/admin/*` 에 `meta.requiresAdmin: true`
+  - `beforeEach` 6번째 단계: `requiresAdmin` 매칭 시 ① 비로그인 → `/auth` ② 로그인했지만 이메일 ≠ `gangtalk815@gmail.com` → `/`
+- **저장 패턴 일관성**: 모든 페이지가 기존 사용자 페이지(`MainPage.vue` `saveOrders`, `StoreFinder.vue` `saveTopRanksNow`, `AdminTools.vue` 배너/뉴스)와 동일한 Firestore 경로/필드를 사용 → 회원 사이트 읽기 호환성 100% 유지
+- **AdminLayout 다크모드 + 모바일 반응형**: 데스크탑 240px 고정 사이드바, 모바일 햄버거 드로어(80% 너비, backdrop 클릭으로 닫힘)
+- **재사용한 기존 코드 패턴**:
+  - `MainPage.vue:1606` `ADMIN_EMAIL = 'gangtalk815@gmail.com'`
+  - `MainPage.vue:1791-1807` `saveOrders` → StoresManagePage 탭 1
+  - `StoreFinder.vue:1533-1553` `saveTopRanksNow` → Top5ManagePage
+  - `AdminTools.vue:372-510` 배너 저장 로직 → BannersManagePage (slim 인덱스 + fixed prod doc)
+  - `useMyPageCore.js:1196-1217` `saveNewsline` → NewsManagePage
+  - `AdminNotifyBell.vue` adminInbox 구독 → InboxPage
 
 ### 2026-06-16: AuthPage 여성회원 전용 정리 (`fix/authpage-female-only`)
 - **목적**: 1단계 후속 — gangtox.com 회원가입 화면에서 기업/관리자 유형을 숨겨 일반 사용자가 여성회원으로만 가입하도록 유도

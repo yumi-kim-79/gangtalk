@@ -26,6 +26,17 @@ const MyStoresPage      = () => import('@/pages/MyStoresPage.vue')
 const EventDetail       = () => import('@/pages/EventDetail.vue')
 const ConsultHelpPage   = () => import('@/pages/ConsultHelpPage.vue')
 
+// ===== 관리자 (gangtalk815.com 분리 전 임시 /admin/* 라우트) =====
+const AdminLayout         = () => import('@/layouts/AdminLayout.vue')
+const AdminDashboard      = () => import('@/pages/admin/DashboardPage.vue')
+const AdminStoresManage   = () => import('@/pages/admin/StoresManagePage.vue')
+const AdminTop5Manage     = () => import('@/pages/admin/Top5ManagePage.vue')
+const AdminBannersManage  = () => import('@/pages/admin/BannersManagePage.vue')
+const AdminNewsManage     = () => import('@/pages/admin/NewsManagePage.vue')
+const AdminInbox          = () => import('@/pages/admin/InboxPage.vue')
+
+const ADMIN_EMAIL = 'gangtalk815@gmail.com'
+
 // session store
 import { me as user } from '@/store/user.js'
 user.init()
@@ -353,6 +364,22 @@ const routes = [
 
   { path: '/diary', name: 'diary', component: DiaryPage },
 
+  // ===== 관리자 (/admin/*) =====
+  {
+    path: '/admin',
+    component: AdminLayout,
+    meta: { requiresAdmin: true },
+    children: [
+      { path: '',           redirect: { name: 'adminDashboard' } },
+      { path: 'dashboard',  name: 'adminDashboard', component: AdminDashboard },
+      { path: 'stores',     name: 'adminStores',    component: AdminStoresManage },
+      { path: 'top5',       name: 'adminTop5',      component: AdminTop5Manage },
+      { path: 'banners',    name: 'adminBanners',   component: AdminBannersManage },
+      { path: 'news',       name: 'adminNews',      component: AdminNewsManage },
+      { path: 'inbox',      name: 'adminInbox',     component: AdminInbox },
+    ],
+  },
+
   { path: '/:pathMatch(.*)*', redirect: '/dashboard' },
 ]
 
@@ -464,6 +491,20 @@ router.beforeEach(async (to, from) => {
     //     return { path: '/auth', query: { next: to.fullPath, mode: 'login' } }
     //   }
     if (requiredRole === 'admin') {
+      return { path: '/' }
+    }
+  }
+
+  // 6) /admin/* 가드 — 현재는 동일 도메인 임시 운영, gangtalk815@gmail.com 만 허용
+  //    추후 gangtalk815.com 도메인 분리 시 이 가드는 호스팅 레벨로 이전 예정
+  const needsAdmin =
+    !!to.meta?.requiresAdmin ||
+    to.matched.some((r) => r.meta?.requiresAdmin)
+  if (needsAdmin) {
+    if (!logged) {
+      return { path: '/auth', query: { next: to.fullPath, mode: 'login' } }
+    }
+    if (String(email).toLowerCase() !== ADMIN_EMAIL) {
       return { path: '/' }
     }
   }
