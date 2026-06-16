@@ -68,28 +68,54 @@
           </div>
         </div>
 
-        <!-- 와이파이 -->
+        <!-- 전체방 (혼잡도 자동 계산에 사용) -->
         <div class="adm-metric-box">
-          <label>와이파이</label>
-          <div class="adm-wifi-group" role="radiogroup">
+          <label>전체방 (선택)</label>
+          <div class="adm-counter">
+            <button type="button" class="adm-counter-btn" @click="dec('totalRooms')">−</button>
+            <input
+              v-model.number="form.totalRooms"
+              type="number"
+              min="0"
+              class="adm-counter-input"
+            />
+            <button type="button" class="adm-counter-btn" @click="inc('totalRooms')">+</button>
+          </div>
+          <p class="adm-metric-hint">맞출방 ÷ 전체방 비율로 혼잡도 자동 계산</p>
+        </div>
+
+        <!-- 혼잡도 (자동/수동) -->
+        <div class="adm-metric-box adm-metric-status">
+          <label>혼잡도</label>
+          <div class="adm-status-mode">
+            <label><input type="radio" v-model="form.statusMode" value="auto" /> 자동 계산</label>
+            <label><input type="radio" v-model="form.statusMode" value="manual" /> 수동 입력</label>
+          </div>
+          <div v-if="form.statusMode === 'manual'" class="adm-status-group">
             <button
               type="button"
-              class="adm-wifi-btn"
-              :class="{ active: form.wifi === 'O' }"
-              @click="form.wifi = 'O'"
-            >O 가능</button>
+              class="adm-status-btn"
+              :class="{ active: form.status === '좋음', good: form.status === '좋음' }"
+              @click="form.status = '좋음'"
+            >좋음</button>
             <button
               type="button"
-              class="adm-wifi-btn"
-              :class="{ active: form.wifi === 'X' }"
-              @click="form.wifi = 'X'"
-            >X 불가</button>
+              class="adm-status-btn"
+              :class="{ active: form.status === '보통', mid: form.status === '보통' }"
+              @click="form.status = '보통'"
+            >보통</button>
             <button
               type="button"
-              class="adm-wifi-btn"
-              :class="{ active: form.wifi === '' }"
-              @click="form.wifi = ''"
-            >- 미설정</button>
+              class="adm-status-btn"
+              :class="{ active: form.status === '나쁨', bad: form.status === '나쁨' }"
+              @click="form.status = '나쁨'"
+            >나쁨</button>
+          </div>
+          <div v-else class="adm-status-preview">
+            <span class="adm-status-badge" :class="statusBadgeClass(autoStatusOf(form.match, form.totalRooms))">
+              {{ autoStatusOf(form.match, form.totalRooms) }}
+            </span>
+            <span class="adm-metric-hint">맞출방/필요인원/전체방 입력 시 자동 계산됩니다.</span>
           </div>
         </div>
       </div>
@@ -210,15 +236,20 @@ const currentStore = computed(() =>
 const currentMetrics = computed(() => metricsByStore.value[selectedStoreId.value] || {})
 
 /* ===== 폼 상태 — 가게 선택이 바뀌면 stores/rooms_biz 값으로 리셋 ===== */
-const form = ref({ match: 0, persons: 0, wifi: '' })
+const form = ref({
+  match: 0, persons: 0, totalRooms: 0,
+  statusMode: 'auto', status: '좋음',
+})
 
 watch([currentStore, currentMetrics], () => {
   const s = currentStore.value || {}
   const m = currentMetrics.value || {}
   form.value = {
-    match:   Number(m.needRooms ?? s.match ?? 0),
-    persons: Number(m.needPeople ?? s.persons ?? 0),
-    wifi:    String(m.wifi ?? s.wifi ?? ''),
+    match:      Number(m.needRooms ?? s.match ?? 0),
+    persons:    Number(m.needPeople ?? s.persons ?? 0),
+    totalRooms: Number(m.totalRooms ?? s.totalRooms ?? 0),
+    statusMode: String(s.statusMode || 'auto'),
+    status:     String(s.status || '좋음'),
   }
 }, { immediate: true })
 
@@ -229,6 +260,23 @@ function dec(key) {
   form.value[key] = Math.max(0, Number(form.value[key] || 0) - 1)
 }
 
+/* === 혼잡도 자동 계산 (StoresManagePage 와 동일 로직) === */
+function autoStatusOf(match, totalRooms){
+  const m = Number(match || 0)
+  const t = Number(totalRooms || 0)
+  if (!t || t <= 0) return '-'
+  const ratio = m / t
+  if (ratio >= 0.6) return '좋음'
+  if (ratio >= 0.3) return '보통'
+  return '나쁨'
+}
+function statusBadgeClass(label){
+  if (label === '좋음') return 'good'
+  if (label === '보통') return 'mid'
+  if (label === '나쁨') return 'bad'
+  return ''
+}
+
 /* ===== 저장 — stores + rooms_biz 양쪽 동기 ===== */
 const saving = ref(false)
 async function onSave() {
@@ -237,12 +285,17 @@ async function onSave() {
   if (saving.value) return
   saving.value = true
   try {
-    const match = Number(form.value.match || 0)
-    const persons = Number(form.value.persons || 0)
-    const wifi = String(form.value.wifi || '')
+    const match      = Number(form.value.match || 0)
+    const persons    = Number(form.value.persons || 0)
+    const totalRooms = Number(form.value.totalRooms || 0)
+    const statusMode = String(form.value.statusMode || 'auto')
+    const status     = statusMode === 'manual'
+      ? String(form.value.status || '좋음')
+      : autoStatusOf(match, totalRooms)
 
     await updateDoc(doc(fbDb, 'stores', s.id), {
-      match, persons, wifi,
+      match, persons, totalRooms,
+      statusMode, status,
       updatedAt: serverTimestamp(),
     })
 
@@ -251,8 +304,7 @@ async function onSave() {
       needPeople: persons,
       need: persons,
       totalNeeded: persons,
-      totalRooms: match,
-      wifi,
+      totalRooms,
       updatedAt: serverTimestamp(),
     }, { merge: true })
 
@@ -348,22 +400,43 @@ function fmtTime(v) {
 }
 .adm-counter-input:focus{ outline:none; border-color:#ff2e7e; }
 
-.adm-wifi-group{
+.adm-metric-hint{
+  margin:6px 0 0; font-size:11px; color:#888;
+}
+
+.adm-status-mode{
+  display:flex; gap:14px; font-size:13px; color:#555;
+  margin-bottom:8px;
+}
+.adm-status-mode label{ cursor:pointer; display:inline-flex; align-items:center; gap:4px; }
+
+.adm-status-group{
   display:flex; gap:6px;
 }
-.adm-wifi-btn{
-  flex:1;
-  height:48px;
+.adm-status-btn{
+  flex:1; height:48px;
   border:1.5px solid #eee;
-  background:#fff;
-  color:#666;
-  border-radius:10px;
-  font-weight:700;
+  background:#fff; color:#666;
+  border-radius:10px; font-weight:700; font-size:14px;
   cursor:pointer;
 }
-.adm-wifi-btn.active{
-  background:#ff2e7e; border-color:#ff2e7e; color:#fff;
+.adm-status-btn.active.good{ background:#21c36b; border-color:#21c36b; color:#fff; }
+.adm-status-btn.active.mid{  background:#f2a100; border-color:#f2a100; color:#fff; }
+.adm-status-btn.active.bad{  background:#ff4d4d; border-color:#ff4d4d; color:#fff; }
+
+.adm-status-preview{
+  display:flex; align-items:center; gap:10px;
+  padding:10px 14px;
+  background:#fff8fb; border-radius:10px;
 }
+.adm-status-badge{
+  display:inline-block; padding:4px 14px; border-radius:999px;
+  font-size:14px; font-weight:800;
+  background:#f5f5f5; color:#888;
+}
+.adm-status-badge.good{ background:#e9f7ef; color:#21c36b; }
+.adm-status-badge.mid{ background:#fff3e0; color:#f2a100; }
+.adm-status-badge.bad{ background:#ffeaea; color:#ff4d4d; }
 
 .adm-section-foot{
   display:flex; align-items:center; justify-content:space-between;
@@ -382,9 +455,10 @@ function fmtTime(v) {
 .adm-btn.big{ height:50px; font-size:15px; }
 .adm-btn:disabled{ opacity:.6; cursor:not-allowed; }
 
-@media (max-width:600px){
+@media (max-width:768px){
   .adm-metric-grid{ grid-template-columns:1fr; }
-  .adm-metric-box:nth-child(3){ grid-column:1; }
+  .adm-metric-box:nth-child(3),
+  .adm-metric-box:nth-child(4){ grid-column:1; }
 }
 
 :root[data-theme="dark"] .adm-section,

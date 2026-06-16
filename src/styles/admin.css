@@ -1,0 +1,73 @@
+/*
+ * src/styles/admin.css
+ * 관리자 빌드(gangtalk815) 공용 모바일/PC 반응형 보정.
+ * main-admin.js 에서 import.
+ *
+ * Breakpoint: 768px (모바일 < 768 ≤ PC)
+ * 터치 친화: 모바일에서 클릭 가능 요소 최소 44px.
+ */
+
+/* ===== 모바일 (≤ 768px) ===== */
+@media (max-width: 768px) {
+
+  /* 페이지 헤더/타이틀 축소 */
+  .adm-page-title { font-size: 18px !important; }
+  .adm-page-sub   { font-size: 12px !important; }
+
+  /* 섹션 패딩 축소 */
+  .adm-section { padding: 14px 12px !important; }
+
+  /* 버튼 최소 44px (Apple/Google HIG 권장 터치 영역) */
+  .adm-btn { min-height: 40px; padding: 0 12px; font-size: 13px; }
+  .adm-btn.primary.big,
+  .adm-btn.big { min-height: 48px; font-size: 15px; }
+  .adm-btn.small { min-height: 36px; }
+
+  /* 테이블 가로 스크롤 컨테이너 */
+  .adm-table-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    margin: 0 -4px;
+  }
+  .adm-table { min-width: 720px; }
+
+  /* 폼/입력 필드 모바일 최적화 */
+  .adm-field input,
+  .adm-field select,
+  .adm-field textarea,
+  .adm-num-input,
+  .adm-news-input {
+    font-size: 16px !important; /* iOS Safari 자동 줌 차단 */
+  }
+
+  /* 페이지 헤드 액션 줄바꿈 */
+  .adm-section-head {
+    flex-direction: column;
+    align-items: stretch !important;
+    gap: 10px;
+  }
+  .adm-section-head h3 { font-size: 14px !important; }
+  .adm-section-actions { width: 100%; justify-content: flex-end; }
+
+  /* 카드 그리드 1열 */
+  .adm-stat-grid { grid-template-columns: 1fr !important; }
+}
+
+/* ===== 작은 모바일 (≤ 480px) — 추가 강화 ===== */
+@media (max-width: 480px) {
+  .adm-section-actions { flex-wrap: wrap; }
+  .adm-section-actions .adm-btn { flex: 1; min-width: 110px; }
+}
+
+/* ===== Sortable 공통 스타일 ===== */
+.adm-drag-ghost {
+  opacity: 0.4;
+  background: #ffe4ef !important;
+}
+.adm-drag-handle {
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+}
+.adm-drag-handle:active { cursor: grabbing; }

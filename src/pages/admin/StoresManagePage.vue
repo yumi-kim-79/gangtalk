@@ -36,16 +36,12 @@
       </header>
       <p class="adm-hint">드래그(☰) 또는 위/아래 버튼으로 순서 변경 · 토글로 노출/숨김 · 15/30/60/90일 버튼으로 노출 기간 설정 (즉시 저장)</p>
 
-      <ul class="adm-store-list" v-if="approvedStores.length">
+      <ul ref="storeListRef" class="adm-store-list" v-if="approvedStores.length">
         <li
           v-for="(s, i) in orderedApproved"
           :key="s.id"
           class="adm-store-row period-row"
-          draggable="true"
-          @dragstart="onDragStart(i, $event)"
-          @dragover.prevent
-          @drop="onDropStore($event, i)"
-          @dragend="onDragEnd"
+          :data-store-id="s.id"
         >
           <div class="adm-store-top">
             <span class="adm-drag-handle" title="드래그로 이동">☰</span>
@@ -53,10 +49,6 @@
             <div class="adm-store-meta">
               <strong>{{ s.name || '(이름 없음)' }}</strong>
               <span class="adm-store-sub">{{ s.region || '-' }} · {{ s.category || '-' }}</span>
-            </div>
-            <div class="adm-move-btns">
-              <button class="adm-move-btn" type="button" :disabled="i===0" @click="moveStore(i, -1)" aria-label="위로">▲</button>
-              <button class="adm-move-btn" type="button" :disabled="i===orderedApproved.length-1" @click="moveStore(i, 1)" aria-label="아래로">▼</button>
             </div>
             <label class="adm-toggle">
               <input type="checkbox" :checked="effExposed(s)" @change="toggleExposed(s, $event.target.checked)" />
@@ -92,62 +84,59 @@
       </header>
       <p class="adm-hint">stores 와 rooms_biz 양쪽에 동기화됩니다.</p>
 
-      <p class="adm-hint">맞출방/전체방으로 혼잡도 자동 계산(좋음 ≥0.6 · 보통 ≥0.3 · 나쁨 &lt;0.3). 수동 모드 선택 시 직접 지정 가능.</p>
+      <p class="adm-hint">
+        💡 <strong>혼잡도</strong>는 맞출방/전체방 비율로 자동 계산됩니다
+        (좋음 ≥0.6 · 보통 ≥0.3 · 나쁨 &lt;0.3). 수동 모드 선택 시 직접 지정 가능.
+      </p>
 
-      <table class="adm-table" v-if="exposedStores.length">
-        <thead>
-          <tr>
-            <th>업체명</th>
-            <th>맞출방</th>
-            <th>전체방</th>
-            <th>필요인원</th>
-            <th>최대인원</th>
-            <th>와이파이</th>
-            <th>혼잡도</th>
-            <th>최근 수정</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="s in exposedStores" :key="s.id">
-            <td>
-              <strong>{{ s.name || '(이름 없음)' }}</strong>
-              <span class="adm-cell-sub">{{ s.region || '-' }} / {{ s.category || '-' }}</span>
-            </td>
-            <td><input class="adm-num-input" type="number" min="0" v-model.number="metricEdits[s.id].match" /></td>
-            <td><input class="adm-num-input" type="number" min="0" v-model.number="metricEdits[s.id].totalRooms" /></td>
-            <td><input class="adm-num-input" type="number" min="0" v-model.number="metricEdits[s.id].persons" /></td>
-            <td><input class="adm-num-input" type="number" min="0" v-model.number="metricEdits[s.id].maxPersons" /></td>
-            <td>
-              <select class="adm-num-input" v-model="metricEdits[s.id].wifi">
-                <option value="">-</option>
-                <option value="O">O</option>
-                <option value="X">X</option>
-              </select>
-            </td>
-            <td>
-              <div class="adm-status-cell">
-                <div class="adm-status-mode">
-                  <label><input type="radio" :name="`mode-${s.id}`" value="auto" v-model="metricEdits[s.id].statusMode" /> 자동</label>
-                  <label><input type="radio" :name="`mode-${s.id}`" value="manual" v-model="metricEdits[s.id].statusMode" /> 수동</label>
+      <div class="adm-table-wrap" v-if="exposedStores.length">
+        <table class="adm-table">
+          <thead>
+            <tr>
+              <th>업체명</th>
+              <th>맞출방</th>
+              <th>전체방</th>
+              <th>필요인원</th>
+              <th>최대인원</th>
+              <th>혼잡도</th>
+              <th>최근 수정</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="s in exposedStores" :key="s.id">
+              <td>
+                <strong>{{ s.name || '(이름 없음)' }}</strong>
+                <span class="adm-cell-sub">{{ s.region || '-' }} / {{ s.category || '-' }}</span>
+              </td>
+              <td><input class="adm-num-input" type="number" min="0" v-model.number="metricEdits[s.id].match" /></td>
+              <td><input class="adm-num-input" type="number" min="0" v-model.number="metricEdits[s.id].totalRooms" /></td>
+              <td><input class="adm-num-input" type="number" min="0" v-model.number="metricEdits[s.id].persons" /></td>
+              <td><input class="adm-num-input" type="number" min="0" v-model.number="metricEdits[s.id].maxPersons" /></td>
+              <td>
+                <div class="adm-status-cell">
+                  <div class="adm-status-mode">
+                    <label><input type="radio" :name="`mode-${s.id}`" value="auto" v-model="metricEdits[s.id].statusMode" /> 자동</label>
+                    <label><input type="radio" :name="`mode-${s.id}`" value="manual" v-model="metricEdits[s.id].statusMode" /> 수동</label>
+                  </div>
+                  <template v-if="metricEdits[s.id].statusMode === 'manual'">
+                    <select class="adm-num-input" v-model="metricEdits[s.id].status">
+                      <option value="좋음">좋음</option>
+                      <option value="보통">보통</option>
+                      <option value="나쁨">나쁨</option>
+                    </select>
+                  </template>
+                  <template v-else>
+                    <span class="adm-status-badge" :class="statusBadgeClass(autoStatusOf(metricEdits[s.id].match, metricEdits[s.id].totalRooms))">
+                      {{ autoStatusOf(metricEdits[s.id].match, metricEdits[s.id].totalRooms) }}
+                    </span>
+                  </template>
                 </div>
-                <template v-if="metricEdits[s.id].statusMode === 'manual'">
-                  <select class="adm-num-input" v-model="metricEdits[s.id].status">
-                    <option value="좋음">좋음</option>
-                    <option value="보통">보통</option>
-                    <option value="나쁨">나쁨</option>
-                  </select>
-                </template>
-                <template v-else>
-                  <span class="adm-status-badge" :class="statusBadgeClass(autoStatusOf(metricEdits[s.id].match, metricEdits[s.id].totalRooms))">
-                    {{ autoStatusOf(metricEdits[s.id].match, metricEdits[s.id].totalRooms) }}
-                  </span>
-                </template>
-              </div>
-            </td>
-            <td class="muted">{{ fmtTime(s.updatedAt) }}</td>
-          </tr>
-        </tbody>
-      </table>
+              </td>
+              <td class="muted">{{ fmtTime(s.updatedAt) }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
       <p v-else class="adm-empty">노출 중인 업소가 없습니다.</p>
     </section>
 
@@ -176,7 +165,8 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
+import Sortable from 'sortablejs'
 import { useRoute } from 'vue-router'
 import { db as fbDb } from '@/firebase'
 import {
@@ -252,7 +242,6 @@ const tabs = computed(() => [
 /* ===== 탭 1: 노출 토글 + 순서 ===== */
 const exposureEdits = ref({})    // { storeId: bool }
 const savingExpose = ref(false)
-const drag = ref({ from: -1 })
 
 function toggleExposed(s, next){
   exposureEdits.value[s.id] = !!next
@@ -265,13 +254,6 @@ function effExposed(s){
   return isExposed(s)
 }
 
-function onDragStart(i, e){
-  drag.value.from = i
-  try {
-    e.dataTransfer.effectAllowed = 'move'
-    e.dataTransfer.setData('text/plain', String(i))
-  } catch {}
-}
 function reorderApproved(fromIdx, toIdx){
   if (fromIdx < 0 || toIdx < 0 || fromIdx === toIdx) return
   const displayIds = orderedApproved.value.map(s => String(s.id))
@@ -283,16 +265,34 @@ function reorderApproved(fromIdx, toIdx){
   const others = homeOrder.value.filter(id => !approvedIdSet.has(String(id)))
   homeOrder.value = [...displayIds, ...others]
 }
-function onDropStore(e, targetIdx){
-  e.preventDefault()
-  const dt = Number(e.dataTransfer?.getData('text/plain'))
-  const fromIdx = Number.isFinite(dt) ? dt : drag.value.from
-  reorderApproved(fromIdx, targetIdx)
-}
-function onDragEnd(){ drag.value.from = -1 }
 
-/* === 모바일 fallback === */
-function moveStore(i, dir){ reorderApproved(i, i + dir) }
+/* === SortableJS (PC/모바일 공용) === */
+const storeListRef = ref(null)
+let sortableInst = null
+function initSortable(el){
+  if (!el) return
+  if (sortableInst) { sortableInst.destroy(); sortableInst = null }
+  sortableInst = Sortable.create(el, {
+    handle: '.adm-drag-handle',
+    animation: 150,
+    ghostClass: 'adm-drag-ghost',
+    onEnd(evt){
+      const { oldIndex, newIndex } = evt
+      if (oldIndex === newIndex || oldIndex == null || newIndex == null) return
+      // SortableJS DOM 이동을 되돌리고 reactive 로만 반영 → Vue 가 일관되게 렌더
+      const list = evt.from
+      list.insertBefore(evt.item, list.children[oldIndex])
+      reorderApproved(oldIndex, newIndex)
+    },
+  })
+}
+watch(storeListRef, (el) => { if (el) initSortable(el) })
+
+onMounted(async () => {
+  await nextTick()
+  if (storeListRef.value) initSortable(storeListRef.value)
+})
+onBeforeUnmount(() => { if (sortableInst) sortableInst.destroy() })
 
 /* === 노출 기간 (adStart / adEnd, ms) — 즉시 저장 === */
 const periodBusy = ref({})
@@ -409,7 +409,6 @@ watch(exposedStores, (list) => {
         persons: Number(s.persons || 0),
         totalRooms: Number(s.totalRooms || 0),
         maxPersons: Number(s.maxPersons || 0),
-        wifi: String(s.wifi || ''),
         statusMode: String(s.statusMode || 'auto'),
         status: String(s.status || '좋음'),
       }
@@ -448,7 +447,6 @@ async function saveAllMetrics(){
       const persons    = Number(e.persons || 0)
       const totalRooms = Number(e.totalRooms || 0)
       const maxPersons = Number(e.maxPersons || 0)
-      const wifi       = String(e.wifi || '')
       const statusMode = String(e.statusMode || 'auto')
       const status     = statusMode === 'manual'
         ? String(e.status || '좋음')
@@ -458,7 +456,7 @@ async function saveAllMetrics(){
         // stores 업데이트 (현황판 표시용)
         await updateDoc(doc(fbDb, 'stores', s.id), {
           match, persons, totalRooms, maxPersons,
-          wifi, statusMode, status,
+          statusMode, status,
           updatedAt: serverTimestamp(),
         })
         // rooms_biz 미러 (ChatBiz 와 동일 키 — store.id)
@@ -468,7 +466,6 @@ async function saveAllMetrics(){
           need: persons,
           totalNeeded: persons,
           totalRooms,
-          wifi,
           updatedAt: serverTimestamp(),
         }, { merge: true })
         okCount++
@@ -696,6 +693,16 @@ function fmtTime(v){
 .adm-status-badge.bad{ background:#ffeaea; color:#ff4d4d; }
 
 .adm-empty{ color:#aaa; font-size:13px; padding:20px 0; text-align:center; }
+
+/* 모바일 보강 */
+@media (max-width:768px){
+  .adm-store-top{ flex-wrap:wrap; gap:8px; }
+  .adm-store-meta{ width:100%; order:3; }
+  .adm-period-row{ padding-left:0; }
+  .adm-period-presets{ width:100%; }
+  .adm-period-btn{ flex:1; min-width:60px; height:34px; }
+  .adm-status-mode{ font-size:12px; gap:6px; }
+}
 
 :root[data-theme="dark"] .adm-section,
 :root[data-theme="black"] .adm-section{ background:#1c1c1c; border-color:#2a2a2a; }
