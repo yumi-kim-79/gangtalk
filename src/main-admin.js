@@ -26,6 +26,7 @@ import {
 // 전역 스타일
 import './reset.css'
 import '@/styles/theme.css'
+import '@/styles/admin.css'
 import { normalizeTheme, applyThemeToDom } from '@/store/theme.js'
 
 const ALLOWED_ADMIN_EMAILS = new Set([

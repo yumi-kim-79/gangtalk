@@ -38,27 +38,17 @@
       </header>
       <p class="adm-hint">드래그(☰)로 순서를 변경하세요. 상위 5개가 사용자 페이지에 노출됩니다.</p>
 
-      <ul class="adm-rank-list" v-if="currentList.length">
+      <ul ref="rankListRef" class="adm-rank-list" v-if="currentList.length">
         <li
           v-for="(s, i) in currentList"
           :key="s.id || i"
           class="adm-rank-row"
-          draggable="true"
-          @dragstart="onDragStart(i, $event)"
-          @dragover.prevent
-          @drop="onDropTop5($event, i)"
-          @dragend="onDragEnd"
         >
-          <span class="adm-drag-handle">☰</span>
+          <span class="adm-drag-handle" title="드래그">☰</span>
           <span class="adm-rank-badge" :class="{ top5: i < 5 }">{{ i + 1 }}</span>
           <div class="adm-rank-meta">
             <strong>{{ s.name || '(이름 없음)' }}</strong>
             <span class="adm-rank-sub">{{ s.region || '-' }} · {{ s.category || '-' }}</span>
-          </div>
-          <!-- 모바일 fallback: 위/아래 화살표 -->
-          <div class="adm-move-btns">
-            <button class="adm-move-btn" type="button" :disabled="i===0" @click="moveTop5(i, -1)" aria-label="위로">▲</button>
-            <button class="adm-move-btn" type="button" :disabled="i===currentList.length-1" @click="moveTop5(i, 1)" aria-label="아래로">▼</button>
           </div>
           <button class="adm-btn ghost small" type="button" @click="removeFromRanks(i)">제거</button>
         </li>
@@ -106,7 +96,8 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
+import Sortable from 'sortablejs'
 import { db as fbDb } from '@/firebase'
 import {
   collection, doc, onSnapshot, setDoc,
@@ -164,15 +155,10 @@ const currentList = computed(() => {
   return ids.map(id => stores.value.find(s => String(s.id) === String(id)) || { id, name: '(삭제됨)', region:'', category:'' })
 })
 
-/* === 드래그 (드롭 기반) === */
-const drag = ref({ from: -1 })
-function onDragStart(i, e){
-  drag.value.from = i
-  try {
-    e.dataTransfer.effectAllowed = 'move'
-    e.dataTransfer.setData('text/plain', String(i))
-  } catch {}
-}
+/* === SortableJS 드래그 (PC/모바일 공용) === */
+const rankListRef = ref(null)
+let sortableInst = null
+
 function reorderTopRanks(fromIdx, toIdx){
   if (fromIdx < 0 || toIdx < 0 || fromIdx === toIdx) return
   const arr = (topRanks.value[catKey.value] || []).slice()
@@ -181,18 +167,34 @@ function reorderTopRanks(fromIdx, toIdx){
   arr.splice(toIdx, 0, moved)
   topRanks.value = { ...topRanks.value, [catKey.value]: arr }
 }
-function onDropTop5(e, targetIdx){
-  e.preventDefault()
-  const dt = Number(e.dataTransfer?.getData('text/plain'))
-  const fromIdx = Number.isFinite(dt) ? dt : drag.value.from
-  reorderTopRanks(fromIdx, targetIdx)
-}
-function onDragEnd(){ drag.value.from = -1 }
 
-/* === 모바일 fallback === */
-function moveTop5(i, dir){
-  reorderTopRanks(i, i + dir)
+function initSortable(el){
+  if (!el) return
+  if (sortableInst) { sortableInst.destroy(); sortableInst = null }
+  sortableInst = Sortable.create(el, {
+    handle: '.adm-drag-handle',
+    animation: 150,
+    ghostClass: 'adm-drag-ghost',
+    onEnd(evt) {
+      const { oldIndex, newIndex } = evt
+      if (oldIndex === newIndex || oldIndex == null || newIndex == null) return
+      // SortableJS 가 옮긴 DOM 을 되돌려놓고 (Vue 가 다시 그릴 수 있게) reactive 상태로 반영
+      const list = evt.from
+      list.insertBefore(evt.item, list.children[oldIndex])
+      reorderTopRanks(oldIndex, newIndex)
+    },
+  })
 }
+
+watch(rankListRef, (el) => { if (el) initSortable(el) })
+// 카테고리 전환 시 v-for 가 children 만 갈아끼우므로 같은 ul 이면 재초기화 불필요.
+// 하지만 v-if 가 비었다가 차서 ref 가 다시 부여될 때를 watcher 가 처리.
+
+onMounted(async () => {
+  await nextTick()
+  if (rankListRef.value) initSortable(rankListRef.value)
+})
+onBeforeUnmount(() => { if (sortableInst) sortableInst.destroy() })
 
 /* === 추가/제거 === */
 function alreadyAdded(id){

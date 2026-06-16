@@ -268,7 +268,7 @@ async function onSave() {
 .adm-btn.big{ height:50px; font-size:15px; }
 .adm-btn:disabled{ opacity:.6; cursor:not-allowed; }
 
-@media (max-width:600px){
+@media (max-width:768px){
   .adm-form-grid{ grid-template-columns:1fr; }
 }
 

@@ -387,6 +387,13 @@ function fmtTime(v) {
 
 .adm-empty{ color:#aaa; font-size:13px; padding:20px 0; text-align:center; }
 
+/* 모바일 보강 */
+@media (max-width:768px){
+  .adm-acc-row{ flex-direction:column; align-items:stretch; gap:10px; }
+  .adm-acc-actions{ width:100%; }
+  .adm-acc-actions .adm-btn{ flex:1; }
+}
+
 /* 모달 */
 .adm-modal-mask{
   position:fixed; inset:0; background:rgba(0,0,0,.4);

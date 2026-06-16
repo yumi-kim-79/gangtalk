@@ -101,6 +101,32 @@ firebase deploy --only hosting:admin
 
 ## 작업 로그
 
+### 2026-06-17: 관리자 SortableJS 드래그 + 모바일/PC 반응형 (`feat/admin-sortable-responsive`)
+- **드래그 SortableJS 교체** (3 페이지) — 이전 PR의 HTML5 native drag(`@drop` 핸들러 + 모바일 fallback ▲▼) 가 작동은 했지만 모바일에서 long-press 가 어색하고 PC 에서도 데스크탑 브라우저별 호환성 이슈가 있었음. **`sortablejs ^1.15.7`** 도입으로 PC/모바일 한 번에 해결
+  - `StoresManagePage.vue` Tab 1: `Sortable.create(storeListRef, { handle: '.adm-drag-handle', animation: 150, ghostClass: 'adm-drag-ghost', onEnd })`
+  - `Top5ManagePage.vue`, `BannersManagePage.vue`: 동일 패턴
+  - `onEnd` 에서 SortableJS 가 옮긴 DOM 을 `list.insertBefore(item, children[oldIndex])` 로 되돌린 뒤 reactive 상태(`homeOrder` / `topRanks[catKey]` / `banners[group]`)만 변경 — Vue 가 일관되게 재렌더
+  - `<li draggable="true" @dragstart/@dragover/@drop>` 등 HTML5 attr 전부 제거. 이전 PR의 ▲▼ 버튼도 제거 (SortableJS 가 모바일 touch 지원)
+  - SortableJS chunk +37KB (admin 빌드만)
+- **와이파이 → 혼잡도 정리**:
+  - `StoresManagePage` Tab 2: 와이파이 컬럼 제거 (직전 PR에서 추가한 혼잡도 컬럼이 더 정확). 헤더 hint 추가: "혼잡도는 맞출방/전체방 비율로 자동 계산됩니다"
+  - 저장에서 `wifi` 키 제거 (기존 `stores.wifi` 값은 보존 — 회원 사이트 호환)
+  - `BizMetricsPage.vue`: 와이파이 O/X 버튼 그룹 → `전체방` 카운터 + 혼잡도(자동/수동) 섹션. 자동 모드에서는 `autoStatusOf(match, totalRooms)` 미리보기, 수동에서는 좋음/보통/나쁨 컬러 버튼
+  - `form` 에 `totalRooms`, `statusMode`, `status` 추가. `wifi` 제거
+- **모바일/PC 반응형 통일**:
+  - 신규 `src/styles/admin.css` — 768px breakpoint 표준화
+    - 모바일: 버튼 min-height 40~48px (터치 영역), 입력 `font-size: 16px` (iOS 자동 줌 차단), 섹션 헤드 vertical stack, stat-grid 1열
+    - 480px 이하: section-actions wrap + flex:1
+    - SortableJS ghost (`.adm-drag-ghost`) 스타일 통일
+  - `main-admin.js` 가 `admin.css` import
+  - `AdminLayout.vue` breakpoint 899→768 통일 (사이드바 드로어 ↔ 고정)
+  - 페이지별 `@media max-width:768` 추가/통일:
+    - `BannersManagePage` (680→768): banner-row 세로 stack
+    - `BizMyStorePage`, `BizMetricsPage` (600→768): 그리드 1열
+    - `StoresManagePage`: period-row 패딩/버튼 flex:1
+    - `BizAccountsPage`: 카드 세로 stack, actions flex:1
+- **빌드**: `npm run build:admin` ✓ (SortableJS +37KB)
+
 ### 2026-06-17: 관리자 드래그 / rooms_biz rules / 혼잡도 / 노출기간 수정 (`fix/admin-drag-rules-period`)
 - **문제 1: 드래그 안 됨 (3 페이지)** — `@drop.prevent` 만 작성됨. `.prevent` 는 Vue modifier 일뿐 핸들러 함수가 없음 → HTML5 spec 상 drop 이벤트가 등록 안 됨. 동작하는 `StoreFinder.vue:1451` 은 `@drop="onDrop"` 패턴
   - 수정: 세 페이지 모두 `@dragover.prevent` + `@drop="onDropXxx($event, i)"` 로 변경 (drop 핸들러에서 dataTransfer 로 fromIdx 읽어 reorder)

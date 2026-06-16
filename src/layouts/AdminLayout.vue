@@ -108,7 +108,7 @@ onMounted(() => {
     currentEmail.value = u?.email || ''
     role.value = await resolveRole(u)
   })
-  if (window.matchMedia('(min-width: 900px)').matches) navOpen.value = true
+  if (window.matchMedia('(min-width: 768px)').matches) navOpen.value = true
 })
 onBeforeUnmount(() => { if (unsubAuth) try { unsubAuth() } catch {} })
 
@@ -235,7 +235,7 @@ async function onLogout(){
 }
 
 /* 모바일 */
-@media (max-width: 899px){
+@media (max-width: 768px){
   .admin-hamburger{ display:grid; }
   .admin-sidebar{
     position:fixed; top:58px; left:0; bottom:0;
