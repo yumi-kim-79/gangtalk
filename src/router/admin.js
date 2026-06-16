@@ -1,52 +1,79 @@
 /**
  * src/router/admin.js
- * gangtalk815.com (관리자 전용 빌드) 라우터.
- * - /admin/{dashboard,stores,top5,banners,news,inbox}
- * - /login (관리자 미니 로그인)
- * - / 진입 시 /admin/dashboard (가드가 미로그인은 /login 으로 보냄)
+ * gangtalk815.com (관리자/업체 공용 빌드) 라우터.
  *
- * 가드: 모든 /admin/* 은 gangtalk815@gmail.com 만 통과.
+ * Role 계층:
+ *   - 'platform' = gangtalk815@gmail.com (플랫폼 관리자)
+ *   - 'biz'      = users/{uid}.type='company' & accountKind='storeOwner' (업체 계정)
+ *   - null       = 인증 안 됐거나 권한 없음
+ *
+ * meta:
+ *   requiresAdmin = true → platform 만 통과
+ *   requiresBiz   = true → platform + biz 둘 다 통과
  */
 
 import { createRouter, createWebHistory } from 'vue-router'
 import { getAuth, onAuthStateChanged } from 'firebase/auth'
+import { db as fbDb } from '@/firebase'
+import { doc, getDoc } from 'firebase/firestore'
 
-const AdminLayout    = () => import('@/layouts/AdminLayout.vue')
-const Dashboard      = () => import('@/pages/admin/DashboardPage.vue')
-const StoresManage   = () => import('@/pages/admin/StoresManagePage.vue')
-const Top5Manage     = () => import('@/pages/admin/Top5ManagePage.vue')
-const BannersManage  = () => import('@/pages/admin/BannersManagePage.vue')
-const NewsManage     = () => import('@/pages/admin/NewsManagePage.vue')
-const InboxPage      = () => import('@/pages/admin/InboxPage.vue')
-const AdminLogin     = () => import('@/pages/admin/AdminLoginPage.vue')
+const AdminLayout      = () => import('@/layouts/AdminLayout.vue')
+const Dashboard        = () => import('@/pages/admin/DashboardPage.vue')
+const StoresManage     = () => import('@/pages/admin/StoresManagePage.vue')
+const Top5Manage       = () => import('@/pages/admin/Top5ManagePage.vue')
+const BannersManage    = () => import('@/pages/admin/BannersManagePage.vue')
+const NewsManage       = () => import('@/pages/admin/NewsManagePage.vue')
+const InboxPage        = () => import('@/pages/admin/InboxPage.vue')
+const BizAccountsPage  = () => import('@/pages/admin/BizAccountsPage.vue')
 
-const ADMIN_EMAIL = 'gangtalk815@gmail.com'
+const AdminLogin       = () => import('@/pages/admin/AdminLoginPage.vue')
+const BizLogin         = () => import('@/pages/admin/BizLoginPage.vue')
+const BizDashboard     = () => import('@/pages/admin/BizDashboardPage.vue')
+const BizMetrics       = () => import('@/pages/admin/BizMetricsPage.vue')
+const BizMyStore       = () => import('@/pages/admin/BizMyStorePage.vue')
+
+const PLATFORM_EMAIL = 'gangtalk815@gmail.com'
 
 const routes = [
-  // 루트 진입 → 대시보드 (가드에서 미로그인이면 /login 으로 리다이렉트)
-  { path: '/', redirect: { name: 'adminDashboard' } },
+  // 루트 — 가드에서 role 따라 분기
+  { path: '/', name: 'root', redirect: { name: 'adminDashboard' } },
 
-  // 관리자 미니 로그인
-  { path: '/login', name: 'adminLogin', component: AdminLogin },
+  // 로그인 (공용 진입점 = BizLogin, 기존 admin 만 쓰는 /login 도 유지)
+  { path: '/login',     name: 'adminLogin', component: AdminLogin },
+  { path: '/biz/login', name: 'bizLogin',   component: BizLogin },
 
-  // /admin/*  ← AdminLayout 안에 모든 페이지
+  // /admin/* — 플랫폼 관리자 전용
   {
     path: '/admin',
     component: AdminLayout,
     meta: { requiresAdmin: true },
     children: [
-      { path: '',           redirect: { name: 'adminDashboard' } },
-      { path: 'dashboard',  name: 'adminDashboard', component: Dashboard },
-      { path: 'stores',     name: 'adminStores',    component: StoresManage },
-      { path: 'top5',       name: 'adminTop5',      component: Top5Manage },
-      { path: 'banners',    name: 'adminBanners',   component: BannersManage },
-      { path: 'news',       name: 'adminNews',      component: NewsManage },
-      { path: 'inbox',      name: 'adminInboxPage', component: InboxPage },
+      { path: '',              redirect: { name: 'adminDashboard' } },
+      { path: 'dashboard',     name: 'adminDashboard',    component: Dashboard },
+      { path: 'stores',        name: 'adminStores',       component: StoresManage },
+      { path: 'top5',          name: 'adminTop5',         component: Top5Manage },
+      { path: 'banners',       name: 'adminBanners',      component: BannersManage },
+      { path: 'news',          name: 'adminNews',         component: NewsManage },
+      { path: 'inbox',         name: 'adminInboxPage',    component: InboxPage },
+      { path: 'biz-accounts',  name: 'adminBizAccounts',  component: BizAccountsPage },
     ],
   },
 
-  // 그 외 경로 → 대시보드
-  { path: '/:pathMatch(.*)*', redirect: { name: 'adminDashboard' } },
+  // /biz/* — 업체(또는 플랫폼) 사용 가능
+  {
+    path: '/biz',
+    component: AdminLayout,
+    meta: { requiresBiz: true },
+    children: [
+      { path: '',          redirect: { name: 'bizDashboard' } },
+      { path: 'dashboard', name: 'bizDashboard', component: BizDashboard },
+      { path: 'metrics',   name: 'bizMetrics',   component: BizMetrics },
+      { path: 'my-store',  name: 'bizMyStore',   component: BizMyStore },
+    ],
+  },
+
+  // 그 외 경로 — 가드가 처리
+  { path: '/:pathMatch(.*)*', redirect: { name: 'root' } },
 ]
 
 const router = createRouter({
@@ -60,8 +87,7 @@ const router = createRouter({
 })
 
 /* ---------------------------------------------------------
- * Firebase Auth 가 초기화될 때까지 한 번 기다리기 위한 헬퍼.
- * onAuthStateChanged 가 1회 발화하면 currentUser 가 채워진다.
+ * Firebase Auth 초기화 1회 대기
  * ------------------------------------------------------- */
 let authReadyPromise = null
 function authReady() {
@@ -76,27 +102,89 @@ function authReady() {
   return authReadyPromise
 }
 
+/* ---------------------------------------------------------
+ * role 판별 — platform / biz / null
+ * users/{uid} 1회 조회 후 캐시
+ * ------------------------------------------------------- */
+let cachedRole = null
+let cachedRoleUid = null
+
+async function getUserRole(user) {
+  if (!user) return null
+  if (cachedRoleUid === user.uid && cachedRole !== null) return cachedRole
+  const email = String(user.email || '').toLowerCase()
+  if (email === PLATFORM_EMAIL) {
+    cachedRole = 'platform'
+    cachedRoleUid = user.uid
+    return cachedRole
+  }
+  try {
+    const snap = await getDoc(doc(fbDb, 'users', user.uid))
+    if (snap.exists()) {
+      const d = snap.data() || {}
+      if (d.type === 'company' && d.accountKind === 'storeOwner') {
+        cachedRole = 'biz'
+        cachedRoleUid = user.uid
+        return cachedRole
+      }
+    }
+  } catch (e) {
+    console.warn('[admin router] getUserRole error:', e)
+  }
+  cachedRole = null
+  cachedRoleUid = user.uid
+  return null
+}
+
+/* role 캐시 무효화 — 로그아웃/계정 전환 시 호출 */
+export function invalidateRoleCache() {
+  cachedRole = null
+  cachedRoleUid = null
+}
+
 router.beforeEach(async (to) => {
   // 로그인 페이지는 무조건 통과
-  if (to.name === 'adminLogin') return true
+  if (to.name === 'adminLogin' || to.name === 'bizLogin') return true
 
   await authReady()
   const auth = getAuth()
-  const u = auth.currentUser
-  const email = String(u?.email || '').toLowerCase()
+  const user = auth.currentUser
 
-  const needsAdmin =
-    !!to.meta?.requiresAdmin ||
-    to.matched.some(r => r.meta?.requiresAdmin)
+  // 캐시된 uid 가 다르면 무효화
+  if (user && cachedRoleUid && cachedRoleUid !== user.uid) {
+    invalidateRoleCache()
+  }
+  if (!user) invalidateRoleCache()
+
+  const role = user ? await getUserRole(user) : null
+
+  // 루트(/): role 에 맞게 분기
+  if (to.name === 'root') {
+    if (role === 'platform') return { name: 'adminDashboard' }
+    if (role === 'biz')      return { name: 'bizDashboard' }
+    return { name: 'bizLogin', query: { next: '/admin/dashboard' } }
+  }
+
+  const needsAdmin = !!to.meta?.requiresAdmin || to.matched.some(r => r.meta?.requiresAdmin)
+  const needsBiz   = !!to.meta?.requiresBiz   || to.matched.some(r => r.meta?.requiresBiz)
 
   if (needsAdmin) {
-    if (!u) {
-      return { name: 'adminLogin', query: { next: to.fullPath } }
-    }
-    if (email !== ADMIN_EMAIL) {
-      // 관리자가 아닌 사용자가 로그인되어 있는 비정상 상태 → 강제 로그아웃
+    if (!user) return { name: 'bizLogin', query: { next: to.fullPath } }
+    if (role !== 'platform') {
+      // biz 가 admin 페이지 접근 시도 → 자기 대시보드로
+      if (role === 'biz') return { name: 'bizDashboard' }
       try { await auth.signOut() } catch {}
-      return { name: 'adminLogin', query: { next: to.fullPath } }
+      invalidateRoleCache()
+      return { name: 'bizLogin', query: { next: to.fullPath } }
+    }
+  }
+
+  if (needsBiz) {
+    if (!user) return { name: 'bizLogin', query: { next: to.fullPath } }
+    if (role !== 'platform' && role !== 'biz') {
+      try { await auth.signOut() } catch {}
+      invalidateRoleCache()
+      return { name: 'bizLogin', query: { next: to.fullPath } }
     }
   }
 
