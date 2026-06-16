@@ -83,6 +83,18 @@ firebase deploy --only hosting
 
 ## 작업 로그
 
+### 2026-06-16: AuthPage 여성회원 전용 정리 (`fix/authpage-female-only`)
+- **목적**: 1단계 후속 — gangtox.com 회원가입 화면에서 기업/관리자 유형을 숨겨 일반 사용자가 여성회원으로만 가입하도록 유도
+- **마크업** (`src/pages/AuthPage.vue`):
+  - 회원유형 탭 "기업회원(가게찾기)" 버튼에 `v-if="false"` 추가 (`:42`)
+  - 회원유형 탭 "관리자회원(제휴관)" 버튼에 `v-if="false"` 추가 (`:51`)
+  - 가입폼 업체명/사업자등록번호/주소 입력 `<template>` 의 조건을 `v-if="who === 'biz' || who === 'admin'"` → `v-if="false && (who === 'biz' || who === 'admin')"` 로 변경
+- **스크립트** (`:290`):
+  - `who` 기본값을 `route.query.who` 기반 분기 → 항상 `'user'` 로 고정
+  - 원본 분기 로직은 주석으로 보존 — 2단계 admin 도메인 신설 시 `false &&` / 주석 / `v-if="false"` 만 제거하면 즉시 복귀
+- **로그인 폼은 변경 없음**: `who === 'biz' / 'admin'` 분기 (`onLogin` 함수) 가 이미 `who.value === 'user'` 기본값에서 자연스럽게 여성회원 경로로 흐름. 관리자 본인이 직접 가입한 계정으로 로그인하면 백엔드 role-mismatch 응답이 그대로 안내됨
+- **보존되는 코드**: `signupBiz / signupAdmin`, `loginBiz / loginAdmin`, `storeName / businessNo / address` ref, role-mismatch 메시지 분기 — 모두 2단계 admin 도메인으로 그대로 이전 예정
+
 ### 2026-06-16: 도메인 분리 1단계 — gangtox.com 여성회원 전용 정리 (`refactor/remove-admin-from-user-site`)
 - **목적**: 전체 프로젝트를 gangtox.com (여성회원) + gangtalk815.com (관리자/업체) 두 도메인으로 분리. 1단계는 회원 사이트에서 관리자 UI 만 숨기고 코드는 보존 (2단계에서 `/admin/*` 라우트로 이전)
 - **패턴**: 모든 변경은 `v-if="false && (기존조건)"` 형태로 통일 — 2단계 복원 시 `false &&` 만 제거하면 원래 동작 복귀
@@ -659,5 +671,8 @@ GangTalk/
     - `src/pages/PartnersPage.vue:18,117,145,191` (배너/Top5/일반등록/편집 툴바)
     - `src/pages/GangTalkPage.vue:227,252,299,323` (공지/게시글 수정·삭제 버튼)
     - `src/pages/GangTalkPage.vue:2307` (글쓰기 모달 '공지' 카테고리)
-  - 관련 데이터/함수 (`isAdmin`, `canEdit`, `isEnterprise`, watchAdmin, AdminTools, BizManagerTabs 컴포넌트) 는 모두 보존
+    - `src/pages/AuthPage.vue:42,51` (기업/관리자 회원유형 탭) — `v-if="false"`
+    - `src/pages/AuthPage.vue:222` (업체명/사업자번호/주소 입력) — `v-if="false && (...)"`
+    - `src/pages/AuthPage.vue:290` (who 기본값) — 항상 `'user'` 강제, 원본은 주석 보존
+  - 관련 데이터/함수 (`isAdmin`, `canEdit`, `isEnterprise`, watchAdmin, AdminTools, BizManagerTabs 컴포넌트, `signupBiz / signupAdmin / loginBiz / loginAdmin / storeName / businessNo / address`) 는 모두 보존
   - AppHeader 알림벨: `src/components/common/AppHeader.vue:171-188` — `watchAdmin` 호출 주석, `notifBadge = computed(() => 0)` 으로 임시 처리
