@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+
+  <!-- App Check 디버그 토큰 차단 (운영 보안) -->
+  <script>
+    (function () {
+      var host = location.hostname;
+      var isLocal = (host === 'localhost' || host === '127.0.0.1');
+      try {
+        if (!isLocal) {
+          var usp = new URLSearchParams(location.search);
+          var touched = false;
+          ['appCheckDebug', 'firebaseAppCheckDebugToken'].forEach(function (k) {
+            if (usp.has(k)) { usp.delete(k); touched = true; }
+          });
+          if (touched) {
+            var clean = location.pathname + (usp.toString() ? '?' + usp.toString() : '') + location.hash;
+            history.replaceState(null, '', clean);
+          }
+        }
+      } catch (e) {}
+      try {
+        if (!isLocal) {
+          delete window.FIREBASE_APPCHECK_DEBUG_TOKEN;
+          window.FIREBASE_APPCHECK_DEBUG_TOKEN = undefined;
+          ['firebase:appCheckDebugToken', 'FIREBASE_APPCHECK_DEBUG_TOKEN'].forEach(function (k) {
+            try { localStorage.removeItem(k); } catch (e) {}
+            try { sessionStorage.removeItem(k); } catch (e) {}
+          });
+        }
+      } catch (e) {}
+    })();
+  </script>
+
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#ff2e87" />
+  <meta name="color-scheme" content="light dark" />
+
+  <meta name="application-name" content="강남톡방 관리자" />
+  <meta name="robots" content="noindex, nofollow" />
+
+  <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="/icons/favicon-16.png" />
+
+  <title>강남톡방 관리자</title>
+
+  <!-- 초기 테마 FOUC 방지 -->
+  <script>
+    (function () {
+      try {
+        var t = (localStorage.getItem('theme') || 'white').toLowerCase();
+        if (t !== 'black' && t !== 'white') t = 'white';
+        document.documentElement.setAttribute('data-theme', t);
+      } catch (e) {
+        document.documentElement.setAttribute('data-theme', 'white');
+      }
+    })();
+  </script>
+</head>
+<body>
+<div id="app"></div>
+
+<!-- 관리자 전용 엔트리 -->
+<script type="module" src="/src/main-admin.js"></script>
+</body>
+</html>

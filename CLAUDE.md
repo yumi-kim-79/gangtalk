@@ -12,11 +12,26 @@
 - **부가 도구**: GangTalkMacro (Python - 카카오톡 매크로)
 
 ## 빌드 & 배포
+
+### gangtox.com (회원, 기본 빌드)
 ```bash
 nvm use 20
-npm run build
-firebase deploy --only hosting
+npm run build                   # → dist/index.html
+firebase deploy --only hosting:prod
+# 또는: npm run deploy:hosting
 ```
+
+### gangtalk815.com (관리자 전용 빌드)
+```bash
+nvm use 20
+npm run build:admin             # VITE_BUILD_TARGET=admin → dist-admin/index.html
+firebase deploy --only hosting:admin
+# 또는: npm run deploy:admin (clean + build + deploy)
+```
+
+- `vite.config.js` 가 `VITE_BUILD_TARGET=admin` 일 때 `index-admin.html` 을 entry 로 사용하고
+  `closeBundle` 훅에서 `dist-admin/index-admin.html` → `index.html` 로 rename.
+- Firebase Hosting 멀티 사이트: `.firebaserc` 에 `prod=gangtalk-b8eb8`, `admin=gangtalk815` 두 타겟 정의.
 
 ## 공통 스타일 기준 (전사 통일)
 - **헤더 + 검색창은 `src/components/common/AppHeader.vue` 공통 컴포넌트 사용으로 단일화.**
@@ -61,16 +76,14 @@ firebase deploy --only hosting
 - [ ] 구글플레이 등록
 - [ ] 애플 앱스토어 등록
 
-**현재 단계**: 도메인 분리 2단계 완료 — `/admin/*` 임시 라우트 + 전용 페이지 6개 구축 (`gangtalk815@gmail.com` 만 접근). 향후 `gangtalk815.com` 으로 도메인 분리 시 그대로 이전 가능.
+**현재 단계**: 도메인 분리 3단계 완료 — `gangtalk815.com` 전용 빌드(`dist-admin/`) + Firebase Hosting 멀티 사이트 설정 완료. 이제 회원/관리자 두 호스팅 사이트에 별도 배포 가능.
 
 ---
 
 ## 다음 작업
-1. **도메인 분리 3단계** — gangtalk815.com 별도 호스팅 분리
-   - 별도 Vite entry 또는 모노레포 셋업 (admin 만 빌드)
-   - Firebase Hosting 사이트 2개 (gangtox / gangtalk815)
-   - Firestore Security Rules: `config/marketing`, `adminInbox`, `stores`(write) 는 admin 도메인 만 허용
-   - Storage Rules: `marketing/adBanners*` 는 admin 만 쓰기
+1. **Firebase Hosting 사이트 생성** — Firebase 콘솔에서 `gangtalk815` 호스팅 사이트 추가 후 도메인 연결 (`firebase hosting:sites:create gangtalk815` 또는 콘솔에서 직접)
+2. **Firestore Security Rules** — `config/marketing`, `adminInbox`, `stores`(write) 는 관리자 이메일만 허용하도록 강화
+3. **Storage Rules** — `marketing/adBanners*` 는 관리자 UID 만 쓰기 허용
 2. 관리자 페이지 보강 (필요 시)
    - 게시판 모더레이션 (board_posts 삭제/공지 고정) — `useMyPageCore` 에 함수 보존됨
    - 포인트 수동 지급 / 등급 수동 조정 UI
@@ -86,6 +99,42 @@ firebase deploy --only hosting
 ---
 
 ## 작업 로그
+
+### 2026-06-16: 도메인 분리 3단계 — gangtalk815.com 별도 빌드 + 멀티 호스팅 (`feat/admin-separate-build`)
+- **목적**: 같은 코드베이스에서 두 호스팅 사이트(회원 `dist/` + 관리자 `dist-admin/`)를 별도로 빌드·배포할 수 있게 인프라 구성
+- **`.firebaserc`**: `targets.gangtalk-b8eb8.hosting` 에 `admin: ["gangtalk815"]` 추가 (Firebase 콘솔에서 `gangtalk815` 호스팅 사이트 생성 필요)
+- **`firebase.json`**: hosting 배열에 admin 블록 추가
+  - `target: "admin"`, `public: "dist-admin"`
+  - `X-Robots-Tag: noindex, nofollow` 헤더 (검색엔진 크롤 차단)
+  - `**` rewrite → `/index.html` (SPA 라우팅)
+- **`vite.config.js`**:
+  - `IS_ADMIN_BUILD = process.env.VITE_BUILD_TARGET === 'admin'` 환경 분기
+  - `build.outDir` admin 시 `dist-admin`, `rollupOptions.input` admin 시 `index-admin.html`
+  - 신규 플러그인 `adminHtmlRenamePlugin` — `closeBundle` 훅에서 `dist-admin/index-admin.html` → `index.html` fs.rename (Firebase rewrite 가 `/index.html` 을 기대하므로)
+- **`package.json`**:
+  - `cross-env` devDependency 추가 (Windows 호환 환경변수)
+  - `build:admin` = `cross-env VITE_BUILD_TARGET=admin vite build --outDir dist-admin`
+  - `clean:admin` = `rimraf dist-admin`
+  - `deploy:admin` = clean + build + `firebase deploy --only hosting:admin`
+  - `deploy:hosting` 도 `hosting:prod` 명시
+- **신규 파일**:
+  - `index-admin.html` — 관리자 빌드용 HTML entry (`<title>강남톡방 관리자</title>`, `noindex` 메타, FCM/PWA 관련 메타 제거, `/src/main-admin.js` 로딩)
+  - `src/main-admin.js` — 관리자 Vue 앱 entry. Firebase 초기화 + 테마 + 관리자 자동등록(`admins/{uid}`) 유지, PWA SW 와 FCM 은 제거(관리자는 푸시 불필요), 잔존 SW 는 즉시 unregister
+  - `src/AdminApp.vue` — 최상위 셸 (`<RouterView />` + 전역 폰트/배경 스타일)
+  - `src/router/admin.js` — 관리자 전용 라우터
+    - `/` → `/admin/dashboard` 리다이렉트
+    - `/login` → `AdminLoginPage`
+    - `/admin/{dashboard,stores,top5,banners,news,inbox}` — `AdminLayout` 하위 children
+    - `beforeEach`: `onAuthStateChanged` 한 번 대기 후 이메일 검증, 비관리자/비로그인 → `/login?next=...`
+  - `src/pages/admin/AdminLoginPage.vue` — 관리자 전용 미니 로그인 (이메일/비밀번호, `signInWithEmailAndPassword`, `gangtalk815@gmail.com` 외 즉시 `signOut`)
+- **재사용**: `AdminLayout.vue` 와 6개 admin 페이지(`DashboardPage / StoresManagePage / Top5ManagePage / BannersManagePage / NewsManagePage / InboxPage`) 는 그대로 사용. `@/pages/admin/*` import 가 회원/관리자 빌드 양쪽에서 동일하게 동작
+- **빌드 결과**:
+  - `dist-admin/` 총 ~700KB (Firebase 청크 포함). 회원 빌드는 영향 없음 (`dist/` 변동 없음)
+  - 회원 빌드에는 `/admin/*` 라우트가 그대로 살아있어 같은 도메인에서 임시 운영도 가능 (2단계 호환성 유지)
+- **2단계와 관계**:
+  - 2단계: 같은 도메인에서 `/admin/*` 임시 운영 (router 가드만)
+  - 3단계: 별도 도메인용 빌드 셋업
+  - 둘 다 같은 페이지 컴포넌트를 공유하므로 추후 router/index.js 의 `/admin/*` 블록만 제거하면 회원 빌드에서 admin 코드를 완전히 분리할 수 있음 (현재는 import 만 늘어나는 정도라 유지)
 
 ### 2026-06-16: 도메인 분리 2단계 — 관리자 페이지 `/admin/*` 구축 (`feat/admin-pages`)
 - **목적**: 향후 `gangtalk815.com` 으로 분리할 관리자 사이트의 페이지 6종 + 공통 레이아웃을 같은 코드베이스 안에 임시 구축. 라우터 가드(`gangtalk815@gmail.com` 만 통과)로 일반 회원 접근 차단
