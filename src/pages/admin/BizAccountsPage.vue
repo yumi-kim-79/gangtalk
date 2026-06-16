@@ -12,6 +12,16 @@
       <p class="adm-page-sub">업체용 로그인 계정을 생성하고 가게에 연결합니다.</p>
     </header>
 
+    <!-- 권한/구독 오류 배너 -->
+    <div v-if="subscribeError" class="adm-error-banner">
+      <strong>⚠️ 업체 계정 목록을 불러올 수 없습니다.</strong>
+      <p>{{ subscribeError }}</p>
+      <p class="adm-error-hint">
+        firestore.rules 의 <code>/users/{uid}</code> 규칙에 <code>isAdmin()</code> 읽기 허용이
+        포함되어 있는지 확인하고 <code>firebase deploy --only firestore:rules</code> 로 배포해 주세요.
+      </p>
+    </div>
+
     <section class="adm-section">
       <header class="adm-section-head">
         <h3>업체 계정 ({{ accounts.length }}개)</h3>
@@ -157,6 +167,7 @@ const fnLinkStore = httpsCallable(fns, 'linkStoreToBiz')
 
 const accounts = ref([])
 const stores = ref([])
+const subscribeError = ref('')
 let unsubAccounts = null
 let unsubStores = null
 
@@ -168,8 +179,19 @@ onMounted(() => {
       where('accountKind', '==', 'storeOwner'),
       limit(500),
     ),
-    (snap) => { accounts.value = snap.docs.map(d => ({ id: d.id, ...d.data() })) },
-    (err) => { console.warn('[BizAccounts] users subscribe error:', err) },
+    (snap) => {
+      subscribeError.value = ''
+      accounts.value = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+    },
+    (err) => {
+      console.warn('[BizAccounts] users subscribe error:', err)
+      const code = String(err?.code || '')
+      if (code.includes('permission-denied')) {
+        subscribeError.value = '권한 부족: 관리자 계정으로 users 컬렉션을 list 할 수 없습니다 (Firestore rules).'
+      } else {
+        subscribeError.value = String(err?.message || err)
+      }
+    },
   )
   unsubStores = onSnapshot(
     query(collection(fbDb, 'stores'), limit(500)),
@@ -314,6 +336,19 @@ function fmtTime(v) {
 .adm-page-head{ margin-bottom:14px; }
 .adm-page-title{ margin:0; font-size:22px; font-weight:900; }
 .adm-page-sub{ margin:4px 0 0; font-size:13px; color:#888; }
+
+.adm-error-banner{
+  background:#fff5f5; border:1px solid #ffd0d0;
+  border-radius:10px; padding:12px 16px; margin-bottom:14px;
+  color:#c0392b; font-size:13px;
+}
+.adm-error-banner strong{ display:block; margin-bottom:4px; font-size:14px; }
+.adm-error-banner p{ margin:2px 0; font-size:12px; }
+.adm-error-banner .adm-error-hint{ color:#666; }
+.adm-error-banner code{
+  background:#fff; padding:1px 5px; border-radius:4px;
+  font-size:11px; color:#c0392b;
+}
 
 .adm-section{
   background:#fff; border:1px solid #f0f0f0; border-radius:14px;

@@ -101,6 +101,39 @@ firebase deploy --only hosting:admin
 
 ## 작업 로그
 
+### 2026-06-16: 업체 계정 생성 후 데이터 연동 문제 수정 (`fix/biz-account-data-sync`)
+- **증상**: BizAccountsPage 에서 "새 업체 계정 생성" 후 alert("업체 계정 생성 완료") 가 떴지만 목록에 새 계정이 나타나지 않음. Firebase Console 에서는 Auth 사용자와 users/{uid} 문서 정상 생성 확인됨 → 쓰기는 됐지만 읽기가 막힘
+- **근본 원인**: `firestore.rules:61-64` 의 users 규칙이 본인 소유자만 read 허용
+  ```
+  match /users/{uid} {
+    allow read, create, update, delete: if isOwner(uid);
+  }
+  ```
+  → 관리자(gangtalk815)도 다른 사용자 문서를 list/get 불가 → BizAccountsPage 의 `query(users where type='company' && accountKind='storeOwner')` onSnapshot 이 `permission-denied` 로 거부 → 콜백이 호출되지 않아 빈 목록 유지
+- **createBizAccount Cloud Function 자체는 정상**:
+  - Admin SDK 가 Firestore Rules 를 우회 — 쓰기 모두 성공
+  - `auth.createUser()` → 새 Auth 사용자 ✓
+  - `users/{uid}.set({type:'company', accountKind:'storeOwner', profile, company, createdBy:'admin', ...})` ✓
+  - storeId 있으면 `stores/{id}.set({ownerId, ownerEmail}, {merge:true})` ✓
+- **수정 1: `firestore.rules:60-67` — users 규칙 확장**:
+  ```
+  match /users/{uid} {
+    allow read: if isOwner(uid) || isAdmin();
+    allow create, update, delete: if isOwner(uid) || isAdmin();
+  }
+  ```
+  관리자는 모든 사용자 문서 read/write 가능, 일반 사용자는 본인 문서만 (기존 동작 유지)
+- **수정 2: `BizAccountsPage.vue` — 권한 오류 가시화**:
+  - `subscribeError` ref 추가 → onSnapshot 에러 콜백에서 `permission-denied` 감지 시 한국어 메시지로 변환
+  - 페이지 상단에 빨간 배너 (`adm-error-banner`) 로 표시 + `firestore.rules` 배포 가이드 안내
+  - 정상 콜백 시 `subscribeError` 자동 초기화
+  - 향후 비슷한 권한 문제 발생 시 즉시 시각적으로 진단 가능
+- **추가 검증 필요 (사용자)**: `gangtalk815@gmail.com` 의 `admins/{uid}` 문서가 Firestore 에 존재해야 `isAdmin()` 통과. 없다면 Firebase Console 에서 수동 생성하거나 `main.js` / `main-admin.js` 의 `ensureAdminProvision()` 이 한 번이라도 성공한 적 있어야 함
+- **배포 명령** (이 PR 머지 후 사용자가 직접 실행):
+  ```
+  firebase deploy --only firestore:rules,hosting:admin
+  ```
+
 ### 2026-06-16: functions/index.js 문법 오류 수정 (`fix/functions-syntax-error`)
 - **증상**: `firebase deploy --only functions` 실패. `node -e "require('./index.js')"` 실행 시 `SyntaxError: Identifier 'ADMIN_EMAIL' has already been declared`
 - **원인**: 이전 PR(`feat/biz-account-system`) 에서 업체 계정 콜러블 섹션을 추가하며 `const ADMIN_EMAIL = "gangtalk815@gmail.com";` (2340 라인) 을 새로 선언. 그러나 `ADMIN_EMAIL` 은 이미 파일 상단(683 라인)에 `const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || "gangtalk815@gmail.com").trim();` 로 선언돼 있어 const 중복 선언 → 전체 파일 파싱 실패

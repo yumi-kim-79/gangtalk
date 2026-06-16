@@ -58,9 +58,15 @@ service cloud.firestore {
     }
 
     /* ===== 사용자 ===== */
+    /*
+     * 관리자(admins/{uid}) 도 모든 사용자 문서를 read/write 가능해야 함.
+     *   - BizAccountsPage 에서 users where type='company' 쿼리
+     *   - 업체 계정 비활성화/이메일 변경 등 관리 작업
+     * 일반 사용자는 본인 문서만 접근 가능.
+     */
     match /users/{uid} {
-      allow read, create, update, delete: if isOwner(uid);
-      // 필요 시: allow update: if isOwner(uid) || isAdmin();
+      allow read: if isOwner(uid) || isAdmin();
+      allow create, update, delete: if isOwner(uid) || isAdmin();
     }
 
     /* ===== 가게(stores) ===== */
