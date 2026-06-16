@@ -39,7 +39,9 @@
           여성회원
         </button>
 
+        <!-- [1단계 gangtox.com 정리] 기업/관리자 탭 숨김 — 2단계 admin 도메인 신설 시 v-if="false" 만 제거 -->
         <button
+          v-if="false"
           class="tab"
           :class="{ active: who === 'biz' }"
           type="button"
@@ -49,6 +51,7 @@
         </button>
 
         <button
+          v-if="false"
           class="tab"
           :class="{ active: who === 'admin' }"
           type="button"
@@ -219,7 +222,8 @@
         </div>
 
         <!-- 기업회원 / 관리자회원(제휴관) 공통 업체 필드 -->
-        <template v-if="who === 'biz' || who === 'admin'">
+        <!-- [1단계 gangtox.com 정리] 업체명/사업자번호/주소 필드 숨김 (원조건: who === 'biz' || who === 'admin') -->
+        <template v-if="false && (who === 'biz' || who === 'admin')">
           <label>업체명</label>
           <div class="flex-row">
             <input
@@ -287,9 +291,14 @@ const route = useRoute()
 
 /* 모드/회원유형 */
 const action = ref(route.query.mode === 'signup' ? 'signup' : 'login')
+// [1단계 gangtox.com 정리] 여성회원 사이트에서는 항상 'user' 로 고정
+//   원본은 ?who=biz / ?who=admin 쿼리도 허용했음 — 2단계 admin 도메인 신설 시 복귀
+/*
 const who = ref(
   ['user', 'biz', 'admin'].includes(route.query.who) ? route.query.who : 'user'
 )
+*/
+const who = ref('user')
 
 /* 입력 필드 */
 const nick = ref('')
