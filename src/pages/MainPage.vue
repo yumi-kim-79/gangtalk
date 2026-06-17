@@ -1146,16 +1146,20 @@ function applyRoomsBiz(){
     const byAg = agg[String(s.name || '')] || null
 
     // ✅ 1) 맞출방 / 필요인원:
-    //    - rooms_biz 값이 있으면 그 값을 우선 사용
-    //    - rooms_biz 값이 없으면 기존 stores.match / stores.persons (또는 needRooms / needPeople) 를 폴백으로 사용
+    //    - rooms_biz 가 "실제 입력" 을 들고 있을 때만 그 값 사용 (_hasInput 신호)
+    //    - 입력 없는 빈 rooms_biz 문서 (예: 생성만 되고 내용 없음) 는 무시 → legacy 폴백
+    //    - 🔥 이전 버그: Number.isFinite(byRb?.rooms) 가 0 도 finite 로 인정해
+    //      빈 rooms_biz 문서의 rooms=0 이 stores.match 실값을 덮어써서
+    //      "10초 후 지표 0" 이 발생. _hasInput 으로 "진짜 0" vs "데이터 없음" 구분.
     const legacyMatch   = Number(s?.match ?? s?.needRooms ?? 0)
     const legacyPersons = Number(s?.persons ?? s?.needPeople ?? 0)
+    const rbActive      = !!byRb?._hasInput
 
-    const match = Number.isFinite(byRb?.rooms)
+    const match = rbActive && Number.isFinite(byRb?.rooms)
       ? Number(byRb.rooms)
       : (Number.isFinite(legacyMatch) ? legacyMatch : 0)
 
-    const persons = Number.isFinite(byRb?.people)
+    const persons = rbActive && Number.isFinite(byRb?.people)
       ? Number(byRb.people)
       : (Number.isFinite(legacyPersons) ? legacyPersons : 0)
 
@@ -1362,10 +1366,16 @@ function subscribeRoomsBiz(){
       bizToStore.value[bizId] = storeId
     })
 
-    const map = {}
+    // 🔄 [수정 2] 병렬 처리 — 이전엔 for-loop 안에서 await fetchLatestMessageText 가
+    //   각 doc 마다 최대 5번의 sequential Firestore read 를 돌려 ~10초 지연 발생.
+    //   각 doc 처리는 서로 독립적이므로 Promise.all 로 동시에 진행.
+    const cgFromScore = (n) => {
+      const v = Number(n)
+      if (!Number.isFinite(v)) return null
+      return v >= 2 ? '여유' : v >= 1 ? '보통' : '혼잡'
+    }
 
-    // 순차 처리(폴백 메시지 조회 포함)
-    for (const { id, x } of entries) {
+    const results = await Promise.all(entries.map(async ({ id, x }) => {
       // 1) 루트의 붙여넣기/배너/수동 텍스트
       let pastedText =
         String(x.lastPastedText || x.manualText || x.bannerText || '').trim()
@@ -1402,19 +1412,26 @@ function subscribeRoomsBiz(){
       rooms  = Math.max(0, Number(rooms  || 0))
       people = Math.max(0, Number(people || 0))
 
-      const cgFromScore = (n) => {
-        const v = Number(n)
-        if (!Number.isFinite(v)) return null
-        return v >= 2 ? '여유' : v >= 1 ? '보통' : '혼잡'
-      }
+      // ✨ [수정 1] "실제 활성 입력 여부" 플래그.
+      //   - pastedText 가 있었거나 (원본/메시지 폴백)
+      //   - needRooms 또는 needPeople 필드가 명시적으로 set 됐을 때 true
+      //   - 둘 다 없으면 false → applyRoomsBiz 가 legacy 폴백을 사용
+      //   "진짜 0" (admin 이 0/0 을 의도) 과 "데이터 없음" (rooms_biz 문서만
+      //   존재하고 내용 비어있음) 을 구분하기 위한 신호.
+      const hasInput = !!pastedText
+        || x.needRooms != null
+        || x.needPeople != null
 
-      map[id] = {
-        rooms    : Math.max(0, Number(rooms  || 0)),
-        people   : Math.max(0, Number(people || 0)),
+      return [id, {
+        rooms,
+        people,
         congestion: (x.congestion && String(x.congestion)) || cgFromScore(x.congestionScore) || null,
         updatedAt : x.updatedAt || x.lastUpdated || x.lastPastedAt || null,
-      }
-    }
+        _hasInput : hasInput,
+      }]
+    }))
+
+    const map = Object.fromEntries(results)
 
     roomsBiz.value = map
     applyRoomsBiz()

@@ -134,6 +134,37 @@ firebase deploy --only hosting:admin
 
 ## 작업 로그
 
+### 2026-06-17: 현황판 지표 10초 후 0 으로 바뀌는 버그 수정 (`fix/metrics-zero-overwrite`)
+- **증상**: gangtox.com/dashboard 진입 직후엔 맞춤방/필요인원이 실값으로 정상 표시되다가, 약 10초 후 0/0 으로 바뀜
+- **진단 결과 (직전 `docs/audit/2026-06-17-지표-덮어쓰기-진단.md`)**:
+  - 범인 1: `applyRoomsBiz:1149-1155` 의 `Number.isFinite(byRb?.rooms)` 가 **0 도 finite 로 인정** → 빈 `rooms_biz` 문서 (rooms=0/people=0) 가 `stores.match` 의 legacy 실값을 0 으로 덮어씀
+  - 범인 2: `subscribeRoomsBiz:1367-1417` 의 for-loop 가 **sequential `await fetchLatestMessageText`** 호출 → 각 doc 마다 최대 5번 Firestore read → 50개 doc × ~50ms × 5 = ~10초
+  - vendors 권한 에러는 0 버그와 무관 (직전 PR #69 에서 확정)
+- **수정 1: `applyRoomsBiz:1149-1166` — `_hasInput` 신호 도입**:
+  - "실제 활성 입력 여부" 플래그 `_hasInput` 추가 (`pastedText` 있었음 OR `needRooms`/`needPeople` 필드 명시적 set)
+  - `rbActive = !!byRb?._hasInput` 일 때만 `byRb.rooms` 사용, 아니면 legacy 폴백
+  - "진짜 0" (admin 이 0/0 의도) 과 "데이터 없음" (빈 rooms_biz doc) 을 명확히 구분
+  - match / persons 두 곳 모두 동일 패턴 적용
+- **수정 2: `subscribeRoomsBiz:1365-1422` — `Promise.all` 병렬화**:
+  - 기존 for-loop + `await` 를 `entries.map(async ...)` + `Promise.all` 로 교체
+  - 각 doc 처리는 독립 → 동시 진행 안전
+  - 가장 느린 doc 1 개 처리 시간이 전체 시간 (~250ms vs ~10s)
+  - `Object.fromEntries(results)` 로 map 재구성
+  - `cgFromScore` 헬퍼는 loop 밖으로 이동 (병렬 클로저 중복 방지)
+  - 같은 출력 형태 유지 (`map[id] = { rooms, people, congestion, updatedAt, _hasInput }`)
+- **흐름 (수정 후)**:
+  - **t=0**: stores 도착 → `applyRoomsBiz #1` → `byRb=null` → legacy 사용 → 실값 표시
+  - **t~250ms**: rooms_biz 병렬 처리 완료 → `applyRoomsBiz #2`
+    - 빈 doc 가 있는 stores → `byRb._hasInput=false` → `rbActive=false` → legacy 유지 → **실값 유지**
+    - 입력 있는 doc → `byRb._hasInput=true` → byRb.rooms 사용 → 정확한 값
+  - **t≫250ms**: 추가 변경 없으면 그대로 — 깜빡임 없음
+- **건드리지 않음 (사용자 지시)**:
+  - 순서/homeOrder 로직
+  - 관리자 저장 로직
+  - vendors / firestore.rules
+- **빌드 검증**: `npm run build` ✓ (index 213KB 유지)
+- **배포 범위**: `firebase deploy --only hosting:prod` 만 필요 (룰/Functions 변경 없음)
+
 ### 2026-06-17: 사용자 페이지 만성 권한 에러 제거 (`fix/firestore-perm-errors`)
 - **목표**: gangtox.com/dashboard 콘솔의 `Missing or insufficient permissions` 에러 3건 (`vendors`, `news:admin/news`, `news:dashboard/news`) 제거
 - **사전 사실 추적**:
