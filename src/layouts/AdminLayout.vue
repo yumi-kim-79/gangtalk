@@ -75,11 +75,7 @@
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter, RouterLink, RouterView } from 'vue-router'
 import { getAuth, onAuthStateChanged, signOut } from 'firebase/auth'
-import { db as fbDb } from '@/firebase'
-import { doc, getDoc } from 'firebase/firestore'
-import { invalidateRoleCache } from '@/router/admin.js'
-
-const PLATFORM_EMAIL = 'gangtalk815@gmail.com'
+import { getRole, invalidateRoleCache } from '@/composables/useAuthRole'
 
 const router = useRouter()
 const auth = getAuth()
@@ -89,25 +85,27 @@ const navOpen = ref(false)
 
 let unsubAuth = null
 
-async function resolveRole(user) {
-  if (!user) return null
-  const email = String(user.email || '').toLowerCase()
-  if (email === PLATFORM_EMAIL) return 'platform'
+async function refreshRole(user) {
+  // user 가 명시적으로 null 인 경우 (signOut) 만 role 비움.
+  // 토큰 갱신 race 로 일시 null 인 경우는 layout 이 unmount 되지 않으므로 무시.
+  if (!user) {
+    currentEmail.value = ''
+    role.value = null
+    return
+  }
+  currentEmail.value = String(user.email || '')
   try {
-    const snap = await getDoc(doc(fbDb, 'users', user.uid))
-    if (snap.exists()) {
-      const d = snap.data() || {}
-      if (d.type === 'company' && d.accountKind === 'storeOwner') return 'biz'
-    }
-  } catch (e) { console.warn('[AdminLayout] resolveRole', e) }
-  return null
+    const { role: r, resolved } = await getRole({ retries: 1 })
+    // resolved=false 일 때는 기존 role 유지 (메뉴가 사라지는 깜빡임 방지).
+    // 다음 navigation 또는 다음 onAuthStateChanged 콜백에서 다시 시도됨.
+    if (resolved) role.value = r
+  } catch (e) {
+    console.warn('[AdminLayout] refreshRole', e)
+  }
 }
 
 onMounted(() => {
-  unsubAuth = onAuthStateChanged(auth, async (u) => {
-    currentEmail.value = u?.email || ''
-    role.value = await resolveRole(u)
-  })
+  unsubAuth = onAuthStateChanged(auth, refreshRole)
   if (window.matchMedia('(min-width: 768px)').matches) navOpen.value = true
 })
 onBeforeUnmount(() => { if (unsubAuth) try { unsubAuth() } catch {} })
