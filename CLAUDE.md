@@ -93,7 +93,7 @@ firebase deploy --only hosting:admin
 5. ~~**`authFunctions.js` 삭제** (죽은 코드)~~ (2-3 의 잔재 제거) ✅
 
 ### Sprint 1 — 이번 주 (다음 작업)
-6. **`reserveReferralCode` 를 `index.js` 로 이전** + `runTransaction` + 추천코드 무중복 보장 (추-1, 2-3) — **이번 Sprint 0 에서 `authFunctions.js` 삭제됐으므로 클라이언트는 항상 폴백 `prefix + '00001'` 으로 빠지는 상태. 즉시 복구 필요**
+6. **`reserveReferralCode` 를 `index.js` 로 이전** + `runTransaction` + 추천코드 무중복 보장 (추-1, 2-3) — **`authFunctions.js` 삭제됐으므로 클라이언트는 항상 폴백 `prefix + '00001'` 으로 빠지는 상태. 즉시 복구 필요**
 7. **`stores` 빈 `ownerId` 점유 룰 제거** (`firestore.rules:83-84` 두 절 삭제) (1-3)
 8. **채팅 `messages` 룰 participants 멤버십 검증** + 기존 룸 doc 마이그레이션 (1-4)
 9. **[수동] GCP 콘솔에서 Maps/Firebase 공용 API 키에 HTTP 리퍼러 + API 제한** (1-5)
@@ -133,6 +133,33 @@ firebase deploy --only hosting:admin
 ---
 
 ## 작업 로그
+
+### 2026-06-17: 관리자 순서 저장 → 사용자 페이지 즉시 반영 수정 (`fix/admin-order-sync`)
+- **목적**: 관리자가 SortableJS 로 변경·저장한 순서가 사용자 페이지에 안 보이는 문제 수정
+- **진단 결과 (코드 직접 대조)**:
+  - **후보 #1 (near.enabled 거리순)**: ❌ 원인 아님. `near.value.enabled = true` 는 코드 어디서도 설정 안 함 (declared `false`, 토글 UI 미연결). 거리순 분기는 dead code 상태
+  - **후보 #2 (isActiveAd 만료 필터)**: ❌ 원인 아님. 만료 항목을 `baseFiltered` 단계에서 제외하지만, 남은 항목은 `homeOrder` 로 정상 정렬됨. 동작 정상
+  - **후보 #3 (StoresManage onSnapshot 덮어쓰기)**: ⚠️ 보조 위험. 로컬 편집 중 외부 write 가 발생하면 `homeOrder.value` 가 Firestore 값으로 강제 동기 → 드래그 결과 손실 가능
+  - **🔴 진짜 원인 (별도 발견)**: `src/views/StoreFinder.vue` 가 **`topRanks` / `listOrders` 를 Firestore 에서 읽지 않음**. `topRanks.value` 는 `ref({})` 로 시작해 admin 의 로컬 드래그로만 채워지고, 페이지 로드 시 항상 빈 상태 → `topFromRanks(catKey)` 가 빈 배열 반환 → `topByCat` (자동 정렬) 으로 폴백 → **admin 의 Top5 저장이 사용자 페이지에 절대 반영 안 됨** (admin 본인이 새로고침해도 본인 변경도 안 보임)
+- **수정 1: `src/views/StoreFinder.vue`** — `config/marketing` 실시간 구독 추가 (🔴 핵심 수정):
+  - `onMounted` 에서 `onSnapshot(doc(db, 'config', 'marketing'))` 등록
+  - 콜백에서 `data.topRanks` / `data.listOrders` 를 ref 에 반영
+  - `if (editMode.value) return` 가드 — 관리자 편집 중에는 로컬 드래그 상태를 덮어쓰지 않게 보호
+  - 권한/네트워크 에러는 무시 (rules 가 public read 라 통과 가능)
+  - `onUnmounted` 에서 cleanup
+- **수정 2: `src/pages/admin/StoresManagePage.vue`** — `homeOrderLoadedOnce` 가드 추가:
+  - Top5ManagePage 와 동일 패턴
+  - 첫 onSnapshot 만 ref 갱신, 이후 모든 외부 변경 무시 (저장 echo 도 무해)
+  - 로컬 드래그 보호 + 사이드 어드민 동시 편집 race 차단
+- **변경 없는 항목 (의도적)**:
+  - `MainPage.vue` 의 near 토글 분기: dead code 지만 동작에 영향 없음 → 보존 (향후 wire-up 가능성)
+  - `MainPage.vue` 의 `isActiveAd`: 사용자 요구대로 만료 필터 유지, 남은 항목은 homeOrder 적용 (이미 정상)
+  - Banners (`useMarketingBanners.js`): fixedDoc onSnapshot + priority 기반 소스 선택으로 이미 정상 동작
+- **데이터 흐름 (PR 설명용 1줄 요약)**:
+  - **Top5**: admin `Top5ManagePage` → `setDoc(config/marketing, { topRanks })` → 사용자 `StoreFinder` `onSnapshot(config/marketing)` → `topRanks.value` 갱신 → `topFromRanks(catKey)` 가 배열 인덱스 순서대로 store 반환
+  - **현황판**: admin `StoresManagePage` → `setDoc(config/marketing, { homeOrder })` → 사용자 `MainPage` `subHomeOrder` (이미 존재) → `filtered` computed 가 `homeOrder` 인덱스로 정렬
+  - **배너**: admin `BannersManagePage` → `setDoc(config/marketing/adBanners*/prod, { adBanners })` → 사용자 `useMarketingBanners` fixedDoc `onSnapshot` → 배열 인덱스 순서로 v-for
+- **빌드 검증**: `npm run build` ✓ / `npm run build:admin` ✓ (양쪽 모두 213KB 청크 유지)
 
 ### 2026-06-17: AuthPage 안 보이는 버튼 색상 수정 (`fix/authpage-invisible-buttons`)
 - **증상**: gangtox.com/auth 의 중복확인 / 인증번호 발송 / 인증확인 버튼이 화면에 안 보임. 비활성 탭도 옅어서 잘 안 보임. 결과: 사용자가 "인증번호 발송" 못 누름 → `smsVerified=false` → 회원가입 alert

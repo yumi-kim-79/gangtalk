@@ -179,6 +179,14 @@ const tab = ref(['expose','metrics','pending'].includes(route.query.tab) ? route
 
 const stores = ref([])
 const homeOrder = ref([])
+/**
+ * homeOrder 첫 로드 후 자체 편집 보호용 가드.
+ * - false 일 때: onSnapshot 콜백이 Firestore 의 homeOrder 로 ref 갱신
+ * - true 일 때:  Firestore 가 갱신되어도 로컬 편집을 덮어쓰지 않음
+ * Top5ManagePage 와 동일 패턴.
+ * (저장 후의 echo 도 무시되지만, 어차피 로컬 값과 동일하므로 무해)
+ */
+const homeOrderLoadedOnce = ref(false)
 
 let unsubStores = null
 let unsubMarketing = null
@@ -193,8 +201,10 @@ onMounted(() => {
   unsubMarketing = onSnapshot(
     doc(fbDb, 'config', 'marketing'),
     (snap) => {
+      if (homeOrderLoadedOnce.value) return  // 로컬 편집 보호
       const data = snap.exists() ? (snap.data() || {}) : {}
       homeOrder.value = Array.isArray(data.homeOrder) ? data.homeOrder.map(String) : []
+      homeOrderLoadedOnce.value = true
     },
   )
 })
