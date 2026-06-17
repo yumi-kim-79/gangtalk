@@ -1412,26 +1412,62 @@ function subscribeRoomsBiz(){
       rooms  = Math.max(0, Number(rooms  || 0))
       people = Math.max(0, Number(people || 0))
 
-      // ✨ [수정 1] "실제 활성 입력 여부" 플래그.
-      //   - pastedText 가 있었거나 (원본/메시지 폴백)
-      //   - needRooms 또는 needPeople 필드가 명시적으로 set 됐을 때 true
-      //   - 둘 다 없으면 false → applyRoomsBiz 가 legacy 폴백을 사용
-      //   "진짜 0" (admin 이 0/0 을 의도) 과 "데이터 없음" (rooms_biz 문서만
-      //   존재하고 내용 비어있음) 을 구분하기 위한 신호.
+      // ✨ [수정 2 — PR #71] "실제 활성 입력 여부" 플래그 강화.
+      //   PR #70 의 `x.needRooms != null` 은 0 도 true 로 만들어 ChatBiz 가 남긴
+      //   needRooms=0 레거시 doc 가 가드를 통과하던 문제 있었음.
+      //   - pastedText 가 있거나 (원본/메시지 폴백)
+      //   - needRooms 또는 needPeople 중 하나라도 양수(>0) 이면 true
+      //   - 전부 0 이고 pastedText 도 없으면 false → applyRoomsBiz 가 legacy 폴백.
+      //   관리자가 진짜로 0/0 을 의도한 가게는 stores doc 에도 0/0 이 저장돼 있어
+      //   legacy 폴백이 0/0 으로 표시 → 의도 유지.
       const hasInput = !!pastedText
-        || x.needRooms != null
-        || x.needPeople != null
+        || inputRooms  > 0
+        || inputPeople > 0
 
       return [id, {
         rooms,
         people,
         congestion: (x.congestion && String(x.congestion)) || cgFromScore(x.congestionScore) || null,
         updatedAt : x.updatedAt || x.lastUpdated || x.lastPastedAt || null,
-        _hasInput : hasInput,
+        _hasInput     : hasInput,
+        _hasPastedText: !!pastedText,
       }]
     }))
 
-    const map = Object.fromEntries(results)
+    // ✨ [수정 1 — PR #71] 중복 storeId 충돌 해소.
+    //   여러 rooms_biz 문서가 같은 storeId 로 매핑될 수 있음 (vendorKey 기반
+    //   레거시 doc + 신규 store.id 기반 admin doc 동시 존재). 이전엔
+    //   Object.fromEntries 가 단순 last-wins 라 빈 레거시가 정상 admin doc 를
+    //   덮어쓰는 사고 발생.
+    //   우선순위: pastedText 있음(3) > 양수 값(2) > 그 외(1).
+    //   동점이면 더 최근(updatedAt) 우선.
+    const tierOf = (v) => {
+      if (!v) return 0
+      if (v._hasPastedText) return 3
+      if ((Number(v.rooms) || 0) > 0 || (Number(v.people) || 0) > 0) return 2
+      return 1
+    }
+    const tsOf = (v) => {
+      const t = v?.updatedAt
+      if (!t) return 0
+      try {
+        if (typeof t.toMillis === 'function') return t.toMillis()
+        if (typeof t.seconds === 'number') return t.seconds * 1000
+        if (t instanceof Date) return t.getTime()
+        const n = Number(t)
+        return Number.isFinite(n) ? n : 0
+      } catch { return 0 }
+    }
+    const map = {}
+    for (const [id, v] of results) {
+      const prev = map[id]
+      if (!prev) { map[id] = v; continue }
+      const tNew = tierOf(v), tOld = tierOf(prev)
+      if (tNew > tOld) { map[id] = v; continue }
+      if (tNew < tOld) continue
+      // 동일 tier — 최근 우선
+      if (tsOf(v) >= tsOf(prev)) map[id] = v
+    }
 
     roomsBiz.value = map
     applyRoomsBiz()
