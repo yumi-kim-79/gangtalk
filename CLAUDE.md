@@ -134,6 +134,39 @@ firebase deploy --only hosting:admin
 
 ## 작업 로그
 
+### 2026-06-17: MainPage `watchWithLabel` 캐시 무시로 첫 진입 시 순서 미적용 수정 (`fix/order-read-field-mismatch`)
+- **사용자가 확인한 사실**: Firestore `config/marketing` 의 저장은 정상 (homeOrder 19개, topRanks/카테고리 OK, listOrders.all 다른 순서)
+- **읽기 쪽 조사**:
+  - `MainPage.vue:1616-1628` `subHomeOrder` 는 `watchWithLabel('config/marketing.homeOrder', ...)` 사용 → `homeOrder.value` 에 반영
+  - `filtered` computed `(:1745-1765)` 는 `homeOrder.value` 만 사용. `listOrders` 는 참조 안 함 → MainPage 와 무관 (StoreFinder 전용)
+  - `StoreFinder.vue` 의 `filtered` (`:1543-1557`) 는 `listOrders.value?.[key]` 사용. `key = currentListKey = type.value` (선택된 카테고리). PR #67 의 onSnapshot 으로 정상 반영 — 별도 수정 불필요
+  - `topRanks` 카테고리 키 매칭 검증: admin(`Top5ManagePage:107-116`) 과 사용자(`StoreFinder:701-716`) 모두 `hopper / point5 / ten / bar / kara / etc` 등 동일. ✓
+- **진짜 원인 — `watchWithLabel` 의 캐시 무시** (`MainPage.vue:1052-1072`):
+  ```js
+  if (meta.fromCache && !meta.hasPendingWrites) {
+    console.info(`[FS][${label}] skip cached snapshot`)
+    return    // ← 캐시 스냅샷을 화면에 반영 안 함
+  }
+  ```
+  - Firestore SDK 는 페이지 진입 시 **로컬 캐시 스냅샷 (fromCache=true)** 를 먼저 콜백으로 전달하고 곧이어 서버 fresh 스냅샷을 전달함
+  - 위 코드는 캐시 스냅샷을 무시 → 새로고침 직후 `homeOrder.value = []` 상태 유지
+  - `filtered` 의 `if (!homeOrder.value.length) return base` 분기로 빠져 **관리자 순서 미적용**
+  - 서버 fresh 가 도착하면 정렬 적용되지만, 네트워크 슬로우/실패 시 영원히 빈 상태
+  - **영향 범위**: MainPage 의 9개 onSnapshot 모두 — 뉴스 3 / stores list / rooms_biz / vendors / vendors status / homeOrder. 첫 진입 시 모두 빈 상태
+- **수정** (`MainPage.vue:1052-1067`):
+  - 캐시 무시 분기 제거. `next(snap)` 을 캐시/서버 양쪽 모두 호출
+  - 캐시 → 서버 순서로 두 번 호출되지만 같은 데이터면 무해, 다르면 서버 값이 덮어씀
+  - try/catch 로 안전망 추가 (개별 콜백 에러가 구독 자체 끊지 않게)
+- **변경 없는 항목**:
+  - 관리자 저장 로직 (사용자 지시: "이미 정상이니 건드리지 마")
+  - `listOrders` (StoreFinder 의 하단 전체 목록 순서, 살아있는 필드)
+  - StoreFinder 의 직접 onSnapshot (`:1469`, PR #67) — watchWithLabel 안 거치므로 영향 없음
+- **데이터 흐름 매핑 (관리자 저장 → 사용자 읽기)**:
+  - 현황판: `config/marketing.homeOrder` → `MainPage.subHomeOrder` → `homeOrder.value` → `filtered` computed → `v-for filtered.slice(0,20)`
+  - Top5: `config/marketing.topRanks` → `StoreFinder` PR #67 onSnapshot → `topRanks.value` → `topFromRanks(catKey)` → `topLists` computed
+  - StoreFinder 하단 전체: `config/marketing.listOrders[catKey]` → 동일 onSnapshot → `listOrders.value` → `filtered` computed
+- **빌드 검증**: `npm run build` ✓ (index 213KB 유지)
+
 ### 2026-06-17: 관리자 순서 저장 → 사용자 페이지 즉시 반영 수정 (`fix/admin-order-sync`)
 - **목적**: 관리자가 SortableJS 로 변경·저장한 순서가 사용자 페이지에 안 보이는 문제 수정
 - **진단 결과 (코드 직접 대조)**:
