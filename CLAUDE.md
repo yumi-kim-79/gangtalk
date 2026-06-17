@@ -134,6 +134,39 @@ firebase deploy --only hosting:admin
 
 ## 작업 로그
 
+### 2026-06-18: 지표 불일치 잔존 3건 수정 — batch + name 충돌 차단 + manualSaved 우선 (`fix/metrics-mismatch-residual`)
+- **목적**: 진단(`docs/audit/2026-06-18-지표불일치-업체구조-진단.md`) 의 PR #71 후 잔존 3가지 해결
+- **수정 1 — 저장 부분 실패 차단 (writeBatch 원자성)**:
+  - `StoresManagePage.vue:447-512 saveAllMetrics`:
+    - 이전: 가게마다 `await updateDoc(stores)` → `await setDoc(rooms_biz)` 순차 호출 → 한쪽 실패 시 데이터 분리
+    - 이후: 250 가게씩 청크 → `writeBatch` 로 두 컬렉션 동시 commit. 부분 실패 불가 (모두 성공 or 모두 실패)
+    - chunk 실패 시 그 청크의 가게 이름을 `errors[]` 에 모아 alert 처음 3건 표시
+  - `BizMetricsPage.vue:282-326 onSave`: 1 가게 batch — 동일 원자성 적용
+- **수정 2 — 동명 가게 name 매칭 충돌 차단**:
+  - `MainPage.vue:451-475 rebuildStoreIndexes`:
+    - 이전: `byName.set(nm, id)` last-wins (동명 둘 중 하나만 매핑됨)
+    - 이후: `_AMBIGUOUS = '__AMBIGUOUS__'` 마커 도입. 같은 normName 에 다른 id 가 두 번째 들어오면 marker 로 교체
+  - `MainPage.vue:1349-1377 subscribeRoomsBiz`:
+    - 매칭 우선순위 재정렬: ① `x.storeId` (가장 신뢰) → ② `bizId === stores.id` 직접 매칭 → ③ name 매칭 (단 `_AMBIGUOUS` 면 매칭 안 함) → ④ vendorKey 매칭 (동일) → ⑤ `bizId` 폴백
+    - 동명 충돌 시 `_AMBIGUOUS` 마커가 잡혀 매핑 안 함 → legacy(stores) 폴백 → **잘못된 매핑으로 다른 가게 지표 표시 차단**
+- **수정 3 — manualSaved 플래그로 자동파싱 덮어쓰기 차단**:
+  - `StoresManagePage` / `BizMetricsPage` 의 batch 가 rooms_biz 에 `manualSaved: true, manualSavedAt: serverTimestamp()` 추가 저장
+  - `MainPage.vue:1398-1465 subscribeRoomsBiz`:
+    - `manualSaved=true` 인 doc 은 pastedText 파싱 단계 **완전 건너뜀** → `needRooms/needPeople` 직접 사용
+    - ChatBiz 자동 갱신이 manualSaved 플래그를 함께 건드리지 않는 이상 수동저장이 유지됨
+    - `updatedAt` 도 `manualSavedAt` 을 우선 사용 (tier 동점 시 가장 최근 자동 갱신보다 수동저장이 위로)
+  - tier 머지 확장: **`manualSaved(4)` > `pastedText(3)` > 양수(2) > 빈(1)**
+  - 결과 객체에 `_manualSaved` 플래그 추가
+- **건드리지 않음**:
+  - 순서/homeOrder 로직, 로그인/라우팅, firestore.rules
+  - 지표 경로만 수정
+- **수정 후 데이터 흐름**:
+  - **관리자/업체 저장**: writeBatch → stores + rooms_biz 동시 commit (실패 불가). `manualSaved=true` 플래그 함께 저장
+  - **사용자 화면**: rooms_biz 구독 → 동명 가게면 매핑 차단 → `manualSaved=true` 면 자동파싱 무시 + tier=4 최우선 → applyRoomsBiz 가 byRb.rooms/people 표시
+  - **결과**: 관리자/업체가 입력한 값이 사용자 화면에 100% 표시 (ChatBiz/시트 자동파싱이 덮어쓰지 못함)
+- **빌드 검증**: `npm run build` ✓ (회원 index 214KB) / `npm run build:admin` ✓ (admin 빌드 정상)
+- **배포 범위**: `firebase deploy --only hosting:prod,hosting:admin` (룰/Functions 변경 없음)
+
 ### 2026-06-18: gangtalk815 통합 로그인 + 역할 분기 race 차단 (`fix/biz-admin-login-routing`)
 - **목적**: 진단(`docs/audit/2026-06-18-업체로그인-라우팅-진단.md`) 의 두 가지 핵심 문제 해결
   1. 업체 로그인 시 "관리자 계정이 아닙니다" / "업체 계정이 아닙니다" 가 잘못 노출되는 경우

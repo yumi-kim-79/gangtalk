@@ -448,8 +448,11 @@ function _normName(s){
     .replace(/[.\s]/g, '')                // 점/공백 제거 (레.이.블 → 레이블)
     .replace(/[\u200B-\u200D\uFEFF]/g, '') // zero-width 제거
 }
-const _storeIdByName   = ref(new Map()) // normName -> storeId
-const _storeIdByVendor = ref(new Map()) // vendorKey(lower) -> storeId
+// 동명 가게 충돌 마커. byName.get(nm) === _AMBIGUOUS 면 매핑하지 않음
+// (잘못된 매핑으로 다른 가게의 지표가 표시되는 것보다, 매핑 안 하고 legacy 폴백이 안전).
+const _AMBIGUOUS = '__AMBIGUOUS__'
+const _storeIdByName   = ref(new Map()) // normName -> storeId | _AMBIGUOUS
+const _storeIdByVendor = ref(new Map()) // vendorKey(lower) -> storeId | _AMBIGUOUS
 function rebuildStoreIndexes(){
   const byName = new Map()
   const byVendor = new Map()
@@ -457,8 +460,17 @@ function rebuildStoreIndexes(){
     const id = String(s.id || '')
     const nm = _normName(s.name || '')
     const vk = String(s.vendorKey || '').toLowerCase()
-    if (id && nm) byName.set(nm, id)
-    if (id && vk) byVendor.set(vk, id)
+    if (id && nm) {
+      const prev = byName.get(nm)
+      // 같은 id 의 중복 등록은 무해. 다른 id 가 같은 이름으로 들어오면 ambiguous.
+      if (prev && prev !== _AMBIGUOUS && prev !== id) byName.set(nm, _AMBIGUOUS)
+      else if (!prev) byName.set(nm, id)
+    }
+    if (id && vk) {
+      const prev = byVendor.get(vk)
+      if (prev && prev !== _AMBIGUOUS && prev !== id) byVendor.set(vk, _AMBIGUOUS)
+      else if (!prev) byVendor.set(vk, id)
+    }
   }
   _storeIdByName.value = byName
   _storeIdByVendor.value = byVendor
@@ -1342,23 +1354,31 @@ function subscribeRoomsBiz(){
       const bizId = String(d.id || '')
       if (!bizId) return
 
-      // 1) rooms_biz.storeId
+      // 1) rooms_biz.storeId (관리자/업체 수동 저장 시 stores.id 로 명시됨 — 가장 신뢰)
       let storeId = String(x.storeId || '')
 
-      // 2) 이름 기반(rooms_biz.name 또는 bizId 자체를 이름으로 간주)
+      // 2) bizId 가 stores 컬렉션의 doc.id 와 일치하면 그대로 사용
+      //    (saveAllMetrics / BizMetrics.onSave 가 `rooms_biz/{store.id}` 패턴으로 저장)
+      if (!storeId || !_hasStoreId(storeId)) {
+        if (_hasStoreId(bizId)) storeId = bizId
+      }
+
+      // 3) 이름 기반 폴백 — 동명 충돌 시(_AMBIGUOUS) 매핑하지 않음
+      //    잘못된 매핑이 다른 가게 지표를 표시하는 것보다, 매핑 안 하고
+      //    legacy(stores) 폴백이 안전. 단일 매핑일 때만 채택.
       if (!storeId || !_hasStoreId(storeId)) {
         const guessName = _normName(x.name || bizId)
         const byName = _storeIdByName.value.get(guessName)
-        if (byName) storeId = String(byName)
+        if (byName && byName !== _AMBIGUOUS) storeId = String(byName)
       }
 
-      // 3) vendorKey 기반(bizId == vendorKey 라는 전제)
+      // 4) vendorKey 기반 — 동명 충돌과 동일하게 단일 매핑일 때만 채택
       if (!storeId || !_hasStoreId(storeId)) {
         const byVendor = _storeIdByVendor.value.get(bizId.toLowerCase())
-        if (byVendor) storeId = String(byVendor)
+        if (byVendor && byVendor !== _AMBIGUOUS) storeId = String(byVendor)
       }
 
-      // 4차: 마지막 폴백
+      // 5) 어디에도 매칭 안 됨 → bizId 자체를 폴백 (응답성 보장)
       if (!storeId) storeId = bizId
 
       // 메인 합성용 입력
@@ -1376,51 +1396,57 @@ function subscribeRoomsBiz(){
     }
 
     const results = await Promise.all(entries.map(async ({ id, x }) => {
-      // 1) 루트의 붙여넣기/배너/수동 텍스트
-      let pastedText =
-        String(x.lastPastedText || x.manualText || x.bannerText || '').trim()
-
-      // 2) 없으면 최근 메시지 텍스트 1건 가져오기
-      if (!pastedText) {
-        try {
-          const bizId = Object.keys(bizToStore.value).find(k => bizToStore.value[k] === id) || id
-          pastedText = (await fetchLatestMessageText(bizId)).trim()
-        } catch {}
-      }
-
-      // 3) 파싱 + 폴백(needRooms/needPeople 우선 반영)
+      // 입력 후보
       const inputRooms  = Number(x.needRooms  ?? 0)
       const inputPeople = Number(x.needPeople ?? 0)
+      const manualSaved = x.manualSaved === true
 
+      // ✨ [수정 3] 관리자/업체 수동저장(manualSaved=true) 은 자동파싱(pastedText)보다 우선.
+      //    saveAllMetrics / BizMetrics.onSave 에서 manualSaved=true 가 함께 저장됨.
+      //    이 경우 pastedText 파싱 단계를 건너뛰고 needRooms/needPeople 직접 사용.
+      //    ChatBiz 자동 갱신이 manualSaved 플래그를 함께 쓰지 않는 이상 수동저장이 유지됨.
       let rooms = 0, people = 0
+      let pastedText = ''
+      if (manualSaved) {
+        rooms  = Math.max(0, inputRooms)
+        people = Math.max(0, inputPeople)
+      } else {
+        // 1) 루트의 붙여넣기/배너/수동 텍스트
+        pastedText =
+          String(x.lastPastedText || x.manualText || x.bannerText || '').trim()
 
-      // (A) 붙여넣기 원문이 있으면 먼저 파싱
-      if (pastedText) {
-        const parsed = parseNeedFromLastPastedText(pastedText)
-        rooms  = Number(parsed.rooms  ?? 0)
-        people = Number(parsed.people ?? 0)
+        // 2) 없으면 최근 메시지 텍스트 1건 가져오기
+        if (!pastedText) {
+          try {
+            const bizId = Object.keys(bizToStore.value).find(k => bizToStore.value[k] === id) || id
+            pastedText = (await fetchLatestMessageText(bizId)).trim()
+          } catch {}
+        }
+
+        // (A) 붙여넣기 원문이 있으면 먼저 파싱
+        if (pastedText) {
+          const parsed = parseNeedFromLastPastedText(pastedText)
+          rooms  = Number(parsed.rooms  ?? 0)
+          people = Number(parsed.people ?? 0)
+        }
+
+        // (B) 파싱이 0/0이거나 원문이 "줄바꿈 없는 한 줄"이면 시트/수동값을 우선 채택
+        const isOneLine = pastedText && !/\n/.test(pastedText)
+        if ((rooms === 0 && people === 0) || isOneLine) {
+          rooms  = Math.max(rooms,  inputRooms)
+          people = Math.max(people, inputPeople)
+        }
+
+        // (C) 마지막 안전망
+        rooms  = Math.max(0, Number(rooms  || 0))
+        people = Math.max(0, Number(people || 0))
       }
-
-      // (B) 파싱이 0/0이거나 원문이 "줄바꿈 없는 한 줄"이면 시트/수동값을 우선 채택
-      const isOneLine = pastedText && !/\n/.test(pastedText)
-      if ((rooms === 0 && people === 0) || isOneLine) {
-        rooms  = Math.max(rooms,  inputRooms)
-        people = Math.max(people, inputPeople)
-      }
-
-      // (C) 마지막 안전망
-      rooms  = Math.max(0, Number(rooms  || 0))
-      people = Math.max(0, Number(people || 0))
 
       // ✨ [수정 2 — PR #71] "실제 활성 입력 여부" 플래그 강화.
-      //   PR #70 의 `x.needRooms != null` 은 0 도 true 로 만들어 ChatBiz 가 남긴
-      //   needRooms=0 레거시 doc 가 가드를 통과하던 문제 있었음.
-      //   - pastedText 가 있거나 (원본/메시지 폴백)
-      //   - needRooms 또는 needPeople 중 하나라도 양수(>0) 이면 true
-      //   - 전부 0 이고 pastedText 도 없으면 false → applyRoomsBiz 가 legacy 폴백.
-      //   관리자가 진짜로 0/0 을 의도한 가게는 stores doc 에도 0/0 이 저장돼 있어
-      //   legacy 폴백이 0/0 으로 표시 → 의도 유지.
-      const hasInput = !!pastedText
+      //   - manualSaved 면 무조건 true (관리자/업체가 명시적으로 저장한 의도)
+      //   - 그 외엔 pastedText 또는 양수일 때만 true
+      const hasInput = manualSaved
+        || !!pastedText
         || inputRooms  > 0
         || inputPeople > 0
 
@@ -1428,9 +1454,10 @@ function subscribeRoomsBiz(){
         rooms,
         people,
         congestion: (x.congestion && String(x.congestion)) || cgFromScore(x.congestionScore) || null,
-        updatedAt : x.updatedAt || x.lastUpdated || x.lastPastedAt || null,
+        updatedAt : x.manualSavedAt || x.updatedAt || x.lastUpdated || x.lastPastedAt || null,
         _hasInput     : hasInput,
         _hasPastedText: !!pastedText,
+        _manualSaved  : manualSaved,
       }]
     }))
 
@@ -1441,8 +1468,10 @@ function subscribeRoomsBiz(){
     //   덮어쓰는 사고 발생.
     //   우선순위: pastedText 있음(3) > 양수 값(2) > 그 외(1).
     //   동점이면 더 최근(updatedAt) 우선.
+    // tier: manualSaved(4) > pastedText(3) > 양수(2) > 빈(1)
     const tierOf = (v) => {
       if (!v) return 0
+      if (v._manualSaved) return 4
       if (v._hasPastedText) return 3
       if ((Number(v.rooms) || 0) > 0 || (Number(v.people) || 0) > 0) return 2
       return 1

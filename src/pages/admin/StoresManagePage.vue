@@ -171,7 +171,7 @@ import { useRoute } from 'vue-router'
 import { db as fbDb } from '@/firebase'
 import {
   collection, doc, onSnapshot, setDoc, updateDoc, getDoc,
-  query, limit, serverTimestamp,
+  writeBatch, query, limit, serverTimestamp,
 } from 'firebase/firestore'
 
 const route = useRoute()
@@ -450,43 +450,60 @@ async function saveAllMetrics(){
   let okCount = 0, failCount = 0
   const errors = []
   try {
-    for (const s of exposedStores.value) {
-      const e = metricEdits.value[s.id]
-      if (!e) continue
-      const match      = Number(e.match || 0)
-      const persons    = Number(e.persons || 0)
-      const totalRooms = Number(e.totalRooms || 0)
-      const maxPersons = Number(e.maxPersons || 0)
-      const statusMode = String(e.statusMode || 'auto')
-      const status     = statusMode === 'manual'
-        ? String(e.status || '좋음')
-        : autoStatusOf(match, totalRooms)
+    // 가게당 (stores + rooms_biz) 2 writes 를 writeBatch 로 묶어 원자성 보장.
+    // - 한쪽만 성공하고 다른쪽 실패하는 부분 실패 불가 → 사용자 화면에서 두 컬렉션이 어긋남 차단.
+    // - Firestore batch 한도 = 500 writes / commit. 250 가게 마다 chunk.
+    const items = exposedStores.value
+      .map(s => ({ s, e: metricEdits.value[s.id] }))
+      .filter(({ e }) => !!e)
 
-      try {
-        // stores 업데이트 (현황판 표시용)
-        await updateDoc(doc(fbDb, 'stores', s.id), {
+    const CHUNK = 250
+    for (let i = 0; i < items.length; i += CHUNK) {
+      const slice = items.slice(i, i + CHUNK)
+      const batch = writeBatch(fbDb)
+      for (const { s, e } of slice) {
+        const match      = Number(e.match || 0)
+        const persons    = Number(e.persons || 0)
+        const totalRooms = Number(e.totalRooms || 0)
+        const maxPersons = Number(e.maxPersons || 0)
+        const statusMode = String(e.statusMode || 'auto')
+        const status     = statusMode === 'manual'
+          ? String(e.status || '좋음')
+          : autoStatusOf(match, totalRooms)
+        const now = serverTimestamp()
+
+        batch.update(doc(fbDb, 'stores', s.id), {
           match, persons, totalRooms, maxPersons,
           statusMode, status,
-          updatedAt: serverTimestamp(),
+          updatedAt: now,
         })
-        // rooms_biz 미러 (ChatBiz 와 동일 키 — store.id)
-        await setDoc(doc(fbDb, 'rooms_biz', s.id), {
+        // rooms_biz 미러. manualSaved=true + manualSavedAt 로 자동파싱(ChatBiz/pastedText)
+        // 보다 우선임을 명시 → applyRoomsBiz 의 tier 머지에서 가장 높은 우선순위.
+        batch.set(doc(fbDb, 'rooms_biz', s.id), {
           needRooms: match,
           needPeople: persons,
           need: persons,
           totalNeeded: persons,
           totalRooms,
-          updatedAt: serverTimestamp(),
+          manualSaved: true,
+          manualSavedAt: now,
+          updatedAt: now,
         }, { merge: true })
-        okCount++
+      }
+      try {
+        await batch.commit()
+        okCount += slice.length
       } catch (err) {
-        console.warn('metric save fail', s.id, err)
-        errors.push(`${s.name || s.id}: ${err?.code || err?.message || err}`)
-        failCount++
+        console.warn('metric batch commit fail', i, err)
+        for (const { s } of slice) {
+          errors.push(`${s.name || s.id}: ${err?.code || err?.message || err}`)
+        }
+        failCount += slice.length
       }
     }
+
     if (failCount > 0) {
-      alert(`저장 완료: 성공 ${okCount} / 실패 ${failCount}\n\n실패 사유:\n${errors.slice(0,3).join('\n')}`)
+      alert(`저장 완료: 성공 ${okCount} / 실패 ${failCount}\n\n실패 사유 (처음 3건):\n${errors.slice(0,3).join('\n')}`)
     } else {
       alert(`저장 완료: ${okCount}건`)
     }

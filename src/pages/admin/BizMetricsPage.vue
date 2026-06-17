@@ -139,7 +139,7 @@ import { getAuth, onAuthStateChanged } from 'firebase/auth'
 import { db as fbDb } from '@/firebase'
 import {
   collection, doc, onSnapshot, setDoc, updateDoc,
-  query, where, serverTimestamp,
+  writeBatch, query, where, serverTimestamp,
 } from 'firebase/firestore'
 
 const route = useRoute()
@@ -277,7 +277,7 @@ function statusBadgeClass(label){
   return ''
 }
 
-/* ===== 저장 — stores + rooms_biz 양쪽 동기 ===== */
+/* ===== 저장 — stores + rooms_biz 양쪽 동기 (원자성 보장) ===== */
 const saving = ref(false)
 async function onSave() {
   const s = currentStore.value
@@ -292,21 +292,27 @@ async function onSave() {
     const status     = statusMode === 'manual'
       ? String(form.value.status || '좋음')
       : autoStatusOf(match, totalRooms)
+    const now = serverTimestamp()
 
-    await updateDoc(doc(fbDb, 'stores', s.id), {
+    // writeBatch 로 두 write 를 함께 commit. 부분 실패 불가.
+    // manualSaved=true 로 자동파싱(ChatBiz/pastedText)보다 우선임을 명시.
+    const batch = writeBatch(fbDb)
+    batch.update(doc(fbDb, 'stores', s.id), {
       match, persons, totalRooms,
       statusMode, status,
-      updatedAt: serverTimestamp(),
+      updatedAt: now,
     })
-
-    await setDoc(doc(fbDb, 'rooms_biz', s.id), {
+    batch.set(doc(fbDb, 'rooms_biz', s.id), {
       needRooms: match,
       needPeople: persons,
       need: persons,
       totalNeeded: persons,
       totalRooms,
-      updatedAt: serverTimestamp(),
+      manualSaved: true,
+      manualSavedAt: now,
+      updatedAt: now,
     }, { merge: true })
+    await batch.commit()
 
     alert('저장되었습니다.')
   } catch (e) {
