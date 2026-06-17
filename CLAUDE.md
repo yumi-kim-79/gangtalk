@@ -134,6 +134,49 @@ firebase deploy --only hosting:admin
 
 ## 작업 로그
 
+### 2026-06-18: stores 보안 룰 정비 + Storage 룰 신설 (`fix/stores-storage-rules`)
+- **목적**: 업체 자가 입력 기능 (PR-C 예정) 켜기 전 보안 사전 정비. 보고서 1-3 / Sprint 1 #7 처리
+- **수정 1 — `firestore.rules` stores 룰 (line 73-86)**:
+  - **"빈 ownerId 점유" 두 절 제거** (이전 ③ `!('ownerId' in resource.data)` + ④ `resource.data.ownerId == null` 점유 룰)
+  - `update` 와 `delete` 를 분리. delete 는 본인 또는 isAdmin
+  - update 는 ① isAdmin (제한 없음) ② 본인 ownerId 인 경우만, **단 ownerId / ownerEmail 변경 금지** (양도 차단). ownerEmail 가 기존에 없는 옛 데이터는 새로 채우는 것 허용 (호환)
+  - create 는 이전 그대로 `ownerId == auth.uid` 강제 → 본인 uid 로만 가게 등록 가능
+- **수정 2 — `storage.rules` 신설**:
+  - `firestore.exists` cross-service 함수로 `admins/{uid}`, `stores/{storeId}.ownerId` 검증
+  - 경로별 룰:
+    - `stores/{storeId}/{**}`: read public / write 는 isStoreOwner 또는 isAdmin (이미지 확인 + 10MB 캡)
+    - `marketing/{**}`: read public / write 는 isAdmin only (배너 / partnerCards)
+    - `board_images/{uid}/{**}`: 작성자 본인 또는 isAdmin
+    - `partnerRequests/{uid}/{**}`: 본인 또는 isAdmin
+    - `profiles/{uid}/{**}`: 본인 또는 isAdmin
+    - 그 외 (`/{**}`): read public / write isAdmin only — 알 수 없는 경로 임의 업로드 차단
+  - 공통 helper: `signedIn`, `isAdmin`, `isStoreOwner`, `isImage`, `sizeOk` (10MB)
+- **수정 3 — `firebase.json` 에 storage 섹션 추가**: `{ "storage": { "rules": "storage.rules" } }`
+- **검증 결과**:
+  - JSON syntax: `firebase.json` 정상 (node JSON.parse)
+  - 룰 syntax: `firebase deploy --only firestore:rules,storage --dry-run` 는 권한 부족으로 API enable 단계에서 거부 — syntax 자체는 직접 검토 완료 (모든 block / 함수 / 변수 참조 표준)
+- **건드리지 않음**:
+  - 기능 코드 (Vue 컴포넌트) — 룰만
+  - users / config / rooms_biz / connectRequests / partnerRequests / board_posts / chats / admins 룰 — 손대지 않음
+  - 회원 / 관리자 빌드 / Functions — 손대지 않음
+- **변경 전후 권한 매트릭스** (stores):
+  | 주체 | 이전 read | 이후 read | 이전 create | 이후 create | 이전 update | 이후 update | 이전 delete | 이후 delete |
+  |---|---|---|---|---|---|---|---|---|
+  | 관리자 | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+  | 본인 (ownerId 일치) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ (단 ownerId 변경 금지) | ✓ | ✓ |
+  | 타인 + 빈 ownerId | ✓ | ✓ | ✗ | ✗ | **✓ (구멍)** | **✗** | ✗ | ✗ |
+  | 비인증 | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
+- **변경 전후 권한 매트릭스** (Storage `stores/{id}/*`):
+  | 주체 | 이전 read | 이후 read | 이전 write | 이후 write |
+  |---|---|---|---|---|
+  | 관리자 | (Console 기본) | ✓ | (Console 기본) | ✓ |
+  | 본인 (ownerId 일치) | (Console 기본) | ✓ | (Console 기본) | ✓ |
+  | 타인 인증 사용자 | (Console 기본) | ✓ | **(Console 기본 = ✓)** | **✗** |
+  | 비인증 | (Console 기본) | ✓ | (Console 기본) | ✗ |
+- **배포 범위**: `firebase deploy --only firestore:rules,storage`
+  - **hosting / functions 변경 없음**
+  - storage 룰은 첫 배포 시 사용자가 Firebase Storage Cross-Service Rules API 활성화 안내 받을 수 있음 — 콘솔에서 확인 후 진행
+
 ### 2026-06-18: 지표 불일치 잔존 3건 수정 — batch + name 충돌 차단 + manualSaved 우선 (`fix/metrics-mismatch-residual`)
 - **목적**: 진단(`docs/audit/2026-06-18-지표불일치-업체구조-진단.md`) 의 PR #71 후 잔존 3가지 해결
 - **수정 1 — 저장 부분 실패 차단 (writeBatch 원자성)**:
