@@ -134,6 +134,20 @@ firebase deploy --only hosting:admin
 
 ## 작업 로그
 
+### 2026-06-17: AuthPage 안 보이는 버튼 색상 수정 (`fix/authpage-invisible-buttons`)
+- **증상**: gangtox.com/auth 의 중복확인 / 인증번호 발송 / 인증확인 버튼이 화면에 안 보임. 비활성 탭도 옅어서 잘 안 보임. 결과: 사용자가 "인증번호 발송" 못 누름 → `smsVerified=false` → 회원가입 alert
+- **원인 (직전 진단 문서 참조)**: `src/styles/theme.css:8-13` 라이트 모드에서 `--bg: #ffffff == --surface: #ffffff` 동일. `.btn.sm` 이 `background: var(--surface)` + 색상 미지정 + `border: 1px solid var(--line)` (`#eaeaea`) → 흰 배경에 흰 버튼 + 옅은 보더
+- **수정** (`src/pages/AuthPage.vue` 의 unscoped `<style>` 블록만):
+  - `.btn.sm` 기본 룰에서 색상 변수 제거 → 테마별 룰로 분리
+  - `html[data-theme='white'] .auth-page .btn.sm`: 흰 배경 + **1.5px 진한 핑크 보더 `#ff2c8a`** + 핑크 텍스트 + `font-weight:800`
+  - 호버/포커스: `#ff2c8a` 채움 + 흰 텍스트 + 0.12s transition
+  - disabled: 회색 (`#f4f4f6` / `#a0a0aa`)
+  - `html[data-theme='black|dark']`: `--surface` 배경 + `#ff4da3` 보더 + `#ff86b9` 텍스트, 호버 시 핑크 채움
+  - 비활성 탭 텍스트 `#ff6aa8` (옅은 핑크) → `#ff2c8a` (진한 핑크) + 보더 강화
+- **스코프**: 모든 룰이 `.auth-page` 안으로 한정 — 다른 화면 버튼 영향 없음
+- **다른 화면 영향 없음 확인**: `.btn.sm` 은 일반 CSS 클래스라 다른 곳에 쓰일 수 있지만, 본 PR 의 모든 룰이 `.auth-page` 셀렉터로 시작 → 스코프 안전
+- **빌드 검증**: `npm run build` ✓ (index 청크 213→213KB)
+
 ### 2026-06-17: Sprint 0 — SMS 시크릿 Secret Manager 전환 + 남용 방지 (`feature/sprint0-sms-secret-hardening`)
 - **목적**: 외부 점검 보고서 1-1 (시크릿 노출) + 1-2 (sendSmsCode 남용) Sprint 0 처리
 - **시크릿 git 추적 제거**:

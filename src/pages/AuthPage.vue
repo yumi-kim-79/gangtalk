@@ -806,13 +806,14 @@ html[data-theme='black'] .auth-page .btn.primary.xl[disabled] {
   line-height: 1.2;
 }
 
-/* 인풋 옆 작은 버튼 (닉네임/이메일 중복확인, 인증번호 발송 등) */
+/* 인풋 옆 작은 버튼 (닉네임/이메일 중복확인, 인증번호 발송 등)
+   레이아웃 베이스 — 색상은 아래 테마별 룰에서 명시
+   ⚠️ 라이트 모드에서 --bg / --surface 가 모두 #ffffff 라
+   기본 색만 var(--surface) 로 두면 흰 배경에 흰 버튼이 돼서 안 보임. */
 .auth-page .btn.sm {
   height: 40px !important;
-  padding: 0 12px !important;
+  padding: 0 14px !important;
   border-radius: 12px !important;
-  border: 1px solid var(--line) !important;
-  background: var(--surface) !important;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -820,5 +821,54 @@ html[data-theme='black'] .auth-page .btn.primary.xl[disabled] {
 
   white-space: nowrap;
   font-size: clamp(11px, 3.2vw, 13px);
+  font-weight: 800;
+  cursor: pointer;
+  transition: background .12s ease, color .12s ease, border-color .12s ease;
+}
+
+/* ── 라이트 모드: 흰 배경 + 진한 핑크 보더/글자 (outline 스타일) */
+html[data-theme='white'] .auth-page .btn.sm {
+  background: #ffffff !important;
+  border: 1.5px solid #ff2c8a !important;
+  color: #ff2c8a !important;
+}
+html[data-theme='white'] .auth-page .btn.sm:hover:not([disabled]),
+html[data-theme='white'] .auth-page .btn.sm:focus-visible:not([disabled]) {
+  background: #ff2c8a !important;
+  color: #ffffff !important;
+}
+html[data-theme='white'] .auth-page .btn.sm[disabled],
+html[data-theme='white'] .auth-page .btn.sm:disabled {
+  background: #f4f4f6 !important;
+  border-color: #e0e0e6 !important;
+  color: #a0a0aa !important;
+  cursor: not-allowed !important;
+}
+
+/* ── 다크 모드: 표면 위에 핑크 보더/글자, 호버 시 채움 */
+html[data-theme='black'] .auth-page .btn.sm,
+html[data-theme='dark']  .auth-page .btn.sm {
+  background: var(--surface, #15161a) !important;
+  border: 1.5px solid #ff4da3 !important;
+  color: #ff86b9 !important;
+}
+html[data-theme='black'] .auth-page .btn.sm:hover:not([disabled]),
+html[data-theme='dark']  .auth-page .btn.sm:hover:not([disabled]) {
+  background: #ff2c8a !important;
+  color: #ffffff !important;
+}
+html[data-theme='black'] .auth-page .btn.sm[disabled],
+html[data-theme='dark']  .auth-page .btn.sm[disabled],
+html[data-theme='black'] .auth-page .btn.sm:disabled,
+html[data-theme='dark']  .auth-page .btn.sm:disabled {
+  opacity: 0.5 !important;
+  cursor: not-allowed !important;
+}
+
+/* ── 비활성 탭 색상 강화 (기존 #ff6aa8 옅은 핑크 → #ff2c8a 진한 핑크 텍스트) */
+html[data-theme='white'] .auth-page .tabs .tab:not(.active) {
+  color: #ff2c8a !important;
+  border: 1.5px solid #ffc0d8 !important;
+  background: #ffffff !important;
 }
 </style>
