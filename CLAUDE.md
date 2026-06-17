@@ -101,6 +101,34 @@ firebase deploy --only hosting:admin
 
 ## 작업 로그
 
+### 2026-06-17: 강톡 게시판 테이블형으로 변경 (퀸알바 스타일) (`feat/gangtalk-board-table-style`)
+- **목적**: 카테고리 시트의 카드형 게시글 목록 → 데스크탑 전통 게시판 테이블형 (퀸알바 스타일). 한 페이지 20개 + 번호형 페이지네이션
+- **마크업 변경** (`src/pages/GangTalkPage.vue`):
+  - `.cat-sheet` 내 `<ul class="v2-post-list">` (카드 stack) → `.board-toolbar` + `<table class="board-table">` + `.pagination`
+  - 컬럼 7개: 번호 / 분류 / 제목 / 작성자 / 날짜 / 추천 / 조회
+  - **공지 행** (`notice-row`): 핑크 배경 (`#fff5f7`) + `notice-badge` (핑크 pill), `noticePosts` 컴퓨티드 그대로 활용 (filter 별 공지 분리)
+  - **일반 행** (`post-row`): zebra striping (짝수 행 `#fafafa`) + hover `#fff9fb`
+  - 제목 컬럼 부가: 📷 이미지 아이콘, N 새글 뱃지, `[댓글수]` 표시
+  - 직전 1단계 정리로 숨겨진 admin 수정/삭제 버튼은 코드와 함께 제거 (테이블 행에는 노출 안 함)
+- **페이지네이션 (신규)**:
+  - `BOARD_PAGE_SIZE = 20` 상수 + `currentPage` ref
+  - `totalCount` / `totalPages` / `pagedPosts` / `pageNumbers` 컴퓨티드 (현재 페이지 ±2 범위 최대 5개)
+  - `goPage(n) / prevPage() / nextPage()` — 마지막 페이지에서 '다음' 클릭 + `hasMorePosts` 있으면 `loadMorePosts()` 자동 호출 후 이동
+  - `watch(catPage.value.filter)` + `watch(catPage.value.open)` → 카테고리 전환/시트 진입 시 `currentPage = 1` 리셋
+  - 페이지 이동 시 `nextTick` 으로 `.cat-sheet` 스크롤 상단 리셋
+- **Firestore 초기 페치 확장**: `POSTS_PER_PAGE` 10 → 20 (UI 1페이지와 매칭, 단발 페치로 1페이지 표시)
+- **CSS (신규)**:
+  - 흰색 배경 + 굵은 상단 border (`border-top:2px solid #333`) + 헤더 회색 `#f8f8f8`
+  - `.cat-tag` 핑크 외곽선 태그, `.post-title` hover 핑크
+  - 페이지네이션 36px 정사각 버튼, active 핑크 배경
+  - **다크모드 분기**: `:root[data-theme='dark']` 추가 (배경 `#1c1c1c`, 행 zebra `#202020`)
+- **모바일 ≤768px 카드 fallback**:
+  - `thead` 숨김, 각 행이 `display:block` + 흰 카드 박스
+  - 제목 윗줄, 메타(분류/작성자/날짜/조회/추천) `inline-block` + `::before` 컨텐츠 (· / 👁 / ❤️)
+  - 공지 행은 카드 형태에서도 핑크 배경 유지
+- **헬링톡 페이지는 변경 없음** — 동일 패턴이지만 사용자 요구는 `.cat-sheet` 만
+- **빌드 검증**: `npm run build` ✓ (index 청크 210→213KB, 게시판 테이블 마크업/CSS 반영)
+
 ### 2026-06-17: 뉴스/한줄 관리 SortableJS 드래그 (`feat/news-sortable`)
 - **목적**: 4 페이지(Stores/Top5/Banners) 만 SortableJS 적용돼 있고 NewsManagePage 만 "위로/아래로" 버튼 + 화살표 UI 였음. 일관성 확보
 - **수정** (`src/pages/admin/NewsManagePage.vue`):
