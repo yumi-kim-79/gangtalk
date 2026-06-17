@@ -101,6 +101,20 @@ firebase deploy --only hosting:admin
 
 ## 작업 로그
 
+### 2026-06-17: 뉴스/한줄 관리 SortableJS 드래그 (`feat/news-sortable`)
+- **목적**: 4 페이지(Stores/Top5/Banners) 만 SortableJS 적용돼 있고 NewsManagePage 만 "위로/아래로" 버튼 + 화살표 UI 였음. 일관성 확보
+- **수정** (`src/pages/admin/NewsManagePage.vue`):
+  - `<ul ref="newsListRef">` + 각 `<li>` 좌측에 `<span class="adm-drag-handle">☰</span>`
+  - `import Sortable from 'sortablejs'`
+  - `initSortable` + `watch(newsListRef)` — Top5/Banners/Stores 와 동일 패턴 (`onEnd` 에서 SortableJS DOM 되돌리고 `reorderNews` 호출, Vue 가 reactive 재렌더)
+  - `onBeforeUnmount` 에서 `sortableInst.destroy()` 추가
+- **마크업 정리**:
+  - 기존 `move(i, dir)` 함수는 `reorderNews(from, to)` 로 리네임 (Sortable 과 공유)
+  - 위로/아래로 버튼 제거 (SortableJS 가 PC/모바일 모두 지원)
+  - 행 레이아웃 세로 stack → 가로 flex (드래그 핸들이 좌측에 보이도록), 모바일 768px 이하는 `flex-wrap` 으로 fields 와 actions 가 줄바꿈
+- **사용 안내 추가**: "드래그(☰) 핸들을 잡고 위/아래로 순서를 변경한 뒤 저장하세요" hint 추가
+- **빌드 검증**: `npm run build:admin` ✓ (sortable.esm 청크 재사용, 크기 변동 없음)
+
 ### 2026-06-17: 관리자 SortableJS 드래그 + 모바일/PC 반응형 (`feat/admin-sortable-responsive`)
 - **드래그 SortableJS 교체** (3 페이지) — 이전 PR의 HTML5 native drag(`@drop` 핸들러 + 모바일 fallback ▲▼) 가 작동은 했지만 모바일에서 long-press 가 어색하고 PC 에서도 데스크탑 브라우저별 호환성 이슈가 있었음. **`sortablejs ^1.15.7`** 도입으로 PC/모바일 한 번에 해결
   - `StoresManagePage.vue` Tab 1: `Sortable.create(storeListRef, { handle: '.adm-drag-handle', animation: 150, ghostClass: 'adm-drag-ghost', onEnd })`
