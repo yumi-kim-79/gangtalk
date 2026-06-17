@@ -1452,6 +1452,31 @@ function onDrop(){} function onDragEnd(){ drag.value = { cat:'', index:-1, id:''
 
 /* ───────────────────────── 하단 목록 순서 편집 ───────────────────────── */
 const listOrders = ref({})
+
+/* ───────────────────────── config/marketing 실시간 구독 ─────────────────────────
+ * 관리자가 /admin/top5 에서 저장한 topRanks 와 listOrders 를 사용자 페이지에 반영.
+ * editMode 일 때는 로컬 드래그 상태를 덮어쓰지 않게 가드.
+ * (배너 ad* 는 useMarketingBanners 가 별도로 처리)
+ */
+let _marketingUnsub = null
+onMounted(() => {
+  _marketingUnsub = onSnapshot(
+    doc(db, 'config', 'marketing'),
+    (snap) => {
+      if (editMode.value) return  // 관리자 편집 중에는 로컬 우선
+      const data = snap.exists() ? (snap.data() || {}) : {}
+      if (data.topRanks && typeof data.topRanks === 'object') {
+        topRanks.value = { ...data.topRanks }
+      }
+      if (data.listOrders && typeof data.listOrders === 'object') {
+        listOrders.value = { ...data.listOrders }
+      }
+    },
+    () => { /* 권한/네트워크 에러 무시 — 자동 폴백 */ },
+  )
+})
+onUnmounted(() => { if (_marketingUnsub) { _marketingUnsub(); _marketingUnsub = null } })
+
 const EDITABLE_LIMIT = 50
 const currentListKey = computed(()=> type.value)
 function baseFiltered(){
