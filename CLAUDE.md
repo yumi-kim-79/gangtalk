@@ -134,6 +134,30 @@ firebase deploy --only hosting:admin
 
 ## 작업 로그
 
+### 2026-06-17: rooms_biz 중복 문서 머지 버그 수정 — PR #70 누락 2경로 차단 (`fix/rooms-biz-duplicate-merge`)
+- **증상 (PR #70 배포 후에도 재발)**: 현황판 지표가 실값으로 잠깐 보였다가 즉시 0/0 으로 덮어써짐
+- **진단 결과 (`docs/audit/2026-06-17-지표0-재발진단.md`)** — PR #70 이 못 막은 두 경로:
+  - **경로 A (`_hasInput` 0 통과)**: PR #70 의 가드 `x.needRooms != null || x.needPeople != null` 는 **0 도 not-null 이라 통과** → 빈 문서가 `_hasInput=true` 로 들어가 legacy 덮어씀
+  - **경로 B (중복 storeId last-wins)**: PR #70 의 `Object.fromEntries(results)` 는 같은 storeId 로 매핑되는 문서가 2개 이상이면 **마지막 entry 가 이전을 덮어씀** → 빈 레거시 doc 이 정상 admin doc 보다 늦게 와서 덮어쓰면 0
+- **수정 1: `MainPage.vue:1421-1423` — `_hasInput` 을 "양수 신호" 로 재정의**:
+  - 이전: `x.needRooms != null || x.needPeople != null` (0 도 true)
+  - 이후: `!!pastedText || inputRooms > 0 || inputPeople > 0` (양수 또는 pastedText 만)
+  - `_hasPastedText: !!pastedText` 플래그를 결과에 함께 실어 머지 우선순위에 활용
+  - 결과: 전부 0 + pastedText 없는 빈 문서는 `_hasInput=false` → legacy 폴백 → 빈 doc 가 실값 못 덮음
+- **수정 2: `MainPage.vue:1378-1430` — 중복 storeId 우선순위 머지**:
+  - 이전: `Object.fromEntries(results)` (last-wins)
+  - 이후: tier 기반 머지 — `tierOf(v)`: pastedText 있음 = 3 / rooms·people 양수 = 2 / 그 외 = 1. 동점이면 `tsOf(v)` (updatedAt → millis) 더 큰 쪽 우선
+  - for-loop 로 prev vs new 비교, 더 의미 있는 문서만 채택
+- **건드리지 않음 (사용자 지시)**:
+  - 관리자 저장 로직, 순서/homeOrder, vendors / firestore.rules
+  - 관리자가 진짜로 0/0 저장한 가게는 legacy 폴백으로 0/0 유지 (admin 의 `saveAllMetrics` 가 stores 에도 0 을 동시 write 하므로 정상 동작)
+- **흐름 (수정 후)**:
+  - **t=0**: stores → legacy 값 표시
+  - **t~250ms**: rooms_biz 도착 → 중복 storeId 시 tier 가장 높은 (pastedText > 양수 > 빈) 문서 채택 → `_hasInput` 양수만 true → 실값 유지
+  - **t≫250ms**: 변경 없음, 깜빡임 없음
+- **빌드 검증**: `npm run build` ✓ (index 213KB 유지)
+- **배포 범위**: `firebase deploy --only hosting:prod` 만 필요 (룰/Functions 변경 없음)
+
 ### 2026-06-17: 현황판 지표 10초 후 0 으로 바뀌는 버그 수정 (`fix/metrics-zero-overwrite`)
 - **증상**: gangtox.com/dashboard 진입 직후엔 맞춤방/필요인원이 실값으로 정상 표시되다가, 약 10초 후 0/0 으로 바뀜
 - **진단 결과 (직전 `docs/audit/2026-06-17-지표-덮어쓰기-진단.md`)**:
