@@ -217,49 +217,96 @@
           </button>
         </div>
 
-        <!-- 공지 카드 -->
-        <div v-if="recentNotice" class="v2-notice" @click="openDetail(recentNotice)">
-          <span class="v2-notice-pin">📌</span>
-          <div class="v2-notice-body">
-            <div class="v2-notice-title ellip">{{ recentNotice.title }}</div>
-            <div class="v2-notice-meta">{{ authorName(recentNotice) }} · {{ timeAgo(recentNotice.updatedAt || recentNotice.createdAt) }}</div>
+        <!-- ===== 게시판 테이블 (퀸알바 스타일) ===== -->
+        <div class="board-toolbar">
+          <div class="board-toolbar-info">
+            총 <strong>{{ totalCount }}</strong>건 · {{ currentPage }} / {{ totalPages }} 페이지
           </div>
-          <!-- [1단계 gangtox.com 정리] 관리자 공지 수정/삭제 버튼 숨김 (원조건: isAdmin) -->
-          <template v-if="false && isAdmin">
-            <div class="v2-notice-admin" @click.stop>
-              <button class="btn-mini" type="button" @click="startNoticeEdit(recentNotice)">수정</button>
-              <button class="btn-mini danger" type="button" @click="deleteNotice(recentNotice)">삭제</button>
-            </div>
-          </template>
+          <button class="board-write-btn" type="button" @click="openCreate">
+            ✏️ 글쓰기
+          </button>
         </div>
 
-        <!-- 게시글 카드 리스트 -->
-        <ul class="v2-post-list">
-          <li v-for="p in catPosts" :key="p.id" class="v2-post-card" @click="openDetail(p)">
-            <div class="v2-pc-main">
-              <div class="v2-pc-top">
-                <span class="v2-cat-badge">{{ catIcon(p.category) }} {{ catLabelFor(p.category) }}</span>
-                <span class="v2-pc-nick">{{ authorName(p) }}</span>
-                <span v-if="isNewPost(p)" class="v2-badge-new">N</span>
-              </div>
-              <div class="v2-pc-title ellip">{{ p.title }}</div>
-              <div v-if="shouldShowSnippet(p)" class="v2-pc-snippet ellip">{{ firstLine(p) }}</div>
-              <div class="v2-pc-footer">
-                <span>{{ ymd(p.updatedAt || p.createdAt) }}</span>
-                <span>👁 {{ Number(p.views||0).toLocaleString() }}</span>
-                <span>❤️ {{ Number(p.likes||0).toLocaleString() }}</span>
-                <span>💬 {{ Number(p.cmtCount||0).toLocaleString() }}</span>
-              </div>
-              <!-- [1단계 gangtox.com 정리] 관리자 게시글 수정/삭제 버튼 숨김 (원조건: isAdmin) -->
-              <div class="v2-pc-admin" v-if="false && isAdmin" @click.stop>
-                <button class="btn-mini" type="button" @click="startEdit(p)">수정</button>
-                <button class="btn-mini danger" type="button" @click="deletePost(p)">삭제</button>
-              </div>
-            </div>
-            <img v-if="p.images && p.images.length" :src="p.images[0]" class="v2-pc-thumb" alt="" loading="lazy" />
-          </li>
-          <li v-if="!catPosts.length" class="v2-empty">아직 등록된 글이 없습니다.</li>
-        </ul>
+        <div class="board-wrap">
+          <table class="board-table">
+            <thead>
+              <tr>
+                <th class="col-num">번호</th>
+                <th class="col-cat">분류</th>
+                <th class="col-title">제목</th>
+                <th class="col-author">작성자</th>
+                <th class="col-date">날짜</th>
+                <th class="col-rec">추천</th>
+                <th class="col-view">조회</th>
+              </tr>
+            </thead>
+            <tbody>
+              <!-- 공지 행 (상단 고정, 핑크 배경) -->
+              <tr
+                v-for="n in noticePosts"
+                :key="'notice-'+n.id"
+                class="notice-row"
+                @click="openDetail(n)"
+              >
+                <td class="col-num" data-label="번호"><span class="notice-badge">공지</span></td>
+                <td class="col-cat" data-label="분류">-</td>
+                <td class="col-title" data-label="제목">
+                  <span class="post-title">{{ n.title }}</span>
+                  <span v-if="n.images && n.images.length" class="img-icon" aria-label="이미지 첨부">📷</span>
+                  <span class="cmt-count" v-if="Number(n.cmtCount||0) > 0">[{{ n.cmtCount }}]</span>
+                </td>
+                <td class="col-author" data-label="작성자">{{ authorName(n) }}</td>
+                <td class="col-date" data-label="날짜">{{ ymd(n.updatedAt || n.createdAt) }}</td>
+                <td class="col-rec" data-label="추천">{{ Number(n.likes||0).toLocaleString() }}</td>
+                <td class="col-view" data-label="조회">{{ Number(n.views||0).toLocaleString() }}</td>
+              </tr>
+
+              <!-- 일반 글 행 -->
+              <tr
+                v-for="(p, i) in pagedPosts"
+                :key="p.id"
+                class="post-row"
+                @click="openDetail(p)"
+              >
+                <td class="col-num" data-label="번호">{{ totalCount - ((currentPage-1)*BOARD_PAGE_SIZE + i) }}</td>
+                <td class="col-cat" data-label="분류">
+                  <span class="cat-tag">{{ catLabelFor(p.category) }}</span>
+                </td>
+                <td class="col-title" data-label="제목">
+                  <span class="post-title">{{ p.title }}</span>
+                  <span v-if="p.images && p.images.length" class="img-icon" aria-label="이미지 첨부">📷</span>
+                  <span v-if="isNewPost(p)" class="new-badge">N</span>
+                  <span class="cmt-count" v-if="Number(p.cmtCount||0) > 0">[{{ p.cmtCount }}]</span>
+                </td>
+                <td class="col-author" data-label="작성자">{{ authorName(p) }}</td>
+                <td class="col-date" data-label="날짜">{{ ymd(p.updatedAt || p.createdAt) }}</td>
+                <td class="col-rec" data-label="추천">{{ Number(p.likes||0).toLocaleString() }}</td>
+                <td class="col-view" data-label="조회">{{ Number(p.views||0).toLocaleString() }}</td>
+              </tr>
+
+              <tr v-if="!pagedPosts.length && !noticePosts.length" class="empty-row-wrap">
+                <td colspan="7" class="empty-row">아직 등록된 글이 없습니다.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- 번호형 페이지네이션 -->
+        <nav class="pagination" v-if="totalPages > 1 || hasMorePosts" aria-label="페이지 이동">
+          <button type="button" @click="prevPage" :disabled="currentPage === 1">이전</button>
+          <button
+            v-for="n in pageNumbers"
+            :key="n"
+            type="button"
+            :class="{ active: n === currentPage }"
+            @click="goPage(n)"
+          >{{ n }}</button>
+          <button
+            type="button"
+            @click="nextPage"
+            :disabled="currentPage === totalPages && !hasMorePosts"
+          >{{ loadingMore ? '불러오는 중…' : '다음' }}</button>
+        </nav>
       </section>
     </div>
 
@@ -805,7 +852,7 @@ const newsPosts = computed(() => {
   })
 })
 
-const POSTS_PER_PAGE = 10
+const POSTS_PER_PAGE = 20
 const hasMorePosts = ref(true)
 const loadingMore = ref(false)
 let lastPostDoc = null
@@ -1881,6 +1928,56 @@ const catPosts = computed(() => {
   )
   return list.slice().sort((a,b)=> (b.updatedAt || 0) - (a.updatedAt || 0))
 })
+
+/* ===== 강톡 게시판 테이블 페이지네이션 (퀸알바 스타일) =====
+ * 한 페이지 20개. 마지막 페이지에서 '다음' 클릭 시 hasMorePosts 가 있으면
+ * loadMorePosts 자동 호출.
+ */
+const BOARD_PAGE_SIZE = 20
+const currentPage = ref(1)
+const totalCount = computed(() => catPosts.value.length)
+const totalPages = computed(() => Math.max(1, Math.ceil(totalCount.value / BOARD_PAGE_SIZE)))
+const pagedPosts = computed(() => {
+  const start = (currentPage.value - 1) * BOARD_PAGE_SIZE
+  return catPosts.value.slice(start, start + BOARD_PAGE_SIZE)
+})
+const pageNumbers = computed(() => {
+  const total = totalPages.value
+  const cur = currentPage.value
+  const max = Math.min(5, total)
+  let start = Math.max(1, cur - 2)
+  let end = Math.min(total, start + max - 1)
+  if (end - start < max - 1) start = Math.max(1, end - max + 1)
+  const out = []
+  for (let i = start; i <= end; i++) out.push(i)
+  return out
+})
+function goPage(n) {
+  currentPage.value = Math.max(1, Math.min(totalPages.value, Number(n)))
+  // 페이지 변경 시 시트 상단으로 스크롤
+  nextTick(() => {
+    const sheet = document.querySelector('.cat-sheet')
+    if (sheet) sheet.scrollTop = 0
+  })
+}
+function prevPage() {
+  if (currentPage.value > 1) goPage(currentPage.value - 1)
+}
+async function nextPage() {
+  if (currentPage.value < totalPages.value) {
+    goPage(currentPage.value + 1)
+    return
+  }
+  // 마지막 페이지 — 더 불러올 게 있으면 fetch 후 페이지 이동
+  if (hasMorePosts.value && !loadingMore.value) {
+    const before = totalPages.value
+    await loadMorePosts()
+    if (totalPages.value > before) goPage(currentPage.value + 1)
+  }
+}
+// 카테고리 필터 전환 시 1페이지로 리셋
+watch(() => catPage.value.filter, () => { currentPage.value = 1 })
+watch(() => catPage.value.open, (open) => { if (open) currentPage.value = 1 })
 
 // ⬇️ 파일 상단에 전역 핸들러
 let listTicker = null
@@ -3493,6 +3590,191 @@ const FALLBACK_BIZ_IMG = 'https://images.unsplash.com/photo-1517248135467-4c7edc
 }
 .v2-pc-admin{ margin-top:6px; display:flex; gap:6px; }
 .v2-empty{ padding:40px 0; text-align:center; color:var(--muted); font-size:13px; }
+
+/* =========================================================
+   강톡 게시판 테이블 (퀸알바 스타일)
+========================================================= */
+.board-toolbar{
+  display:flex; align-items:center; justify-content:space-between;
+  padding:12px 16px 8px;
+  gap:10px;
+}
+.board-toolbar-info{
+  font-size:12px; color:#666;
+}
+.board-toolbar-info strong{ color:#ff4d8d; font-weight:800; }
+.board-write-btn{
+  height:36px; padding:0 16px;
+  background:linear-gradient(135deg,#ff4d8d,#ff2e7e); color:#fff;
+  border:none; border-radius:8px;
+  font-size:13px; font-weight:800;
+  cursor:pointer;
+  box-shadow:0 2px 8px rgba(255,77,141,.25);
+}
+.board-write-btn:active{ transform:translateY(1px); }
+
+.board-wrap{
+  overflow-x:auto;
+  padding:0 16px;
+  -webkit-overflow-scrolling:touch;
+}
+.board-table{
+  width:100%;
+  border-collapse:collapse;
+  font-size:14px;
+  background:#fff;
+}
+.board-table thead th{
+  background:#f8f8f8;
+  border-top:2px solid #333;
+  border-bottom:1px solid #ddd;
+  padding:10px 8px;
+  text-align:center;
+  font-weight:bold;
+  font-size:13px;
+  color:#333;
+  white-space:nowrap;
+}
+.board-table tbody tr{
+  border-bottom:1px solid #eee;
+  cursor:pointer;
+  transition:background .12s;
+}
+.board-table tbody tr:hover{ background:#fff9fb; }
+.board-table tbody tr.post-row:nth-child(even){ background:#fafafa; }
+.board-table tbody tr.post-row:nth-child(even):hover{ background:#fff5f8; }
+
+/* 공지 행 */
+.notice-row{
+  background:#fff5f7 !important;
+}
+.notice-row:hover{ background:#ffeaf0 !important; }
+.notice-badge{
+  display:inline-block;
+  background:#ff4d8d; color:#fff;
+  padding:2px 8px; border-radius:4px;
+  font-size:11px; font-weight:800;
+}
+
+/* 컬럼 */
+.board-table td{
+  padding:10px 8px; text-align:center; vertical-align:middle;
+}
+.col-num{ width:60px; color:#999; font-size:12px; }
+.col-cat{ width:80px; }
+.col-title{ width:auto; text-align:left !important; padding:10px 12px !important; }
+.col-author{ width:80px; font-size:12px; color:#666; }
+.col-date{ width:100px; font-size:12px; color:#999; }
+.col-rec{ width:50px; font-size:12px; color:#ff4d8d; font-weight:700; }
+.col-view{ width:60px; font-size:12px; color:#999; }
+
+.post-title{
+  color:#333; font-size:14px; font-weight:500;
+  display:inline; vertical-align:middle;
+}
+.post-row:hover .post-title{ color:#ff4d8d; }
+.notice-row .post-title{ font-weight:700; color:#222; }
+
+.cat-tag{
+  display:inline-block;
+  font-size:11px; background:#fff0f5; color:#ff4d8d;
+  padding:2px 8px; border-radius:3px;
+  border:1px solid #ffcce0; font-weight:600;
+}
+.new-badge{
+  color:#ff4d8d; font-size:11px; font-weight:bold; margin-left:6px;
+  vertical-align:middle;
+}
+.img-icon{ font-size:11px; margin-left:6px; vertical-align:middle; }
+.cmt-count{ color:#ff4d8d; font-size:12px; margin-left:4px; font-weight:700; vertical-align:middle; }
+.empty-row{ padding:60px 0 !important; text-align:center !important; color:#aaa; font-size:13px; }
+
+/* 페이지네이션 */
+.pagination{
+  display:flex; justify-content:center; align-items:center; gap:4px;
+  padding:24px 16px;
+  flex-wrap:wrap;
+}
+.pagination button{
+  min-width:36px; height:36px; padding:0 10px;
+  border:1px solid #ddd; background:#fff;
+  border-radius:6px; cursor:pointer;
+  font-size:13px; font-weight:600;
+  color:#444;
+  transition:background .12s, border-color .12s;
+}
+.pagination button:hover:not(:disabled){
+  border-color:#ff4d8d; color:#ff4d8d;
+}
+.pagination button.active{
+  background:#ff4d8d; color:#fff; border-color:#ff4d8d;
+}
+.pagination button:disabled{ opacity:.4; cursor:default; }
+
+/* ===== 다크모드 보정 ===== */
+:root[data-theme='dark'] .board-table,
+:root[data-theme='black'] .board-table{ background:#1c1c1c; }
+:root[data-theme='dark'] .board-table thead th,
+:root[data-theme='black'] .board-table thead th{
+  background:#252525; color:#ddd;
+  border-top-color:#666; border-bottom-color:#3a3a3a;
+}
+:root[data-theme='dark'] .board-table tbody tr,
+:root[data-theme='black'] .board-table tbody tr{ border-bottom-color:#2a2a2a; }
+:root[data-theme='dark'] .board-table tbody tr.post-row:nth-child(even),
+:root[data-theme='black'] .board-table tbody tr.post-row:nth-child(even){ background:#202020; }
+:root[data-theme='dark'] .board-table tbody tr:hover,
+:root[data-theme='black'] .board-table tbody tr:hover{ background:#2a1a22; }
+:root[data-theme='dark'] .notice-row,
+:root[data-theme='black'] .notice-row{ background:#2a1a22 !important; }
+:root[data-theme='dark'] .post-title,
+:root[data-theme='black'] .post-title{ color:#ddd; }
+:root[data-theme='dark'] .pagination button,
+:root[data-theme='black'] .pagination button{
+  background:#1c1c1c; border-color:#2a2a2a; color:#ddd;
+}
+
+/* ===== 모바일 (≤ 768px) — 카드형 fallback ===== */
+@media (max-width: 768px){
+  .board-toolbar{ padding:10px 12px 6px; }
+  .board-wrap{ padding:0 12px; }
+  .board-table thead{ display:none; }
+  .board-table tbody tr{
+    display:block;
+    padding:12px 12px;
+    border-radius:10px;
+    border:1px solid #eee;
+    margin-bottom:8px;
+    background:#fff;
+  }
+  .board-table tbody tr.post-row:nth-child(even){ background:#fff; }
+  .board-table tbody tr:hover{ background:#fff9fb; }
+  .board-table td{ display:none; padding:0; text-align:left; }
+  .col-title{
+    display:block !important;
+    padding:0 0 6px !important;
+    font-size:14px;
+  }
+  .col-cat,
+  .col-author,
+  .col-date,
+  .col-view,
+  .col-rec{
+    display:inline-block !important;
+    font-size:11px; color:#888;
+    margin-right:8px;
+  }
+  .col-cat::before{ content:''; }
+  .col-author::before{ content:'· '; }
+  .col-date::before{ content:'· '; }
+  .col-view::before{ content:'· 👁 '; }
+  .col-rec::before{ content:'· ❤️ '; color:#ff4d8d; }
+  .col-num{ display:none !important; }
+  .notice-row .col-num{
+    display:inline-block !important;
+    margin-right:6px;
+  }
+}
 
 /* --- 상세 페이지 --- */
 .detail-sheet.v2{ background:var(--bg); }
