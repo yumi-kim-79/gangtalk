@@ -81,10 +81,11 @@ firebase deploy --only hosting:admin
 ---
 
 ## 다음 작업
-1. **Firebase Hosting 사이트 생성** — Firebase 콘솔에서 `gangtalk815` 호스팅 사이트 추가 후 도메인 연결
-2. **Cloud Functions 배포** — `cd functions && firebase deploy --only functions:createBizAccount,functions:resetBizPassword,functions:linkStoreToBiz`
-3. **Firestore Security Rules** — `config/marketing`, `adminInbox`, `stores`(write) / `rooms_biz`(write) 는 관리자 + 본인 소유 업체만 허용하도록 강화
-4. **Storage Rules** — `marketing/adBanners*` 는 관리자 UID 만 쓰기 허용
+1. **힐링톡/우리가게게시판/이벤트톡 게시판 동일 적용** — 강톡 압축 모바일 테이블 패턴 확정 후, `.healing-page` 와 동일 마크업/CSS 로 이전 (현재는 `.cat-sheet` 만 적용됨)
+2. **Firebase Hosting 사이트 생성** — Firebase 콘솔에서 `gangtalk815` 호스팅 사이트 추가 후 도메인 연결
+3. **Cloud Functions 배포** — `cd functions && firebase deploy --only functions:createBizAccount,functions:resetBizPassword,functions:linkStoreToBiz`
+4. **Firestore Security Rules** — `config/marketing`, `adminInbox`, `stores`(write) / `rooms_biz`(write) 는 관리자 + 본인 소유 업체만 허용하도록 강화
+5. **Storage Rules** — `marketing/adBanners*` 는 관리자 UID 만 쓰기 허용
 2. 관리자 페이지 보강 (필요 시)
    - 게시판 모더레이션 (board_posts 삭제/공지 고정) — `useMyPageCore` 에 함수 보존됨
    - 포인트 수동 지급 / 등급 수동 조정 UI
@@ -100,6 +101,32 @@ firebase deploy --only hosting:admin
 ---
 
 ## 작업 로그
+
+### 2026-06-17: 강톡 게시판 모바일 압축 테이블형으로 변경 (`feature/gangtalk-mobile-table`)
+- **목적**: 직전 PR 의 모바일 카드형 fallback (행을 display:block + 흰 카드 + radius/border) 을 진짜 `<table>` 행 구조의 "압축 테이블" 로 교체. 퀸알바 게시판처럼 표 느낌을 모바일에서도 유지
+- **모바일 컬럼 구성** (`@media (max-width: 768px)`):
+  - 보임: **제목(flex)** / 작성자 / 날짜 / 조회
+  - 숨김: 번호 / 분류(타이틀 안으로 흡수) / 추천
+  - 분류 pill 은 `mobile-cat` span 으로 타이틀 셀 안에 inline 표시
+  - 공지 행: `mobile-notice` 작은 핑크 pill 을 타이틀 안에 표시, author/date/view 는 숨김
+- **마크업** (`src/pages/GangTalkPage.vue` `.cat-sheet`):
+  - 일반 행: `<span :class="['cat-tag','mobile-cat','cat-'+(p.category||'default')]">` 를 `col-title` 셀 안에 추가 (데스크탑에선 `display:none`)
+  - 공지 행: `<span class="notice-badge mobile-notice">공지</span>` 를 `col-title` 안에 추가
+  - 기존 `col-cat` td (데스크탑 분류 컬럼) 의 `.cat-tag` 도 `cat-${category}` 동적 클래스 부여 → 색상 통일
+- **CSS — 카테고리별 색상**:
+  - `cat-daily/default` 핑크 · `cat-suggest` 주황 · `cat-pledge` 보라 · `cat-vote` 파랑 · `cat-quiz` 노랑 · `cat-event` 초록 · `cat-travel` 청록 · `cat-health` 자주 · `cat-quote` 회보라
+- **CSS — 모바일 압축 테이블**:
+  - 카드형 fallback (`display:block`, `border-radius:10px`, `border:1px solid`) 완전 제거
+  - 행: `<tr>` 그대로 사용, `border-bottom:1px solid #f0f0f0` 얇은 보더
+  - zebra 유지 (`post-row:nth-child(even) { background:#fafafa }`), hover/active `#fff5f8`
+  - 셀 padding `7px 4px`, 폰트 12~13px
+  - 제목 셀 `font-size:13px` + `word-break:break-word`
+  - 날짜 셀 핑크 컬러 (`color:#ff4d8d`, 퀸알바 톤)
+  - 공지 행 zebra 무관 핑크 배경 유지
+- **데스크탑 7컬럼/페이지네이션/다크모드 변수는 그대로** — 사용자 요구
+- **힐링톡/우리가게게시판/이벤트톡** — 이번 작업 제외, 강톡 확정 후 동일 패턴 적용 예정 ("다음 작업" 에 기록)
+- **빌드 검증**: `npm run build` ✓ (index 청크 213→213KB, CSS-only 변경 위주)
+- **배포 보류**: 사용자 요청대로 수동 배포 (`firebase deploy --only hosting:prod`)
 
 ### 2026-06-17: 강톡 게시판 테이블형으로 변경 (퀸알바 스타일) (`feat/gangtalk-board-table-style`)
 - **목적**: 카테고리 시트의 카드형 게시글 목록 → 데스크탑 전통 게시판 테이블형 (퀸알바 스타일). 한 페이지 20개 + 번호형 페이지네이션

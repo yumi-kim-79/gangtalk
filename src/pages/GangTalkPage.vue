@@ -251,6 +251,8 @@
                 <td class="col-num" data-label="번호"><span class="notice-badge">공지</span></td>
                 <td class="col-cat" data-label="분류">-</td>
                 <td class="col-title" data-label="제목">
+                  <!-- 모바일 압축 모드에서 col-num 이 숨겨질 때 대비한 in-title 공지 뱃지 -->
+                  <span class="notice-badge mobile-notice">공지</span>
                   <span class="post-title">{{ n.title }}</span>
                   <span v-if="n.images && n.images.length" class="img-icon" aria-label="이미지 첨부">📷</span>
                   <span class="cmt-count" v-if="Number(n.cmtCount||0) > 0">[{{ n.cmtCount }}]</span>
@@ -270,9 +272,11 @@
               >
                 <td class="col-num" data-label="번호">{{ totalCount - ((currentPage-1)*BOARD_PAGE_SIZE + i) }}</td>
                 <td class="col-cat" data-label="분류">
-                  <span class="cat-tag">{{ catLabelFor(p.category) }}</span>
+                  <span :class="['cat-tag', 'cat-' + (p.category || 'default')]">{{ catLabelFor(p.category) }}</span>
                 </td>
                 <td class="col-title" data-label="제목">
+                  <!-- 모바일 압축 테이블: 분류 컬럼 숨김 → 타이틀 안에 inline 표시 -->
+                  <span :class="['cat-tag','mobile-cat','cat-' + (p.category || 'default')]">{{ catLabelFor(p.category) }}</span>
                   <span class="post-title">{{ p.title }}</span>
                   <span v-if="p.images && p.images.length" class="img-icon" aria-label="이미지 첨부">📷</span>
                   <span v-if="isNewPost(p)" class="new-badge">N</span>
@@ -3681,6 +3685,22 @@ const FALLBACK_BIZ_IMG = 'https://images.unsplash.com/photo-1517248135467-4c7edc
   padding:2px 8px; border-radius:3px;
   border:1px solid #ffcce0; font-weight:600;
 }
+
+/* 카테고리별 색상 — 데스크탑 분류 컬럼 + 모바일 in-title pill 공용 */
+.cat-tag.cat-daily,
+.cat-tag.cat-default { background:#fff0f5; color:#ff4d8d; border-color:#ffcce0; }
+.cat-tag.cat-suggest { background:#fff4e6; color:#e0791d; border-color:#fbcc94; }
+.cat-tag.cat-pledge  { background:#f3e8ff; color:#7e22ce; border-color:#d8b4fe; }
+.cat-tag.cat-vote    { background:#e0efff; color:#1e6eea; border-color:#b6d4fe; }
+.cat-tag.cat-quiz    { background:#fff8db; color:#b07c00; border-color:#f3df8d; }
+.cat-tag.cat-event   { background:#e6f7ec; color:#1e8c4a; border-color:#a7d8b8; }
+.cat-tag.cat-travel  { background:#e6f6f9; color:#0e859f; border-color:#a4dde9; }
+.cat-tag.cat-health  { background:#fde9ec; color:#c2185b; border-color:#f4b3c0; }
+.cat-tag.cat-quote   { background:#eef0f5; color:#566280; border-color:#c9d0e0; }
+
+/* mobile-cat 은 데스크탑에서 숨김 — 모바일 @media 에서 inline-block 으로 노출 */
+.mobile-cat,
+.mobile-notice{ display:none; }
 .new-badge{
   color:#ff4d8d; font-size:11px; font-weight:bold; margin-left:6px;
   vertical-align:middle;
@@ -3734,45 +3754,95 @@ const FALLBACK_BIZ_IMG = 'https://images.unsplash.com/photo-1517248135467-4c7edc
   background:#1c1c1c; border-color:#2a2a2a; color:#ddd;
 }
 
-/* ===== 모바일 (≤ 768px) — 카드형 fallback ===== */
+/* ===== 모바일 (≤ 768px) — 압축 테이블 (real <table> 행 유지) ===== */
 @media (max-width: 768px){
   .board-toolbar{ padding:10px 12px 6px; }
-  .board-wrap{ padding:0 12px; }
+  .board-wrap{ padding:0 8px; }
+
+  /* 헤더 숨김 (압축 모드) */
   .board-table thead{ display:none; }
+
+  /* 진짜 <tr> 유지 — 카드 스타일 (radius/shadow/border 박스) 전부 제거 */
   .board-table tbody tr{
-    display:block;
-    padding:12px 12px;
-    border-radius:10px;
-    border:1px solid #eee;
-    margin-bottom:8px;
-    background:#fff;
+    border-bottom:1px solid #f0f0f0;
+    background:transparent;
   }
-  .board-table tbody tr.post-row:nth-child(even){ background:#fff; }
-  .board-table tbody tr:hover{ background:#fff9fb; }
-  .board-table td{ display:none; padding:0; text-align:left; }
-  .col-title{
-    display:block !important;
-    padding:0 0 6px !important;
-    font-size:14px;
+  .board-table tbody tr.post-row:nth-child(even){ background:#fafafa; }
+  .board-table tbody tr:hover,
+  .board-table tbody tr:active{ background:#fff5f8; }
+
+  /* 셀 압축 */
+  .board-table td{
+    padding:7px 4px;
+    font-size:12px;
+    line-height:1.35;
+    vertical-align:middle;
   }
+
+  /* 숨길 컬럼: 번호 / 분류(타이틀에 흡수) / 추천 */
+  .col-num,
   .col-cat,
-  .col-author,
-  .col-date,
-  .col-view,
-  .col-rec{
-    display:inline-block !important;
-    font-size:11px; color:#888;
-    margin-right:8px;
+  .col-rec{ display:none !important; }
+
+  /* 보일 컬럼 */
+  .col-title{
+    text-align:left !important;
+    padding:7px 6px !important;
+    font-size:13px;
+    white-space:normal;
+    word-break:break-word;
   }
-  .col-cat::before{ content:''; }
-  .col-author::before{ content:'· '; }
-  .col-date::before{ content:'· '; }
-  .col-view::before{ content:'· 👁 '; }
-  .col-rec::before{ content:'· ❤️ '; color:#ff4d8d; }
-  .col-num{ display:none !important; }
-  .notice-row .col-num{
+  .col-author{
+    width:60px;
+    text-align:center;
+    font-size:11px; color:#666;
+    padding:7px 2px;
+  }
+  .col-date{
+    width:68px;
+    text-align:center;
+    font-size:11px;
+    color:#ff4d8d;
+    font-weight:600;
+    padding:7px 2px;
+  }
+  .col-view{
+    width:44px;
+    text-align:center;
+    font-size:11px; color:#999;
+    padding:7px 2px;
+  }
+
+  /* 분류 pill 을 타이틀 셀 안에 표시 */
+  .mobile-cat{
     display:inline-block !important;
-    margin-right:6px;
+    margin-right:5px;
+    font-size:10.5px;
+    padding:1px 6px;
+    border-radius:3px;
+    vertical-align:middle;
+    font-weight:700;
+  }
+
+  /* 타이틀 본문/뱃지 — 압축 */
+  .post-title{ font-size:13px; }
+  .new-badge{ margin-left:4px; font-size:10.5px; }
+  .img-icon{ margin-left:4px; font-size:10.5px; }
+  .cmt-count{ margin-left:3px; font-size:11px; }
+
+  /* 공지 — 핑크 배경 유지, 타이틀 안에 작은 공지 뱃지 노출 */
+  .notice-row{ background:#fff5f7 !important; }
+  .notice-row:nth-child(even){ background:#fff5f7 !important; }
+  .notice-row .col-author,
+  .notice-row .col-date,
+  .notice-row .col-view{ display:none !important; }
+  .notice-row .col-title{ padding:8px 8px !important; }
+  .mobile-notice{
+    display:inline-block !important;
+    background:#ff4d8d; color:#fff;
+    padding:1px 7px; border-radius:3px;
+    font-size:10.5px; font-weight:800;
+    margin-right:5px; vertical-align:middle;
   }
 }
 
