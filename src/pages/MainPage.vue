@@ -1053,17 +1053,12 @@ function watchWithLabel(label, refOrQuery, next) {
   return onSnapshot(
     refOrQuery,
     (snap) => {
-      const meta = snap.metadata || {}
-
-      // 👉 로컬 캐시에서만 온 스냅샷이면 화면에 반영하지 않고 건너뜀
-      //    (fromCache === true 이고, hasPendingWrites === false 인 경우)
-      if (meta.fromCache && !meta.hasPendingWrites) {
-        console.info(`[FS][${label}] skip cached snapshot`)
-        return
-      }
-
-      // ✅ 서버에서 받은 최신 스냅샷만 실제로 사용
-      next(snap)
+      // 캐시/서버 스냅샷 모두 반영 — 첫 페이지 진입 시 빈 상태로 표시되는 문제 차단.
+      // (기존: fromCache 스냅샷을 무시 → 새로고침 직후 homeOrder 등이 [] 인 채로
+      //  filtered computed 가 정렬 미적용 → 관리자 순서가 화면에 안 보이던 증상의 진짜 원인)
+      // 서버 fresh 가 도착하면 다음 스냅샷에서 자동 갱신되므로 stale 위험은 낮다.
+      try { next(snap) }
+      catch (e) { console.warn(`[FS][${label}] next() error:`, e) }
     },
     (err) => {
       console.error(`[FS][${label}] onSnapshot error:`, err)
