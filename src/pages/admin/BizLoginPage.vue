@@ -1,19 +1,23 @@
 <!--
   src/pages/admin/BizLoginPage.vue
-  업체/관리자 공용 로그인 화면.
-  - 로그인 성공 시 users/{uid} 또는 이메일을 확인해 role 결정:
-      platform (gangtalk815@gmail.com) → /admin/dashboard
-      biz (type='company' & accountKind='storeOwner') → /biz/dashboard
-      그 외 → 로그아웃 + 에러
+  gangtalk815 통합 로그인 화면 (관리자 + 업체 공용).
+  - 로그인 성공 시 useAuthRole.getRole() 로 role 판별:
+      platform → /admin/dashboard
+      biz      → /biz/dashboard
+      null + resolved=true → 권한 없음 안내 + 강제 로그아웃
+      null + resolved=false → 일시 오류 안내 (signOut 안 함, 재시도 권장)
+  - 라우터 query.reason='retry' 인 경우 진단 안내 표시 (가드의 미확정 redirect).
 -->
 <template>
   <main class="adm-login-shell">
     <section class="adm-login-card">
       <div class="adm-login-brand">
         <img src="/icons/icon-192.png" alt="강톡" class="adm-login-logo" />
-        <h1>업체 관리자 로그인</h1>
-        <p>강남톡방 업체용 페이지입니다.</p>
+        <h1>강남톡방 통합 로그인</h1>
+        <p>관리자 / 업체 계정 모두 사용 가능합니다.</p>
       </div>
+
+      <p v-if="hintMsg" class="adm-login-hint">{{ hintMsg }}</p>
 
       <form class="adm-login-form" @submit.prevent="onLogin" :aria-busy="busy">
         <label>
@@ -23,7 +27,7 @@
             type="email"
             autocomplete="email"
             required
-            placeholder="업체에 부여된 이메일"
+            placeholder="이메일"
           />
         </label>
         <label>
@@ -45,22 +49,21 @@
         <p v-if="errorMsg" class="adm-login-error">{{ errorMsg }}</p>
       </form>
 
-      <p class="adm-login-foot">© 강남톡방 업체 관리</p>
+      <p class="adm-login-foot">© 강남톡방</p>
     </section>
   </main>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import {
   getAuth, setPersistence, browserLocalPersistence,
   signInWithEmailAndPassword, signOut,
 } from 'firebase/auth'
-import { db as fbDb } from '@/firebase'
-import { doc, getDoc } from 'firebase/firestore'
-
-const PLATFORM_EMAIL = 'gangtalk815@gmail.com'
+import {
+  authReady, getRole, invalidateRoleCache,
+} from '@/composables/useAuthRole'
 
 const router = useRouter()
 const route = useRoute()
@@ -70,20 +73,22 @@ const password = ref('')
 const busy = ref(false)
 const errorMsg = ref('')
 
-async function resolveRole(user) {
-  if (!user) return null
-  const em = String(user.email || '').toLowerCase()
-  if (em === PLATFORM_EMAIL) return 'platform'
-  try {
-    const snap = await getDoc(doc(fbDb, 'users', user.uid))
-    if (snap.exists()) {
-      const d = snap.data() || {}
-      if (d.type === 'company' && d.accountKind === 'storeOwner') return 'biz'
-    }
-  } catch (e) {
-    console.warn('[BizLogin] resolveRole:', e)
+const hintMsg = computed(() => {
+  if (route.query.reason === 'retry') {
+    return '세션 복원 중 일시적인 오류가 발생했습니다. 다시 로그인해 주세요.'
   }
-  return null
+  return ''
+})
+
+function destinationFor(role) {
+  const next = String(route.query.next || '')
+  if (role === 'platform') {
+    return next && next.startsWith('/admin') ? next : '/admin/dashboard'
+  }
+  if (role === 'biz') {
+    return next && next.startsWith('/biz') ? next : '/biz/dashboard'
+  }
+  return '/biz/login'
 }
 
 onMounted(async () => {
@@ -91,13 +96,16 @@ onMounted(async () => {
     const auth = getAuth()
     await setPersistence(auth, browserLocalPersistence)
     // 이미 로그인되어 있으면 role 에 맞는 곳으로 즉시 이동
-    const u = auth.currentUser
-    if (u) {
-      const role = await resolveRole(u)
-      if (role === 'platform') return router.replace(String(route.query.next || '/admin/dashboard'))
-      if (role === 'biz')      return router.replace(String(route.query.next || '/biz/dashboard'))
+    const u = await authReady()
+    if (!u) return
+    const { role, resolved } = await getRole({ retries: 1 })
+    if (!resolved) return  // 미확정 — 사용자에게 로그인 폼 노출
+    if (role === 'platform' || role === 'biz') {
+      router.replace(destinationFor(role))
     }
-  } catch {}
+  } catch (e) {
+    console.warn('[BizLogin] onMounted', e)
+  }
 })
 
 async function onLogin() {
@@ -107,20 +115,29 @@ async function onLogin() {
   try {
     const auth = getAuth()
     const cred = await signInWithEmailAndPassword(auth, email.value, password.value)
-    const role = await resolveRole(cred.user)
-    if (role === 'platform') {
-      router.replace(String(route.query.next || '/admin/dashboard'))
+    if (!cred?.user) {
+      errorMsg.value = '로그인에 실패했습니다.'
       return
     }
-    if (role === 'biz') {
-      router.replace(String(route.query.next || '/biz/dashboard'))
+    // 새 세션이므로 캐시 무효 후 재판별
+    invalidateRoleCache()
+    const { role, resolved } = await getRole({ retries: 2 })
+
+    if (!resolved) {
+      // Firestore 일시 오류 — 강제 로그아웃 하지 않고 안내만
+      errorMsg.value = '계정 정보를 일시적으로 확인할 수 없습니다. 잠시 후 다시 시도해 주세요.'
       return
     }
-    // 권한 없음 → 강제 로그아웃
+    if (role === 'platform' || role === 'biz') {
+      router.replace(destinationFor(role))
+      return
+    }
+    // 확정적 권한 없음 → 강제 로그아웃
     await signOut(auth).catch(() => {})
-    errorMsg.value = '업체 계정이 아닙니다. 관리자에게 문의해 주세요.'
+    invalidateRoleCache()
+    errorMsg.value = '등록된 관리자 또는 업체 계정이 아닙니다. 관리자에게 문의해 주세요.'
   } catch (e) {
-    console.warn('biz login fail:', e)
+    console.warn('login fail:', e)
     const code = String(e?.code || '')
     if (code.includes('auth/invalid-credential') || code.includes('wrong-password') || code.includes('user-not-found')) {
       errorMsg.value = '이메일 또는 비밀번호가 올바르지 않습니다.'
@@ -195,6 +212,16 @@ async function onLogin() {
 .adm-login-error{
   margin:0; color:#c0392b;
   font-size:13px; text-align:center;
+}
+.adm-login-hint{
+  margin:-8px 0 8px;
+  padding:10px 12px;
+  background:#fff5f8;
+  border:1px solid #ffd6e4;
+  border-radius:8px;
+  color:#ff2e7e;
+  font-size:12px;
+  text-align:center;
 }
 .adm-login-foot{
   margin:20px 0 0; text-align:center;

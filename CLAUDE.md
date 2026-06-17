@@ -134,6 +134,44 @@ firebase deploy --only hosting:admin
 
 ## 작업 로그
 
+### 2026-06-18: gangtalk815 통합 로그인 + 역할 분기 race 차단 (`fix/biz-admin-login-routing`)
+- **목적**: 진단(`docs/audit/2026-06-18-업체로그인-라우팅-진단.md`) 의 두 가지 핵심 문제 해결
+  1. 업체 로그인 시 "관리자 계정이 아닙니다" / "업체 계정이 아닙니다" 가 잘못 노출되는 경우
+  2. 시간이 지나면 가게찾기 등 다른 페이지 진입이 막히는 race
+- **수정 1 — `src/composables/useAuthRole.js` 신규**: role 판별 단일화
+  - 기존 4곳 중복 (`router/admin.js`, `BizLoginPage`, `AdminLoginPage`, `AdminLayout`) → 단일 모듈로 통합
+  - 판별 우선순위: `email===gangtalk815@gmail.com` → platform / `admins/{uid}` 존재 → platform / `users/{uid}.type==='company' && accountKind==='storeOwner'` → biz
+  - **`authReady()` 의 race 차단**: `lastKnownUser` 폴백 도입. 토큰 갱신 race 로 `auth.currentUser` 가 일시 null 이어도 마지막으로 확정된 user 반환. 명시적 `invalidateRoleCache()` 시에만 null 로 리셋
+  - **`getRole({ retries: 1 })` 반환 형식**: `{ role, resolved }`. `resolved=false` 면 Firestore 일시 오류 — 호출자가 분기. `resolved=true && role===null` 만 확정적 권한 없음
+  - probe 안에서 `admins/{uid}` 1회, `users/{uid}` 1회 호출. 실패 시 300ms 대기 후 retry
+- **수정 2 — `src/router/admin.js` 재작성**:
+  - 기존 `cachedRole/getUserRole/authReady` 제거 → `useAuthRole` import
+  - 가드 진입 시 `await authReady()` — `lastKnownUser` 폴백 효과로 토큰 갱신 race 시 강제 redirect 방지
+  - `getRole({ retries: 1 })` 호출. **`resolved=false` 인데 user 가 있는 경우 강제 로그아웃 하지 않고** `/biz/login?reason=retry` 로 안내 (멀쩡한 세션이 무한 루프 안 빠지게)
+  - **관리자가 `/biz/*` 접근 시 → `/admin/dashboard` 안내** (차단 아님, 사용자 요청 반영)
+  - 업체가 `/admin/*` 접근 시 → `/biz/dashboard` 안내 (기존 동작 유지)
+  - `/login` → `/biz/login` redirect (호환용. AdminLoginPage 더 이상 import 안 됨)
+- **수정 3 — `BizLoginPage.vue` 통합 로그인화**:
+  - 타이틀 "강남톡방 통합 로그인" / 서브 "관리자 / 업체 계정 모두 사용 가능합니다."
+  - `useAuthRole.getRole` 사용. `resolved=false` 시 강제 로그아웃 하지 않고 "잠시 후 다시 시도해 주세요" 안내
+  - `resolved=true && role===null` 일 때만 강제 로그아웃 + "등록된 관리자 또는 업체 계정이 아닙니다" 안내
+  - 라우터 가드가 `reason=retry` 로 보낸 경우 상단에 핑크 hint 박스로 "세션 복원 중 일시적인 오류" 표시
+  - `destinationFor(role)` 헬퍼로 `next` 쿼리 적절 검증 (관리자는 `/admin/*` 만, 업체는 `/biz/*` 만)
+- **수정 4 — `AdminLayout.vue` resolveRole 정리**:
+  - 자체 `resolveRole` 함수 제거 → `useAuthRole.getRole` 사용
+  - `onAuthStateChanged` 콜백: `user=null` 발화 시 role 비움 (signOut 정상 처리). **단 `resolved=false` 인 경우 기존 role 유지** — 메뉴가 깜빡이며 사라지는 현상 차단
+- **AdminLoginPage.vue 보존**: 파일은 그대로, 라우터 import 만 제거. 향후 별도 관리자 진입점이 필요해지면 즉시 복귀 가능
+- **변경 없음 (의도적)**:
+  - 회원 사이트 (`gangtox.com`) 로그인/라우팅: `src/router/index.js`, `src/main.js`, `AuthPage.vue` — 전혀 손대지 않음
+  - 업체 가게정보 필드 추가 (`eventMain`, `wage` 등): 별도 PR 로 처리 예정
+  - `firestore.rules`: 룰 변경 없음 (배포 불필요)
+- **흐름 요약**:
+  - **로그인**: gangtox815.com → `/biz/login` (관리자/업체 동일 화면) → `signIn` → `getRole(retries:2)` → platform/biz 따라 자동 분기. 미확정 시 안내만.
+  - **분기 (가드)**: 진입 시 `await authReady()` + `getRole(retries:1)`. 토큰 race 시 `lastKnownUser` 가 user 를 살려둠 → redirect 방지.
+  - **토큰 만료 후 재진입**: 새 토큰 자동 갱신 중에는 `lastKnownUser` 가 인증 유지. 갱신 실패 시에도 `resolved=false` 분기로 정중한 안내. 새로고침 시 retry 로 복구.
+- **빌드 검증**: `npm run build:admin` ✓ (admin index 12.2KB) / `npm run build` ✓ (회원 index 213KB 유지, 영향 없음)
+- **배포 범위**: `firebase deploy --only hosting:admin` 만 필요 (회원 빌드/룰/Functions 변경 없음)
+
 ### 2026-06-17: rooms_biz 중복 문서 머지 버그 수정 — PR #70 누락 2경로 차단 (`fix/rooms-biz-duplicate-merge`)
 - **증상 (PR #70 배포 후에도 재발)**: 현황판 지표가 실값으로 잠깐 보였다가 즉시 0/0 으로 덮어써짐
 - **진단 결과 (`docs/audit/2026-06-17-지표0-재발진단.md`)** — PR #70 이 못 막은 두 경로:
