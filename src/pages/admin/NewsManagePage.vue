@@ -20,8 +20,11 @@
         </div>
       </header>
 
-      <ul class="adm-news-list" v-if="news.length">
+      <p class="adm-hint">드래그(☰) 핸들을 잡고 위/아래로 순서를 변경한 뒤 저장하세요. PC/모바일 모두 동작합니다.</p>
+
+      <ul ref="newsListRef" class="adm-news-list" v-if="news.length">
         <li v-for="(n, i) in news" :key="n.id || i" class="adm-news-row">
+          <span class="adm-drag-handle" title="드래그로 순서 변경">☰</span>
           <div class="adm-news-fields">
             <input
               class="adm-news-input"
@@ -36,8 +39,6 @@
           </div>
           <div class="adm-news-actions">
             <small class="adm-news-time">{{ fmtTime(n.createdAt) }}</small>
-            <button class="adm-btn ghost small" :disabled="i===0" @click="move(i, -1)">위로</button>
-            <button class="adm-btn ghost small" :disabled="i===news.length-1" @click="move(i, +1)">아래로</button>
             <button class="adm-btn ghost small danger" @click="remove(i)">삭제</button>
           </div>
         </li>
@@ -48,7 +49,8 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onBeforeUnmount } from 'vue'
+import { ref, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
+import Sortable from 'sortablejs'
 import { getAuth } from 'firebase/auth'
 import { db as fbDb } from '@/firebase'
 import {
@@ -79,7 +81,10 @@ onMounted(() => {
     },
   )
 })
-onBeforeUnmount(() => { if (unsub) try { unsub() } catch {} })
+onBeforeUnmount(() => {
+  if (unsub) try { unsub() } catch {}
+  if (sortableInst) sortableInst.destroy()
+})
 
 function addNewsTop(){
   const auth = getAuth()
@@ -98,14 +103,38 @@ function remove(i){
   arr.splice(i, 1)
   news.value = arr
 }
-function move(i, dir){
-  const ni = i + dir
-  if (ni < 0 || ni >= news.value.length) return
+function reorderNews(fromIdx, toIdx){
+  if (fromIdx < 0 || toIdx < 0 || fromIdx === toIdx) return
+  if (fromIdx >= news.value.length || toIdx >= news.value.length) return
   const arr = news.value.slice()
-  const [it] = arr.splice(i, 1)
-  arr.splice(ni, 0, it)
+  const [it] = arr.splice(fromIdx, 1)
+  arr.splice(toIdx, 0, it)
   news.value = arr
 }
+
+/* === SortableJS 드래그 (PC/모바일 공용) === */
+const newsListRef = ref(null)
+let sortableInst = null
+
+function initSortable(el){
+  if (!el) return
+  if (sortableInst) { sortableInst.destroy(); sortableInst = null }
+  sortableInst = Sortable.create(el, {
+    handle: '.adm-drag-handle',
+    animation: 150,
+    ghostClass: 'adm-drag-ghost',
+    onEnd(evt) {
+      const { oldIndex, newIndex } = evt
+      if (oldIndex === newIndex || oldIndex == null || newIndex == null) return
+      // SortableJS DOM 이동을 되돌리고 reactive 로만 반영
+      const list = evt.from
+      list.insertBefore(evt.item, list.children[oldIndex])
+      reorderNews(oldIndex, newIndex)
+    },
+  })
+}
+
+watch(newsListRef, (el) => { if (el) initSortable(el) })
 
 async function saveNews(){
   if (saving.value) return
@@ -174,14 +203,23 @@ function fmtTime(v){
 .adm-btn.danger{ color:#c0392b; }
 .adm-btn:disabled{ opacity:.6; cursor:not-allowed; }
 
+.adm-hint{ font-size:12px; color:#888; margin:0 0 12px; }
+
 .adm-news-list{ list-style:none; margin:0; padding:0; }
 .adm-news-row{
   padding:12px 0;
   border-bottom:1px solid #f5f5f5;
-  display:flex; flex-direction:column; gap:8px;
+  display:flex; align-items:center; gap:10px;
 }
 .adm-news-row:last-child{ border-bottom:none; }
-.adm-news-fields{ display:flex; gap:10px; align-items:center; }
+.adm-drag-handle{
+  flex:none;
+  color:#bbb; font-size:14px;
+  cursor:grab; user-select:none;
+  padding:6px 4px;
+}
+.adm-drag-handle:active{ cursor:grabbing; }
+.adm-news-fields{ flex:1; min-width:0; display:flex; gap:10px; align-items:center; }
 .adm-news-input{
   flex:1; height:36px; padding:0 12px;
   border:1px solid #eee; border-radius:8px;
@@ -194,9 +232,16 @@ function fmtTime(v){
 }
 .adm-news-actions{
   display:flex; gap:6px; align-items:center;
-  font-size:11px;
+  font-size:11px; flex:none;
 }
-.adm-news-time{ color:#aaa; flex:1; }
+.adm-news-time{ color:#aaa; }
+
+/* 모바일: 행을 세로 stack — 드래그 핸들만 좌측 상단 */
+@media (max-width: 768px){
+  .adm-news-row{ flex-wrap:wrap; align-items:flex-start; }
+  .adm-news-fields{ flex:1; min-width:0; order:2; flex-wrap:wrap; }
+  .adm-news-actions{ order:3; width:100%; justify-content:flex-end; }
+}
 
 .adm-empty{ color:#aaa; font-size:13px; padding:20px 0; text-align:center; }
 
