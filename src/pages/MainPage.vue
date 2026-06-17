@@ -764,8 +764,13 @@ onMounted(async () => {
   await firebaseReady
   subNewsMarketing()
   subNewsDoc('config', 'config', 'news')
-  subNewsDoc('admin', 'admin', 'news')
-  subNewsDoc('dashboard', 'dashboard', 'news')
+  // 죽은 폴백 구독 제거 (`admin/news`, `dashboard/news`):
+  //  - 두 path 는 firestore.rules 에 매칭 룰 없음 → permission-denied 만 발생
+  //  - 실제 데이터도 없는 상태 (콜백이 안 불려 newsState.admin/dashboard 가 항상 [])
+  //  - recomputeNews 의 spread 는 빈 배열을 받아도 무해 → 동작 변화 0
+  //  - 콘솔 에러 2건 즉시 소멸
+  // subNewsDoc('admin', 'admin', 'news')
+  // subNewsDoc('dashboard', 'dashboard', 'news')
   subNewsCollection()
   recomputeNews()
 })

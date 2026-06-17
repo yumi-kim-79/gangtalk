@@ -134,6 +134,30 @@ firebase deploy --only hosting:admin
 
 ## 작업 로그
 
+### 2026-06-17: 사용자 페이지 만성 권한 에러 제거 (`fix/firestore-perm-errors`)
+- **목표**: gangtox.com/dashboard 콘솔의 `Missing or insufficient permissions` 에러 3건 (`vendors`, `news:admin/news`, `news:dashboard/news`) 제거
+- **사전 사실 추적**:
+  - `admin/news`, `dashboard/news`: `MainPage.vue:767-768` 에서 `subNewsDoc` 으로 구독. `firestore.rules` 에 `admin/{docId}` / `dashboard/{docId}` 룰 부재 → default deny → 에러. **콜백이 안 불려 `newsState.admin/dashboard` 가 항상 `[]` 상태 유지** → 화면(`recomputeNews:669-672`) 의 spread 는 빈 배열을 받아 무해. **실제 데이터 0 건**
+  - `vendors`: `subscribeVendorsSummary:1428` 가 구독. `vendors/{vendorId}` 도큐먼트는 `name/totalRooms/totalNeeded/totalCurrent/totalRemaining/congestion/savedToken` 등을 가짐. ⚠️ **`savedToken` 은 `/sheets/vendors/update` 위장 차단용 공유 시크릿** (`functions/index.js:1270` `assertVendor`). **public read 하면 누구나 token 을 읽어 시트 endpoint 위장 호출 가능** → public read 절대 금지
+- **수정 1: `src/pages/MainPage.vue:763-771`** — 죽은 폴백 구독 2건 제거:
+  - `subNewsDoc('admin', 'admin', 'news')` 주석 처리
+  - `subNewsDoc('dashboard', 'dashboard', 'news')` 주석 처리
+  - 사유 주석 추가 (룰 부재 + 데이터 없음 + 동작 변화 0)
+  - 콘솔 에러 2건 즉시 소멸
+- **수정 안 함 (의도적, 보안)**:
+  - `firestore.rules` 의 vendors 룰 추가 — `savedToken` 노출 위험. 보안 priority > 콘솔 노이즈 해소
+  - 결과: vendors 권한 에러 1건은 잔존. 단 `applyRoomsBiz` 는 `byAg` 없어도 `s.totalRooms` legacy 폴백으로 동작 → 사용자 페이지 기능 영향 없음
+- **현황판 지표 0 버그 와 관계 (사용자 우려에 답)**:
+  - 직전 진단 (`docs/audit/2026-06-17-지표-덮어쓰기-진단.md`) 결론대로 지표 0 의 진짜 원인은 `applyRoomsBiz:1149-1155` 의 `Number.isFinite(byRb?.rooms)` (0 도 finite 로 인정) + rooms_biz 의 sequential await 처리 (10s 지연)
+  - **vendors 권한 에러는 0 버그의 원인이 아님** — match/persons 는 `rooms_biz` 또는 `stores` legacy 에서만 옴, vendors 미사용
+  - 따라서 vendors 룰 열어도 0 버그 해결 안 됨 → 별도 PR 에서 `applyRoomsBiz` 조건 보정 필요
+- **별도 PR 제안 (savedToken 분리)**:
+  - 안전한 vendors 공개 read 를 원한다면, `savedToken` 을 `vendor_secrets/{vendorId}` 같은 admin-only 서브 컬렉션으로 이전
+  - Cloud Function `assertVendor` 가 새 경로에서 읽도록 수정
+  - 그 후 `vendors/{vendorId}` 자체는 public read 안전
+- **빌드 검증**: `npm run build` ✓ (index 청크 213KB 유지)
+- **배포 필요 범위**: `firebase deploy --only hosting:prod` 만. **`firestore:rules` 배포는 이 PR 에 없음 (룰 변경 0건)**
+
 ### 2026-06-17: MainPage `watchWithLabel` 캐시 무시로 첫 진입 시 순서 미적용 수정 (`fix/order-read-field-mismatch`)
 - **사용자가 확인한 사실**: Firestore `config/marketing` 의 저장은 정상 (homeOrder 19개, topRanks/카테고리 OK, listOrders.all 다른 순서)
 - **읽기 쪽 조사**:
