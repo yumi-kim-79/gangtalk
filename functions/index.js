@@ -124,83 +124,136 @@ function computeCongestion(matchedRooms, needPeople) {
 }
 
 /* =========================================================
-   문자 인증 (CoolSMS)
+   문자 인증 (CoolSMS) — Firebase Secret Manager 사용
+   ---------------------------------------------------------
+   - 시크릿은 `firebase functions:secrets:set COOLSMS_*` 로 등록
+   - 콜러블에서 { secrets: [...] } 옵션으로 주입
+   - smsClient 는 모듈 로드가 아닌 함수 실행 안에서 lazy init
+   - { enforceAppCheck: true } 강제 + 번호별 쿨다운/일일캡/검증실패 캡
 ========================================================= */
 
-// CoolSMS 환경변수( .env 에 반드시 추가 )
-// COOLSMS_API_KEY=xxxx
-// COOLSMS_API_SECRET=xxxx
-// COOLSMS_SENDER=01012345678
-const smsClient = new coolsms(
-  process.env.COOLSMS_API_KEY,
-  process.env.COOLSMS_API_SECRET
-);
+// Secret 선언 (Functions v2 params API)
+const COOLSMS_API_KEY    = defineSecret("COOLSMS_API_KEY");
+const COOLSMS_API_SECRET = defineSecret("COOLSMS_API_SECRET");
+const COOLSMS_SENDER     = defineSecret("COOLSMS_SENDER");
+
+// SMS 남용 방지 파라미터
+const SMS_COOLDOWN_MS    = 60 * 1000;            // 60초 재발송 차단
+const SMS_DAILY_CAP      = 5;                    // 24시간 5회
+const SMS_DAILY_WINDOW   = 24 * 60 * 60 * 1000;  // 24h
+const SMS_VERIFY_FAIL_CAP = 5;                   // 코드 검증 5회 실패 시 무효화
 
 // 문자 인증번호 발송
-exports.sendSmsCode = onCall(async (req) => {
-  // 1) 파라미터 정리/검증
-  const rawPhone = safeStr(req.data?.phone || "");
-  const phone = rawPhone.replace(/[^0-9]/g, "");
-  if (!/^\d{10,11}$/.test(phone)) {
-    throw new HttpsError("invalid-argument", "휴대폰 번호를 정확히 입력해 주세요.");
-  }
-
-  // 2) 6자리 코드 생성 + Firestore 저장
-  const code = String(Math.floor(100000 + Math.random() * 900000)); // 6자리
-
-  await db.collection("smsAuth").doc(phone).set({
-    code,
-    createdAt: admin.firestore.Timestamp.now(),
-    validUntil: admin.firestore.Timestamp.fromMillis(Date.now() + 3 * 60 * 1000),
-  });
-
-  // 3) 환경변수 유무 체크 (개발/테스트 환경에서 키가 없으면 실제 발송 스킵)
-  const hasSmsEnv =
-    !!process.env.COOLSMS_API_KEY &&
-    !!process.env.COOLSMS_API_SECRET &&
-    !!process.env.COOLSMS_SENDER;
-
-  if (!hasSmsEnv) {
-    console.log(
-      "[sendSmsCode] COOLSMS env 없음 → 실제 발송 없이 mock 성공 처리. phone:",
-      phone,
-      "code:",
-      code
-    );
-    // 프론트에서는 정상 발송처럼 보이게
-    return { ok: true, mock: true };
-  }
-
-  // 4) 실제 SMS 발송 (CoolSMS)
-  try {
-    await smsClient.sendOne({
-      to: phone,
-      from: process.env.COOLSMS_SENDER,
-      text: `[GangTalk] 인증번호는 ${code} 입니다. (3분 이내 입력)`,
-    });
-
-    console.log("[sendSmsCode] SMS sent:", phone);
-    return { ok: true };
-  } catch (err) {
-    console.error("[sendSmsCode] SMS provider error:", err);
-
-    const msg = String(err?.message || "");
-
-    // ✅ 잔액 부족일 때: 명확하게 알려주기
-    if (msg.includes("NotEnoughBalance")) {
-      throw new HttpsError(
-        "resource-exhausted",
-        "sms-balance-empty"  // 클라이언트에서 구분용
-      );
+exports.sendSmsCode = onCall(
+  {
+    enforceAppCheck: true,
+    secrets: [COOLSMS_API_KEY, COOLSMS_API_SECRET, COOLSMS_SENDER],
+  },
+  async (req) => {
+    // 1) 파라미터 정리/검증
+    const rawPhone = safeStr(req.data?.phone || "");
+    const phone = rawPhone.replace(/[^0-9]/g, "");
+    if (!/^\d{10,11}$/.test(phone)) {
+      throw new HttpsError("invalid-argument", "휴대폰 번호를 정확히 입력해 주세요.");
     }
 
-    // 그 외는 일반 내부 오류
-    throw new HttpsError("internal", "sms-send-failed");
+    // 2) 쿨다운 / 일일 한도 검사 (smsAuth/{phone} 문서 활용)
+    const phoneRef = db.collection("smsAuth").doc(phone);
+    const snap = await phoneRef.get();
+    const data = snap.exists ? (snap.data() || {}) : {};
+    const nowMs = Date.now();
+
+    const tsToMs = (v) => {
+      if (!v) return 0;
+      try { if (typeof v.toMillis === "function") return v.toMillis(); } catch {}
+      const n = Number(v); return Number.isNaN(n) ? 0 : n;
+    };
+    const lastSentMs   = tsToMs(data.lastSentAt);
+    const dailyResetMs = tsToMs(data.dailyResetAt);
+    let   dailyCount   = Number(data.dailyCount || 0);
+
+    // 2-1) 60초 쿨다운
+    if (lastSentMs && nowMs - lastSentMs < SMS_COOLDOWN_MS) {
+      const waitSec = Math.ceil((SMS_COOLDOWN_MS - (nowMs - lastSentMs)) / 1000);
+      console.log("[sendSmsCode] cooldown blocked:", phone, "wait:", waitSec);
+      throw new HttpsError("resource-exhausted", `sms-cooldown:${waitSec}`);
+    }
+
+    // 2-2) 24시간 윈도우 리셋
+    let nextDailyResetMs = dailyResetMs;
+    if (!dailyResetMs || nowMs > dailyResetMs) {
+      dailyCount = 0;
+      nextDailyResetMs = nowMs + SMS_DAILY_WINDOW;
+    }
+
+    // 2-3) 일일 캡 (5회)
+    if (dailyCount >= SMS_DAILY_CAP) {
+      console.log("[sendSmsCode] daily cap reached:", phone, "count:", dailyCount);
+      throw new HttpsError("resource-exhausted", "sms-daily-cap");
+    }
+
+    // 3) 6자리 코드 생성 + Firestore 상태 갱신 (검증 실패 카운터 리셋)
+    const code = String(Math.floor(100000 + Math.random() * 900000));
+    await phoneRef.set({
+      code,
+      createdAt:        admin.firestore.Timestamp.now(),
+      validUntil:       admin.firestore.Timestamp.fromMillis(nowMs + 3 * 60 * 1000),
+      lastSentAt:       admin.firestore.Timestamp.fromMillis(nowMs),
+      dailyResetAt:     admin.firestore.Timestamp.fromMillis(nextDailyResetMs),
+      dailyCount:       dailyCount + 1,
+      verifyFailCount:  0,
+    });
+
+    // 4) Secret 값 조회 — 모두 있어야 실제 발송, 없으면 mock (배포 안전망)
+    let apiKey, apiSecret, sender;
+    try {
+      apiKey    = COOLSMS_API_KEY.value();
+      apiSecret = COOLSMS_API_SECRET.value();
+      sender    = COOLSMS_SENDER.value();
+    } catch (_) {
+      apiKey = apiSecret = sender = "";
+    }
+    const hasSmsEnv = !!apiKey && !!apiSecret && !!sender;
+
+    if (!hasSmsEnv) {
+      console.log(
+        "[sendSmsCode] COOLSMS Secret 없음 → mock 성공 처리. phone:",
+        phone,
+        "code:",
+        code
+      );
+      return { ok: true, mock: true };
+    }
+
+    // 5) 실제 SMS 발송 — smsClient lazy init
+    try {
+      const smsClient = new coolsms(apiKey, apiSecret);
+      await smsClient.sendOne({
+        to: phone,
+        from: sender,
+        text: `[GangTalk] 인증번호는 ${code} 입니다. (3분 이내 입력)`,
+      });
+
+      console.log("[sendSmsCode] SMS sent:", phone);
+      return { ok: true };
+    } catch (err) {
+      console.error("[sendSmsCode] SMS provider error:", err);
+
+      const msg = String(err?.message || "");
+      if (msg.includes("NotEnoughBalance")) {
+        throw new HttpsError("resource-exhausted", "sms-balance-empty");
+      }
+      throw new HttpsError("internal", "sms-send-failed");
+    }
   }
-});
+);
 
 // 문자 인증번호 검증 (createdAt + 3분 기준으로 만료 판단)
-exports.verifySmsCode = onCall(async (req) => {
+// - { enforceAppCheck: true } 강제
+// - 5회 연속 실패 시 코드 무효화 (재발송 필요)
+exports.verifySmsCode = onCall(
+  { enforceAppCheck: true },
+  async (req) => {
   const rawPhone = safeStr(req.data?.phone || "");
   const phone = rawPhone.replace(/[^0-9]/g, ""); // 항상 숫자만 사용
   const code = safeStr(req.data?.code || "");
@@ -209,7 +262,8 @@ exports.verifySmsCode = onCall(async (req) => {
     throw new HttpsError("invalid-argument", "phone + code required");
   }
 
-  const snap = await db.collection("smsAuth").doc(phone).get();
+  const phoneRef = db.collection("smsAuth").doc(phone);
+  const snap = await phoneRef.get();
   if (!snap.exists) {
     console.log("[verifySmsCode] no request for phone:", phone);
     return { ok: false, reason: "no_request" };
@@ -218,13 +272,32 @@ exports.verifySmsCode = onCall(async (req) => {
   const d = snap.data() || {};
   const expected = safeStr(d.code || "");
 
-  // 코드 불일치
+  // 이미 무효화된 코드 (verify 5회 실패 후)
+  if (!expected) {
+    console.log("[verifySmsCode] code invalidated previously:", phone);
+    return { ok: false, reason: "code_invalidated" };
+  }
+
+  // 코드 불일치 → verify 실패 카운터 ++
   if (expected !== code) {
+    const failCount = Number(d.verifyFailCount || 0) + 1;
+    const reached = failCount >= SMS_VERIFY_FAIL_CAP;
+
     console.log("[verifySmsCode] wrong code:", {
-      phone,
-      expect: expected,
-      got: code,
+      phone, fails: failCount, capped: reached,
     });
+
+    if (reached) {
+      // 코드 자체를 무효화 — 새 인증번호를 받아야 함
+      await phoneRef.update({
+        code: "",
+        verifyFailCount: failCount,
+        invalidatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+      return { ok: false, reason: "code_invalidated" };
+    }
+
+    await phoneRef.update({ verifyFailCount: failCount });
     return { ok: false, reason: "wrong_code" };
   }
 

@@ -80,12 +80,44 @@ firebase deploy --only hosting:admin
 
 ---
 
-## 다음 작업
-1. **힐링톡/우리가게게시판/이벤트톡 게시판 동일 적용** — 강톡 압축 모바일 테이블 패턴 확정 후, `.healing-page` 와 동일 마크업/CSS 로 이전 (현재는 `.cat-sheet` 만 적용됨)
-2. **Firebase Hosting 사이트 생성** — Firebase 콘솔에서 `gangtalk815` 호스팅 사이트 추가 후 도메인 연결
-3. **Cloud Functions 배포** — `cd functions && firebase deploy --only functions:createBizAccount,functions:resetBizPassword,functions:linkStoreToBiz`
-4. **Firestore Security Rules** — `config/marketing`, `adminInbox`, `stores`(write) / `rooms_biz`(write) 는 관리자 + 본인 소유 업체만 허용하도록 강화
-5. **Storage Rules** — `marketing/adBanners*` 는 관리자 UID 만 쓰기 허용
+## 다음 작업 (외부 점검 보고서 검토 후 확정된 백로그)
+
+> 상세 근거는 `docs/audit/2026-06-17-검토결과.md` 참고.
+> 사용자 수동 액션 (콘솔 작업) 은 별도 표시.
+
+### Sprint 0 — ✅ 완료 (`feature/sprint0-sms-secret-hardening`)
+1. ~~**[수동] CoolSMS 콘솔에서 API Key/Secret 폐기 → 재발급**~~ (사용자 사전 처리 완료, Secret Manager 등록 완료)
+2. ~~**git rm `.env` / `functions/.env` + `.gitignore` 추가**~~ (1-1) ✅
+3. ~~**`sendSmsCode` 보강**: `onCall({ enforceAppCheck: true })` + 60초 쿨다운 + 24시간 5회 캡~~ (1-2) ✅
+4. ~~**Firebase Secret Manager 전환** — `secrets.value()` 적용, `defineSecret` 실제 사용~~ (1-1) ✅
+5. ~~**`authFunctions.js` 삭제** (죽은 코드)~~ (2-3 의 잔재 제거) ✅
+
+### Sprint 1 — 이번 주 (다음 작업)
+6. **`reserveReferralCode` 를 `index.js` 로 이전** + `runTransaction` + 추천코드 무중복 보장 (추-1, 2-3) — **이번 Sprint 0 에서 `authFunctions.js` 삭제됐으므로 클라이언트는 항상 폴백 `prefix + '00001'` 으로 빠지는 상태. 즉시 복구 필요**
+7. **`stores` 빈 `ownerId` 점유 룰 제거** (`firestore.rules:83-84` 두 절 삭제) (1-3)
+8. **채팅 `messages` 룰 participants 멤버십 검증** + 기존 룸 doc 마이그레이션 (1-4)
+9. **[수동] GCP 콘솔에서 Maps/Firebase 공용 API 키에 HTTP 리퍼러 + API 제한** (1-5)
+
+### Sprint 2 — 다음 주
+9. **관리자 판별 Custom Claims (`admin:true`) 통일** — Rules `isAdmin()` + Functions `assertCallerIsAdmin` 동시. `gangtalk815@gmail.com` 에 claim 부여 스크립트 1회 (1-6)
+10. **`/api` Express 라우트 인증 검증** + `/pass/mock` 운영 빌드 제거 (1-7, 추-3)
+11. **`userSeq` 트랜잭션화** — Cloud Function 으로 이전, 클라이언트 직접 +1 차단 (2-2)
+
+### Sprint 3 — 여유 시
+12. **이미지 webp 변환** — `public/brand/gangnamtalk-wordmar01.png` (2.3MB) 등 우선 (3-2)
+13. **`vite.config.js` 에 `esbuild: { drop: ['console','debugger'] }`** (3-4)
+14. **`public/img/reference/target-design.png` 삭제 + 루트 잡파일 정리** (3-3, 4-2)
+15. **`GangTalkMacro/.venv` git 추적 제거** (4-1)
+16. **`functions/index.js` 도메인별 분리** (4-3)
+17. **좋아요/조회 어뷰징 방지** — `likes/{uid}` 서브문서 + Functions 집계 (2-1)
+18. **`onSnapshot` 일부 → `getDocs`** 전환 (3-1)
+19. **PWA / Service Worker 정책 재검토** (Capacitor 전환 시점) (4-4)
+
+### 누락된 기존 작업
+- 힐링톡/우리가게게시판/이벤트톡 게시판에 강톡 압축 모바일 테이블 패턴 적용 (`.cat-sheet` 패턴 그대로 이전)
+- Firebase Hosting `gangtalk815` 사이트 생성 + 도메인 연결
+- Cloud Functions 배포 (createBizAccount / resetBizPassword / linkStoreToBiz)
+- Storage Rules — `marketing/adBanners*` 는 관리자 UID 만 쓰기
 2. 관리자 페이지 보강 (필요 시)
    - 게시판 모더레이션 (board_posts 삭제/공지 고정) — `useMyPageCore` 에 함수 보존됨
    - 포인트 수동 지급 / 등급 수동 조정 UI
@@ -101,6 +133,45 @@ firebase deploy --only hosting:admin
 ---
 
 ## 작업 로그
+
+### 2026-06-17: Sprint 0 — SMS 시크릿 Secret Manager 전환 + 남용 방지 (`feature/sprint0-sms-secret-hardening`)
+- **목적**: 외부 점검 보고서 1-1 (시크릿 노출) + 1-2 (sendSmsCode 남용) Sprint 0 처리
+- **시크릿 git 추적 제거**:
+  - `.gitignore` 에 `.env`, `.env.*`, `functions/.env`, `functions/.env.*`, `dist-admin/` 추가
+  - `git rm --cached .env functions/.env` (히스토리에는 남지만 추적 중단). 사용자가 이미 CoolSMS 키를 폐기/재발급해 Firebase Secret Manager 에 등록 완료
+- **`functions/index.js` 변경**:
+  - `defineSecret("COOLSMS_API_KEY" | "COOLSMS_API_SECRET" | "COOLSMS_SENDER")` 3개 선언
+  - 모듈 로드 시점의 `const smsClient = new coolsms(process.env.*, ...)` 제거 → 함수 실행 안에서 lazy init (`new coolsms(KEY.value(), SECRET.value())`)
+  - `sendSmsCode` 옵션: `{ enforceAppCheck: true, secrets: [COOLSMS_API_KEY, COOLSMS_API_SECRET, COOLSMS_SENDER] }`
+  - **남용 방지** (smsAuth/{phone} 문서로 추적):
+    - `SMS_COOLDOWN_MS = 60s` — 60초 이내 재요청 → `resource-exhausted: sms-cooldown:{waitSec}`
+    - `SMS_DAILY_CAP = 5` / `SMS_DAILY_WINDOW = 24h` — 24시간 5회 초과 → `sms-daily-cap`
+    - `dailyResetAt` 시각 지나면 카운터 자동 리셋
+    - `verifyFailCount` 필드 추가, 신규 발송 시 0 으로 리셋
+  - `verifySmsCode` 옵션: `{ enforceAppCheck: true }`
+  - **검증 5회 실패 시 코드 무효화**: `verifyFailCount` 증가 → `SMS_VERIFY_FAIL_CAP=5` 도달 시 `code=""` 로 설정 + `invalidatedAt` 기록 → 이후 동일 코드 검증 시 `code_invalidated` 반환 (새 인증번호 발송 필요)
+- **죽은 코드 제거**: `functions/authFunctions.js` 삭제 — `index.js` 에 import 없어 미배포. 단 `reserveReferralCode` 가 이 파일에만 있었으므로 **Sprint 1 #6 즉시 복구 필요** (추천코드 폴백 100% 발동 상태)
+- **로컬 검증**: `node -e "require('./index.js')"` 정상, `sendSmsCode` / `verifySmsCode` 모두 function export 확인. `reserveReferralCode` 는 `undefined` (예상)
+- **회귀 위험**:
+  - 클라이언트(`AuthPage.vue:328`)가 App Check 토큰 발급 가능해야 함 — 기존 `IS_ADMIN_BUILD=false` 회원 빌드는 reCAPTCHA Enterprise 정상 동작 중. admin 빌드는 회원가입 미사용 → 영향 없음
+  - Secret 미설정 시 mock 분기 (`return { ok: true, mock: true }`) 폴백 유지 — 사용자가 모든 Secret 등록 완료했으므로 운영에서는 실제 발송
+- **변경 파일**: `.gitignore`, `functions/.env` (untracked), `.env` (untracked), `functions/index.js`, `functions/authFunctions.js` (삭제), `docs/audit/2026-06-17-검토결과.md` (직전 검토 산출물 동시 커밋), `CLAUDE.md`
+
+### 2026-06-17: 외부 점검 보고서 검토 완료 (소스 수정 없음, 문서 2개만)
+- **검토 대상**: `docs/audit/gangtalk_점검보고서.md` (외부 코드 리뷰, 18개 항목)
+- **검토 산출물**: `docs/audit/2026-06-17-검토결과.md` (항목별 위치/판정/심각도 재평가/수정방안/영향범위)
+- **검증 결과**:
+  - 보안 1-1 ~ 1-7 모두 실제 코드 위치 확인 (1-7 `/api` 라우트는 인증 유무 후속 검증 필요)
+  - 버그 2-1 ~ 2-3 모두 확인. **2-3 의 심각도를 🟢→🟠 상향** (추가 발견과 연동)
+  - 성능 3-1 ~ 3-4 모두 확인 (3-1 수치는 `src/` 기준 69곳, 보고서 120 은 functions 포함 추정)
+  - 위생 4-1 ~ 4-4 모두 확인
+- **추가 발견 3건**:
+  - **추-1**: `src/pages/AuthPage.vue:509` 가 `reserveReferralCode` 호출하지만 함수 정의는 `functions/authFunctions.js:83` 에만 있고 `index.js` 에 import 안 됨 → **미배포 상태**. catch 폴백 (`prefix + '00001'`) 으로 빠져 추천코드 무중복 보장 깨짐. 🟠 (회원가입 흐름)
+  - **추-2**: admin StoresManagePage 의 `stores` write 에 audit 트레일 없음. 🟢 (다중 운영자 시점 대비)
+  - **추-3**: `firebase.json:56` `/api/**` rewrite 가 인증 없는 Express 라우트 외부 공개 → 1-7 과 연동. 🟡
+- **사용자 수동 액션 분류**: CoolSMS 키 폐기 (1-1), GCP API 키 리퍼러 제한 (1-5), Firebase Custom Claim 부여 (1-6), Secret Manager 등록 (1-1) — 모두 코드 변경 불가, 콘솔 작업
+- **시크릿 처리**: 본 검토 문서에 노출된 키 값 직접 기재 0건. "노출 사실 + 파일 위치" 만 표기
+- **변경 파일**: `docs/audit/2026-06-17-검토결과.md` (신규) + `CLAUDE.md` (다음 작업 갱신). 소스 코드 변경 0건, 브랜치/PR/빌드/배포 0건 (검토 전용 턴 정책 준수)
 
 ### 2026-06-17: 강톡 게시판 모바일 압축 테이블형으로 변경 (`feature/gangtalk-mobile-table`)
 - **목적**: 직전 PR 의 모바일 카드형 fallback (행을 display:block + 흰 카드 + radius/border) 을 진짜 `<table>` 행 구조의 "압축 테이블" 로 교체. 퀸알바 게시판처럼 표 느낌을 모바일에서도 유지
