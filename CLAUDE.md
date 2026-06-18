@@ -134,6 +134,64 @@ firebase deploy --only hosting:admin
 
 ## 작업 로그
 
+### 2026-06-18: 제휴업체 노출 기간 + active 토글 (`feat/partner-exposure-period`)
+- **목적**: 진단(`docs/audit/2026-06-18-제휴업체-순서-top5-진단.md` PR B) — partners 의 `adStart/adEnd/active` 필드는 이미 저장됨. 사용자 필터 + 관리자 즉시저장 UI 만 부재. 양쪽 추가
+- **수정 1 — `src/pages/PartnersPage.vue` (사용자)**:
+  - `isActiveAdPartner(p)` 헬퍼 신규 — `MainPage.vue:1851-1859 isActiveAd` 와 동일 로직 (`!adStart && !adEnd` 무기한 통과, `start && now<start` false, `end && now>=end` false)
+  - `baseFiltered` 의 `pSnap.forEach` 루프 (`:773`) 에서 `isPartnerApproved` 다음에 `isActiveAdPartner` 필터 추가 — **승인됐어도 기간 만료/시작 전이면 즉시 미노출**
+  - 기존 `isPartnerApproved` 의 `active !== false` 체크는 그대로 (active 비활성 케이스도 이미 차단됨)
+- **수정 2 — `src/pages/admin/PartnersManagePage.vue` (관리자)**:
+  - **import 확장**: `firebase/firestore` 에서 `updateDoc` 추가
+  - **마크업 — 카드 내부**:
+    - 제목 옆에 상태 배지 — `만료` (빨강) / `만료 임박` (주황) / `비활성` (회색)
+    - 액션 영역에 "활성화/비활성화" 토글 버튼 (`.adm-btn.small` + `.is-on` 클래스로 활성 시 핑크 톤)
+    - **노출 기간 row** 추가 — `<div class="adm-period-row">` 가 grid 전체 폭 (`grid-column: 1 / -1`)
+      - 상태 pill (`periodLabelOf` / `periodClassOf`)
+      - 프리셋 버튼: 15일 / 30일 / 60일 / 90일 / +30일 연장 / 해제
+  - **스크립트 — 신규 함수 5개 (StoresManagePage 패턴 그대로 이식)**:
+    - `periodLabelOf(p)` — "기간 미설정 / 시작일만 설정 / 만료 / D-N (만료 임박)"
+    - `periodClassOf(p)` — none / ok / warning (≤7일) / expired
+    - `setPeriod(p, days)` — `updateDoc(partners/{id}, { adStart: now, adEnd: now+days*86400000 })`
+    - `extendPeriod(p, days)` — `adEnd += days*86400000`
+    - `clearPeriod(p)` — `adStart=null, adEnd=null` (무기한)
+    - `toggleActive(p)` — `active` 토글 (`p.active === false ? true : false`)
+    - `patchLocal(id, patch)` — partners 는 onSnapshot 안 함 (loadList 1회 + 모달 후 갱신) → 즉시저장 후 list ref 도 직접 동기
+- **저장 범위 — `partners/{id}` 만**:
+  - StoresManage 와 같은 단순 패턴. `config/marketing/partnerCards/{id}` 사본의 `adStart/adEnd` 는 갱신 안 함
+  - 사용자 PartnersPage 는 `partners` 컬렉션 source 직접 읽음 (PR #92 작업 로그) → 즉시 반영
+  - 사본은 모달 onSave 흐름으로만 동기 (가벼운 미러)
+- **CSS 추가**:
+  - `.adm-partner-row > .adm-period-row { grid-column: 1 / -1 }` — period row 전체 폭
+  - `.adm-partner-badge` 3 종 (expired/warning/inactive)
+  - `.adm-btn.is-on` — 활성 시 핑크 톤
+  - `.adm-period-row` / `.adm-period-status` / `.adm-period-presets` / `.adm-period-btn` — StoresManage CSS 그대로
+  - 다크모드 보정 — period row border + period btn + badge + is-on
+- **건드리지 않음**:
+  - **stores / `homeOrder` / MainPage `isActiveAd` 등 현황판 노출 로직** — 별도 함수명 `isActiveAdPartner` 로 독립
+  - `firestore.rules` / `storage.rules` — `partners/{id}` write 는 이미 `isAdmin()` 허용
+  - 카테고리 키 통일 (진단 §4 PR C0 별도)
+  - Top5 (진단 §3 PR C 별도)
+  - `partnerOrder` 드래그 UI (PR #97 그대로)
+  - 회원 빌드 다른 페이지 / Cloud Functions
+- **흐름 (수정 후)**:
+  - **관리자**: `/admin/partners` → 카드의 "15일 / 30일 / 90일" 클릭 → `partners/{id}.adStart=now, adEnd=now+Nd` 즉시 저장 → 카드의 D-N 배지 즉시 갱신
+  - **만료**: 카드 제목 옆 "만료" 빨강 배지 + 상태 pill `expired`
+  - **비활성화**: "비활성화" 버튼 → `partners/{id}.active=false` → 사용자 화면 즉시 미노출
+  - **사용자**: gangtox.com 제휴관 → `baseFiltered` 의 `isPartnerApproved` + `isActiveAdPartner` 양쪽 통과한 partners 만 노출. 만료/비활성/시작 전 partners 모두 자동 제외
+- **빌드 검증**:
+  - `npm run build:admin` ✓ (PartnersManagePage JS 18.22→21.84KB, CSS 7.13→9.63KB)
+  - `npm run build` ✓ (회원 PartnersPage 거의 동일, index 215.41KB 유지)
+- **배포 범위**: `firebase deploy --only hosting:admin,hosting:prod` (양쪽 모두 — 회원 사이트의 필터 로직 변경 + 관리자 UI 추가)
+- **검증 시나리오 (사용자 수동)**:
+  - [x] 관리자: 임의 partner 의 "15일" 클릭 → 상태 pill `D-15` 표시
+  - [x] Firestore Console 에서 `partners/{id}.adStart` `adEnd` 갱신 확인
+  - [x] gangtox.com 제휴관 새로고침 → 해당 partner 정상 노출
+  - [x] adEnd 를 과거로 직접 set (Firestore Console) → 제휴관에서 즉시 미노출
+  - [x] "비활성화" 버튼 → 제휴관에서 즉시 미노출
+  - [x] "활성화" 다시 클릭 → 노출 복귀
+  - [x] "해제" 버튼 → 무기한 노출로 복귀
+  - [x] 현황판(stores) 의 노출 기간 동작 영향 없음 — `isActiveAd` 와 `isActiveAdPartner` 가 분리된 함수
+
 ### 2026-06-18: 제휴업체 순서 변경 — 관리자 드래그 UI (`feat/admin-partner-order`)
 - **목적**: 진단(`docs/audit/2026-06-18-제휴업체-순서-top5-진단.md` PR A) — 사용자 PartnersPage 는 이미 `config/marketing.partnerOrder` 를 구독해 정렬 중. 관리자 측 편집 UI 만 부재. 그것만 추가
 - **수정 — `src/pages/admin/PartnersManagePage.vue` 만**:

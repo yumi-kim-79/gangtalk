@@ -714,6 +714,23 @@ function isPartnerApproved(x = {}) {
   return active && (approvedFlag || applyApproved)
 }
 
+/* ───────── 노출 기간 필터 (adStart / adEnd, ms) =====
+ * MainPage.vue:1851-1859 의 isActiveAd 와 동일 로직.
+ * - 양쪽 모두 빈 경우: 무기한 통과
+ * - adStart 가 있고 현재 < start: 아직 노출 안 함
+ * - adEnd 가 있고 현재 >= end: 만료
+ * 관리자(PartnersManagePage) 가 만료 처리한 항목은 사용자 화면에서 자동 빠짐.
+ */
+function isActiveAdPartner(p = {}) {
+  if (!p.adStart && !p.adEnd) return true
+  const now = Date.now()
+  const start = Number(p.adStart || 0)
+  const end   = Number(p.adEnd   || 0)
+  if (start && now < start) return false
+  if (end   && now >= end)  return false
+  return true
+}
+
 /* ───────── 내 주변 모달 연동(반경/거리계산/목록) ───────── */
 const NEAR_KM = 10
 
@@ -769,6 +786,9 @@ async function loadPartners(){
 
       // 🔹 승인되지 않은 제휴업체는 목록에서 제외
       if (!isPartnerApproved(x)) return
+
+      // 🔹 노출 기간 만료 / 시작 전 → 사용자 화면에서 자동 미노출
+      if (!isActiveAdPartner(x)) return
 
       const myLocal = getLocalRating(d.id)
       const thumbCand = pickThumb(x)

@@ -50,7 +50,12 @@
           <span class="adm-drag-handle" title="드래그하여 순서 변경" aria-label="순서 변경">☰</span>
           <div class="adm-partner-thumb" :style="bgStyle(p.thumb)" />
           <div class="adm-partner-meta">
-            <strong class="adm-partner-name">{{ p.name || '(이름 없음)' }}</strong>
+            <strong class="adm-partner-name">
+              {{ p.name || '(이름 없음)' }}
+              <span v-if="periodClassOf(p) === 'expired'" class="adm-partner-badge expired">만료</span>
+              <span v-else-if="periodClassOf(p) === 'warning'" class="adm-partner-badge warning">만료 임박</span>
+              <span v-if="p.active === false" class="adm-partner-badge inactive">비활성</span>
+            </strong>
             <span class="adm-partner-sub">
               {{ p.region || '-' }} · {{ catLabel(p.category) }} · ⭐ {{ Number(p.rating || 4.5).toFixed(1) }}
             </span>
@@ -61,11 +66,32 @@
           <div class="adm-partner-actions">
             <button class="adm-btn small" type="button" @click="openEdit(p)">수정</button>
             <button
+              class="adm-btn small"
+              type="button"
+              :class="{ 'is-on': p.active !== false }"
+              :disabled="!!periodBusy[p.id]"
+              @click="toggleActive(p)"
+              :title="p.active === false ? '활성화' : '비활성화'"
+            >{{ p.active === false ? '활성화' : '비활성화' }}</button>
+            <button
               class="adm-btn small danger"
               type="button"
               :disabled="!!deleting[p.id]"
               @click="deletePartner(p)"
             >{{ deleting[p.id] ? '삭제 중…' : '삭제' }}</button>
+          </div>
+
+          <!-- 노출 기간 UI (StoresManagePage 패턴 이식) -->
+          <div class="adm-period-row">
+            <span class="adm-period-status" :class="periodClassOf(p)">{{ periodLabelOf(p) }}</span>
+            <div class="adm-period-presets">
+              <button type="button" class="adm-period-btn" @click="setPeriod(p, 15)" :disabled="periodBusy[p.id]">15일</button>
+              <button type="button" class="adm-period-btn" @click="setPeriod(p, 30)" :disabled="periodBusy[p.id]">30일</button>
+              <button type="button" class="adm-period-btn" @click="setPeriod(p, 60)" :disabled="periodBusy[p.id]">60일</button>
+              <button type="button" class="adm-period-btn" @click="setPeriod(p, 90)" :disabled="periodBusy[p.id]">90일</button>
+              <button type="button" class="adm-period-btn extend" @click="extendPeriod(p, 30)" :disabled="periodBusy[p.id] || !p.adEnd">+30일 연장</button>
+              <button v-if="p.adStart || p.adEnd" type="button" class="adm-period-btn clear" @click="clearPeriod(p)" :disabled="periodBusy[p.id]">해제</button>
+            </div>
           </div>
         </li>
       </ul>
@@ -227,7 +253,7 @@
 import { ref, reactive, computed, onMounted, onBeforeUnmount, nextTick, watch } from 'vue'
 import { db as fbDb, storage as fbStorage } from '@/firebase'
 import {
-  collection, doc, getDoc, getDocs, setDoc, deleteDoc, serverTimestamp,
+  collection, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, serverTimestamp,
   onSnapshot, query, limit,
 } from 'firebase/firestore'
 import {
@@ -455,6 +481,108 @@ async function savePartnerOrder() {
     alert('순서 저장 실패: ' + (e?.message || e))
   } finally {
     savingOrder.value = false
+  }
+}
+
+/* ───────── 노출 기간 (adStart / adEnd) + active 토글 — 즉시 저장 =====
+ * StoresManagePage.vue:322-388 의 setPeriod/extendPeriod/clearPeriod 패턴 그대로.
+ * 사용자 PartnersPage.vue 의 isActiveAdPartner 가 adStart/adEnd 를 즉시 필터링.
+ *
+ * 변경 범위: partners/{id} 만. config/marketing.partnerCards 사본의 adStart/adEnd 는
+ * 변경 안 함 (사용자 화면은 partners 컬렉션 source 직접 읽음 — 진단 §1-1 / PR #92 작업 로그).
+ * 사본은 모달 onSave 흐름으로만 동기 (가벼운 미러).
+ */
+const DAY_MS_PT = 86400000
+const periodBusy = ref({})
+
+function periodLabelOf(p) {
+  if (!p?.adStart && !p?.adEnd) return '기간 미설정 (무기한)'
+  const now = Date.now()
+  const end = Number(p.adEnd || 0)
+  if (!end) return '시작일만 설정'
+  if (now >= end) return '만료'
+  const diff = end - now
+  const days = Math.ceil(diff / DAY_MS_PT)
+  return `D-${days}` + (days <= 7 ? ' (만료 임박)' : '')
+}
+function periodClassOf(p) {
+  if (!p?.adStart && !p?.adEnd) return 'none'
+  const now = Date.now()
+  const end = Number(p.adEnd || 0)
+  if (end && now >= end) return 'expired'
+  if (end && end - now <= 7 * DAY_MS_PT) return 'warning'
+  return 'ok'
+}
+
+function patchLocal(id, patch) {
+  // onSnapshot 이 없어서 (partners 는 onSnapshot 안 함) 로컬 list 도 즉시 동기
+  const idx = list.value.findIndex(x => x.id === id)
+  if (idx >= 0) list.value[idx] = { ...list.value[idx], ...patch }
+}
+
+async function setPeriod(p, days) {
+  if (periodBusy.value[p.id]) return
+  if (!confirm(`'${p.name || '(이름 없음)'}' 노출 기간을 ${days}일로 설정하시겠습니까?`)) return
+  periodBusy.value = { ...periodBusy.value, [p.id]: true }
+  try {
+    const now = Date.now()
+    const end = now + days * DAY_MS_PT
+    await updateDoc(doc(fbDb, 'partners', p.id), {
+      adStart: now, adEnd: end, updatedAt: serverTimestamp(),
+    })
+    patchLocal(p.id, { adStart: now, adEnd: end })
+  } catch (e) {
+    alert('기간 설정 실패: ' + (e?.message || e))
+  } finally {
+    periodBusy.value = { ...periodBusy.value, [p.id]: false }
+  }
+}
+async function extendPeriod(p, days) {
+  if (periodBusy.value[p.id]) return
+  const cur = Number(p.adEnd || Date.now())
+  const newEnd = cur + days * DAY_MS_PT
+  periodBusy.value = { ...periodBusy.value, [p.id]: true }
+  try {
+    await updateDoc(doc(fbDb, 'partners', p.id), {
+      adEnd: newEnd, updatedAt: serverTimestamp(),
+    })
+    patchLocal(p.id, { adEnd: newEnd })
+  } catch (e) {
+    alert('기간 연장 실패: ' + (e?.message || e))
+  } finally {
+    periodBusy.value = { ...periodBusy.value, [p.id]: false }
+  }
+}
+async function clearPeriod(p) {
+  if (periodBusy.value[p.id]) return
+  if (!confirm('노출 기간을 해제하시겠습니까? (무기한 노출로 전환)')) return
+  periodBusy.value = { ...periodBusy.value, [p.id]: true }
+  try {
+    await updateDoc(doc(fbDb, 'partners', p.id), {
+      adStart: null, adEnd: null, updatedAt: serverTimestamp(),
+    })
+    patchLocal(p.id, { adStart: null, adEnd: null })
+  } catch (e) {
+    alert('기간 해제 실패: ' + (e?.message || e))
+  } finally {
+    periodBusy.value = { ...periodBusy.value, [p.id]: false }
+  }
+}
+async function toggleActive(p) {
+  if (periodBusy.value[p.id]) return
+  const nextActive = p.active === false   // 비활성 → 활성, 활성/미지정 → 비활성
+  const verb = nextActive ? '활성화' : '비활성화'
+  if (!confirm(`'${p.name || '(이름 없음)'}' 을(를) ${verb}하시겠습니까?`)) return
+  periodBusy.value = { ...periodBusy.value, [p.id]: true }
+  try {
+    await updateDoc(doc(fbDb, 'partners', p.id), {
+      active: nextActive, updatedAt: serverTimestamp(),
+    })
+    patchLocal(p.id, { active: nextActive })
+  } catch (e) {
+    alert(`${verb} 실패: ` + (e?.message || e))
+  } finally {
+    periodBusy.value = { ...periodBusy.value, [p.id]: false }
   }
 }
 
@@ -774,10 +902,57 @@ async function deletePartner(p) {
 .adm-partner-list{ list-style:none; padding:0; margin:0; }
 .adm-partner-row{
   display:grid; grid-template-columns:32px 80px 1fr auto;
-  gap:14px; align-items:center;
+  gap:14px;
+  align-items:center;
   padding:12px 0;
   border-bottom:1px solid #f5f5f5;
 }
+.adm-partner-row > .adm-period-row{ grid-column: 1 / -1; }
+
+/* 만료/비활성 배지 (제목 옆) */
+.adm-partner-badge{
+  display:inline-block;
+  margin-left:6px;
+  padding:2px 8px;
+  border-radius:999px;
+  font-size:10px; font-weight:800;
+  vertical-align:middle;
+}
+.adm-partner-badge.expired{ background:#ffeaea; color:#ff4d4d; }
+.adm-partner-badge.warning{ background:#fff3e0; color:#f2a100; }
+.adm-partner-badge.inactive{ background:#f5f5f5; color:#888; }
+
+/* 활성/비활성 토글 — 활성 시 살짝 핑크 톤 */
+.adm-btn.is-on{
+  background:#fff5f8; border-color:#ffd6e4; color:#ff2e7e;
+}
+
+/* 노출 기간 row (StoresManage 패턴) */
+.adm-period-row{
+  display:flex; align-items:center; gap:8px; flex-wrap:wrap;
+  margin-top:6px;
+  padding-top:8px;
+  border-top:1px dashed #f0f0f0;
+}
+.adm-period-status{
+  font-size:11px; font-weight:800;
+  padding:3px 9px; border-radius:999px;
+  background:#f5f5f5; color:#888;
+}
+.adm-period-status.ok{ background:#e9f7ef; color:#21c36b; }
+.adm-period-status.warning{ background:#fff3e0; color:#f2a100; }
+.adm-period-status.expired{ background:#ffeaea; color:#ff4d4d; }
+.adm-period-status.none{ background:#f5f5f5; color:#888; }
+.adm-period-presets{ display:flex; gap:4px; flex-wrap:wrap; }
+.adm-period-btn{
+  height:24px; padding:0 10px;
+  border:1px solid #eee; background:#fff; color:#666;
+  border-radius:6px; font-size:11px; font-weight:700; cursor:pointer;
+}
+.adm-period-btn:hover:not(:disabled){ background:#ffe4ef; color:#ff2e7e; }
+.adm-period-btn:disabled{ opacity:.5; cursor:not-allowed; }
+.adm-period-btn.extend{ background:#fff8fb; color:#ff2e7e; border-color:#ffd6e4; }
+.adm-period-btn.clear{ color:#aaa; }
 
 /* 드래그 핸들 (SortableJS 와 짝) */
 .adm-drag-handle{
@@ -942,5 +1117,23 @@ async function deletePartner(p) {
 :root[data-theme="dark"] .adm-section-hint code,
 :root[data-theme="black"] .adm-section-hint code{
   background:#222; border-color:#2a2a2a; color:#ff86b9;
+}
+:root[data-theme="dark"] .adm-period-row,
+:root[data-theme="black"] .adm-period-row{ border-top-color:#2a2a2a; }
+:root[data-theme="dark"] .adm-period-btn,
+:root[data-theme="black"] .adm-period-btn{
+  background:#222; border-color:#2a2a2a; color:#bbb;
+}
+:root[data-theme="dark"] .adm-period-btn:hover:not(:disabled),
+:root[data-theme="black"] .adm-period-btn:hover:not(:disabled){
+  background:#2a1a22; color:#ff86b9;
+}
+:root[data-theme="dark"] .adm-partner-badge.inactive,
+:root[data-theme="black"] .adm-partner-badge.inactive{
+  background:#2a2a2a; color:#aaa;
+}
+:root[data-theme="dark"] .adm-btn.is-on,
+:root[data-theme="black"] .adm-btn.is-on{
+  background:#2a1a22; border-color:#3a1d2a; color:#ff86b9;
 }
 </style>
