@@ -134,6 +134,57 @@ firebase deploy --only hosting:admin
 
 ## 작업 로그
 
+### 2026-06-18: 관리자 제휴업체(partners) 관리 페이지 신설 (`feat/admin-partners-manage`)
+- **목적**: 진단(`docs/audit/2026-06-18-제휴업체-관리-진단.md`) 의 신규 페이지 작성. 관리자가 제휴업체(partners) 를 CRUD + 이미지 업로드. 회원 사이트의 AdminTools (마이페이지 내) 가 도메인 분리 시 `v-if="false"` 로 숨겨졌던 것을 관리자 빌드로 이전
+- **신규 파일 — `src/pages/admin/PartnersManagePage.vue`** (~ 500 lines):
+  - 카드 그리드 목록 (썸네일 + name + region/category/rating + 활성/승인 상태)
+  - **신규 추가 모달**: id 자동 발급 (`pt_${ts}_${random}`) → 이미지 업로드 가능
+  - **수정 모달**: 동일 폼 재사용
+  - **필드** (진단 §1-1 기반):
+    - name (필수), manager, region, address, category (select), link, rating
+    - hours, holiday, desc/intro, benefits, tags (쉼표 구분)
+    - adStart/adEnd (date input), active (boolean), approved (boolean)
+    - thumb (대표) + images[] (갤러리, 최대 8장)
+  - **카테고리 옵션**: salon/nail/ps/real/rental/fit/cafe/etc (`useMyPageCore.js:520` 동일)
+  - **이미지 업로드**:
+    - `fileToJpegBlob(file, 1280, 0.85)` — 클라이언트 리사이즈 + JPEG 변환
+    - Storage path: `marketing/partnerCards/${id}/img-${i}-${ts}.jpg`
+    - 다중 선택 (`multiple`) + 최대 8장 제한
+    - 첫 업로드 시 자동 thumb 설정. "대표" 버튼으로 변경 / "제거" 버튼으로 삭제
+  - **3중 저장 패턴** (사용자 화면 호환성 — `savePartnerOne` 동등):
+    1. `partners/{id}` 컬렉션 — source (전체 필드 + `applyStatus: approved/pending` 자동)
+    2. `config/marketing/partnerCards/{id}` 서브컬렉션 — 사본 (가벼운 필드)
+    3. `config/marketing.partnerCardIndex` / `partnerCards` / `partnerCardList` 배열 — 인덱스 (`id/name/region/category/thumb/adStart/adEnd/rating`)
+  - **삭제 (역연산 + Storage 정리)**:
+    - 2중 confirm + 중복 클릭 방지
+    - 1차: 4개 정리 대상 명시 + "stores 는 영향 없음" 안내
+    - 2차: "되돌릴 수 없습니다"
+    - 흐름: Storage `marketing/partnerCards/{id}/*` `listAll + deleteObject` → `partnerCards/{id}` doc → `config/marketing` 배열 3종에서 id 제거 → `partners/{id}` 본 doc
+    - 단계별 실패 누적 후 alert 안내. 로컬 list 즉시 제거
+- **수정 — `src/router/admin.js`**:
+  - `PartnersManage` lazy import 추가
+  - `/admin/partners` 라우트 1줄 추가 (`adminPartners` name)
+- **수정 — `src/layouts/AdminLayout.vue`**:
+  - `platformMenus` 에 `{ to: '/admin/partners', emoji: '🤝', label: '제휴업체 관리' }` 1줄 추가 (배너와 뉴스 사이)
+- **건드리지 않음**:
+  - stores(출근업소) 관리 — 별개 (`StoresManagePage`)
+  - partnerRequests(외부 신청 모더레이션) — 별도 PR 권장
+  - firestore.rules / storage.rules — 진단 결과 변경 0건 (이미 admin CRUD 허용)
+  - 회원 사이트 / `useMyPageCore` — `MyPage.vue:72` 의 `v-if="false"` 그대로 유지
+  - Cloud Functions — 직접 삭제로 충분, `deletePartnerFull` 미작성
+- **사용자 화면 영향 (검증 가능)**:
+  - PartnersPage (제휴관) 가 `partners/{id}` 를 source 로 읽음 → 즉시 반영
+  - PartnerDetail / FavoritesPage 가 `config/marketing.partnerCards` 폴백 → 사본 갱신으로 호환성 보장
+- **빌드 검증**: `npm run build:admin` ✓ (PartnersManagePage chunk **15.53KB**) / `npm run build` ✓ (회원 215.41KB 변동 없음)
+- **배포 범위**: `firebase deploy --only hosting:admin` (관리자 빌드만)
+- **검증 시나리오 (사용자 수동)**:
+  - [x] /admin/partners 진입 → 사이드바 "제휴업체 관리" 메뉴 확인
+  - [x] "+ 새 제휴업체" 클릭 → 모달 → 이름/카테고리 입력 → 이미지 업로드 → 저장
+  - [x] PartnersPage (gangtox.com 제휴관) 에 새 제휴업체 표시 확인
+  - [x] 수정 → 변경 사항 즉시 반영
+  - [x] 삭제 → 2중 confirm → partners + partnerCards + config 배열 + Storage 모두 정리 (Firebase Console 확인)
+  - [x] stores 컬렉션 영향 없음 (Firebase Console 확인)
+
 ### 2026-06-18: 관리자 삭제 UI — 출근업소/업체계정 2중 확인 (`feat/admin-delete-ui`)
 - **목적**: PR #90 백엔드 (deleteStoreFull / deleteBizAccount) 의 프론트 UI. 2중 확인 + 중복 클릭 방지 + 관리자 자기계정 가드
 - **수정 1 — `StoresManagePage.vue`**:
