@@ -8,16 +8,14 @@ const IS_ADMIN_BUILD =
   (typeof import.meta !== 'undefined' &&
     import.meta?.env?.VITE_BUILD_TARGET === 'admin')
 
-// ⚠️ 2026-06-18 임시 테스트 스위치 — App Check 가 새로고침 시 인증 토큰 refresh 를
-//   간헐적으로 방해해 로그아웃을 유발하는지 확정하기 위함.
-//   - 기본값: 끔 (App Check 초기화 스킵)
-//   - VITE_DISABLE_APPCHECK=false 로 빌드하면 다시 켬
-//   원인 확정 후 reCAPTCHA Enterprise 키를 gangtox.com 도메인에 정식 등록하는
-//   정석 해결로 가야 함. 이 스위치는 임시.
+// App Check 켬/끔 스위치. 기본값: 켬 (정상 상태, 2026-06-18 정상화).
+//   - VITE_DISABLE_APPCHECK=true 로 빌드하면 끌 수 있음 (디버깅용)
+//   - 진단 PR #83 에서 기본값을 임시로 '끔' 으로 했었지만 PR #85 의 진짜 수정
+//     (main.js beforeunload signOut 제거) 후 정상화.
 const _DISABLE_APPCHECK_RAW =
   (typeof import.meta !== 'undefined' &&
-    String(import.meta?.env?.VITE_DISABLE_APPCHECK ?? 'true').toLowerCase())
-const DISABLE_APPCHECK = _DISABLE_APPCHECK_RAW !== 'false'
+    String(import.meta?.env?.VITE_DISABLE_APPCHECK ?? 'false').toLowerCase())
+const DISABLE_APPCHECK = _DISABLE_APPCHECK_RAW === 'true'
 
 import { initializeApp, getApps, getApp } from 'firebase/app'
 import {
@@ -174,27 +172,16 @@ if (typeof document !== 'undefined' && appCheck) {
    ────────────────────────────────────────────────────────── */
 let auth
 try {
-  console.log('[DIAG] initializeAuth START', { t: performance.now().toFixed(1) })
-  // ⚠️ 2026-06-18 복원 원인 격리 테스트 — indexedDB vs browserLocal.
-  //   PR #82 에서 indexedDB 를 1순위로 뒀지만 새로고침 시 토큰 복원 실패 지속.
-  //   indexedDBLocalPersistence 자체가 이 환경에서 복원을 못 하는지 확인하기 위해
-  //   browserLocal(localStorage)을 1순위로 변경.
-  //   - 유지되면: indexedDB 가 원인 → 정석은 localStorage 유지 또는 indexedDB 동작 환경 점검
-  //   - 여전히 실패: persistence 종류 무관 — 더 깊은 SDK/환경 문제
-  //   원인 확정 후 정상 순서 (indexedDB 1순위) 로 복귀 예정.
   auth = initializeAuth(app, {
     persistence: [
-      browserLocalPersistence,
       indexedDBLocalPersistence,
+      browserLocalPersistence,
       inMemoryPersistence,
     ],
   })
-  console.log('[DIAG] initializeAuth OK (persistence=[browserLocal, indexedDB, inMemory]) — TEST', {
-    t: performance.now().toFixed(1),
-  })
 } catch (e) {
   // HMR / 이미 초기화된 경우 getAuth 폴백.
-  console.warn('[DIAG] initializeAuth FAIL, fallback to getAuth:', e?.code || e?.message)
+  console.warn('[Auth] initializeAuth failed, fallback to getAuth:', e?.code || e?.message)
   auth = getAuth(app)
 }
 
@@ -204,29 +191,6 @@ const storage = getStorage(app)
 /* persistence 는 initializeAuth 가 동기 처리 — 별도 promise 대기 불필요.
    기존 호환을 위해 즉시 resolve 되는 promise 만 노출. */
 const persistenceReady = Promise.resolve()
-
-/* [DIAG] 전역 onAuthStateChanged + onIdTokenChanged 추적 — 모든 발화 로그.
- *   initializeAuth 가 동기 처리 후 등록되므로 첫 발화부터 indexedDB persistence
- *   기준 user 가 들어옴. */
-import { onIdTokenChanged } from 'firebase/auth'
-onAuthStateChanged(auth, (u) => {
-  console.log('[DIAG] onAuthStateChanged', {
-    t: performance.now().toFixed(1),
-    has_user: !!u,
-    uid: u?.uid || null,
-    email: u?.email || null,
-    isAnonymous: u?.isAnonymous ?? null,
-  })
-})
-onIdTokenChanged(auth, (u) => {
-  console.log('[DIAG] onIdTokenChanged', {
-    t: performance.now().toFixed(1),
-    has_user: !!u,
-    uid: u?.uid || null,
-    email: u?.email || null,
-    isAnonymous: u?.isAnonymous ?? null,
-  })
-})
 
 /* ──────────────────────────────────────────────────────────
    4) 인증 부트스트랩 — 익명 자동 로그인 폐지 (2026-06-18)

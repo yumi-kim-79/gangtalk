@@ -25,31 +25,6 @@ import App from './App.vue'
 import router from './router'
 import { setupMessaging } from './lib/messaging' // 🔔 FCM 초기화
 
-/* ============================================================
- * [DIAG] 인증 복원 추적 로그 — 임시 (`diag/auth-logout-trace`).
- *  새로고침 시 로그아웃 튕김의 정확한 단계를 찾기 위한 임시 로그.
- *  원인 확정 후 별도 PR 로 제거 예정.
- * ============================================================ */
-try {
-  const t0 = performance.now()
-  const raw = (() => {
-    try { return localStorage.getItem('app:user:auth') } catch { return null }
-  })()
-  let parsed = null
-  try { parsed = raw ? JSON.parse(raw) : null } catch {}
-  console.log('[DIAG] APP START', {
-    t: t0.toFixed(1),
-    href: location.href,
-    'LS_AUTH.loggedIn': parsed?.loggedIn,
-    'LS_AUTH.email': parsed?.email
-      || parsed?.profile?.email
-      || parsed?.user?.email
-      || null,
-    'LS_AUTH.type': parsed?.type,
-    'LS_AUTH.nickname': parsed?.profile?.nickname || parsed?.nickname || null,
-  })
-} catch (e) { console.warn('[DIAG] APP START log fail:', e) }
-
 // ❗ App Check/서비스 초기화를 가장 먼저 로드
 import '@/firebase'
 // 🔑 핵심: Firebase(AppCheck + 익명로그인) 준비 완료 대기용
