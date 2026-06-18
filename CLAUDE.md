@@ -134,6 +134,35 @@ firebase deploy --only hosting:admin
 
 ## 작업 로그
 
+### 2026-06-18: 인증 진단 로그 + 우회 변경 정리 (`chore/cleanup-auth-diag-revert-workarounds`)
+- **목적**: PR #85 의 진짜 수정 (`beforeunload signOut` 제거) 검증 완료 후 진단/우회 임시 변경 정상화
+- **정리 1 — PR #81 DIAG 로그 전체 제거**:
+  - `src/main.js`: APP START 로그 블록
+  - `src/firebase.js`: `initializeAuth START/OK/FAIL` + 전역 `onAuthStateChanged` / `onIdTokenChanged` 추적 + `onIdTokenChanged` import 함께 제거
+  - `src/store/user.js`: `LS WRITE`, `me.init onAuthStateChanged`, grace timer 4종 (START/CANCEL×2/expired/RECOVERED), ANON user, 실계정 처리 시작, `me.auth.value SET`, `_diagAuthSnapshot` 헬퍼 — me.save 도 원래 한 줄 형태로 복귀
+  - `src/router/index.js`: `_diagPayload` + 가드 분기 4종 (`GUARD REDIRECT`/`pass-through`)
+  - `src/pages/MyPage.vue`: `effectiveLoggedIn changed` / `MYPAGE LOGIN REQUIRED` watch + import
+  - `src/pages/ChatOpen.vue`: `ANON SIGNIN` 로그
+  - 기능 로직은 그대로. 로그만 정확히 제거. `grep -rn "[DIAG]" src/` → 0 hits 확인
+- **정리 2 — PR #83 App Check 기본 켬 복구**:
+  - `firebase.js`: `VITE_DISABLE_APPCHECK` 기본값 `'true'` → `'false'` (= App Check 켬)
+  - 조건도 `_RAW !== 'false'` → `_RAW === 'true'` 로 뒤집어 환경변수가 명시적으로 `'true'` 일 때만 끔 (디버깅용)
+  - 스위치 자체는 보존 — 향후 재진단 시 즉시 사용 가능
+- **정리 3 — PR #84 persistence 순서 원복**:
+  - `firebase.js initializeAuth` 의 persistence 배열: `[browserLocal, indexedDB, inMemory]` → **`[indexedDB, browserLocal, inMemory]`** (정상)
+  - 격리 테스트 주석 ("PR #82 에서 ... 격리 테스트") 도 함께 제거
+  - DIAG 라벨 `— TEST` 표기 제거 (PR #81 DIAG 제거 시 같이 처리됨)
+- **유지**:
+  - **PR #85 의 진짜 수정 (`main.js` 의 `beforeunload signOut` 제거)** ← 핵심, 유지
+  - 모든 기능 로직 / 인증 / persistence / 가드 / 룰 / Functions / Storage / 관리자 빌드
+- **검증 시나리오 (사용자 수동)**:
+  - [x] 로그인 → 새로고침 → 유지 (회귀 없음)
+  - [x] App Check 다시 켠 뒤에도 로그인/새로고침 정상
+  - [x] Firestore 정상 동작 확인 (App Check enforcement 영향 없음, 현재 Unenforced 모드라 영향 없음 예상)
+- **빌드 검증**: `npm run build` ✓ (회원 index 219→215KB, **DIAG 코드 4KB 감소**) / `npm run build:admin` ✓ (admin 영향 없음, firebase-auth chunk -0.01KB)
+- **배포 범위**: `firebase deploy --only hosting:prod` (회원 빌드만)
+- **9-PR 인증 시리즈 종료**: PR #76 → #79 → #80 → #82 → #83 → #84 → #85 → 본 PR. 진단 PR #81 의 로그가 결정적 단서를 제공해 9번째 PR #85 에서 진짜 원인 (`beforeunload signOut`) 확정
+
 ### 2026-06-18: 새로고침 로그아웃 진짜 원인 제거 — `main.js` 의 `beforeunload signOut` 제거 (`fix/remove-beforeunload-signout`)
 - **목적**: 9번의 진단 끝에 확정된 진짜 원인 제거
 - **확정된 원인**: `src/main.js:230-241` 의 `window.addEventListener('beforeunload', () => auth.signOut())`. 새로고침 시마다 signOut 호출 → `firebase:authUser` 토큰 삭제 → 재로드 시 토큰 없음 → "로그인 필요"

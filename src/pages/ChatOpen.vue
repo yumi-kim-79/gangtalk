@@ -182,14 +182,7 @@ let unsubs = []
 onMounted(async () => {
   // 1) 익명 로그인
   try {
-    if (!auth.currentUser) {
-      // [DIAG] 익명 호출 직전 로그 — 회원 사이트에서 익명 호출이 어디서 발생하는지 추적
-      console.log('[DIAG] ANON SIGNIN (ChatOpen.onMounted)', {
-        t: performance.now().toFixed(1),
-        href: location.href,
-      })
-      await signInAnonymously(auth)
-    }
+    if (!auth.currentUser) await signInAnonymously(auth)
   } catch (e) {
     console.warn(
       '익명 로그인 실패(규칙이 public read/write이면 무시 가능):',

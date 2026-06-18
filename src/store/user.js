@@ -214,22 +214,7 @@ export const me = {
   auth: ref(loadJSON(LS_AUTH, { loggedIn: false })),
 
   /** 저장 */
-  save() {
-    // [DIAG] LS_AUTH 덮어쓰는 모든 지점을 한 곳에서 추적.
-    try {
-      const v = unref(me.auth)
-      const caller = (new Error('trace').stack || '').split('\n').slice(2, 4).join(' | ')
-      console.log('[DIAG] LS WRITE app:user:auth', {
-        t: performance.now().toFixed(1),
-        loggedIn: v?.loggedIn,
-        email: v?.email || v?.profile?.email || null,
-        type: v?.type,
-        nickname: v?.profile?.nickname || v?.nickname || null,
-        caller,
-      })
-    } catch {}
-    saveJSON(LS_AUTH, unref(me.auth))
-  },
+  save() { saveJSON(LS_AUTH, unref(me.auth)) },
 
   /** 초기화: Firebase 모드면 onAuthStateChanged 구독, 아니면 즉시 ready 처리 */
   async init() {
@@ -262,79 +247,34 @@ export const me = {
     const NULL_GRACE_MS = 2500
     let _nullPending = null
 
-    // [DIAG] me.init 의 onAuthStateChanged 흐름 추적용 헬퍼
-    const _diagAuthSnapshot = () => ({
-      'me.auth.loggedIn': me.auth.value?.loggedIn,
-      'me.auth.email': me.auth.value?.email
-        || me.auth.value?.profile?.email
-        || me.auth.value?.user?.email
-        || null,
-      'me.auth.type': me.auth.value?.type,
-    })
-
     onAuthStateChanged(auth, async (u) => {
-      console.log('[DIAG] me.init onAuthStateChanged', {
-        t: performance.now().toFixed(1),
-        has_user: !!u,
-        uid: u?.uid || null,
-        email: u?.email || null,
-        isAnonymous: u?.isAnonymous ?? null,
-        ..._diagAuthSnapshot(),
-      })
-
       if (!u) {
-        if (_nullPending) {
-          console.log('[DIAG] me.init grace timer CANCEL (new null)', { t: performance.now().toFixed(1) })
-          clearTimeout(_nullPending)
-        }
+        if (_nullPending) clearTimeout(_nullPending)
         // _ready 는 즉시 true 로 (다른 컴포넌트가 hang 되지 않게).
         // me.auth.value 는 grace 후 진짜 null 일 때만 reset → LS_AUTH 보존.
         _ready.value = true
-        console.log('[DIAG] me.init grace timer START', { t: performance.now().toFixed(1), graceMs: NULL_GRACE_MS })
         _nullPending = setTimeout(() => {
           _nullPending = null
           if (!auth.currentUser) {
-            console.log('[DIAG] LS RESET (me.init grace expired, auth.currentUser still null)', {
-              t: performance.now().toFixed(1),
-              prev: _diagAuthSnapshot(),
-            })
             me.auth.value = { loggedIn: false }
             me.save()
             _uid.value = ''
             _listenUserDoc(FBOK, '')
-          } else {
-            console.log('[DIAG] me.init grace expired but auth.currentUser RECOVERED', {
-              t: performance.now().toFixed(1),
-              uid: auth.currentUser?.uid,
-            })
           }
         }, NULL_GRACE_MS)
         return
       }
 
       // user 가 오면 pending null reset 취소
-      if (_nullPending) {
-        console.log('[DIAG] me.init grace timer CANCEL (user recovered)', { t: performance.now().toFixed(1) })
-        clearTimeout(_nullPending); _nullPending = null
-      }
+      if (_nullPending) { clearTimeout(_nullPending); _nullPending = null }
 
       // ✨ 2026-06-18: 익명 user 는 "로그인 사용자" 로 취급하지 않음.
-      //   이전에는 ensureSignedIn 의 자동 signInAnonymously 가 실계정 토큰
-      //   복원 실패 후 익명 user 를 currentUser 로 만들고, 여기서 me.init 가
-      //   users/{익명uid} 문서를 자동 생성해 me.auth.value = { loggedIn:true,
-      //   profile:{ email:'' }, ... } 로 LS_AUTH 를 덮었음. 그 결과 라우터
-      //   가드의 `rawLogged = loggedIn && !!email` 가 false → /auth redirect.
-      //   본 PR 은 firebase.js 의 익명 자동 호출을 폐지했으므로 평상시엔
-      //   여기로 익명 user 가 들어오지 않지만, ChatOpen 등 명시 호출 경로가
-      //   있어 방어적으로 분기.
+      //   firebase.js 의 익명 자동 호출은 폐지됐지만 ChatOpen 등 명시 호출
+      //   경로가 있어 방어적으로 분기. 익명일 때 LS_AUTH 캐시 보존.
       if (u.isAnonymous === true) {
-        // 익명 — me.auth 는 LS_AUTH 캐시 그대로 두고, _ready 만 켬.
-        // (기존 실계정 LS_AUTH 가 캐시에 있어도 보존)
-        console.log('[DIAG] me.init ANON user — me.auth 보존, _ready=true', { t: performance.now().toFixed(1) })
         _ready.value = true
         return
       }
-      console.log('[DIAG] me.init 실계정 처리 시작', { t: performance.now().toFixed(1), uid: u.uid, email: u.email })
 
       const userRef = doc(db, 'users', u.uid)
       let data
@@ -443,15 +383,6 @@ export const me = {
         me.auth.value = fixed
       }
       me.save()
-      console.log('[DIAG] me.auth.value SET (실계정 처리 완료)', {
-        t: performance.now().toFixed(1),
-        loggedIn: me.auth.value?.loggedIn,
-        email: me.auth.value?.email
-          || me.auth.value?.profile?.email
-          || null,
-        type: me.auth.value?.type,
-        nickname: me.auth.value?.profile?.nickname,
-      })
 
       const nick = me.auth.value?.profile?.nickname
       if (nick) {
