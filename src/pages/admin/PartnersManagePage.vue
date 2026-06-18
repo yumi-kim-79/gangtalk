@@ -1,0 +1,766 @@
+<!--
+  src/pages/admin/PartnersManagePage.vue
+  ──────────────────────────────────────────────────────────
+  관리자 — 제휴업체(partners) 관리
+   - 진단: docs/audit/2026-06-18-제휴업체-관리-진단.md
+   - 사용자 화면(PartnersPage)이 source 로 읽는 컬렉션 = partners
+   - 3중 저장 패턴 유지: partners/{id} + config/marketing/partnerCards/{id} +
+     config/marketing 의 partnerCardIndex / partnerCards / partnerCardList 배열
+   - 이미지 경로: marketing/partnerCards/{id}/(thumb|img-N)-{ts}.jpg
+   - 룰: firestore.rules (partners/partnerCards/config 모두 admin write) +
+         storage.rules (marketing/** admin write) — 변경 0건
+   - partnerRequests(외부 신청) 모더레이션은 별도 PR
+-->
+<template>
+  <div class="adm-page">
+    <header class="adm-page-head">
+      <h2 class="adm-page-title">🤝 제휴업체 관리</h2>
+      <p class="adm-page-sub">
+        partners 컬렉션 + config/marketing 사본을 함께 갱신해 사용자 화면(제휴관) 에 즉시 반영됩니다.
+      </p>
+    </header>
+
+    <section class="adm-section">
+      <header class="adm-section-head">
+        <h3>제휴업체 목록 ({{ list.length }})</h3>
+        <button class="adm-btn primary" type="button" @click="openCreate" :disabled="loading">
+          + 새 제휴업체
+        </button>
+      </header>
+
+      <p v-if="loading" class="adm-empty">불러오는 중…</p>
+      <p v-else-if="!list.length" class="adm-empty">등록된 제휴업체가 없습니다.</p>
+
+      <ul v-else class="adm-partner-list">
+        <li v-for="p in list" :key="p.id" class="adm-partner-row">
+          <div class="adm-partner-thumb" :style="bgStyle(p.thumb)" />
+          <div class="adm-partner-meta">
+            <strong class="adm-partner-name">{{ p.name || '(이름 없음)' }}</strong>
+            <span class="adm-partner-sub">
+              {{ p.region || '-' }} · {{ catLabel(p.category) }} · ⭐ {{ Number(p.rating || 4.5).toFixed(1) }}
+            </span>
+            <span class="adm-partner-sub muted">
+              {{ p.active === false ? '비활성' : '활성' }} · {{ p.approved === false ? '미승인' : '승인' }}
+            </span>
+          </div>
+          <div class="adm-partner-actions">
+            <button class="adm-btn small" type="button" @click="openEdit(p)">수정</button>
+            <button
+              class="adm-btn small danger"
+              type="button"
+              :disabled="!!deleting[p.id]"
+              @click="deletePartner(p)"
+            >{{ deleting[p.id] ? '삭제 중…' : '삭제' }}</button>
+          </div>
+        </li>
+      </ul>
+    </section>
+
+    <!-- ===== 추가/수정 모달 ===== -->
+    <div v-if="modal" class="adm-modal-mask" @click.self="closeModal">
+      <div class="adm-modal" role="dialog">
+        <header class="adm-modal-head">
+          <strong>{{ modal === 'create' ? '새 제휴업체 추가' : '제휴업체 수정' }}</strong>
+          <button class="adm-modal-close" type="button" @click="closeModal">✕</button>
+        </header>
+
+        <div class="adm-modal-body">
+          <div class="adm-form-grid">
+            <label class="adm-field">
+              <span>이름 *</span>
+              <input v-model.trim="form.name" type="text" placeholder="제휴업체 이름" />
+            </label>
+
+            <label class="adm-field">
+              <span>담당자명</span>
+              <input v-model.trim="form.manager" type="text" placeholder="담당자(선택)" />
+            </label>
+
+            <label class="adm-field">
+              <span>지역</span>
+              <input v-model.trim="form.region" type="text" placeholder="예: 강남" />
+            </label>
+
+            <label class="adm-field">
+              <span>카테고리</span>
+              <select v-model="form.category">
+                <option v-for="c in partnerCategoryOptions" :key="c.key" :value="c.key">{{ c.label }}</option>
+              </select>
+            </label>
+
+            <label class="adm-field full">
+              <span>주소</span>
+              <input v-model.trim="form.address" type="text" placeholder="가게 주소" />
+            </label>
+
+            <label class="adm-field">
+              <span>영업시간</span>
+              <input v-model.trim="form.hours" type="text" placeholder="예: 10:00 - 21:00" />
+            </label>
+
+            <label class="adm-field">
+              <span>휴무일</span>
+              <input v-model.trim="form.holiday" type="text" placeholder="예: 매주 일요일" />
+            </label>
+
+            <label class="adm-field">
+              <span>외부 링크</span>
+              <input v-model.trim="form.link" type="url" placeholder="https://..." />
+            </label>
+
+            <label class="adm-field">
+              <span>평점 (0-5)</span>
+              <input v-model.number="form.rating" type="number" min="0" max="5" step="0.1" />
+            </label>
+
+            <label class="adm-field">
+              <span>노출 시작</span>
+              <input v-model="form.adStartStr" type="date" />
+            </label>
+
+            <label class="adm-field">
+              <span>노출 종료</span>
+              <input v-model="form.adEndStr" type="date" />
+            </label>
+
+            <label class="adm-field full">
+              <span>한 줄 소개 / 설명</span>
+              <textarea v-model.trim="form.desc" rows="3" placeholder="제휴업체 소개"></textarea>
+            </label>
+
+            <label class="adm-field full">
+              <span>혜택 / 이벤트</span>
+              <textarea v-model.trim="form.benefits" rows="2" placeholder="강남톡 회원 혜택"></textarea>
+            </label>
+
+            <label class="adm-field full">
+              <span>태그 (쉼표로 구분)</span>
+              <input v-model.trim="form.tagsStr" type="text" placeholder="예: 미용,할인,프로모션" />
+            </label>
+
+            <label class="adm-field">
+              <span>활성 여부</span>
+              <select v-model="form.active">
+                <option :value="true">활성 (노출)</option>
+                <option :value="false">비활성 (숨김)</option>
+              </select>
+            </label>
+
+            <label class="adm-field">
+              <span>승인 상태</span>
+              <select v-model="form.approved">
+                <option :value="true">승인</option>
+                <option :value="false">미승인 (검토중)</option>
+              </select>
+            </label>
+
+            <div class="adm-field full">
+              <span>대표 이미지 + 갤러리 (최대 8장)</span>
+              <div class="adm-img-row">
+                <input
+                  ref="fileInputRef"
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  class="adm-img-file"
+                  :disabled="uploading"
+                  @change="onPickImages"
+                />
+                <button
+                  type="button"
+                  class="adm-btn"
+                  :disabled="uploading || !form.id"
+                  @click="triggerFilePick"
+                >{{ uploading ? '업로드 중…' : '사진 선택 (다중)' }}</button>
+                <span v-if="!form.id" class="adm-hint">먼저 저장 후 이미지를 업로드하세요.</span>
+              </div>
+              <ul v-if="form.images.length" class="adm-img-grid">
+                <li
+                  v-for="(url, i) in form.images"
+                  :key="i"
+                  class="adm-img-item"
+                  :class="{ on: form.thumb === url }"
+                >
+                  <img :src="url" :alt="`이미지 ${i+1}`" />
+                  <div class="adm-img-actions">
+                    <button type="button" class="adm-btn small" @click="setThumb(url)">대표</button>
+                    <button type="button" class="adm-btn small danger" @click="removeImage(i)">제거</button>
+                  </div>
+                </li>
+              </ul>
+            </div>
+          </div>
+
+          <p v-if="formError" class="adm-form-error">{{ formError }}</p>
+        </div>
+
+        <footer class="adm-modal-foot">
+          <button class="adm-btn" type="button" @click="closeModal">취소</button>
+          <button
+            class="adm-btn primary"
+            type="button"
+            :disabled="saving"
+            @click="onSave"
+          >{{ saving ? '저장 중…' : '저장' }}</button>
+        </footer>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script setup>
+import { ref, reactive, onMounted } from 'vue'
+import { db as fbDb, storage as fbStorage } from '@/firebase'
+import {
+  collection, doc, getDoc, getDocs, setDoc, deleteDoc, serverTimestamp,
+  query, limit,
+} from 'firebase/firestore'
+import {
+  ref as sRef, uploadBytes, getDownloadURL, listAll, deleteObject,
+} from 'firebase/storage'
+
+/* ───────── 카테고리 + 헬퍼 (useMyPageCore 에서 발췌) ───────── */
+const partnerCategoryOptions = [
+  { key:'salon',  label:'미용실' },
+  { key:'nail',   label:'네일' },
+  { key:'ps',     label:'성형외과' },
+  { key:'real',   label:'부동산' },
+  { key:'rental', label:'렌탈샵' },
+  { key:'fit',    label:'피트니스' },
+  { key:'cafe',   label:'카페' },
+  { key:'etc',    label:'기타' },
+]
+const catLabel = (k) => (partnerCategoryOptions.find(o => o.key === k)?.label || '기타')
+
+function ensurePtId(s) {
+  const v = String(s || '').replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 80)
+  return v || `pt_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`
+}
+
+const parseDateStr = (s) => {
+  const v = String(s || '').trim(); if (!v) return null
+  const m = v.match(/^(\d{4})-(\d{2})-(\d{2})$/); if (!m) return null
+  const ms = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 0, 0, 0, 0).getTime()
+  return isFinite(ms) ? ms : null
+}
+const dateStrOf = (v) => {
+  if (!v) return ''
+  const ms = typeof v === 'number' ? v : (v?.seconds ? v.seconds * 1000 : 0)
+  if (!ms) return ''
+  const d = new Date(ms)
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+}
+const parseTags = (s) => String(s || '').split(',').map(t => t.trim()).filter(Boolean)
+
+function bgStyle(url) {
+  if (!url) return { background: '#f3f4f6' }
+  return { backgroundImage: `url(${url})`, backgroundSize: 'cover', backgroundPosition: 'center' }
+}
+
+/* ───────── 상태 ───────── */
+const list = ref([])
+const loading = ref(false)
+const deleting = ref({})
+const modal = ref('')   // '' | 'create' | 'edit'
+const saving = ref(false)
+const formError = ref('')
+const uploading = ref(false)
+const fileInputRef = ref(null)
+
+const emptyForm = () => ({
+  id: '',
+  name: '',
+  manager: '',
+  region: '',
+  address: '',
+  category: 'etc',
+  link: '',
+  rating: 4.5,
+  hours: '',
+  holiday: '',
+  desc: '',
+  benefits: '',
+  tagsStr: '',
+  active: true,
+  approved: true,
+  adStartStr: '',
+  adEndStr: '',
+  thumb: '',
+  images: [],
+  createdAt: null,
+})
+const form = reactive(emptyForm())
+
+function resetForm() {
+  Object.assign(form, emptyForm())
+}
+
+/* ───────── 로드 ───────── */
+async function loadList() {
+  loading.value = true
+  try {
+    const snap = await getDocs(query(collection(fbDb, 'partners'), limit(500)))
+    const arr = []
+    snap.forEach(d => arr.push({ id: d.id, ...d.data() }))
+    arr.sort((a, b) => {
+      const ta = a.updatedAt?.toMillis?.() || a.updatedAt?.seconds * 1000 || 0
+      const tb = b.updatedAt?.toMillis?.() || b.updatedAt?.seconds * 1000 || 0
+      return tb - ta
+    })
+    list.value = arr
+  } catch (e) {
+    console.warn('[PartnersManage] load fail:', e)
+    list.value = []
+  } finally {
+    loading.value = false
+  }
+}
+
+onMounted(() => { loadList() })
+
+/* ───────── 모달 열기 ───────── */
+function openCreate() {
+  resetForm()
+  // create 시점에 id 미리 발급 → 이미지 업로드 가능하게
+  form.id = ensurePtId(`pt_${Date.now()}`)
+  formError.value = ''
+  modal.value = 'create'
+}
+
+function openEdit(p) {
+  resetForm()
+  form.id = p.id
+  form.name = p.name || ''
+  form.manager = p.manager || p.managerName || ''
+  form.region = p.region || ''
+  form.address = p.address || ''
+  form.category = p.category || p.categoryRaw || 'etc'
+  form.link = p.link || ''
+  form.rating = Number(p.rating || 4.5)
+  form.hours = p.hours || ''
+  form.holiday = p.holiday || ''
+  form.desc = p.desc || p.intro || ''
+  form.benefits = p.benefits || ''
+  form.tagsStr = Array.isArray(p.tags) ? p.tags.join(',') : ''
+  form.active = p.active !== false
+  form.approved = p.approved !== false
+  form.adStartStr = dateStrOf(p.adStart)
+  form.adEndStr = dateStrOf(p.adEnd)
+  form.thumb = p.thumb || p.image || ''
+  form.images = Array.isArray(p.images) && p.images.length
+    ? p.images.slice()
+    : (form.thumb ? [form.thumb] : [])
+  form.createdAt = p.createdAt || null
+  formError.value = ''
+  modal.value = 'edit'
+}
+
+function closeModal() {
+  modal.value = ''
+  resetForm()
+  formError.value = ''
+}
+
+/* ───────── 이미지 업로드 ───────── */
+async function fileToJpegBlob(file, maxW = 1280, quality = 0.85) {
+  const dataUrl = await new Promise((resolve, reject) => {
+    const fr = new FileReader()
+    fr.onload = () => resolve(String(fr.result))
+    fr.onerror = reject
+    fr.readAsDataURL(file)
+  })
+  const img = new Image()
+  await new Promise((res) => { img.onload = res; img.src = dataUrl })
+  const scale = Math.min(1, maxW / img.width)
+  const w = Math.max(1, Math.round(img.width * scale))
+  const h = Math.max(1, Math.round(img.height * scale))
+  const canvas = document.createElement('canvas')
+  canvas.width = w; canvas.height = h
+  canvas.getContext('2d').drawImage(img, 0, 0, w, h)
+  const blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', quality))
+  return blob || file
+}
+
+function triggerFilePick() {
+  if (uploading.value || !form.id) return
+  try { fileInputRef.value?.click() } catch {}
+}
+
+async function onPickImages(e) {
+  const files = Array.from(e.target.files || [])
+  if (!files.length) return
+  if (!form.id) {
+    alert('id 가 없습니다.')
+    return
+  }
+  uploading.value = true
+  try {
+    const remain = Math.max(0, 8 - form.images.length)
+    const target = files.slice(0, remain)
+    for (let i = 0; i < target.length; i++) {
+      const blob = await fileToJpegBlob(target[i], 1280, 0.85)
+      const ts = Date.now() + '_' + Math.random().toString(36).slice(2, 6)
+      const path = `marketing/partnerCards/${form.id}/img-${form.images.length}-${ts}.jpg`
+      const r = sRef(fbStorage, path)
+      await uploadBytes(r, blob, {
+        contentType: 'image/jpeg',
+        cacheControl: 'public, max-age=60',
+      })
+      const url = await getDownloadURL(r)
+      form.images.push(url)
+      if (!form.thumb) form.thumb = url
+    }
+  } catch (err) {
+    console.warn('[upload] fail', err)
+    alert('이미지 업로드 실패: ' + (err?.message || err))
+  } finally {
+    uploading.value = false
+    try { e.target.value = '' } catch {}
+  }
+}
+
+function setThumb(url) { form.thumb = url }
+
+function removeImage(i) {
+  const removed = form.images[i]
+  form.images.splice(i, 1)
+  if (form.thumb === removed) {
+    form.thumb = form.images[0] || ''
+  }
+}
+
+/* ───────── 저장 (3중 저장 패턴 — useMyPageCore.savePartnerOne 동등) ───────── */
+async function onSave() {
+  if (saving.value) return
+  formError.value = ''
+  if (!form.name) {
+    formError.value = '이름을 입력해 주세요.'
+    return
+  }
+  if (!form.id) form.id = ensurePtId(`pt_${Date.now()}`)
+
+  saving.value = true
+  try {
+    const id = form.id
+    const startMs = parseDateStr(form.adStartStr)
+    const endMs = parseDateStr(form.adEndStr)
+    const tags = parseTags(form.tagsStr)
+    const thumb = form.thumb || form.images[0] || ''
+
+    // 1) partners/{id} — source
+    const partnerBody = {
+      name: form.name,
+      manager: form.manager,
+      region: form.region,
+      address: form.address,
+      category: form.category,
+      categoryRaw: form.category,
+      link: form.link,
+      rating: Number(form.rating || 4.5),
+      hours: form.hours,
+      holiday: form.holiday,
+      desc: form.desc,
+      intro: form.desc,
+      benefits: form.benefits,
+      tags,
+      active: form.active,
+      approved: form.approved,
+      applyStatus: form.approved ? 'approved' : 'pending',
+      adStart: startMs,
+      adEnd: endMs,
+      thumb,
+      image: thumb,
+      images: form.images.slice(),
+      updatedAt: serverTimestamp(),
+      createdAt: form.createdAt || serverTimestamp(),
+    }
+    await setDoc(doc(fbDb, 'partners', id), partnerBody, { merge: true })
+
+    // 2) config/marketing/partnerCards/{id} — 사본 (가벼운 필드)
+    await setDoc(doc(fbDb, 'config', 'marketing', 'partnerCards', id), {
+      name: form.name,
+      region: form.region,
+      category: form.category,
+      thumb,
+      images: form.images.slice(),
+      desc: form.desc,
+      address: form.address,
+      hours: form.hours,
+      holiday: form.holiday,
+      benefits: form.benefits,
+      tags,
+      adStart: startMs,
+      adEnd: endMs,
+      rating: Number(form.rating || 4.5),
+      updatedAt: serverTimestamp(),
+    }, { merge: true })
+
+    // 3) config/marketing 의 index/array 갱신
+    const mkRef = doc(fbDb, 'config', 'marketing')
+    const mkSnap = await getDoc(mkRef)
+    const mkData = mkSnap.exists() ? (mkSnap.data() || {}) : {}
+    const idxList = Array.isArray(mkData.partnerCardIndex) ? mkData.partnerCardIndex.slice() : []
+    const row = {
+      id,
+      name: form.name,
+      region: form.region,
+      category: form.category,
+      thumb,
+      adStart: startMs,
+      adEnd: endMs,
+      rating: Number(form.rating || 4.5),
+    }
+    const pos = idxList.findIndex(x => String(x.id || '') === id)
+    if (pos >= 0) idxList[pos] = row
+    else idxList.unshift(row)
+
+    await setDoc(mkRef, {
+      partnerCardIndex: idxList,
+      partnerCards: idxList,
+      partnerCardList: idxList,
+      updatedAt: serverTimestamp(),
+    }, { merge: true })
+
+    alert(modal.value === 'create' ? '제휴업체가 추가되었습니다.' : '제휴업체가 수정되었습니다.')
+    closeModal()
+    await loadList()
+  } catch (e) {
+    console.error('[PartnersManage] save fail', e)
+    formError.value = '저장 실패: ' + (e?.message || e)
+  } finally {
+    saving.value = false
+  }
+}
+
+/* ───────── 삭제 (3중 저장 역연산 + Storage 정리) ───────── */
+async function deletePartner(p) {
+  if (!p?.id || deleting.value[p.id]) return
+  const label = p.name || p.id
+
+  const c1 = window.confirm(
+    `'${label}' 제휴업체를 삭제하시겠습니까?\n\n` +
+    `다음 데이터가 모두 함께 삭제됩니다:\n` +
+    `· partners/${p.id} 문서\n` +
+    `· config/marketing/partnerCards/${p.id} 사본\n` +
+    `· config/marketing 의 인덱스 배열에서 제거\n` +
+    `· Storage marketing/partnerCards/${p.id}/* 전체\n\n` +
+    `※ stores(출근업소) 는 영향받지 않습니다.`
+  )
+  if (!c1) return
+
+  const c2 = window.confirm(
+    `정말 '${label}' 을(를) 삭제하시겠습니까?\n` +
+    `되돌릴 수 없습니다.`
+  )
+  if (!c2) return
+
+  deleting.value = { ...deleting.value, [p.id]: true }
+  const errors = []
+  try {
+    // 1) Storage marketing/partnerCards/{id}/*
+    try {
+      const dirRef = sRef(fbStorage, `marketing/partnerCards/${p.id}/`)
+      const all = await listAll(dirRef)
+      await Promise.all(all.items.map(item => deleteObject(item).catch(() => null)))
+    } catch (e) {
+      errors.push(`Storage: ${e?.code || e?.message}`)
+    }
+
+    // 2) config/marketing/partnerCards/{id}
+    try {
+      await deleteDoc(doc(fbDb, 'config', 'marketing', 'partnerCards', p.id))
+    } catch (e) {
+      errors.push(`partnerCards 사본: ${e?.code || e?.message}`)
+    }
+
+    // 3) config/marketing 의 배열에서 제거
+    try {
+      const mkRef = doc(fbDb, 'config', 'marketing')
+      const mkSnap = await getDoc(mkRef)
+      if (mkSnap.exists()) {
+        const mkData = mkSnap.data() || {}
+        const filterById = (arr) => Array.isArray(arr) ? arr.filter(x => String(x.id || '') !== p.id) : arr
+        const patch = {
+          partnerCardIndex: filterById(mkData.partnerCardIndex),
+          partnerCards: filterById(mkData.partnerCards),
+          partnerCardList: filterById(mkData.partnerCardList),
+          updatedAt: serverTimestamp(),
+        }
+        await setDoc(mkRef, patch, { merge: true })
+      }
+    } catch (e) {
+      errors.push(`marketing 인덱스: ${e?.code || e?.message}`)
+    }
+
+    // 4) partners/{id} 본 doc
+    try {
+      await deleteDoc(doc(fbDb, 'partners', p.id))
+    } catch (e) {
+      errors.push(`partners doc: ${e?.code || e?.message}`)
+    }
+
+    if (errors.length) {
+      alert(`'${label}' 삭제 — 일부 단계 실패:\n` + errors.join('\n'))
+    } else {
+      alert(`'${label}' 제휴업체를 삭제했습니다.`)
+    }
+    list.value = list.value.filter(x => x.id !== p.id)
+  } finally {
+    const next = { ...deleting.value }
+    delete next[p.id]
+    deleting.value = next
+  }
+}
+</script>
+
+<style scoped>
+.adm-page{ max-width:1100px; margin:0 auto; }
+.adm-page-head{ margin-bottom:18px; }
+.adm-page-title{ margin:0; font-size:22px; font-weight:900; }
+.adm-page-sub{ margin:4px 0 0; font-size:13px; color:#888; }
+
+.adm-section{
+  background:#fff; border:1px solid #f0f0f0; border-radius:14px;
+  padding:24px; margin-bottom:14px;
+}
+.adm-section-head{
+  display:flex; justify-content:space-between; align-items:center;
+  margin-bottom:14px; gap:12px;
+}
+.adm-section-head h3{ margin:0; font-size:16px; font-weight:900; }
+
+.adm-empty{ color:#aaa; font-size:14px; text-align:center; padding:24px 0; }
+
+.adm-partner-list{ list-style:none; padding:0; margin:0; }
+.adm-partner-row{
+  display:grid; grid-template-columns:80px 1fr auto;
+  gap:14px; align-items:center;
+  padding:12px 0;
+  border-bottom:1px solid #f5f5f5;
+}
+.adm-partner-thumb{
+  width:80px; height:60px; border-radius:10px;
+  background:#f3f4f6; background-size:cover; background-position:center;
+}
+.adm-partner-meta{ display:flex; flex-direction:column; gap:2px; min-width:0; }
+.adm-partner-name{ font-size:15px; font-weight:800; }
+.adm-partner-sub{ font-size:12px; color:#666; }
+.adm-partner-sub.muted{ color:#aaa; }
+.adm-partner-actions{ display:flex; gap:6px; }
+
+.adm-btn{
+  height:34px; padding:0 14px;
+  border:1px solid #eee; background:#fafafa; color:#333;
+  border-radius:10px; font-weight:700; font-size:13px;
+  cursor:pointer;
+}
+.adm-btn.primary{ background:#ff2e7e; border-color:#ff2e7e; color:#fff; }
+.adm-btn.primary:disabled{ opacity:.6; cursor:not-allowed; }
+.adm-btn.small{ height:30px; padding:0 10px; font-size:12px; border-radius:8px; }
+.adm-btn.danger{
+  color:#d92626; border-color:#f3b0b0; background:#fff;
+}
+.adm-btn.danger:hover:not(:disabled){
+  background:#d92626; color:#fff; border-color:#d92626;
+}
+.adm-btn.danger:disabled{ opacity:.5; cursor:not-allowed; }
+
+/* ===== 모달 ===== */
+.adm-modal-mask{
+  position:fixed; inset:0; z-index:9999;
+  background:rgba(0,0,0,.4);
+  display:grid; place-items:center;
+  padding:20px;
+}
+.adm-modal{
+  width:100%; max-width:780px; max-height:90vh;
+  background:#fff; border-radius:16px;
+  display:flex; flex-direction:column;
+  box-shadow:0 10px 40px rgba(0,0,0,.2);
+}
+.adm-modal-head{
+  display:flex; justify-content:space-between; align-items:center;
+  padding:16px 20px;
+  border-bottom:1px solid #f0f0f0;
+}
+.adm-modal-close{
+  border:none; background:none; cursor:pointer;
+  font-size:18px; color:#888;
+}
+.adm-modal-body{ padding:20px; overflow-y:auto; }
+.adm-modal-foot{
+  display:flex; justify-content:flex-end; gap:8px;
+  padding:14px 20px;
+  border-top:1px solid #f0f0f0;
+}
+.adm-form-error{
+  margin:12px 0 0; padding:10px 12px;
+  background:#fff5f5; border:1px solid #f3b0b0; border-radius:8px;
+  color:#d92626; font-size:13px;
+}
+
+.adm-form-grid{
+  display:grid; grid-template-columns:1fr 1fr; gap:12px;
+}
+.adm-field{ display:flex; flex-direction:column; gap:4px; }
+.adm-field.full{ grid-column:1 / -1; }
+.adm-field span{ font-size:12px; font-weight:700; color:#666; }
+.adm-field input, .adm-field textarea, .adm-field select{
+  padding:10px 12px;
+  border:1.5px solid #eee; border-radius:8px;
+  font-size:14px; background:#fff;
+  font-family:inherit;
+}
+.adm-field input{ height:40px; padding:0 12px; }
+.adm-field select{ height:40px; padding:0 12px; }
+.adm-field input:focus, .adm-field textarea:focus, .adm-field select:focus{
+  outline:none; border-color:#ff2e7e;
+}
+
+.adm-img-row{
+  display:flex; gap:10px; align-items:center;
+  margin:6px 0 10px;
+}
+.adm-img-file{ display:none; }
+.adm-hint{ font-size:12px; color:#999; }
+
+.adm-img-grid{
+  list-style:none; padding:0; margin:0;
+  display:grid; grid-template-columns:repeat(4, 1fr); gap:8px;
+}
+.adm-img-item{
+  position:relative; aspect-ratio:4/3;
+  border:2px solid transparent; border-radius:8px;
+  overflow:hidden;
+}
+.adm-img-item.on{ border-color:#ff2e7e; }
+.adm-img-item img{ width:100%; height:100%; object-fit:cover; }
+.adm-img-actions{
+  position:absolute; bottom:4px; left:4px; right:4px;
+  display:flex; gap:4px; opacity:0;
+  transition:opacity .15s;
+}
+.adm-img-item:hover .adm-img-actions{ opacity:1; }
+.adm-img-actions .adm-btn{
+  flex:1; height:24px; padding:0 6px; font-size:11px;
+}
+
+@media (max-width:768px){
+  .adm-form-grid{ grid-template-columns:1fr; }
+  .adm-img-grid{ grid-template-columns:repeat(2, 1fr); }
+  .adm-partner-row{ grid-template-columns:60px 1fr; }
+  .adm-partner-thumb{ width:60px; height:45px; }
+  .adm-partner-actions{ grid-column:1 / -1; }
+}
+
+:root[data-theme="dark"] .adm-section,
+:root[data-theme="black"] .adm-section{ background:#1c1c1c; border-color:#2a2a2a; color:#eee; }
+:root[data-theme="dark"] .adm-modal,
+:root[data-theme="black"] .adm-modal{ background:#1c1c1c; color:#eee; }
+:root[data-theme="dark"] .adm-field input,
+:root[data-theme="dark"] .adm-field textarea,
+:root[data-theme="dark"] .adm-field select,
+:root[data-theme="black"] .adm-field input,
+:root[data-theme="black"] .adm-field textarea,
+:root[data-theme="black"] .adm-field select{ background:#222; border-color:#2a2a2a; color:#eee; }
+</style>

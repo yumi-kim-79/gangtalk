@@ -116,6 +116,7 @@ const platformMenus = [
   { to: '/admin/stores',        emoji: '🏢', label: '현황판 업소 관리' },
   { to: '/admin/top5',          emoji: '🏆', label: '가게찾기 Top5' },
   { to: '/admin/banners',       emoji: '📢', label: '배너 관리' },
+  { to: '/admin/partners',      emoji: '🤝', label: '제휴업체 관리' },
   { to: '/admin/news',          emoji: '📰', label: '뉴스/한줄' },
   { to: '/admin/inbox',         emoji: '📬', label: '메시지함' },
   { to: '/admin/biz-accounts',  emoji: '👥', label: '업체 계정 관리' },
