@@ -151,16 +151,46 @@ const storage = getStorage(app)
 // 퍼시스턴스 (IndexedDB → LocalStorage → InMemory 순 폴백).
 // firebaseReady 가 시작되기 전에 끝나도록 모듈 스코프 promise 로 노출.
 const persistenceReady = (async () => {
+  // [DIAG]
+  console.log('[DIAG] persistenceReady START', { t: performance.now().toFixed(1) })
   try {
     await setPersistence(auth, indexedDBLocalPersistence)
-  } catch {
+    console.log('[DIAG] persistenceReady = indexedDB', { t: performance.now().toFixed(1) })
+  } catch (e1) {
+    console.warn('[DIAG] persistenceReady indexedDB FAIL', e1?.code || e1?.message)
     try {
       await setPersistence(auth, browserLocalPersistence)
-    } catch {
+      console.log('[DIAG] persistenceReady = browserLocal', { t: performance.now().toFixed(1) })
+    } catch (e2) {
+      console.warn('[DIAG] persistenceReady browserLocal FAIL', e2?.code || e2?.message)
       await setPersistence(auth, inMemoryPersistence)
+      console.log('[DIAG] persistenceReady = inMemory (volatile!)', { t: performance.now().toFixed(1) })
     }
   }
-})().catch(() => {})
+})().catch((e) => { console.warn('[DIAG] persistenceReady IIFE catch:', e?.code || e?.message) })
+
+/* [DIAG] 전역 onAuthStateChanged + onIdTokenChanged 추적 — 모든 발화 로그.
+ *   ensureSignedIn 의 unsub onAuthStateChanged 와는 별개. 한 번만 등록되어
+ *   페이지 라이프타임 동안 모든 인증 변화를 기록. */
+import { onIdTokenChanged } from 'firebase/auth'
+onAuthStateChanged(auth, (u) => {
+  console.log('[DIAG] onAuthStateChanged', {
+    t: performance.now().toFixed(1),
+    has_user: !!u,
+    uid: u?.uid || null,
+    email: u?.email || null,
+    isAnonymous: u?.isAnonymous ?? null,
+  })
+})
+onIdTokenChanged(auth, (u) => {
+  console.log('[DIAG] onIdTokenChanged', {
+    t: performance.now().toFixed(1),
+    has_user: !!u,
+    uid: u?.uid || null,
+    email: u?.email || null,
+    isAnonymous: u?.isAnonymous ?? null,
+  })
+})
 
 /* ──────────────────────────────────────────────────────────
    4) 인증 부트스트랩 — 익명 자동 로그인 폐지 (2026-06-18)

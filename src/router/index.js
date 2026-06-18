@@ -437,8 +437,23 @@ router.beforeEach(async (to, from) => {
   // requiresAuth 메타도 탭 루트에서는 무시
   const effectiveNeedAuth = needAuth && !isTabRoot
 
+  // [DIAG] 가드 판정 결과 한 줄 로그 — 매 navigation 마다
+  const _diagPayload = {
+    t: performance.now().toFixed(1),
+    to: to.fullPath,
+    toName,
+    logged,
+    rawLogged,
+    'a.loggedIn': a.loggedIn,
+    email,
+    myType,
+    needAuth,
+    isTabRoot,
+  }
+
   // 1) 클릭해야 들어가는 상세/채팅 등: 비로그인 상태면 회원가입 화면으로 유도
   if (!logged && needLoginOnClick) {
+    console.log('[DIAG] GUARD REDIRECT to /auth (needLoginOnClick)', _diagPayload)
     window.alert('회원가입 후 이용해 주세요')
     return {
       path: '/auth',
@@ -451,6 +466,7 @@ router.beforeEach(async (to, from) => {
 
   // 2) 그 외 페이지: 비로그인 상태면 /auth 로 보냄 (auth/support/탭루트 제외)
   if (!logged && !publicForGuests.has(toName) && !isTabRoot) {
+    console.log('[DIAG] GUARD REDIRECT to /auth (not logged, not public, not tabRoot)', _diagPayload)
     return {
       path: '/auth',
       query: {
@@ -463,11 +479,13 @@ router.beforeEach(async (to, from) => {
   // 3) 이미 로그인했는데 /auth 로 가려 하면 마이페이지/next로 보냄
   if (to.name === 'auth' && logged) {
     const nextPath = (to.query?.next && String(to.query.next)) || '/mypage'
+    console.log('[DIAG] GUARD pass-through (logged → leaving /auth)', { ..._diagPayload, nextPath })
     return nextPath
   }
 
   // 4) meta.requiresAuth 라우트 처리(탭 루트는 제외)
   if (effectiveNeedAuth && !logged) {
+    console.log('[DIAG] GUARD REDIRECT to /auth (effectiveNeedAuth && !logged)', _diagPayload)
     const who = requiredRole === 'company' ? 'biz' : 'user'
     return {
       path: '/auth',

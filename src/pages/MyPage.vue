@@ -373,6 +373,26 @@ const effectiveLoggedIn = computed(() => {
   return true
 })
 
+// [DIAG] effectiveLoggedIn 변화 추적 — LoggedOutSection ("로그인이 필요합니다") 렌더 시점 표시
+import { watch as _diagWatch } from 'vue'
+_diagWatch(effectiveLoggedIn, (next, prev) => {
+  const s = state?.value || state || {}
+  console.log('[DIAG] MyPage effectiveLoggedIn changed', {
+    t: performance.now().toFixed(1),
+    next,
+    prev,
+    state_loggedIn: s.loggedIn,
+    state_type: s.type,
+    state_email: s.profile?.email || s.email || null,
+    state_nickname: s.profile?.nickname || s.nickname || null,
+  })
+  if (next === false) {
+    console.log('[DIAG] MYPAGE LOGIN REQUIRED rendered', {
+      t: performance.now().toFixed(1),
+    })
+  }
+}, { immediate: true })
+
 /* 리워드 금액 */
 const userReward = computed(() => {
   const s = state?.value || {}
