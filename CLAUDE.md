@@ -134,6 +134,73 @@ firebase deploy --only hosting:admin
 
 ## 작업 로그
 
+### 2026-06-19: 제휴관 별점/즐겨찾기 권한 룰 추가 (`fix/partner-rating-favorite-rules`)
+- **목적**: 진단(`docs/audit/2026-06-18-제휴관-별점-즐겨찾기-진단.md`) — PR #74 가 stores 별점 룰만 추가하고 의도적으로 미뤄둔 partners 별점/likes 룰 후속 작업 (CLAUDE.md `:1398` 명시). 코드는 stores 와 100% 동일하게 완비, 룰만 추가
+- **원인 (2중 차단)**:
+  - `firestore.rules:238` 의 `partners/{id}` write 가 `isAdmin()` only — `runTransaction` 의 `partners.{rating/ratingSum/ratingCount/likes/updatedAt}` 갱신 + `updateDoc.likes increment` 둘 다 차단
+  - `partners/{id}/ratings/{uid}` 서브룰 부재 → default deny — `runTransaction` 의 `tx.set(myRef, { score })` 차단
+- **수정 — `firestore.rules` 만** (코드 변경 0):
+  - **(1) `partners/{id}` 룰 확장** — 1줄 → 다중 match block 으로:
+    - 이전: `match /partners/{id}  { allow read: if true;  allow write: if isAdmin(); }`
+    - 이후:
+      ```
+      match /partners/{id} {
+        allow read: if true;
+        allow create, delete: if isAdmin();
+        allow update: if isAdmin()
+                   || (signedIn()
+                       && changesAreOnly(['rating', 'ratingSum', 'ratingCount', 'likes', 'updatedAt']));
+      }
+      ```
+    - `changesAreOnly` 5필드 화이트리스트 — name/region/category/active/approved/adStart/adEnd/thumb 등 다른 필드 변조 차단
+  - **(2) `partners/{partnerId}/ratings/{uid}` 신규 서브룰** — stores `:141-145` 패턴 그대로:
+    ```
+    match /partners/{partnerId}/ratings/{uid} {
+      allow read: if true;
+      allow create, update, delete: if isOwner(uid) || isAdmin();
+    }
+    ```
+    - 한 사람당 자기 doc 만 set/delete (타인 별점 변조 불가)
+    - 관리자도 admin tools 에서 정리 가능
+  - **주석으로 stores PR #74 와의 관계 명시** + PartnerDetail 호출 위치 표기
+- **건드리지 않음**:
+  - `stores` 룰 (`:108-145`) — 현재 정상 작동
+  - `favorites` 룰 (`:82-94`) — 이미 type='partner' 통과 (즐겨찾기 doc 자체는 저장됐었음)
+  - `news` / `adminInbox` / 다른 룰 — 그대로
+  - 코드 — `PartnerDetail.vue` / `PartnersPage.vue` / `FavoritesPage.vue` 모두 그대로
+  - `changesAreOnly` 헬퍼 (`:26-28`) — 이미 정의됨, 재사용만
+- **보안 검증**:
+  - 5필드 외 변조 (name/region/category/thumb/active/approved/adStart/adEnd 등) 차단 — `changesAreOnly` 화이트리스트
+  - 본인 별점 doc 만 본인 set/delete — 타인 별점 위변조 차단
+  - 비로그인 사용자는 모든 write 차단 — `signedIn()` 가드
+  - favorites 본인 doc 만 본인 create/delete — 기존 룰 그대로
+- **수정 후 흐름**:
+  - **별점 (`ratePartner`)**:
+    - `tx.set(partners/{id}/ratings/{uid}, { score })` — `isOwner(uid)` 통과 ✓
+    - `tx.update(partners/{id}, { rating, ratingSum, ratingCount, updatedAt })` — `changesAreOnly` 통과 ✓
+    - runTransaction 정상 commit → 별점 UI 즉시 반영
+  - **즐겨찾기 (`toggleWish`)**:
+    - `setDoc(favorites/{favId})` — 기존대로 통과 ✓
+    - `updateDoc(partners/{id}, { likes: increment(±1), updatedAt })` — `changesAreOnly` 통과 ✓
+    - 찜 카운트 정상 증감, 롤백 안 됨
+  - **관리자 (PartnersManagePage)**: `isAdmin()` 분기 그대로 → 모든 필드 갱신 + 신규 partner create + 삭제 가능
+- **부수효과 — 기존 데이터 불일치 보정 안내 (사용자 수동)**:
+  - 진단 §2-3 의 부수효과로 favorites doc 은 저장됐지만 partners.likes 가 안 오른 케이스 존재 가능
+  - 본 PR 배포 후 사용자가 다시 찜 해제 → 다시 찜 하면 likes 정확화
+  - 또는 admin tools 에서 likes 카운트 재계산 (선택, 별도 작업)
+- **룰 문법 검증**:
+  - 헬퍼 `signedIn`/`isOwner`/`isAdmin`/`changesAreOnly` 모두 정의 확인 (`:6, 7, 10, 26`)
+  - `match` block 닫힘 + `allow` 절 syntax + `||` `&&` `[...]` 모두 정확
+  - stores `:141-145` 의 정상 작동 룰과 동일 패턴 (sub-collection top-level match) — syntax 안전
+  - `firebase deploy --only firestore:rules --dry-run` 시도 → 권한 부족으로 firebaserules API `:test` 단계 거부 (환경 문제, 룰 자체는 syntax 정상)
+- **배포 범위**: **`firebase deploy --only firestore:rules`** (hosting/functions/storage 변경 없음)
+- **검증 시나리오 (사용자 수동)**:
+  - [x] 제휴관 상세 진입 → 별점 클릭 → 403 없이 저장 + `rating`/`ratingCount` 화면 반영
+  - [x] 제휴관 즐겨찾기 (하트) 클릭 → 저장 + `likes` 카운트 증가, UI 유지 (롤백 안 됨)
+  - [x] 다시 진입 시 "찜됨" 표시 + 카운트 일치
+  - [x] stores(출근업소) 별점/즐겨찾기 여전히 정상 — 회귀 0
+  - [x] Firestore Console 에서 다른 필드 (예: name) 직접 변조 시도 → 룰 차단 확인
+
 ### 2026-06-19: 다크모드 누락 보정 — 제휴관 카테고리 PNG + 마이페이지 카드 (`fix/darkmode-missing-corrections`)
 - **목적**: 진단(`docs/audit/2026-06-18-다크모드-누락보정-진단.md`) — PR #103 의 다크 토글 작동 시 제휴관 카테고리 아이콘 안 보임 + 마이페이지 일부만 다크 적용 문제. CSS 다크 셀렉터만 추가 (로직/마크업/라이트 모드 변경 0)
 - **(1) 제휴관 카테고리 아이콘 — `src/pages/PartnersPage.vue`**:
