@@ -145,8 +145,9 @@ const auth = getAuth(app)
 const db = getFirestore(app)
 const storage = getStorage(app)
 
-// 퍼시스턴스 (IndexedDB → LocalStorage → InMemory 순 폴백)
-;(async () => {
+// 퍼시스턴스 (IndexedDB → LocalStorage → InMemory 순 폴백).
+// firebaseReady 가 시작되기 전에 끝나도록 모듈 스코프 promise 로 노출.
+const persistenceReady = (async () => {
   try {
     await setPersistence(auth, indexedDBLocalPersistence)
   } catch {
@@ -160,13 +161,47 @@ const storage = getStorage(app)
 
 /* ──────────────────────────────────────────────────────────
    4) 익명 로그인 보장 + 외부 준비 Promise
+   ──────────────────────────────────────────────────────────
+   race 차단 (2026-06-18):
+   - 이전: onAuthStateChanged 첫 콜백이 null 이면 즉시 signInAnonymously
+     → SDK 가 indexedDB/localStorage 에서 실계정 복원 중인 동안 익명 user 가
+       currentUser 점유 → 실계정 잃음
+   - 이후:
+     ① persistence 설정 완료 대기
+     ② 첫 콜백이 user 면 즉시 채택, null 이면 grace period (2500ms) 대기
+     ③ grace 동안 두 번째 콜백이 user 주면 그 user 채택
+     ④ grace 후에도 user 없으면 그제야 익명 로그인 (진짜 비로그인)
    ────────────────────────────────────────────────────────── */
+const RESTORE_GRACE_MS = 2500
+
 async function ensureSignedIn() {
+  // ① persistence 설정 완료까지 대기 — 미설정 상태에서 signInAnonymously 호출 시
+  //    in-memory 폴백으로 저장될 수 있어 새로고침 시 사라짐.
+  await persistenceReady
+
   if (auth.currentUser) return auth.currentUser
-  const existing = await new Promise(resolve => {
-    const unsub = onAuthStateChanged(auth, u => { unsub(); resolve(u || null) })
+
+  // ② onAuthStateChanged 의 첫 user 발화를 대기. null 발화는 grace 동안 무시.
+  const restored = await new Promise((resolve) => {
+    let done = false
+    let unsub = () => {}
+    const finish = (u) => {
+      if (done) return
+      done = true
+      try { unsub() } catch {}
+      clearTimeout(timer)
+      resolve(u || null)
+    }
+    const timer = setTimeout(() => finish(auth.currentUser || null), RESTORE_GRACE_MS)
+    unsub = onAuthStateChanged(auth, (u) => {
+      if (u) finish(u)
+      // u=null 일 때는 SDK 가 아직 복원 중일 수 있으므로 timer 만료까지 더 기다림.
+    })
   })
-  if (existing) return existing
+
+  if (restored) return restored
+
+  // ③ 진짜 비로그인 → 익명 로그인
   try {
     const cred = await signInAnonymously(auth)
     return cred.user ?? null
