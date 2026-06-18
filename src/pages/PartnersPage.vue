@@ -1650,6 +1650,15 @@ function refresh(){ loadPartners() }
   color:#ddd;
 }
 
+/* 다크 모드에서 PNG 아이콘 흰색 반전 (PNG 는 currentColor 무효)
+ * - active 시에도 같은 filter (line :1422-1424) — 충돌 없음, 흰색 일관
+ * - 진단: docs/audit/2026-06-18-다크모드-누락보정-진단.md §1
+ */
+:root[data-theme="dark"] .pp-cat-scroll .cat-icon,
+:root[data-theme="black"] .pp-cat-scroll .cat-icon{
+  filter: brightness(0) invert(1);
+}
+
 /* 드롭다운 팝업 */
 .region-pop{
   position:absolute;
