@@ -134,6 +134,64 @@ firebase deploy --only hosting:admin
 
 ## 작업 로그
 
+### 2026-06-18: 제휴업체 순서 변경 — 관리자 드래그 UI (`feat/admin-partner-order`)
+- **목적**: 진단(`docs/audit/2026-06-18-제휴업체-순서-top5-진단.md` PR A) — 사용자 PartnersPage 는 이미 `config/marketing.partnerOrder` 를 구독해 정렬 중. 관리자 측 편집 UI 만 부재. 그것만 추가
+- **수정 — `src/pages/admin/PartnersManagePage.vue` 만**:
+  - **import 확장**:
+    - `vue` → `computed, onBeforeUnmount, nextTick, watch` 추가
+    - `firebase/firestore` → `onSnapshot` 추가
+    - `import Sortable from 'sortablejs'` 신규
+  - **상태**:
+    - `partnerOrderRemote` — Firestore 마지막 read 값 (dirty 비교용)
+    - `partnerOrderLocal` — 로컬 드래그 결과
+    - `partnerOrderLoadedOnce` 가드 — 첫 onSnapshot 만 로컬 시드, 이후 외부 변경은 로컬 드래그 보호 (StoresManage Tab1 패턴)
+    - `savingOrder` 버튼 busy
+  - **`subMarketing`** — `onSnapshot(config/marketing)` 구독. `data.partnerOrder` 가 변하면 remote 갱신, 첫 로드면 local 도 시드
+  - **`orderedList` computed** — `partnerOrderLocal` 인덱스 우선 정렬, 없는 항목은 list 원본(updatedAt 역순) 끝에. 사용자 PartnersPage `:1030-1040` 와 동일 알고리즘
+  - **`orderDirty` computed** — local vs remote 비교. 다르면 "순서 저장" 버튼 활성
+  - **`reorderPartner(from, to)`** — `orderedList` displayIds 스플라이스 + 화면 외 잔존 ID 는 뒤에 보존 (StoresManage `reorderApproved` 패턴)
+  - **SortableJS** — `partnerListRef` + `initSortable(el)`:
+    - `handle: '.adm-drag-handle'`, `animation: 150`, `ghostClass: 'adm-drag-ghost'`
+    - `onEnd` — DOM 이동을 `insertBefore` 로 되돌리고 `reorderPartner(oldIndex, newIndex)` 만 호출 → Vue reactive 가 일관 렌더
+    - `watch(partnerListRef)` + `nextTick` 으로 마운트 직후 init, `onBeforeUnmount` 에서 destroy
+  - **`savePartnerOrder()`** — `setDoc(config/marketing, { partnerOrder: ids.map(String), partnerOrderSavedAt: serverTimestamp() }, { merge: true })`:
+    - **`merge:true` 로 `homeOrder` / `topRanks` / `partnerCardIndex` 등 다른 필드 보존**
+    - 성공 시 remote 즉시 동기 (onSnapshot 따라옴)
+- **마크업**:
+  - 섹션 헤더에 "순서 저장" 버튼 (`orderDirty && !savingOrder` 일 때 활성, 변경 없으면 "순서 저장됨" 표시)
+  - 섹션 헤더 아래 hint: 드래그 핸들(☰) 안내 + `config/marketing.partnerOrder` 키 명시
+  - 각 `<li class="adm-partner-row">` 좌측에 `<span class="adm-drag-handle">☰</span>` 추가 → grid `80px 1fr auto` → `32px 80px 1fr auto`
+  - `<ul ref="partnerListRef" class="adm-partner-list">` ref 부착
+- **CSS 추가**:
+  - `.adm-drag-handle` — 32×36 회색 배경, hover 시 핑크 톤. cursor grab/grabbing
+  - `.adm-drag-ghost` — 드래그 중 핑크 dashed 외곽선
+  - `.adm-section-actions` — 헤더 우측 버튼 flex
+  - `.adm-section-hint` + `.adm-section-hint code` — 작은 핑크 inline-code
+  - 모바일 (≤768px): grid `28px 60px 1fr`, 핸들 28×32, section-actions full-width
+  - 다크모드 보정 — 핸들/hint code 모두
+- **사용자 화면 코드 변경 0**:
+  - PartnersPage `partnerOrder` onSnapshot 이 이미 동작 중 → 관리자가 저장하면 즉시 반영
+  - `filtered` computed 의 인덱스 정렬도 그대로 (`:1030-1040`)
+- **건드리지 않음**:
+  - stores / `homeOrder` / `topRanks` / `partnerCardIndex` / `partnerCards` / `partnerCardList`
+  - partners 컬렉션 내 다른 필드 (`adStart/adEnd/active/approved/applyStatus/category` 등)
+  - 카테고리 키 통일 (진단 §4 PR C0 별도 PR)
+  - 노출 기간 UI (진단 §2 PR B 별도 PR)
+  - Top5 (진단 §3 PR C 별도 PR)
+  - `firestore.rules` / `storage.rules` / Cloud Functions / 회원 빌드 / 다른 admin 페이지
+- **흐름 (수정 후)**:
+  1. 관리자 → `/admin/partners` → 드래그 핸들 잡고 카드 위/아래 옮김
+  2. "순서 저장" 클릭 → `config/marketing.partnerOrder` 갱신 (다른 필드 merge 보존)
+  3. 사용자 → gangtox.com 제휴관 → 새 순서대로 표시 (PartnersPage onSnapshot 즉시 반영)
+- **빌드 검증**: `npm run build:admin` ✓ (PartnersManagePage JS 15.53→18.22KB, CSS 5.58→7.13KB, sortable.esm 청크 재사용으로 변화 없음) / 회원 빌드 영향 없음
+- **배포 범위**: `firebase deploy --only hosting:admin` (관리자 빌드만, 룰/Functions 변경 없음)
+- **검증 시나리오 (사용자 수동)**:
+  - [x] /admin/partners 에서 드래그 핸들로 카드 순서 변경 → "순서 저장" 버튼 활성
+  - [x] "순서 저장" → Firestore Console 에서 `config/marketing.partnerOrder` 배열 갱신 확인
+  - [x] `config/marketing` 의 `homeOrder` / `topRanks` / `partnerCardIndex` 등 다른 필드 그대로 보존
+  - [x] gangtox.com 제휴관 새로고침 → 새 순서로 표시
+  - [x] 관리자 페이지 새로고침 → 저장된 순서로 다시 보임
+
 ### 2026-06-18: 업체 본인 비밀번호 변경 기능 (`feat/biz-change-password`)
 - **목적**: 관리자가 `createBizAccount` 로 발급한 임시 비밀번호를 업체가 로그인 후 직접 본인 비밀번호로 변경
 - **위치**: `/biz/my-store` (BizMyStorePage) 하단에 별도 "🔒 비밀번호 변경" 섹션. 모달이 아닌 인라인 카드 (저장 폼 다음에 자연스럽게 노출)

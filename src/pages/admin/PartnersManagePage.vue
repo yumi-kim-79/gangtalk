@@ -22,17 +22,32 @@
 
     <section class="adm-section">
       <header class="adm-section-head">
-        <h3>제휴업체 목록 ({{ list.length }})</h3>
-        <button class="adm-btn primary" type="button" @click="openCreate" :disabled="loading">
-          + 새 제휴업체
-        </button>
+        <h3>제휴업체 목록 ({{ orderedList.length }})</h3>
+        <div class="adm-section-actions">
+          <button
+            class="adm-btn"
+            type="button"
+            :disabled="!orderDirty || savingOrder"
+            @click="savePartnerOrder"
+            :title="orderDirty ? '순서 변경사항을 저장합니다' : '변경된 순서 없음'"
+          >{{ savingOrder ? '순서 저장 중…' : (orderDirty ? '순서 저장' : '순서 저장됨') }}</button>
+          <button class="adm-btn primary" type="button" @click="openCreate" :disabled="loading">
+            + 새 제휴업체
+          </button>
+        </div>
       </header>
 
-      <p v-if="loading" class="adm-empty">불러오는 중…</p>
-      <p v-else-if="!list.length" class="adm-empty">등록된 제휴업체가 없습니다.</p>
+      <p class="adm-section-hint">
+        드래그 핸들(☰) 을 잡고 위/아래로 옮긴 뒤 "순서 저장" 을 누르면
+        <code>config/marketing.partnerOrder</code> 에 반영되어 사용자 제휴관 화면 순서가 즉시 바뀝니다.
+      </p>
 
-      <ul v-else class="adm-partner-list">
-        <li v-for="p in list" :key="p.id" class="adm-partner-row">
+      <p v-if="loading" class="adm-empty">불러오는 중…</p>
+      <p v-else-if="!orderedList.length" class="adm-empty">등록된 제휴업체가 없습니다.</p>
+
+      <ul v-else ref="partnerListRef" class="adm-partner-list">
+        <li v-for="p in orderedList" :key="p.id" class="adm-partner-row">
+          <span class="adm-drag-handle" title="드래그하여 순서 변경" aria-label="순서 변경">☰</span>
           <div class="adm-partner-thumb" :style="bgStyle(p.thumb)" />
           <div class="adm-partner-meta">
             <strong class="adm-partner-name">{{ p.name || '(이름 없음)' }}</strong>
@@ -209,15 +224,16 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, onBeforeUnmount, nextTick, watch } from 'vue'
 import { db as fbDb, storage as fbStorage } from '@/firebase'
 import {
   collection, doc, getDoc, getDocs, setDoc, deleteDoc, serverTimestamp,
-  query, limit,
+  onSnapshot, query, limit,
 } from 'firebase/firestore'
 import {
   ref as sRef, uploadBytes, getDownloadURL, listAll, deleteObject,
 } from 'firebase/storage'
+import Sortable from 'sortablejs'
 
 /* ───────── 카테고리 + 헬퍼 (useMyPageCore 에서 발췌) ───────── */
 const partnerCategoryOptions = [
@@ -317,6 +333,130 @@ async function loadList() {
 }
 
 onMounted(() => { loadList() })
+
+/* ───────── 순서 변경 (config/marketing.partnerOrder) =====
+ * 사용자 PartnersPage.vue:1014-1040 이 이미 partnerOrder 를 onSnapshot 구독하고
+ * 같은 키 기반 인덱스 정렬을 적용 중. 관리자가 여기서 setDoc(merge:true) 하면
+ * 사용자 제휴관 화면 순서가 즉시 바뀐다.
+ *
+ * 패턴: StoresManagePage.vue 의 SortableJS 구현 (initSortable/reorderApproved/
+ *       saveAllOrders) 을 partners 에 그대로 이식.
+ *
+ * 충돌 없음: homeOrder / topRanks / partnerCardIndex 등 다른 config/marketing 필드는
+ *           merge:true 로 보존. partnerOrder 만 갱신.
+ */
+const PARTNER_ORDER_FIELD = 'partnerOrder'
+const partnerOrderRemote = ref([])    // Firestore 에서 마지막으로 읽은 값 (saved 비교용)
+const partnerOrderLocal = ref([])     // 로컬 드래그 결과
+const partnerOrderLoadedOnce = ref(false)
+const savingOrder = ref(false)
+let unsubMarketing = null
+
+function subMarketing() {
+  try {
+    unsubMarketing = onSnapshot(doc(fbDb, 'config', 'marketing'), (snap) => {
+      const data = snap.exists() ? (snap.data() || {}) : {}
+      const arr = Array.isArray(data[PARTNER_ORDER_FIELD])
+        ? data[PARTNER_ORDER_FIELD].map(String)
+        : []
+      partnerOrderRemote.value = arr
+      // 첫 로드만 로컬에 반영. 이후 외부 변경은 로컬 드래그 보호 (StoresManage Tab1 패턴).
+      if (!partnerOrderLoadedOnce.value) {
+        partnerOrderLocal.value = arr.slice()
+        partnerOrderLoadedOnce.value = true
+      }
+    })
+  } catch (e) {
+    console.warn('[PartnersManage] subMarketing error:', e)
+  }
+}
+onMounted(subMarketing)
+onBeforeUnmount(() => { if (typeof unsubMarketing === 'function') try { unsubMarketing() } catch {} })
+
+/* orderedList: partnerOrderLocal 인덱스 우선, 없는 항목은 list 원본 (updatedAt 역순) 끝에 */
+const orderedList = computed(() => {
+  if (!partnerOrderLocal.value.length) return list.value.slice()
+  const pos = new Map(partnerOrderLocal.value.map((id, idx) => [String(id), idx]))
+  return list.value.slice().sort((a, b) => {
+    const ai = pos.has(String(a.id)) ? pos.get(String(a.id)) : Infinity
+    const bi = pos.has(String(b.id)) ? pos.get(String(b.id)) : Infinity
+    if (ai !== bi) return ai - bi
+    return 0
+  })
+})
+
+const orderDirty = computed(() => {
+  // 비교: 로컬 partnerOrder 와 Firestore remote 가 다른지
+  const a = partnerOrderLocal.value
+  const b = partnerOrderRemote.value
+  if (a.length !== b.length) return true
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return true
+  return false
+})
+
+function reorderPartner(fromIdx, toIdx) {
+  if (fromIdx < 0 || toIdx < 0 || fromIdx === toIdx) return
+  const displayIds = orderedList.value.map(p => String(p.id))
+  if (fromIdx >= displayIds.length || toIdx >= displayIds.length) return
+  const [moved] = displayIds.splice(fromIdx, 1)
+  displayIds.splice(toIdx, 0, moved)
+
+  // 현재 화면에 안 보이는 잔존 partnerOrder ID 는 뒤에 유지
+  const visibleSet = new Set(displayIds)
+  const tail = partnerOrderLocal.value.filter(id => !visibleSet.has(String(id)))
+  partnerOrderLocal.value = [...displayIds, ...tail]
+}
+
+/* SortableJS — PC/모바일 공용 */
+const partnerListRef = ref(null)
+let sortableInst = null
+function initSortable(el) {
+  if (!el) return
+  if (sortableInst) { try { sortableInst.destroy() } catch {} sortableInst = null }
+  sortableInst = Sortable.create(el, {
+    handle: '.adm-drag-handle',
+    animation: 150,
+    ghostClass: 'adm-drag-ghost',
+    onEnd(evt) {
+      const { oldIndex, newIndex } = evt
+      if (oldIndex === newIndex || oldIndex == null || newIndex == null) return
+      // SortableJS DOM 이동을 되돌리고 reactive 만 갱신 (Vue 일관 렌더)
+      const listEl = evt.from
+      listEl.insertBefore(evt.item, listEl.children[oldIndex])
+      reorderPartner(oldIndex, newIndex)
+    },
+  })
+}
+watch(partnerListRef, (el) => { if (el) initSortable(el) })
+onMounted(async () => {
+  await nextTick()
+  if (partnerListRef.value) initSortable(partnerListRef.value)
+})
+onBeforeUnmount(() => { if (sortableInst) try { sortableInst.destroy() } catch {} })
+
+async function savePartnerOrder() {
+  if (savingOrder.value) return
+  if (!orderDirty.value) return
+  savingOrder.value = true
+  try {
+    await setDoc(
+      doc(fbDb, 'config', 'marketing'),
+      {
+        [PARTNER_ORDER_FIELD]: partnerOrderLocal.value.map(String),
+        partnerOrderSavedAt: serverTimestamp(),
+      },
+      { merge: true },
+    )
+    // remote 즉시 동기 — onSnapshot 이 곧 따라옴
+    partnerOrderRemote.value = partnerOrderLocal.value.slice()
+    alert('제휴업체 순서가 저장되었습니다. 사용자 제휴관에 반영됩니다.')
+  } catch (e) {
+    console.error('[savePartnerOrder] fail', e)
+    alert('순서 저장 실패: ' + (e?.message || e))
+  } finally {
+    savingOrder.value = false
+  }
+}
 
 /* ───────── 모달 열기 ───────── */
 function openCreate() {
@@ -633,10 +773,35 @@ async function deletePartner(p) {
 
 .adm-partner-list{ list-style:none; padding:0; margin:0; }
 .adm-partner-row{
-  display:grid; grid-template-columns:80px 1fr auto;
+  display:grid; grid-template-columns:32px 80px 1fr auto;
   gap:14px; align-items:center;
   padding:12px 0;
   border-bottom:1px solid #f5f5f5;
+}
+
+/* 드래그 핸들 (SortableJS 와 짝) */
+.adm-drag-handle{
+  display:inline-flex; align-items:center; justify-content:center;
+  width:32px; height:36px;
+  border:1px solid #eee; border-radius:8px;
+  background:#fafafa; color:#888;
+  font-size:18px; font-weight:700;
+  cursor:grab; user-select:none;
+}
+.adm-drag-handle:hover{ background:#fff0f6; color:#ff2e7e; border-color:#ffd6e4; }
+.adm-drag-handle:active{ cursor:grabbing; }
+.adm-drag-ghost{
+  opacity:.6; background:#fff5f8 !important; border:1.5px dashed #ff2e7e !important;
+}
+
+/* 섹션 액션/힌트 */
+.adm-section-actions{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+.adm-section-hint{
+  margin:-4px 0 12px; font-size:12px; color:#888; line-height:1.5;
+}
+.adm-section-hint code{
+  background:#fafafa; padding:1px 6px; border-radius:4px;
+  font-size:11px; color:#ff2e7e; border:1px solid #f0f0f0;
 }
 .adm-partner-thumb{
   width:80px; height:60px; border-radius:10px;
@@ -748,9 +913,12 @@ async function deletePartner(p) {
 @media (max-width:768px){
   .adm-form-grid{ grid-template-columns:1fr; }
   .adm-img-grid{ grid-template-columns:repeat(2, 1fr); }
-  .adm-partner-row{ grid-template-columns:60px 1fr; }
+  .adm-partner-row{ grid-template-columns:28px 60px 1fr; }
   .adm-partner-thumb{ width:60px; height:45px; }
   .adm-partner-actions{ grid-column:1 / -1; }
+  .adm-drag-handle{ width:28px; height:32px; font-size:16px; }
+  .adm-section-actions{ width:100%; }
+  .adm-section-actions .adm-btn{ flex:1; }
 }
 
 :root[data-theme="dark"] .adm-section,
@@ -763,4 +931,16 @@ async function deletePartner(p) {
 :root[data-theme="black"] .adm-field input,
 :root[data-theme="black"] .adm-field textarea,
 :root[data-theme="black"] .adm-field select{ background:#222; border-color:#2a2a2a; color:#eee; }
+:root[data-theme="dark"] .adm-drag-handle,
+:root[data-theme="black"] .adm-drag-handle{
+  background:#222; border-color:#2a2a2a; color:#888;
+}
+:root[data-theme="dark"] .adm-drag-handle:hover,
+:root[data-theme="black"] .adm-drag-handle:hover{
+  background:#2a1a22; color:#ff86b9; border-color:#3a1d2a;
+}
+:root[data-theme="dark"] .adm-section-hint code,
+:root[data-theme="black"] .adm-section-hint code{
+  background:#222; border-color:#2a2a2a; color:#ff86b9;
+}
 </style>
