@@ -192,13 +192,75 @@
         </button>
       </footer>
     </section>
+
+    <!-- 비밀번호 변경 — 로그인된 업체 계정 본인 -->
+    <section v-if="currentEmail" class="adm-section">
+      <h3 class="adm-section-title">🔒 비밀번호 변경</h3>
+      <p class="adm-section-hint">
+        관리자가 발급한 임시 비밀번호를 본인 비밀번호로 변경하세요.
+        현재 비밀번호로 재인증 후 새 비밀번호로 변경됩니다.
+      </p>
+
+      <div class="adm-pw-grid">
+        <label class="adm-field">
+          <span>현재 비밀번호 *</span>
+          <input
+            v-model="pwForm.current"
+            type="password"
+            autocomplete="current-password"
+            placeholder="관리자가 전달한 임시 비밀번호"
+            :disabled="pwBusy"
+          />
+        </label>
+
+        <label class="adm-field">
+          <span>새 비밀번호 (6자 이상) *</span>
+          <input
+            v-model="pwForm.next"
+            type="password"
+            autocomplete="new-password"
+            placeholder="새 비밀번호"
+            :disabled="pwBusy"
+          />
+        </label>
+
+        <label class="adm-field">
+          <span>새 비밀번호 확인 *</span>
+          <input
+            v-model="pwForm.confirm"
+            type="password"
+            autocomplete="new-password"
+            placeholder="새 비밀번호 재입력"
+            :disabled="pwBusy"
+            @keyup.enter="onChangePassword"
+          />
+        </label>
+      </div>
+
+      <p v-if="pwError" class="adm-form-error">{{ pwError }}</p>
+      <p v-if="pwSuccess" class="adm-form-success">{{ pwSuccess }}</p>
+
+      <footer class="adm-section-foot">
+        <button
+          class="adm-btn primary"
+          type="button"
+          :disabled="pwBusy || !canSubmitPw"
+          @click="onChangePassword"
+        >
+          {{ pwBusy ? '변경 중…' : '비밀번호 변경' }}
+        </button>
+      </footer>
+    </section>
   </div>
 </template>
 
 <script setup>
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute } from 'vue-router'
-import { getAuth, onAuthStateChanged } from 'firebase/auth'
+import {
+  getAuth, onAuthStateChanged,
+  EmailAuthProvider, reauthenticateWithCredential, updatePassword,
+} from 'firebase/auth'
 import { db as fbDb, storage as fbStorage } from '@/firebase'
 import {
   collection, doc, onSnapshot, updateDoc, setDoc,
@@ -538,6 +600,87 @@ async function createNewStore() {
     saving.value = false
   }
 }
+
+/* ───────── 비밀번호 변경 ─────────
+ * 관리자가 createBizAccount 로 발급한 임시 비밀번호를 본인 비밀번호로 변경.
+ * Firebase: reauthenticateWithCredential(현재 비번) → updatePassword(새 비번).
+ * 현재 비밀번호는 평문 저장/로깅/표시 절대 금지 — Firebase 가 해시로만 저장.
+ * 입력값은 반응형 상태로만 보관, 성공/실패 즉시 초기화.
+ */
+const pwForm = ref({ current: '', next: '', confirm: '' })
+const pwBusy = ref(false)
+const pwError = ref('')
+const pwSuccess = ref('')
+
+const canSubmitPw = computed(() => {
+  const f = pwForm.value
+  return !!f.current && !!f.next && !!f.confirm
+})
+
+function resetPwForm() {
+  pwForm.value = { current: '', next: '', confirm: '' }
+}
+
+async function onChangePassword() {
+  if (pwBusy.value) return
+  pwError.value = ''
+  pwSuccess.value = ''
+
+  const f = pwForm.value
+  if (!f.current || !f.next || !f.confirm) {
+    pwError.value = '모든 항목을 입력해 주세요.'
+    return
+  }
+  if (f.next.length < 6) {
+    pwError.value = '새 비밀번호는 6자 이상이어야 합니다.'
+    return
+  }
+  if (f.next !== f.confirm) {
+    pwError.value = '새 비밀번호와 확인이 일치하지 않습니다.'
+    return
+  }
+  if (f.current === f.next) {
+    pwError.value = '새 비밀번호가 현재 비밀번호와 동일합니다.'
+    return
+  }
+
+  const auth = getAuth()
+  const user = auth.currentUser
+  if (!user || !user.email) {
+    pwError.value = '로그인이 필요합니다.'
+    return
+  }
+
+  pwBusy.value = true
+  try {
+    // 재인증 (Firebase 가 최근 로그인 시점에서 시간 경과 시 요구)
+    const cred = EmailAuthProvider.credential(user.email, f.current)
+    await reauthenticateWithCredential(user, cred)
+    // 새 비밀번호 적용
+    await updatePassword(user, f.next)
+
+    pwSuccess.value = '비밀번호가 변경되었습니다. 다음 로그인부터 새 비밀번호를 사용하세요.'
+    resetPwForm()
+  } catch (e) {
+    const code = String(e?.code || '')
+    if (code.includes('wrong-password') || code.includes('invalid-credential') || code.includes('invalid-login-credentials')) {
+      pwError.value = '현재 비밀번호가 올바르지 않습니다.'
+    } else if (code.includes('weak-password')) {
+      pwError.value = '새 비밀번호가 너무 약합니다. (6자 이상 + 추측 어려운 조합)'
+    } else if (code.includes('too-many-requests')) {
+      pwError.value = '요청이 너무 잦습니다. 잠시 후 다시 시도해 주세요.'
+    } else if (code.includes('requires-recent-login')) {
+      pwError.value = '보안을 위해 다시 로그인한 후 시도해 주세요.'
+    } else if (code.includes('network-request-failed')) {
+      pwError.value = '네트워크 오류입니다. 연결을 확인해 주세요.'
+    } else {
+      pwError.value = '변경 실패: ' + (e?.message || code || '알 수 없는 오류')
+    }
+    console.warn('[changePassword] fail', code)
+  } finally {
+    pwBusy.value = false
+  }
+}
 </script>
 
 <style scoped>
@@ -602,6 +745,29 @@ async function createNewStore() {
 .adm-section-title{
   margin:0 0 18px; font-size:18px; font-weight:900;
 }
+.adm-section-hint{
+  margin:-10px 0 16px;
+  font-size:13px; color:#888; line-height:1.5;
+}
+
+/* 비밀번호 변경 섹션 */
+.adm-pw-grid{
+  display:grid; grid-template-columns:1fr;
+  gap:14px;
+  margin-bottom:12px;
+}
+.adm-form-error{
+  margin:8px 0 0; color:#c0392b; font-size:13px; font-weight:700;
+}
+.adm-form-success{
+  margin:8px 0 0; color:#2e8b57; font-size:13px; font-weight:700;
+}
+:root[data-theme='dark'] .adm-section-hint,
+:root[data-theme='black'] .adm-section-hint{ color:#999; }
+:root[data-theme='dark'] .adm-form-error,
+:root[data-theme='black'] .adm-form-error{ color:#ff8a80; }
+:root[data-theme='dark'] .adm-form-success,
+:root[data-theme='black'] .adm-form-success{ color:#7fd99e; }
 
 .adm-form-grid{
   display:grid; grid-template-columns:1fr 1fr;
