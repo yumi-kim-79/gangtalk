@@ -302,7 +302,7 @@ import AppHeader from '@/components/common/AppHeader.vue'
 import { db, firebaseReady } from '@/firebase'
 import {
   collection, onSnapshot, query, orderBy, doc,
-  getDoc, setDoc, updateDoc, serverTimestamp, getDocs, limit
+  getDoc, setDoc, updateDoc, deleteDoc, serverTimestamp, getDocs, where, limit
 } from 'firebase/firestore'
 import { getStorage, ref as sRef, getDownloadURL } from 'firebase/storage'
 import { getAuth, onAuthStateChanged } from 'firebase/auth'
@@ -894,27 +894,93 @@ function openFilter(){
   type.value = 'all'
 }
 
-/* ===== 찜(로컬 저장) ===== */
-const favSet = ref(new Set())
-function _loadFavs(){
+/* ===== 찜(Firestore favorites 통일) =====
+ * 2026-06-18 변경: localStorage(mp:favs) → 루트 favorites 컬렉션으로 통일.
+ *   - PartnerDetail.vue 의 favDocId 패턴(`${uid}__${type}__${targetId}`) 과 호환
+ *   - FavoritesPage.vue 의 `favorites where ownerId == uid` 구독에 즉시 반영
+ *   - 디바이스/브라우저 간 동기화
+ *   - 비로그인 사용자는 하트 클릭 시 /auth 로 안내
+ * 룰: firestore.rules 의 favorites 매치 (본 PR 동시 추가).
+ */
+const favSet = ref(new Set())   // 본인 즐겨찾기 storeId 집합
+let unsubFav = null
+
+const FAV_TYPE = 'store'
+const favDocIdFor = (uid, storeId) => `${uid}__${FAV_TYPE}__${storeId}`
+
+function subscribeFavorites(uid){
+  if (typeof unsubFav === 'function') { try { unsubFav() } catch {} ; unsubFav = null }
+  if (!uid) { favSet.value = new Set(); return }
   try {
-    const raw = localStorage.getItem('mp:favs')
-    const arr = raw ? JSON.parse(raw) : []
-    favSet.value = new Set(Array.isArray(arr) ? arr.map(String) : [])
-  } catch { favSet.value = new Set() }
+    const q = query(
+      collection(db, 'favorites'),
+      where('ownerId', '==', uid),
+      where('type', '==', FAV_TYPE),
+    )
+    unsubFav = onSnapshot(q, (snap) => {
+      const next = new Set()
+      snap.forEach(d => {
+        const data = d.data() || {}
+        if (data.targetId) next.add(String(data.targetId))
+      })
+      favSet.value = next
+    }, (e) => {
+      console.warn('[favorites] onSnapshot error:', e?.code || e?.message)
+    })
+  } catch (e) {
+    console.warn('[favorites] subscribe failed:', e)
+  }
 }
-function _saveFavs(){
-  try { localStorage.setItem('mp:favs', JSON.stringify(Array.from(favSet.value))) } catch {}
-}
-_loadFavs()
+
+// auth 변동 시 favorites 재구독 (currentUser 는 아래에서 ref 로 정의됨 — TDZ 회피 위해
+// onMounted 안에서 watch 등록).
+onMounted(() => {
+  watch(currentUser, (u) => {
+    subscribeFavorites(u?.uid || '')
+  }, { immediate: true })
+})
+
+onUnmounted(() => {
+  if (typeof unsubFav === 'function') { try { unsubFav() } catch {} ; unsubFav = null }
+})
+
 function isFav(s){ return s?.id ? favSet.value.has(String(s.id)) : false }
-function toggleFav(s){
+
+async function toggleFav(s){
   if (!s?.id) return
-  const id = String(s.id)
-  const next = new Set(favSet.value)
-  if (next.has(id)) next.delete(id); else next.add(id)
-  favSet.value = next
-  _saveFavs()
+  const u = currentUser.value
+  if (!u || !u.uid) {
+    // 비로그인 — 로그인 페이지로 안내
+    try { router.push({ path: '/auth', query: { next: route.fullPath, mode: 'login' } }) } catch {}
+    return
+  }
+  const storeId = String(s.id)
+  const favId = favDocIdFor(u.uid, storeId)
+  const wasFav = favSet.value.has(storeId)
+
+  // 낙관적 업데이트 (onSnapshot 가 곧 진실로 덮어씀)
+  const optimistic = new Set(favSet.value)
+  if (wasFav) optimistic.delete(storeId); else optimistic.add(storeId)
+  favSet.value = optimistic
+
+  try {
+    if (wasFav) {
+      await deleteDoc(doc(db, 'favorites', favId))
+    } else {
+      await setDoc(doc(db, 'favorites', favId), {
+        ownerId : u.uid,
+        type    : FAV_TYPE,
+        targetId: storeId,
+        createdAt: serverTimestamp(),
+      }, { merge: true })
+    }
+  } catch (e) {
+    console.warn('[favorites] toggle failed:', e?.code || e?.message)
+    // 롤백 (onSnapshot 이 정상이면 자동 정합되지만, 권한 에러 등은 명시 롤백)
+    const rb = new Set(favSet.value)
+    if (wasFav) rb.add(storeId); else rb.delete(storeId)
+    favSet.value = rb
+  }
 }
 
 /* ===== 별점/리뷰 (스토어 데이터 우선, 폴백 기본값) ===== */

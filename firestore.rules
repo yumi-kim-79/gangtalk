@@ -69,6 +69,30 @@ service cloud.firestore {
       allow create, update, delete: if isOwner(uid) || isAdmin();
     }
 
+    /* ===== 즐겨찾기(favorites) =====
+     * 통일 경로 (2026-06-18):
+     *  - 모든 즐겨찾기는 루트 /favorites/{favId} 컬렉션 사용
+     *  - favId 패턴: `${uid}__${type}__${targetId}` (MainPage / PartnerDetail / FavoritesPage 공유)
+     *  - payload: { ownerId, type, targetId, createdAt }
+     *  - read: 본인 doc 만. list 쿼리는 클라이언트가 where(ownerId, ==, uid) 강제
+     *  - create: 본인 uid 로만 ownerId 박을 수 있음
+     *  - delete: 본인 또는 관리자
+     *  - update: 본인 만, ownerId/type/targetId 변경 금지
+     */
+    match /favorites/{favId} {
+      allow read: if signedIn()
+                  && (resource.data.ownerId == request.auth.uid || isAdmin());
+      allow create: if signedIn()
+                    && request.resource.data.ownerId == request.auth.uid;
+      allow delete: if signedIn()
+                    && (resource.data.ownerId == request.auth.uid || isAdmin());
+      allow update: if signedIn()
+                    && resource.data.ownerId == request.auth.uid
+                    && request.resource.data.ownerId == resource.data.ownerId
+                    && request.resource.data.type == resource.data.type
+                    && request.resource.data.targetId == resource.data.targetId;
+    }
+
     /* ===== 가게(stores) =====
      * - read: 공개 (현황판/가게찾기 표시)
      * - create: 본인 uid 로만 ownerId 박을 수 있음 (자가등록)
