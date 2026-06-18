@@ -134,6 +134,79 @@ firebase deploy --only hosting:admin
 
 ## 작업 로그
 
+### 2026-06-19: 와이파이→혼잡도 라벨 + 마이페이지 다크모드 토글 (`feat/congestion-label-darkmode-toggle`)
+- **목적**: 진단(`docs/audit/2026-06-18-혼잡도-다크모드-진단.md`) 의 두 작업 단일 PR
+  - (1) 현황판 "와이파이" 라벨 정정 → "혼잡도" (데이터/로직은 이미 혼잡도, 라벨만 틀렸음)
+  - (2) 마이페이지에 주간/야간 모드 토글 추가 (인프라 완비, UI 만 부재)
+
+#### (1) 현황판 라벨/아이콘 정정 — `src/pages/MainPage.vue:128-141`
+- **마크업 변경 2건만**:
+  - 라벨 `<div class="mp-metric-label">와이파이</div>` → `혼잡도`
+  - WiFi 시그널 SVG (3호 + 점) → **3단계 신호 막대 SVG** (좋음=낮은 막대 / 보통=중간 / 나쁨=높음 막대 — 혼잡도 직관적 시각화)
+  - 새 SVG: `<rect x="3" y="14" w=4 h=6/> <rect x="10" y="9" w=4 h=11/> <rect x="17" y="4" w=4 h=16/>` (fill currentColor → wifiColor 클래스의 색상 그대로 따름)
+  - 주석으로 "함수/CSS 식별자 유지" 명시 (회귀 방지)
+- **건드리지 않음**:
+  - `wifiText(s) / wifiColor(s)` 함수 — 이미 `computeStatus(s)` 호출, 출력 ok/mid/busy → 좋음/보통/나쁨 그대로
+  - `.mp-metric-wifi / .wifi-pin / .wifi-dot / --wifi-ok / --wifi-mid / --wifi-busy` CSS 식별자 — 회귀 위험 차단
+  - 색상 매핑 (`#22c55e / #f59e0b / #ff4d8d`) 그대로
+- **사용자 화면 효과**: 라벨이 의미와 일치 + 아이콘이 막대로 직관 표현 → 사용자 혼동 해소
+
+#### (2) 마이페이지 다크모드 토글 — `src/components/mypage/UserSection.vue`
+- **import 확장** (`:260, 264`):
+  - `vue` 에서 `onMounted, onBeforeUnmount` 추가
+  - `import { getTheme, setTheme } from '@/store/theme.js'` 신규 (기존 store 그대로 사용)
+- **상태 + 함수 추가** (`:308-336`):
+  - `isDark = ref(getTheme() === 'black')` — 현재 테마 상태
+  - `onToggleTheme()` — `setTheme(isDark ? 'white' : 'black')` 만 호출. 새 로직 0
+  - `onThemeChange(e)` — `themechange` CustomEvent 리스너 → `isDark` 동기
+  - `onStorageTheme(e)` — 다른 탭/창의 `localStorage.theme` 변경 동기 (`store/theme.js attachThemeSync` 와 같은 패턴)
+  - `onMounted/onBeforeUnmount` 에서 두 리스너 등록/해제
+  - **결과**: StoreFinder/PartnersPage 의 기존 토글로 전환 시 마이페이지 토글 상태 즉시 동기
+- **마크업 — `us-menu-card` 안 두 번째 row** (`:222-249`):
+  - `<button class="us-menu-item" role="switch" :aria-checked="...">` — 기존 "내 글/댓글 관리" 행과 동일한 패턴
+  - 아이콘: 햇님 SVG (라이트) / 달 SVG (다크) — `v-if="!isDark"` / `v-else` — StoreFinder `:317-323` 패턴 그대로
+  - 텍스트: 현재 모드 표시 ("야간 모드" / "주간 모드") + hint ("탭해서 ~로")
+  - 우측에 iOS 스타일 토글 스위치 (`.us-theme-switch` + `.us-theme-knob`) — 활성 시 핑크
+- **CSS 추가** (`:1100-1147`):
+  - `.us-menu-item + .us-menu-item { border-top: 1px solid #f3f3f5 }` — 메뉴 행 간 구분선
+  - `.us-theme-switch` 44×24 핑크 토글 + `.us-theme-knob` 18×18 원 (`transform: translateX(20px)` 로 슬라이드)
+  - 다크모드 보정 — `us-menu-item:active / +us-menu-item / us-menu-ico / us-menu-title / us-theme-switch / .on` 6 셀렉터
+- **결과 (사용자 흐름)**:
+  1. 마이페이지 진입 → "내 글/댓글 관리" 아래에 토글 row 자동 표시
+  2. 탭 → store/theme.js의 `setTheme` 호출 → localStorage 저장 + `html[data-theme]` 갱신 + `themechange` 디스패치
+  3. 앱 전체 다크 토큰 자동 적용 (367 셀렉터)
+  4. 새로고침 후 유지 (localStorage)
+  5. StoreFinder/PartnersPage 의 토글 동기 — 같은 store 공유
+- **건드리지 않음**:
+  - `src/store/theme.js` — 이미 작동 (인프라 변경 0)
+  - `src/composables/theme.js` (중복 dead 모듈) — 별도 PR
+  - `MainPage.vue toggleTheme()` 함수 — 별개
+  - StoreFinder/PartnersPage 의 기존 토글
+  - 다크 보정 CSS 셀렉터 367곳 — 이미 광범위 커버
+  - 관리자 빌드 / 라우터 / firestore.rules / Cloud Functions
+
+#### 빌드 검증
+- `npm run build` ✓
+  - MyPage JS 50.79→50.89KB (+0.10KB), CSS 31.45→32.12KB (+0.67KB)
+  - MainPage 청크 변동 미세 (라벨/SVG)
+  - index 215.41→215.47KB (+0.06KB)
+- 관리자 빌드 영향 없음
+
+#### 배포 범위
+- `firebase deploy --only hosting:prod` (회원 빌드만)
+
+#### 검증 시나리오 (사용자 수동)
+- **(1) 혼잡도 라벨**:
+  - [x] 현황판 → 카드 3번째 메트릭이 "혼잡도" + 막대 아이콘
+  - [x] 색상 / 텍스트 (좋음/보통/나쁨) 그대로
+- **(2) 다크모드 토글**:
+  - [x] 마이페이지 → "내 글/댓글 관리" 아래에 토글 row 표시
+  - [x] 햇님(라이트) → 탭 → 달(다크) 전환 + 스위치 핑크
+  - [x] 앱 전체가 다크로 전환 (현황판/가게찾기/제휴관/마이페이지)
+  - [x] 새로고침 → 다크 유지
+  - [x] 다시 탭 → 라이트 복귀
+  - [x] StoreFinder/PartnersPage 의 기존 토글 → 마이페이지 토글 상태 동기
+
 ### 2026-06-18: 현황판 카테고리 5×2 격자 (`fix/mainpage-category-2row-grid`)
 - **목적**: 진단(`docs/audit/2026-06-18-현황판-카테고리-2줄-진단.md`) — PR #101 이 가게찾기/제휴관 만 적용해 현황판은 가로 스크롤 1줄 상태. 동일 패턴으로 통일
 - **변경 폭이 작은 이유**: MainPage 의 `.mp-cat-*` 셀렉터는 다른 페이지/관리자 빌드 어디서도 사용 안 함 (`grep` 결과 0건). PR #101 와 100% 동일 마크업 + 100% 동일 CSS 변수 → prefix `sf-` → `mp-` 만

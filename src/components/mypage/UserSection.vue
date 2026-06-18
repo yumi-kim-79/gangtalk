@@ -218,6 +218,34 @@
           <path d="M9 6l6 6-6 6"/>
         </svg>
       </button>
+
+      <!-- 다크 / 라이트 모드 토글 — store/theme.js 공유 -->
+      <button
+        class="us-menu-item"
+        type="button"
+        role="switch"
+        :aria-checked="isDark ? 'true' : 'false'"
+        @click="onToggleTheme"
+      >
+        <span class="us-menu-ico" aria-hidden="true">
+          <!-- 햇님 (라이트) -->
+          <svg v-if="!isDark" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="4"/>
+            <path d="M12 2v2M12 20v2M4 12H2M22 12h-2M5 5l-1.5-1.5M20.5 20.5L19 19M5 19l-1.5 1.5M20.5 3.5L19 5"/>
+          </svg>
+          <!-- 달 (다크) -->
+          <svg v-else viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3a7 7 0 0 0 9.79 9.79z"/>
+          </svg>
+        </span>
+        <span class="us-menu-text">
+          <span class="us-menu-title">{{ isDark ? '야간 모드' : '주간 모드' }}</span>
+          <span class="us-menu-hint">{{ isDark ? '탭해서 주간 모드로' : '탭해서 야간 모드로' }}</span>
+        </span>
+        <span class="us-theme-switch" :class="{ on: isDark }" aria-hidden="true">
+          <span class="us-theme-knob"></span>
+        </span>
+      </button>
     </div>
 
     <!-- ===== 수정 모달(글) ===== -->
@@ -257,10 +285,11 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { getAuth, onAuthStateChanged } from 'firebase/auth'
 import { db as fbDb } from '@/firebase'
+import { getTheme, setTheme } from '@/store/theme.js'
 import {
   collection,
   collectionGroup,
@@ -303,6 +332,34 @@ const props = defineProps({
 
 const router = useRouter()
 const route = useRoute()
+
+/* ===== 다크 모드 토글 =====
+ * 인프라는 src/store/theme.js 에 완비됨 (localStorage + html[data-theme]).
+ * 본 컴포넌트는 그 store 를 그대로 사용 — 새 로직 0.
+ * - getTheme() 가 'white' | 'black' 반환
+ * - StoreFinder / PartnersPage 의 토글과 같은 store 공유 → 한쪽 변경 시 다른 쪽도 동기
+ * - themechange CustomEvent + storage 이벤트 listen 으로 외부 변경 시 isDark 반영
+ */
+const isDark = ref(getTheme() === 'black')
+function onToggleTheme() {
+  setTheme(isDark.value ? 'white' : 'black')
+  // setTheme 가 dispatch 하는 themechange 콜백이 isDark 갱신
+}
+function onThemeChange(e) {
+  const t = e?.detail || (e?.newValue ?? null)
+  if (t === 'black' || t === 'white') isDark.value = t === 'black'
+}
+function onStorageTheme(e) {
+  if (e?.key === 'theme') onThemeChange({ detail: e.newValue })
+}
+onMounted(() => {
+  window.addEventListener('themechange', onThemeChange)
+  window.addEventListener('storage', onStorageTheme)
+})
+onBeforeUnmount(() => {
+  window.removeEventListener('themechange', onThemeChange)
+  window.removeEventListener('storage', onStorageTheme)
+})
 
 /* ===== 등급 정의 ===== */
 const TIERS = [
@@ -1045,6 +1102,45 @@ html[data-theme='black'] :where(.btn.primary.sm) {
   flex: none;
   transition: transform .15s ease;
 }
+/* 메뉴 행이 둘 이상일 때 사이 구분선 */
+.us-menu-item + .us-menu-item {
+  border-top: 1px solid #f3f3f5;
+}
+
+/* 다크/라이트 토글 스위치 */
+.us-theme-switch {
+  flex: none;
+  width: 44px; height: 24px;
+  border-radius: 999px;
+  background: #e5e5e5;
+  position: relative;
+  transition: background .15s ease;
+}
+.us-theme-knob {
+  position: absolute;
+  top: 3px; left: 3px;
+  width: 18px; height: 18px;
+  background: #fff;
+  border-radius: 50%;
+  box-shadow: 0 1px 3px rgba(0,0,0,.2);
+  transition: transform .18s ease;
+}
+.us-theme-switch.on { background: #ff2e7e; }
+.us-theme-switch.on .us-theme-knob { transform: translateX(20px); }
+
+/* 다크모드에서 토글 행 가독성 */
+:root[data-theme='dark'] .us-menu-item:active,
+:root[data-theme='black'] .us-menu-item:active { background: #2a1a22; }
+:root[data-theme='dark'] .us-menu-item + .us-menu-item,
+:root[data-theme='black'] .us-menu-item + .us-menu-item { border-top-color: #2a2a2a; }
+:root[data-theme='dark'] .us-menu-ico,
+:root[data-theme='black'] .us-menu-ico { background: #2a1a22; }
+:root[data-theme='dark'] .us-menu-title,
+:root[data-theme='black'] .us-menu-title { color: #f5f6f9; }
+:root[data-theme='dark'] .us-theme-switch,
+:root[data-theme='black'] .us-theme-switch { background: #2a2d35; }
+:root[data-theme='dark'] .us-theme-switch.on,
+:root[data-theme='black'] .us-theme-switch.on { background: #ff4da3; }
 
 /* ===== 내 활동 패널 ===== */
 .mypanel {
