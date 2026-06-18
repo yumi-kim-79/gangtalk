@@ -22,15 +22,32 @@
       </label>
     </section>
 
-    <section v-if="!loading && !myStores.length" class="adm-section empty-state">
+    <!-- 신규 등록 안내 (연결된 업소 없음 + 등록 모드 아님) -->
+    <section v-if="!loading && !myStores.length && !creating" class="adm-section">
+      <h3 class="adm-section-title">새 출근업소 등록</h3>
       <p class="adm-empty">
-        아직 연결된 가게가 없습니다.<br />
-        관리자에게 가게 연결을 요청해 주세요.
+        아직 등록된 업소가 없습니다.<br />
+        본인 출근업소 정보를 입력해 등록을 신청해 주세요.<br />
+        관리자 승인 후 사용자 화면(현황판)에 노출됩니다.
       </p>
+      <div style="text-align:center; margin-top:12px;">
+        <button class="adm-btn primary big" type="button" @click="startCreate">
+          새 업소 등록 시작
+        </button>
+      </div>
     </section>
 
-    <section v-else-if="currentStore" class="adm-section">
-      <h3 class="adm-section-title">{{ currentStore.name || '(이름 없음)' }} 정보 수정</h3>
+    <!-- 폼 (수정 모드 또는 신규 등록 모드) -->
+    <section v-else-if="creating || currentStore" class="adm-section">
+      <!-- 승인 대기 안내 (이미 등록됐지만 승인 전) -->
+      <div v-if="!creating && isPending(currentStore)" class="biz-pending-banner">
+        <strong>⏳ 승인 대기 중입니다</strong>
+        <span>관리자 승인 후 사용자 현황판에 노출됩니다. 정보는 계속 수정 가능합니다.</span>
+      </div>
+
+      <h3 class="adm-section-title">
+        {{ creating ? '새 출근업소 등록 신청' : `${currentStore.name || '(이름 없음)'} 정보 수정` }}
+      </h3>
 
       <div class="adm-form-grid">
         <label class="adm-field">
@@ -152,8 +169,15 @@
       </div>
 
       <footer class="adm-section-foot">
+        <button
+          v-if="creating"
+          class="adm-btn"
+          type="button"
+          :disabled="saving"
+          @click="cancelCreate"
+        >취소</button>
         <button class="adm-btn primary big" type="button" :disabled="saving" @click="onSave">
-          {{ saving ? '저장 중…' : '저장' }}
+          {{ saving ? '저장 중…' : (creating ? '등록 신청' : '저장') }}
         </button>
       </footer>
     </section>
@@ -166,7 +190,7 @@ import { useRoute } from 'vue-router'
 import { getAuth, onAuthStateChanged } from 'firebase/auth'
 import { db as fbDb, storage as fbStorage } from '@/firebase'
 import {
-  collection, doc, onSnapshot, updateDoc,
+  collection, doc, onSnapshot, updateDoc, setDoc,
   query, where, serverTimestamp,
 } from 'firebase/firestore'
 import {
@@ -355,13 +379,52 @@ async function onPickImage(e) {
   }
 }
 
+/* ───────── 승인 상태 헬퍼 ─────────
+ * MainPage 와 StoresManagePage 의 분류 로직과 정확히 일치 (진단 §3-4):
+ *  - applyStatus in [pending/대기/waiting/신청/검토중] → 승인 대기
+ *  - approved === false 또는 위 applyStatus → 사용자 화면 미노출 (자동)
+ */
+function isPending(s) {
+  if (!s) return false
+  const a = String(s?.applyStatus || '').toLowerCase()
+  if (['pending', '대기', 'waiting', '신청', '검토중'].includes(a)) return true
+  if (s?.approved === false) return true
+  return false
+}
+
+/* ───────── 신규 등록 모드 ───────── */
+const creating = ref(false)
+
+function emptyForm() {
+  return {
+    name: '', phone: '', desc: '', detailDesc: '',
+    address: '', hours: '', closed: '', thumb: '',
+    category: 'hopper', region: '강남',
+    wage: 0, wageType: 'hourly',
+  }
+}
+
+function startCreate() {
+  creating.value = true
+  selectedStoreId.value = ''
+  form.value = emptyForm()
+}
+
+function cancelCreate() {
+  creating.value = false
+  // 기존 stores 있으면 첫 번째로 복귀, 없으면 신규 안내 화면으로
+  if (stores.value[0]) selectedStoreId.value = stores.value[0].id
+}
+
 const saving = ref(false)
 async function onSave() {
+  if (saving.value) return
+  if (creating.value) return createNewStore()
+
   const s = currentStore.value
   if (!s) return
-  if (saving.value) return
   if (!form.value.name) {
-    alert('가게명을 입력해 주세요.')
+    alert('업소명을 입력해 주세요.')
     return
   }
   saving.value = true
@@ -393,6 +456,70 @@ async function onSave() {
     saving.value = false
   }
 }
+
+async function createNewStore() {
+  if (saving.value) return
+  if (!form.value.name) {
+    alert('업소명을 입력해 주세요.')
+    return
+  }
+  const uid = currentUid.value
+  const email = currentEmail.value
+  if (!uid) {
+    alert('로그인이 필요합니다.')
+    return
+  }
+
+  saving.value = true
+  try {
+    // Firestore auto-id 생성
+    const newId = doc(collection(fbDb, 'stores')).id
+
+    const payload = {
+      name:        form.value.name,
+      phone:       form.value.phone,
+      desc:        form.value.desc,
+      detailDesc:  form.value.detailDesc,
+      address:     form.value.address,
+      hours:       form.value.hours,
+      closed:      form.value.closed,
+      thumb:       form.value.thumb,
+      category:    form.value.category,
+      region:      form.value.region,
+      wage:        Number(form.value.wage || 0),
+      wageType:    form.value.wageType,
+
+      // 소유자 — firestore.rules:111 의 create 조건 (ownerId == auth.uid) 통과
+      ownerId:     uid,
+      ownerEmail:  email,
+
+      // 승인 대기 상태 — 사용자 화면(MainPage.isApproved) 자동 미노출
+      applyStatus: 'pending',
+      approved:    false,
+      'exposure.gangtalk': false,
+
+      thumbVer:    Date.now(),
+      createdAt:   serverTimestamp(),
+      updatedAt:   serverTimestamp(),
+    }
+    await setDoc(doc(fbDb, 'stores', newId), payload)
+
+    alert(
+      `'${form.value.name}' 업소 등록을 신청했습니다.\n` +
+      `관리자 승인 후 사용자 현황판에 노출됩니다.\n` +
+      `승인 전에도 정보는 계속 수정 가능합니다.`
+    )
+
+    // 신규 모드 종료 + 방금 만든 doc 자동 선택 (onSnapshot 이 곧 stores.value 갱신)
+    creating.value = false
+    selectedStoreId.value = newId
+  } catch (e) {
+    console.error(e)
+    alert('등록 실패: ' + (e?.message || e))
+  } finally {
+    saving.value = false
+  }
+}
 </script>
 
 <style scoped>
@@ -406,7 +533,26 @@ async function onSave() {
   padding:24px; margin-bottom:14px;
 }
 .adm-section.empty-state{ text-align:center; }
-.adm-empty{ color:#aaa; font-size:14px; margin:0; }
+.adm-empty{ color:#aaa; font-size:14px; margin:0; line-height:1.6; text-align:center; }
+
+/* 승인 대기 안내 배너 (신규 등록 후 표시) */
+.biz-pending-banner{
+  display:flex; flex-direction:column; gap:4px;
+  padding:14px 16px;
+  margin-bottom:16px;
+  background:#fff5f8;
+  border:1.5px solid #ffd6e4;
+  border-radius:10px;
+  color:#ff2e7e;
+}
+.biz-pending-banner strong{ font-size:15px; font-weight:800; }
+.biz-pending-banner span{ font-size:13px; color:#666; }
+:root[data-theme='dark'] .biz-pending-banner,
+:root[data-theme='black'] .biz-pending-banner{
+  background:#2a1620; border-color:#3a2030; color:#ff86b9;
+}
+:root[data-theme='dark'] .biz-pending-banner span,
+:root[data-theme='black'] .biz-pending-banner span{ color:#aaa; }
 .adm-selector label{ display:flex; flex-direction:column; gap:6px; }
 .adm-selector span{ font-size:12px; font-weight:700; color:#666; }
 .adm-selector select{
