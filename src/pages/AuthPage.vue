@@ -266,7 +266,9 @@ import { ref, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { me } from '@/store/user.js'
 import { humanizeAuthError } from '../utils/authErrors.js'
-import { getAuth, setPersistence, browserLocalPersistence } from 'firebase/auth'
+// setPersistence 는 firebase.js 가 단일 책임으로 indexedDBLocalPersistence 적용.
+// 여기서 다시 호출하면 race + persistence 충돌 (진단 §1-1) → 새로고침 시 토큰 복원 실패.
+import { getAuth } from 'firebase/auth'
 import { getFunctions, httpsCallable } from 'firebase/functions'
 import { checkEmailAvailable, checkNicknameAvailable } from '@/services/authService'
 
@@ -667,12 +669,8 @@ async function onSignup() {
    Firebase Auth 초기 설정
 --------------------------------------------------------- */
 onMounted(async () => {
-  try {
-    const auth = getAuth()
-    await setPersistence(auth, browserLocalPersistence)
-  } catch (e) {
-    console.warn(e)
-  }
+  // 퍼시스턴스 설정은 firebase.js 가 모듈 로드 시 단일 책임 처리.
+  // 여기서 다시 호출하지 않음 (이중 setPersistence 시 토큰 저장처 race 발생).
 
   const qRef = String(route.query.ref || route.query.code || '').trim()
   if (qRef) {

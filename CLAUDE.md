@@ -134,6 +134,39 @@ firebase deploy --only hosting:admin
 
 ## 작업 로그
 
+### 2026-06-18: 회원 인증 복원 race 근본 수정 — persistence 충돌 + 익명 자동 호출 폐지 (`fix/auth-persistence-conflict`)
+- **목적**: 진단(`docs/audit/2026-06-18-로그인복원실패-진단.md`) 의 3개 결합 원인 차단. PR #76 grace 만으로 못 잡은 케이스 (SDK 복원 *실패* + 익명으로 덮어쓰기) 정리
+- **수정 1 — `src/pages/AuthPage.vue` (`:269`, `:672`)**:
+  - `setPersistence(auth, browserLocalPersistence)` 호출 + 관련 import 제거
+  - 사유: `firebase.js:151` 의 `indexedDBLocalPersistence` 와 충돌 → 토큰 저장처가 race 로 결정 → 새로고침 시 SDK 가 복원 못 함
+  - 단일 책임 원칙: persistence 는 `firebase.js` 만 설정
+- **수정 2 — `src/firebase.js` `ensureSignedIn` (`:191-217`)**:
+  - **익명 자동 호출 폐지**. grace 만료 후 user 없어도 `null` 반환만, `signInAnonymously` 호출 안 함
+  - `signInAnonymously` import 는 유지 (다른 모듈이 named export 로 사용 가능성 대비, 단 본 모듈은 호출 안 함)
+  - ChatOpen 등 명시적 익명 필요 경로는 자체 `if (!auth.currentUser) await signInAnonymously(auth)` 패턴 유지 (`ChatOpen.vue:185`)
+- **수정 3 — `src/store/user.js`**:
+  - `ensureFirebase` (`:133-152`) 에 `await mod.firebaseReady` 추가 → persistence 설정 완료 후에만 signIn 호출되도록 보장 (로그인 토큰이 indexedDB 에 정상 저장)
+  - `me.init` 의 `onAuthStateChanged` 콜백 (`:264-277`) 에 익명 user 분기 추가:
+    ```js
+    if (u.isAnonymous === true) {
+      _ready.value = true
+      return  // me.auth 캐시 보존, users doc 자동 생성 안 함, LS_AUTH 안 덮음
+    }
+    ```
+- **건드리지 않음**:
+  - 즐겨찾기 / 별점 / 룰 / Functions / Storage / 관리자 빌드
+  - 다른 회원 사이트 컴포넌트
+  - 명시적 signOut / 로그인 / 가입 흐름 — 정상 경로 그대로
+- **수정 후 흐름**:
+  - **t=0 새로고침**: `firebase.js` 모듈 로드 → `persistenceReady(indexedDB)` 시작
+  - **t~수십ms**: `me.init` → `ensureFirebase` 가 `await firebaseReady` → persistence 완료 보장 후 onAuthStateChanged 등록
+  - **t~100ms**: SDK 가 indexedDB 에서 실계정 복원 → user 발화 → me.init 가 정상 user 처리 → me.auth.value = 실계정
+  - **만약 복원 실패**: onAuthStateChanged null → me.init grace (2500ms) → 만료 시 LS_AUTH reset. **익명 호출 안 함 → 익명이 실계정 덮을 일 없음**
+  - **명시적 로그인**: `_fbLoginWithRole` → `ensureFirebase` → `firebaseReady` 완료 후 `signInWithEmailAndPassword` 호출 → indexedDB 저장 → 다음 새로고침 시 복원
+  - **ChatOpen 익명 필요 시**: 자체 호출 → 그 화면에서만 익명 user
+- **빌드 검증**: `npm run build` ✓ (회원 index 215KB) / `npm run build:admin` ✓ (영향 없음, firebase-auth 청크 변동 -0.8KB)
+- **배포 범위**: `firebase deploy --only hosting:prod` (회원 빌드만, 룰/Functions 변경 없음)
+
 ### 2026-06-18: 별점(ratings) 룰 추가 — PR #74 부수효과 회복 (`fix/ratings-rules`)
 - **목적**: 진단(`docs/audit/2026-06-18-로그아웃-즐겨찾기-진단.md` §3) 의 별점 미동작 해결
   - StoreDetail.vue:488-535 의 `runTransaction` 은 정상 (변경 없음)
