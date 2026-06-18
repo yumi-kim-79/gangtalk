@@ -134,6 +134,39 @@ firebase deploy --only hosting:admin
 
 ## 작업 로그
 
+### 2026-06-18: BizMyStorePage 풀 입력 — 시급/카테고리/지역 + 이미지 파일 업로드 (`feat/biz-mystore-wage-image-upload`)
+- **목적**: 진단(`docs/audit/2026-06-18-지표불일치-업체구조-진단.md` §2-4 C/D) 의 누락 필드 보완
+- **수정 — `src/pages/admin/BizMyStorePage.vue`**:
+  - **신규 필드 4종 추가**:
+    - `category` — select. 옵션 9개 (hopper/point5/ten/tenpro/onep/nrb/kara/bar/lounge) StoreEditPage 와 동일 키
+    - `region` — select. 옵션 4개 (강남/비강남/경기/인천)
+    - `wage` — number. "원" 단위. `wageDisplay` computed + `onWageInput` 으로 숫자만 추출
+    - `wageType` — select. 옵션 4개 (hourly/daily/monthly/etc)
+  - **대표 이미지 파일 업로드** (StoreEditPage.vue:780-828 패턴 재활용):
+    - `fileToJpegBlob(file, 1280, 0.85)` — 클라이언트 리사이즈 (max width 1280px) + JPEG 변환 (quality 0.85)
+    - Storage path: `stores/${storeId}/thumb-${ts}.jpg` — **자기 storeId 만 사용** (PR #74 storage 룰 `isStoreOwner` 와 일치)
+    - `uploadBytes` → `getDownloadURL` → versioned URL (`?v=${ts}`)
+    - 업로드 완료 시 `form.thumb` 에 versioned URL set. 저장 버튼은 별도 (form 통째로 commit)
+    - 기존 URL 직접 입력도 그대로 — "파일 선택" 버튼과 URL input 둘 다 표시. 둘 중 마지막 변경값 사용
+    - `fileInputRef` ref + `triggerFilePick()` 으로 hidden file input 클릭
+    - `uploading` ref + 버튼 disabled + "업로드 중…" 텍스트
+  - **`onSave` 확장**:
+    - 새 필드들 stores doc 에 함께 update
+    - `thumb` 변경 감지 → `thumbVer: Date.now()` 함께 갱신 (사용자 화면 캐시 무력화)
+- **사용자 화면 필드 매핑 확정**:
+  - **시급**: `store.wage` (number) — `StoreDetail.vue:417 rawPay` 가 `store.wage ?? store.pay ?? store.tc ?? store.hourly` 우선순위로 읽음. `wage` 가 1순위
+  - **시급 단위**: `store.wageType` — StoreEditPage 의 `wageType` 와 동일 키
+  - **카테고리**: `store.category` — `StoreFinder.vue:1487`, `MainPage.vue:1779` 가 `s.category===type.value` 로 필터. 옵션 key 일치
+  - **지역**: `store.region` — `MainPage.vue:103`, `StoreFinder.vue:241` 가 `{{ s.region }} · ` 로 표시
+  - **대표이미지**: `store.thumb` (versioned URL) + `store.thumbVer` (timestamp)
+- **건드리지 않음**:
+  - 로그인/즐겨찾기/별점 (별도 진단 중)
+  - `firestore.rules` / `storage.rules` (PR #74 로 완료)
+  - 회원 사이트 / 회원 빌드
+  - 다른 admin 페이지
+- **빌드 검증**: `npm run build:admin` ✓ (BizMyStorePage chunk 5.77KB → 9.64KB)
+- **배포 범위**: `firebase deploy --only hosting:admin`
+
 ### 2026-06-18: stores 보안 룰 정비 + Storage 룰 신설 (`fix/stores-storage-rules`)
 - **목적**: 업체 자가 입력 기능 (PR-C 예정) 켜기 전 보안 사전 정비. 보고서 1-3 / Sprint 1 #7 처리
 - **수정 1 — `firestore.rules` stores 룰 (line 73-86)**:
