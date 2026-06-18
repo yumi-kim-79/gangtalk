@@ -510,25 +510,6 @@ async function checkNickDuplicate() {
 }
 
 /* ---------------------------------------------------------
-   추천코드 자동 생성 함수
---------------------------------------------------------- */
-async function getOrCreateMyReferralCode(emailStr) {
-  const localId = (emailStr.split('@')[0] || '').replace(/[^a-z0-9]/gi, '')
-  const prefix = (localId[0] || 'X').toUpperCase()
-
-  try {
-    const reserveReferralCode = httpsCallable(fns, 'reserveReferralCode')
-    const res = await reserveReferralCode({ prefix })
-    const code = String(res?.data?.code || '').toUpperCase()
-    if (!/^[A-Z]\d{5}$/.test(code)) throw new Error('코드 형식 오류')
-    return code
-  } catch (e) {
-    console.error('reserveReferralCode 실패:', e)
-    return prefix + '00001'
-  }
-}
-
-/* ---------------------------------------------------------
    추천코드 보상 처리
 --------------------------------------------------------- */
 async function applyReferralIfAny(rawCode) {
@@ -613,8 +594,11 @@ async function onSignup() {
 
     // ===== 여성회원 =====
     if (who.value === 'user') {
-      const myReferralCode = await getOrCreateMyReferralCode(emailTrim)
-
+      // 추천코드 발급은 _fbSignupUser 의 runTransaction (makeMyCodeV2) 에서 정상 작동.
+      // 옛 getOrCreateMyReferralCode 호출은 dead 였음 (PR #89 진단 + 출시전 점검 보고서 C-1):
+      //   - 결과값을 me.signupUser 에 안 넘김
+      //   - reserveReferralCode Cloud Function 미배포 → 항상 CORS/ERR_FAILED 콘솔 에러
+      // → 제거. 추천코드 자체는 트랜잭션 + makeMyCodeV2 로 그대로 발급됨.
       await me.signupUser({
         email: emailTrim,
         password: password.value,

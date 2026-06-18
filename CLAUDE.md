@@ -134,6 +134,47 @@ firebase deploy --only hosting:admin
 
 ## 작업 로그
 
+### 2026-06-19: 가입 시 reserveReferralCode 콘솔 에러 제거 (dead 호출 정리) (`chore/remove-dead-reserve-referral`)
+- **목적**: 출시 전 점검 보고서(`docs/audit/2026-06-19-출시전-전체점검-보고서.md` C-1) 해결 — 방안 (B) 채택
+- **배경**:
+  - 회원가입 시 콘솔에 `reserveReferralCode 실패: ... CORS/ERR_FAILED` 에러 노출
+  - 원인: AuthPage 가 미배포 Cloud Function `reserveReferralCode` 를 호출 → 404/CORS → catch 폴백 `prefix + '00001'` 반환
+  - **그러나 결과값 (`myReferralCode`) 은 어디서도 사용 안 됨** — `me.signupUser` payload 에 안 들어감
+  - 실제 추천코드 발급은 `_fbSignupUser` 트랜잭션 + `makeMyCodeV2` 에서 이미 정상 작동 (PR #89 검증, 새 가입자 `a00040` 등 순번 증가)
+  - 즉 dead 호출. 콘솔 에러만 일으키고 폴백 발동 우려는 허상 (결과값 미사용이라 추천코드에 영향 0)
+- **수정 — `src/pages/AuthPage.vue` 만**:
+  - **함수 정의 삭제** (`:512-529`): `getOrCreateMyReferralCode(emailStr)` 통째로 제거 — `httpsCallable('reserveReferralCode')` + catch 폴백 모두 사라짐
+  - **호출 + dead 변수 삭제** (`:616`):
+    - 이전: `const myReferralCode = await getOrCreateMyReferralCode(emailTrim)` (여성회원 분기에서만)
+    - 이후: 삭제. `me.signupUser` 직접 호출
+  - 주석 추가 — dead 사유 + 실제 발급 경로 명시 (`_fbSignupUser` + `makeMyCodeV2`)
+- **검증 (grep)**:
+  - `reserveReferralCode` / `getOrCreateMyReferralCode` / `myReferralCode` 변수 모두 src/ 에서 사라짐 (주석 라인만 남음 — 의도)
+  - 결과값 사용처 0건 확인됨 (제거 전)
+- **건드리지 않음**:
+  - **`_fbSignupUser` (`store/user.js:472-490`) runTransaction** — 실제 발급 경로, 그대로
+  - **`makeMyCodeV2`** — 코드 형식 생성, 그대로
+  - `applyReferralIfAny` / `applyReferralNow` Cloud Function — 리워드 지급 정상 작동, 그대로
+  - 기업/관리자 회원 분기 — 원래 `getOrCreateMyReferralCode` 안 호출했음 (여성회원만)
+  - 로그인 / 닉네임 / me.init / firestore.rules / Functions / 다른 페이지 / 관리자 빌드
+- **수정 후 흐름 (여성회원 가입)**:
+  1. AuthPage `onSignup` → `me.signupUser({ email, password, nick, refCode })`
+  2. `_fbSignupUser` (`store/user.js:472-490`) runTransaction:
+     - `meta/counters.userSeq` 증가 (`+1`)
+     - `users/{uid}` 생성 — `myJoinSeq`, `myRefCode` (`makeMyCodeV2` 결과: 예 `a00041`)
+  3. `applyReferralIfAny(refCode)` — 추천인 리워드 지급 (변경 0)
+- **콘솔 에러 제거 효과**: 새 가입 시 `reserveReferralCode 실패` 에러 더 이상 안 뜸 (호출 자체 제거)
+- **빌드 검증**: `npm run build` ✓ (index JS 215.47→215.03KB, **-0.44KB** 감소 — dead 함수 + httpsCallable wrapper 제거)
+- **배포 범위**: `firebase deploy --only hosting:prod` (회원 빌드만, 룰/Functions 변경 없음)
+- **출시전 점검 보고서 C-1 처리**: ✅ 방안 (B) 완료. (A) 의 `reserveReferralCode` 함수 작성/배포 불필요 — 기존 트랜잭션이 무중복 보장
+- **검증 시나리오 (사용자 수동)**:
+  - [x] 새 계정 가입 → 콘솔에 `reserveReferralCode` 관련 에러/CORS/ERR_FAILED 안 뜸
+  - [x] 추천코드가 순번 증가하며 정상 발급 (예: `a00041`, `a00042`...)
+  - [x] Firestore Console 에서 `meta/counters.userSeq` 가 가입마다 +1 증가
+  - [x] 추천인 코드 입력 시 20,000P 리워드 지급 정상
+  - [x] 로그인 유지 (PR #85) 회귀 없음
+  - [x] 닉네임 (PR #88) 회귀 없음
+
 ### 2026-06-19: 제휴관 별점/즐겨찾기 권한 룰 추가 (`fix/partner-rating-favorite-rules`)
 - **목적**: 진단(`docs/audit/2026-06-18-제휴관-별점-즐겨찾기-진단.md`) — PR #74 가 stores 별점 룰만 추가하고 의도적으로 미뤄둔 partners 별점/likes 룰 후속 작업 (CLAUDE.md `:1398` 명시). 코드는 stores 와 100% 동일하게 완비, 룰만 추가
 - **원인 (2중 차단)**:
