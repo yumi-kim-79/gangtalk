@@ -134,6 +134,34 @@ firebase deploy --only hosting:admin
 
 ## 작업 로그
 
+### 2026-06-18: GangTalkPage 잔존 setPersistence 제거 — 토큰 저장 실패 근본 차단 (`fix/gangtalk-persistence-conflict`)
+- **목적**: 진단(`docs/audit/2026-06-18-토큰저장실패-진단.md` §1-1) 의 PR #79 가 놓친 3번째 setPersistence 호출 제거
+- **결정적 단서**: `grep -rn setPersistence src/` 결과 회원 빌드에 `GangTalkPage.vue:2423` 잔존 호출 발견. 사용자가 강톡 탭 한 번이라도 진입하면 `setPersistence(browserLocal)` 가 firebase.js 의 `indexedDB` 설정 위에 덮어써 토큰이 localStorage 에 저장됨 → 새로고침 시 SDK 가 indexedDB 만 보고 복원 실패 → 게스트 표시
+- **수정 — `src/pages/GangTalkPage.vue`**:
+  - `:594` import 에서 `setPersistence`, `browserLocalPersistence` 제거 (`getAuth`, `onAuthStateChanged` 는 다른 곳에서 사용 중이라 유지)
+  - `:2422-2423` onBeforeMount 의 `setPersistence(auth, browserLocalPersistence).catch(()=>{})` 호출 제거
+  - 인증 가드 자체 (auth.currentUser 체크 + openFromQueryFast) 는 그대로 유지
+- **수정 후 회원 빌드 setPersistence 호출처 (확인 완료)**:
+  ```
+  src/firebase.js:155-160   indexedDB → browserLocal → inMemory 폴백 (단일 책임)
+  ```
+  - admin 빌드 전용 `AdminLoginPage.vue:72` / `BizLoginPage.vue:97` 는 `router/admin.js` 만 import → 회원 빌드 (`router/index.js`) 에서 미사용 확인 완료
+- **건드리지 않음**:
+  - `firebase.js` 의 indexedDB persistence 설정 — 유지
+  - admin 빌드 (AdminLoginPage / BizLoginPage / router/admin.js)
+  - 추천코드 y00001 폴백 — 별개 문제 (Sprint 1 #6, `reserveReferralCode` Cloud Function 미배포)
+- **흐름 (수정 후)**:
+  - 새로고침 → `firebase.js` 가 `setPersistence(indexedDB)` 적용 (단일 호출)
+  - 사용자가 강톡 탭 진입해도 setPersistence 재호출 없음 → indexedDB persistence 유지
+  - 로그인 시 토큰이 indexedDB (`firebaseLocalStorageDb`) 에 저장
+  - 다음 새로고침 → SDK 가 indexedDB 에서 복원 → onAuthStateChanged 가 실계정 user 발화 → me.init 가 실계정 처리 → 마이페이지에 실계정 표시
+- **검증 시나리오 (사용자 수동)**:
+  - [x] 실계정 로그인 → 강톡 탭 진입 → 새로고침 → 로그인 유지
+  - [x] 마이페이지에 게스트 아닌 실계정 닉네임/이메일 표시
+  - [x] DevTools → Application → IndexedDB 에 `firebaseLocalStorageDb` 생성 확인
+- **빌드 검증**: `npm run build` ✓ (회원 index 214KB) / `npm run build:admin` ✓ (admin 영향 없음)
+- **배포 범위**: `firebase deploy --only hosting:prod` (회원 빌드만, 룰/Functions 변경 없음)
+
 ### 2026-06-18: 회원 인증 복원 race 근본 수정 — persistence 충돌 + 익명 자동 호출 폐지 (`fix/auth-persistence-conflict`)
 - **목적**: 진단(`docs/audit/2026-06-18-로그인복원실패-진단.md`) 의 3개 결합 원인 차단. PR #76 grace 만으로 못 잡은 케이스 (SDK 복원 *실패* + 익명으로 덮어쓰기) 정리
 - **수정 1 — `src/pages/AuthPage.vue` (`:269`, `:672`)**:
