@@ -8,6 +8,17 @@ const IS_ADMIN_BUILD =
   (typeof import.meta !== 'undefined' &&
     import.meta?.env?.VITE_BUILD_TARGET === 'admin')
 
+// ⚠️ 2026-06-18 임시 테스트 스위치 — App Check 가 새로고침 시 인증 토큰 refresh 를
+//   간헐적으로 방해해 로그아웃을 유발하는지 확정하기 위함.
+//   - 기본값: 끔 (App Check 초기화 스킵)
+//   - VITE_DISABLE_APPCHECK=false 로 빌드하면 다시 켬
+//   원인 확정 후 reCAPTCHA Enterprise 키를 gangtox.com 도메인에 정식 등록하는
+//   정석 해결로 가야 함. 이 스위치는 임시.
+const _DISABLE_APPCHECK_RAW =
+  (typeof import.meta !== 'undefined' &&
+    String(import.meta?.env?.VITE_DISABLE_APPCHECK ?? 'true').toLowerCase())
+const DISABLE_APPCHECK = _DISABLE_APPCHECK_RAW !== 'false'
+
 import { initializeApp, getApps, getApp } from 'firebase/app'
 import {
   initializeAuth,
@@ -103,24 +114,29 @@ const ENTERPRISE_SITE_KEY =
 const V3_SITE_KEY =
   (import.meta?.env?.VITE_RECAPTCHA_V3_SITE_KEY) || ''
 
-const appCheckProvider = IS_ADMIN_BUILD
-  ? null  // ✅ 관리자 빌드는 AppCheck 초기화 스킵
+const appCheckProvider = (IS_ADMIN_BUILD || DISABLE_APPCHECK)
+  ? null  // 관리자 빌드 또는 임시 스위치(VITE_DISABLE_APPCHECK) 시 초기화 스킵
   : (ENTERPRISE_SITE_KEY
       ? new ReCaptchaEnterpriseProvider(ENTERPRISE_SITE_KEY)
       : (V3_SITE_KEY ? new ReCaptchaV3Provider(V3_SITE_KEY) : null))
 
-if (!appCheckProvider && !IS_ADMIN_BUILD) {
+if (!appCheckProvider && !IS_ADMIN_BUILD && !DISABLE_APPCHECK) {
   console.warn('[AppCheck] No provider key configured. Add ENTERPRISE or V3 site key.')
 }
 if (IS_ADMIN_BUILD) {
   console.info('[AppCheck] disabled in admin build (gangtalk815)')
+}
+if (!IS_ADMIN_BUILD && DISABLE_APPCHECK) {
+  // ⚠️ 테스트용. 원인 확정 후 reCAPTCHA 키를 gangtox.com 에 정식 등록하고 되돌릴 것.
+  console.info('[AppCheck] disabled by VITE_DISABLE_APPCHECK (temp test switch)')
 }
 
 const appCheck = appCheckProvider
   ? initializeAppCheck(app, { provider: appCheckProvider, isTokenAutoRefreshEnabled: true })
   : null
 
-// 첫 토큰(캐시 허용) — 준비 Promise로 사용
+// 첫 토큰(캐시 허용) — 준비 Promise로 사용.
+// appCheck 가 null 이면 즉시 null 반환 → firebaseReady 가 막힘 없이 진행.
 const _appCheckReady = (async () => {
   if (!appCheck) return null
   try {

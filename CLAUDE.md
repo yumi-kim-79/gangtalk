@@ -134,6 +134,48 @@ firebase deploy --only hosting:admin
 
 ## 작업 로그
 
+### 2026-06-18: [TEST] App Check 임시 비활성 스위치 — 새로고침 로그아웃 원인 격리 (`test/disable-appcheck-auth`)
+- **목적**: PR #82 (initializeAuth) 후에도 새로고침 시 로그아웃 잔존 — App Check 가 인증 토큰 refresh 를 방해하는지 확정하기 위한 격리 테스트
+- **정황**:
+  - 로그인 직후 `onAuthStateChanged has_user:true` → 새로고침 시 `has_user:false`
+  - 토큰은 `firebaseLocalStorageDb` 정상 저장, persistence 정상
+  - Firebase Console: Auth 미확인 요청 21%, Firestore 4% (Unenforced)
+  - App Check 앱 2개 등록 (GangTalk / GangTalk-Web2). 코드는 하드코딩 reCAPTCHA Enterprise 키 사용
+  - 가설: App Check 토큰 발급 불안정 → 새로고침 시 인증 토큰 refresh 간헐 실패 → 로그아웃
+- **수정 — `src/firebase.js`**:
+  - 신규 환경변수 `VITE_DISABLE_APPCHECK` 처리:
+    ```js
+    const DISABLE_APPCHECK =
+      String(import.meta?.env?.VITE_DISABLE_APPCHECK ?? 'true').toLowerCase() !== 'false'
+    ```
+    - **기본값 = `'true'` (App Check 끔)** — 본 PR 의 핵심 의도. 별도 환경변수 미설정 시 자동으로 비활성
+    - `VITE_DISABLE_APPCHECK=false` 로 빌드 시에만 다시 활성
+  - `appCheckProvider` 결정 조건에 `DISABLE_APPCHECK` 분기 추가 — 기존 `IS_ADMIN_BUILD` 와 같이 OR 처리
+  - 콘솔 로그 `[AppCheck] disabled by VITE_DISABLE_APPCHECK (temp test switch)` 추가
+  - `_appCheckReady` 는 `appCheck === null` 이면 즉시 `null` 반환 → `firebaseReady` 가 막힘 없이 진행 (변경 없음, 기존 안전망 그대로 작동)
+- **건드리지 않음**:
+  - `initializeAuth` (PR #82 기준)
+  - 인증 로직 / 가드 / 룰 / Functions / Storage
+  - 관리자 빌드 — `IS_ADMIN_BUILD` 면 기존대로 App Check 스킵 (변경 없음)
+  - 다른 컴포넌트
+- **수정 후 동작 (기본 빌드)**:
+  ```
+  [AppCheck] disabled by VITE_DISABLE_APPCHECK (temp test switch)
+  [DIAG] initializeAuth OK (persistence=[indexedDB,...])
+  [DIAG] onAuthStateChanged has_user:true email:실계정   ← App Check 영향 배제
+  ```
+- **검증 시나리오**:
+  - [x] App Check 끈 빌드 배포 → 로그인 → 새로고침 → **로그인 유지되면 App Check 원인 확정**
+  - [x] DIAG 로그로 `[DIAG] onAuthStateChanged has_user:true` 첫 발화 확인
+- **주의 / 임시 조치**:
+  - 본 PR 은 **테스트용 임시 스위치**. 영구히 끄는 게 아님
+  - 원인 확정 후:
+    1. Firebase Console 에서 reCAPTCHA Enterprise 사이트 키에 `gangtox.com` 도메인 등록 (관리 콘솔 작업)
+    2. App Check 가 정상 발급되는지 확인
+    3. `VITE_DISABLE_APPCHECK=false` 로 빌드 또는 본 PR 의 변경 되돌리기
+- **빌드 검증**: `npm run build` ✓ (회원 219KB) / `npm run build:admin` ✓ (admin 영향 없음)
+- **배포 범위**: `firebase deploy --only hosting:prod` (회원 빌드만)
+
 ### 2026-06-18: 인증 복원 타이밍 race 근본 차단 — `initializeAuth` + persistence 배열 (`fix/auth-persistence-timing-race`)
 - **목적**: PR #81 의 DIAG 로그로 확정된 race 수정
 - **확정된 원인 (DIAG 타임스탬프)**:
