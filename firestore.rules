@@ -234,8 +234,39 @@ service cloud.firestore {
         || (signedIn() && resource.data.ownerId == request.auth.uid && resource.data.status == 'pending');
     }
 
-    /* ===== 제휴/뉴스(탑 레벨) ===== */
-    match /partners/{id}  { allow read: if true;  allow write: if isAdmin(); }
+    /* ===== 제휴(partners) =====
+     * - read: 공개 (제휴관/즐겨찾기 표시)
+     * - create/delete: 관리자만 (PartnersManagePage CRUD)
+     * - update: 관리자(전체 필드) 또는 일반 사용자(별점/좋아요 4 필드만)
+     *   PR #74 의 stores 별점 룰 패턴 그대로 (CLAUDE.md:1398 의 후속 작업).
+     *   - PartnerDetail.vue:284 runTransaction 이 partners.{rating,ratingSum,ratingCount,updatedAt} 갱신
+     *   - PartnerDetail.vue:220, :230 toggleWish 가 partners.{likes,updatedAt} 갱신
+     *   - changesAreOnly 화이트리스트가 name/region/category/active/approved/adStart/adEnd 등 다른
+     *     필드 변조를 차단 → 보안 유지.
+     */
+    match /partners/{id} {
+      allow read: if true;
+
+      allow create, delete: if isAdmin();
+
+      allow update: if isAdmin()
+                 || (signedIn()
+                     && changesAreOnly(['rating', 'ratingSum', 'ratingCount', 'likes', 'updatedAt']));
+    }
+
+    /* ===== 제휴 별점(partners/{id}/ratings/{uid}) =====
+     * stores ratings 서브룰 (line :141-145) 과 동일 패턴.
+     * - 한 사람당 한 doc (doc id = uid)
+     * - read: 공개 (평균은 partners.rating 사용)
+     * - write: 본인(isOwner(uid)) 또는 관리자
+     * PartnerDetail.vue:253-282 의 runTransaction 이 partners update 와 함께 호출.
+     */
+    match /partners/{partnerId}/ratings/{uid} {
+      allow read: if true;
+      allow create, update, delete: if isOwner(uid) || isAdmin();
+    }
+
+    /* ===== 뉴스(탑 레벨) ===== */
     match /news/{docId}   { allow read: if true;  allow write: if isAdmin(); }
 
     /* ===== 운영자 인박스(알림) ===== */
