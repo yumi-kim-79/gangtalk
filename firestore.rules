@@ -140,7 +140,9 @@ service cloud.firestore {
      */
     match /stores/{storeId}/ratings/{uid} {
       allow read: if true;
-      allow create, update, delete: if isOwner(uid);
+      // 본인 별점만 본인이 수정 가능. 단 관리자(deleteStoreFull) 가 가게 삭제 시
+      // ratings 서브컬렉션을 일괄 정리하므로 isAdmin 분기 추가 (2026-06-18).
+      allow create, update, delete: if isOwner(uid) || isAdmin();
     }
 
     /* ===== rooms_biz (현황판 지표 미러 + 초톡) =====

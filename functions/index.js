@@ -2598,6 +2598,261 @@ exports.linkStoreToBiz = onCall({ cors: ADMIN_CORS }, async (req) => {
 });
 
 /* =========================================================
+   삭제 헬퍼 — 출근업소(stores) 완전 정리
+   ──────────────────────────────────────────────────────────
+   주의 (개념 구분 — docs/audit/2026-06-18-업체-가게-개념구분-진단.md):
+   - 본 함수는 stores 컬렉션(출근업소) 만 처리.
+   - partners / partnerCards (제휴처) 는 절대 건드리지 않음.
+
+   의존성 역순 정리 (각 단계 실패해도 다음 단계 진행 — 결과 요약 반환):
+     1) Storage stores/{storeId}/* 전체
+     2) rooms_biz/{storeId} 본 doc + 서브컬렉션
+     3) stores/{storeId}/ratings/* 서브컬렉션
+     4) favorites where targetId==storeId 일괄
+     5) config/marketing 의 homeOrder / topRanks / listOrders 배열에서 storeId 제거
+     6) stores/{storeId} 본 doc
+========================================================= */
+
+// 서브컬렉션 batched delete 헬퍼 (간단 구현 — 500개씩)
+async function deleteSubcollection(collRef, batchSize = 300) {
+  let total = 0;
+  for (;;) {
+    const snap = await collRef.limit(batchSize).get();
+    if (snap.empty) break;
+    const batch = db.batch();
+    snap.docs.forEach((d) => batch.delete(d.ref));
+    await batch.commit();
+    total += snap.size;
+    if (snap.size < batchSize) break;
+  }
+  return total;
+}
+
+async function _deleteStoreFullCore(storeId) {
+  const result = {
+    storeId,
+    storage: { ok: false, deleted: 0, error: null },
+    roomsBiz: { ok: false, deletedSub: 0, deletedDoc: false, error: null },
+    ratings: { ok: false, deleted: 0, error: null },
+    favorites: { ok: false, deleted: 0, error: null },
+    marketingRefs: { ok: false, removed: [], error: null },
+    storeDoc: { ok: false, error: null },
+  };
+
+  // 1) Storage stores/{storeId}/*
+  try {
+    const bucket = admin.storage().bucket();
+    const [files] = await bucket.getFiles({ prefix: `stores/${storeId}/` });
+    if (files.length > 0) {
+      await Promise.all(files.map((f) => f.delete().catch(() => null)));
+    }
+    result.storage.ok = true;
+    result.storage.deleted = files.length;
+  } catch (e) {
+    result.storage.error = e?.code || e?.message || String(e);
+    console.warn(`[deleteStoreFull] storage fail (${storeId}):`, result.storage.error);
+  }
+
+  // 2) rooms_biz/{storeId} 서브컬렉션 → 본 doc
+  try {
+    const rbDoc = db.collection("rooms_biz").doc(storeId);
+    // 알려진 잠재 서브컬렉션 (messages 등). 미지 서브컬렉션도 listCollections 로 처리.
+    const subCols = await rbDoc.listCollections();
+    for (const sub of subCols) {
+      result.roomsBiz.deletedSub += await deleteSubcollection(sub);
+    }
+    await rbDoc.delete().catch(() => null);
+    result.roomsBiz.ok = true;
+    result.roomsBiz.deletedDoc = true;
+  } catch (e) {
+    result.roomsBiz.error = e?.code || e?.message || String(e);
+    console.warn(`[deleteStoreFull] rooms_biz fail (${storeId}):`, result.roomsBiz.error);
+  }
+
+  // 3) stores/{storeId}/ratings/*
+  try {
+    const ratingsRef = db.collection("stores").doc(storeId).collection("ratings");
+    result.ratings.deleted = await deleteSubcollection(ratingsRef);
+    result.ratings.ok = true;
+  } catch (e) {
+    result.ratings.error = e?.code || e?.message || String(e);
+    console.warn(`[deleteStoreFull] ratings fail (${storeId}):`, result.ratings.error);
+  }
+
+  // 4) favorites where targetId==storeId
+  try {
+    const favSnap = await db.collection("favorites")
+      .where("targetId", "==", storeId)
+      .get();
+    if (!favSnap.empty) {
+      // 500 limit 대비 청크
+      const docs = favSnap.docs;
+      for (let i = 0; i < docs.length; i += 400) {
+        const batch = db.batch();
+        docs.slice(i, i + 400).forEach((d) => batch.delete(d.ref));
+        await batch.commit();
+      }
+    }
+    result.favorites.ok = true;
+    result.favorites.deleted = favSnap.size;
+  } catch (e) {
+    result.favorites.error = e?.code || e?.message || String(e);
+    console.warn(`[deleteStoreFull] favorites fail (${storeId}):`, result.favorites.error);
+  }
+
+  // 5) config/marketing 의 homeOrder / topRanks(맵의 각 배열) / listOrders(맵의 각 배열) 에서 storeId 제거
+  try {
+    const mkRef = db.doc("config/marketing");
+    const mkSnap = await mkRef.get();
+    if (mkSnap.exists) {
+      const data = mkSnap.data() || {};
+      const patch = {};
+      const removed = [];
+
+      // homeOrder: string[]
+      if (Array.isArray(data.homeOrder) && data.homeOrder.includes(storeId)) {
+        patch.homeOrder = data.homeOrder.filter((id) => id !== storeId);
+        removed.push("homeOrder");
+      }
+      // topRanks: { [catKey]: string[] }
+      if (data.topRanks && typeof data.topRanks === "object") {
+        const nextTopRanks = { ...data.topRanks };
+        let touched = false;
+        for (const [k, arr] of Object.entries(nextTopRanks)) {
+          if (Array.isArray(arr) && arr.includes(storeId)) {
+            nextTopRanks[k] = arr.filter((id) => id !== storeId);
+            touched = true;
+            removed.push(`topRanks.${k}`);
+          }
+        }
+        if (touched) patch.topRanks = nextTopRanks;
+      }
+      // listOrders: { [key]: string[] }
+      if (data.listOrders && typeof data.listOrders === "object") {
+        const nextListOrders = { ...data.listOrders };
+        let touched = false;
+        for (const [k, arr] of Object.entries(nextListOrders)) {
+          if (Array.isArray(arr) && arr.includes(storeId)) {
+            nextListOrders[k] = arr.filter((id) => id !== storeId);
+            touched = true;
+            removed.push(`listOrders.${k}`);
+          }
+        }
+        if (touched) patch.listOrders = nextListOrders;
+      }
+
+      if (Object.keys(patch).length > 0) {
+        patch.updatedAt = admin.firestore.FieldValue.serverTimestamp();
+        await mkRef.set(patch, { merge: true });
+      }
+      result.marketingRefs.removed = removed;
+    }
+    result.marketingRefs.ok = true;
+  } catch (e) {
+    result.marketingRefs.error = e?.code || e?.message || String(e);
+    console.warn(`[deleteStoreFull] marketingRefs fail (${storeId}):`, result.marketingRefs.error);
+  }
+
+  // 6) stores/{storeId} 본 doc
+  try {
+    await db.collection("stores").doc(storeId).delete();
+    result.storeDoc.ok = true;
+  } catch (e) {
+    result.storeDoc.error = e?.code || e?.message || String(e);
+    console.warn(`[deleteStoreFull] stores doc fail (${storeId}):`, result.storeDoc.error);
+  }
+
+  return result;
+}
+
+/**
+ * deleteStoreFull
+ *  - 출근업소(stores) + 연관 데이터 5종 완전 삭제
+ *  - partners / partnerCards 는 절대 건드리지 않음
+ *  - isAdmin 만 검증 (2중 확인은 클라이언트 UI 담당)
+ */
+exports.deleteStoreFull = onCall({ cors: ADMIN_CORS }, async (req) => {
+  assertCallerIsAdmin(req);
+  const storeId = safeStr(req?.data?.storeId);
+  if (!storeId) {
+    throw new HttpsError("invalid-argument", "storeId 필수");
+  }
+  const result = await _deleteStoreFullCore(storeId);
+  return { ok: true, result };
+});
+
+/**
+ * deleteBizAccount
+ *  - 업체 계정 (users/{uid}) 와 Auth 사용자 삭제
+ *  - 연결된 모든 stores (ownerId == uid) 를 deleteStoreFull 로 정리 (옵션 B)
+ *  - 관리자 본인 (ADMIN_EMAIL) 계정 삭제는 차단
+ *  - partners 는 절대 건드리지 않음
+ */
+exports.deleteBizAccount = onCall({ cors: ADMIN_CORS }, async (req) => {
+  assertCallerIsAdmin(req);
+  const uid = safeStr(req?.data?.uid);
+  if (!uid) {
+    throw new HttpsError("invalid-argument", "uid 필수");
+  }
+
+  // 관리자 본인 계정 삭제 차단 (caller 자신 + ADMIN_EMAIL 양쪽)
+  if (uid === req.auth?.uid) {
+    throw new HttpsError("failed-precondition", "관리자 본인 계정은 삭제할 수 없습니다.");
+  }
+  try {
+    const target = await admin.auth().getUser(uid);
+    if (String(target?.email || "").toLowerCase() === ADMIN_EMAIL) {
+      throw new HttpsError("failed-precondition", "관리자 이메일 계정은 삭제할 수 없습니다.");
+    }
+  } catch (e) {
+    if (e instanceof HttpsError) throw e;
+    // getUser 실패 시 그래도 진행 (사용자 doc 만 남은 경우 정리)
+    console.warn(`[deleteBizAccount] getUser warn (${uid}):`, e?.code || e?.message);
+  }
+
+  const summary = {
+    uid,
+    stores: [],     // 각 store 의 _deleteStoreFullCore 결과
+    usersDoc: { ok: false, error: null },
+    authUser: { ok: false, error: null },
+  };
+
+  // 1) 연결된 stores 전부 삭제 (deleteStoreFull 로직 직접 호출)
+  try {
+    const storesSnap = await db.collection("stores")
+      .where("ownerId", "==", uid)
+      .get();
+    for (const doc of storesSnap.docs) {
+      const r = await _deleteStoreFullCore(doc.id);
+      summary.stores.push(r);
+    }
+  } catch (e) {
+    console.warn(`[deleteBizAccount] stores list/delete fail (${uid}):`, e?.code || e?.message);
+    // 진행
+  }
+
+  // 2) users 문서 삭제
+  try {
+    await db.collection("users").doc(uid).delete();
+    summary.usersDoc.ok = true;
+  } catch (e) {
+    summary.usersDoc.error = e?.code || e?.message || String(e);
+    console.warn(`[deleteBizAccount] users doc fail (${uid}):`, summary.usersDoc.error);
+  }
+
+  // 3) Firebase Auth 사용자 삭제
+  try {
+    await admin.auth().deleteUser(uid);
+    summary.authUser.ok = true;
+  } catch (e) {
+    summary.authUser.error = e?.code || e?.message || String(e);
+    console.warn(`[deleteBizAccount] auth deleteUser fail (${uid}):`, summary.authUser.error);
+  }
+
+  return { ok: true, summary };
+});
+
+/* =========================================================
    ★ 매일 07:05 이전 날짜 다이제스트 메시지 정리
    - 대상: meta.source === 'vendor-digest' 인 messages
    - 기준: createdAtMs < 오늘 00:00 (Asia/Seoul)
