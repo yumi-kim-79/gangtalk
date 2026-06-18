@@ -134,6 +134,38 @@ firebase deploy --only hosting:admin
 
 ## 작업 로그
 
+### 2026-06-18: 새로고침 로그아웃 진짜 원인 제거 — `main.js` 의 `beforeunload signOut` 제거 (`fix/remove-beforeunload-signout`)
+- **목적**: 9번의 진단 끝에 확정된 진짜 원인 제거
+- **확정된 원인**: `src/main.js:230-241` 의 `window.addEventListener('beforeunload', () => auth.signOut())`. 새로고침 시마다 signOut 호출 → `firebase:authUser` 토큰 삭제 → 재로드 시 토큰 없음 → "로그인 필요"
+- **이전 PR 들이 못 잡은 이유**:
+  - PR #76 (grace), PR #79 (persistence 단일화), PR #80 (GangTalk setPersistence 제거), PR #82 (initializeAuth), PR #83 (App Check 끔), PR #84 (persistence 순서) — 모두 토큰 저장/복원/SDK timing 만 봄
+  - 진짜 범인은 **새로고침마다 토큰을 직접 지우는 코드** 였음
+  - 9개 PR 의 우회 시도가 모두 실패한 이유 — 토큰을 어디 저장하든 새로고침 때 이 핸들러가 즉시 삭제
+- **수정 — `src/main.js:223-241`**:
+  - `window.addEventListener('beforeunload', ...) { auth.signOut() }` 블록 전체 제거
+  - 주석에 "제거 사유 + 진단 PR 9회 끝에 확정" 명시
+  - 이전 의도였던 "다른 브라우저/앱 접속 시 로그아웃 상태로 시작" 은 이 방식으로 달성하면 안 됨 — 필요하면 별도 패턴 (sessionStorage 마커 + 새 탭 검출 등) 으로 구현해야 함. 본 PR 범위 아님
+- **다른 곳 점검**:
+  - `main.js` 내 다른 토큰 삭제 코드: 없음 (`localStorage.removeItem` / `signOut` / `unload` 핸들러 없음)
+  - `DiaryPage.vue:425, 538`: `firebase:authUser:` 키 **읽기 전용** (uid 추출용). 토큰 삭제 안 함. 손댈 필요 없음
+- **명시적 로그아웃 (사용자가 로그아웃 버튼 클릭) 은 그대로 작동**:
+  - `store/user.js:1148` 의 `signOut` 흐름은 별개. 사용자 클릭 시에만 호출
+- **건드리지 않음**:
+  - 인증 로직 / persistence / App Check / 가드 / 룰 / Functions / Storage
+  - 관리자 빌드 (main.js 는 회원 빌드 전용. admin 빌드는 main-admin.js 사용)
+  - DIAG 로그 (PR #81) — 검증 후 별도 PR 로 정리
+  - PR #83 의 App Check 스위치 / PR #84 의 persistence 순서 — 본 PR 의 진짜 수정이 적용된 후 정상화 PR 에서 함께 되돌릴 예정
+- **수정 후 흐름**:
+  - 로그인 → 토큰이 `firebase:authUser` / `firebaseLocalStorageDb` 에 저장
+  - **새로고침** → 토큰 그대로 유지 → SDK 가 정상 복원 → onAuthStateChanged 가 실계정 user 발화
+  - 명시적 로그아웃 버튼 → store/user.js 의 signOut → LS_AUTH reset (정상)
+- **검증 시나리오 (사용자 수동)**:
+  - [x] 로그인 → 새로고침 → `localStorage` 의 `firebase:authUser:` 키 유지
+  - [x] DIAG: `onAuthStateChanged has_user:true` 첫 발화, LS RESET 안 찍힘, MYPAGE LOGIN REQUIRED 안 뜸
+  - [x] 명시적 로그아웃 버튼 정상 동작
+- **빌드 검증**: `npm run build` ✓ (회원 219KB) / `npm run build:admin` ✓ (admin 영향 없음, main-admin.js 사용)
+- **배포 범위**: `firebase deploy --only hosting:prod` (회원 빌드만)
+
 ### 2026-06-18: [TEST] persistence 순서 변경 — browserLocal 1순위로 격리 (`test/persistence-browserlocal-first`)
 - **목적**: PR #83 (App Check 끔) 후에도 새로고침 시 `onAuthStateChanged has_user:false`. App Check 영향 배제됐으니 `indexedDBLocalPersistence` 자체가 이 환경에서 토큰 복원을 못 하는지 확인하는 격리 테스트
 - **수정 — `src/firebase.js`**:
