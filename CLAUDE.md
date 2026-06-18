@@ -134,6 +134,47 @@ firebase deploy --only hosting:admin
 
 ## 작업 로그
 
+### 2026-06-18: 인증 복원 타이밍 race 근본 차단 — `initializeAuth` + persistence 배열 (`fix/auth-persistence-timing-race`)
+- **목적**: PR #81 의 DIAG 로그로 확정된 race 수정
+- **확정된 원인 (DIAG 타임스탬프)**:
+  - `t=1260`: `onAuthStateChanged` 발화 (user=null) ← persistence 적용 **전**에 SDK 자동 복원 끝남
+  - `t=1261`: `persistenceReady = indexedDB` 완료 ← 1ms 늦게 적용
+  - 즉 `setPersistence(indexedDB)` 가 비동기라 SDK 의 자동 복원이 default persistence(browserLocal)로 시작 → indexedDB 의 토큰 못 읽음 → null 발화 → grace 만료 → LS RESET → 로그아웃
+- **수정 — `src/firebase.js`**:
+  - **`getAuth(app)` → `initializeAuth(app, { persistence: [indexedDB, browserLocal, inMemory] })`** 로 교체
+  - `initializeAuth` 는 **동기적으로** persistence 설정 → SDK 의 자동 복원이 indexedDB 에서 시작
+  - persistence 배열은 폴백 순서 (Firebase Auth Web SDK 9+ 지원)
+  - HMR / 이미 초기화된 경우 `getAuth(app)` 폴백
+  - 기존 `setPersistence(...)` IIFE 와 `persistenceReady` promise 제거
+  - 호환을 위해 `persistenceReady = Promise.resolve()` 만 export 유지 (즉시 resolve, await 해도 무해)
+  - `signInAnonymously`, `setPersistence` import 정리 (`setPersistence` 미사용으로 제거)
+- **수정 안 함**:
+  - `store/user.js me.init` — 이미 `await ensureFirebase()` → `await mod.firebaseReady` 후 onAuthStateChanged 등록. initializeAuth 동기 처리로 race 자체 차단됐으므로 추가 변경 불필요
+  - grace 로직 — initializeAuth 후엔 첫 발화부터 실계정 user 들어옴. 진짜 비로그인 케이스만 grace 작동
+  - DIAG 로그 — 검증용으로 유지. 사용자 확인 후 별도 PR 로 제거
+- **수정 후 흐름 (예상 DIAG 순서)**:
+  ```
+  [DIAG] APP START                      loggedIn:true email:yusung...
+  [DIAG] initializeAuth START
+  [DIAG] initializeAuth OK (persistence=[indexedDB,...])
+  [DIAG] onAuthStateChanged             has_user:true email:yusung...  ← 첫 발화에 실계정
+  [DIAG] me.init onAuthStateChanged     has_user:true email:yusung...
+  [DIAG] me.init 실계정 처리 시작
+  [DIAG] LS WRITE app:user:auth         loggedIn:true email:yusung...
+  [DIAG] me.auth.value SET (실계정 처리 완료)
+  (라우터 가드 통과, MyPage 정상 표시)
+  ```
+- **검증 시나리오 (사용자 수동)**:
+  - [x] 새로고침 → `[DIAG] onAuthStateChanged has_user:true email:실계정` 첫 발화
+  - [x] 마이페이지가 실계정 표시 (MYPAGE LOGIN REQUIRED 안 뜸)
+  - [x] LS RESET 로그 안 찍힘 (grace 타이머 시작 안 함)
+- **건드리지 않음**:
+  - 토큰 저장처 (indexedDB 그대로)
+  - 인증 로직 / 가드 분기 조건 / 룰 / Functions / Storage
+  - 즐겨찾기 / 별점 / 관리자 빌드 코드 (firebase.js 는 admin 빌드도 사용하지만 initializeAuth 가 동일 indexedDB 적용 — admin 도 토큰 저장 안정성 향상)
+- **빌드 검증**: `npm run build` ✓ (회원 index 219KB, 변동 없음) / `npm run build:admin` ✓ (admin 영향 없음, firebase-auth 청크 +0.01KB)
+- **배포 범위**: `firebase deploy --only hosting:prod` (회원 빌드만)
+
 ### 2026-06-18: [DIAG] 인증 복원 추적 로그 임시 추가 (`diag/auth-logout-trace`)
 - **목적**: PR #80 배포 후에도 새로고침 시 마이페이지가 "로그인이 필요합니다" 로 튕기는 증상 — 정확한 단계를 잡기 위한 진단 로그. **로직/기능 변경 없음, `console.log` 만**. 원인 확정 후 별도 PR 로 제거 예정
 - **확정된 사실**:

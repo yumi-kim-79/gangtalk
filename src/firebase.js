@@ -10,10 +10,10 @@ const IS_ADMIN_BUILD =
 
 import { initializeApp, getApps, getApp } from 'firebase/app'
 import {
+  initializeAuth,
   getAuth,
   onAuthStateChanged,
   signInAnonymously,
-  setPersistence,
   indexedDBLocalPersistence,
   browserLocalPersistence,
   inMemoryPersistence,
@@ -143,35 +143,48 @@ if (typeof document !== 'undefined' && appCheck) {
 
 /* ──────────────────────────────────────────────────────────
    3) Firestore / Storage / Auth
+   ──────────────────────────────────────────────────────────
+   ✨ 2026-06-18 race 차단:
+     이전: getAuth(app) + 비동기 setPersistence(indexedDB).
+       → SDK 의 자동 인증 복원이 default persistence(browserLocal)로
+         시작돼버려 indexedDB 의 토큰을 못 읽고 onAuthStateChanged
+         첫 발화가 null 로 끝남 (DIAG: t=1260 null 발화 → t=1261
+         persistenceReady=indexedDB).
+     이후: initializeAuth(app, { persistence: [indexedDB, browserLocal,
+       inMemory] }).
+       → 동기적으로 persistence 설정. SDK 의 자동 복원이 indexedDB 에서
+         시작 → onAuthStateChanged 첫 발화에 실계정 user 전달.
+       → persistence 배열이 폴백 순서 (Firebase Auth Web SDK 9+ 지원).
    ────────────────────────────────────────────────────────── */
-const auth = getAuth(app)
+let auth
+try {
+  console.log('[DIAG] initializeAuth START', { t: performance.now().toFixed(1) })
+  auth = initializeAuth(app, {
+    persistence: [
+      indexedDBLocalPersistence,
+      browserLocalPersistence,
+      inMemoryPersistence,
+    ],
+  })
+  console.log('[DIAG] initializeAuth OK (persistence=[indexedDB, browserLocal, inMemory])', {
+    t: performance.now().toFixed(1),
+  })
+} catch (e) {
+  // HMR / 이미 초기화된 경우 getAuth 폴백.
+  console.warn('[DIAG] initializeAuth FAIL, fallback to getAuth:', e?.code || e?.message)
+  auth = getAuth(app)
+}
+
 const db = getFirestore(app)
 const storage = getStorage(app)
 
-// 퍼시스턴스 (IndexedDB → LocalStorage → InMemory 순 폴백).
-// firebaseReady 가 시작되기 전에 끝나도록 모듈 스코프 promise 로 노출.
-const persistenceReady = (async () => {
-  // [DIAG]
-  console.log('[DIAG] persistenceReady START', { t: performance.now().toFixed(1) })
-  try {
-    await setPersistence(auth, indexedDBLocalPersistence)
-    console.log('[DIAG] persistenceReady = indexedDB', { t: performance.now().toFixed(1) })
-  } catch (e1) {
-    console.warn('[DIAG] persistenceReady indexedDB FAIL', e1?.code || e1?.message)
-    try {
-      await setPersistence(auth, browserLocalPersistence)
-      console.log('[DIAG] persistenceReady = browserLocal', { t: performance.now().toFixed(1) })
-    } catch (e2) {
-      console.warn('[DIAG] persistenceReady browserLocal FAIL', e2?.code || e2?.message)
-      await setPersistence(auth, inMemoryPersistence)
-      console.log('[DIAG] persistenceReady = inMemory (volatile!)', { t: performance.now().toFixed(1) })
-    }
-  }
-})().catch((e) => { console.warn('[DIAG] persistenceReady IIFE catch:', e?.code || e?.message) })
+/* persistence 는 initializeAuth 가 동기 처리 — 별도 promise 대기 불필요.
+   기존 호환을 위해 즉시 resolve 되는 promise 만 노출. */
+const persistenceReady = Promise.resolve()
 
 /* [DIAG] 전역 onAuthStateChanged + onIdTokenChanged 추적 — 모든 발화 로그.
- *   ensureSignedIn 의 unsub onAuthStateChanged 와는 별개. 한 번만 등록되어
- *   페이지 라이프타임 동안 모든 인증 변화를 기록. */
+ *   initializeAuth 가 동기 처리 후 등록되므로 첫 발화부터 indexedDB persistence
+ *   기준 user 가 들어옴. */
 import { onIdTokenChanged } from 'firebase/auth'
 onAuthStateChanged(auth, (u) => {
   console.log('[DIAG] onAuthStateChanged', {
