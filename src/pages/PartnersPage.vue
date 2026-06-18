@@ -371,6 +371,11 @@ import {
 import { getAuth, onAuthStateChanged } from 'firebase/auth'
 import { getStorage, ref as sRef, getDownloadURL } from 'firebase/storage'
 import { useMarketingBanners } from '@/composables/useMarketingBanners'
+import {
+  PARTNER_CATEGORIES,
+  PARTNER_CATEGORY_LABEL,
+  normalizePartnerCategory,
+} from '@/lib/partnerCategories'
 
 const router = useRouter()
 const route  = useRoute()
@@ -605,53 +610,19 @@ function doSearch(){
 onMounted(() => { if (route.query.q) q.value = String(route.query.q) })
 watch(() => route.query.q, v => { q.value = String(v || '') })
 
-/* ---------- 카테고리 ---------- */
-const categories = [
-  { key:'ps',     label:'성형'     },
-  { key:'skin',   label:'피부'     },
-  { key:'beauty', label:'미용'     },
-  { key:'nail',   label:'네일'     },
-  { key:'real',   label:'부동산'   },
-  { key:'fit',    label:'피트니스' },
-  { key:'deal',   label:'공동구매' },
-  { key:'shop',   label:'상품관'   },
-  // ETC 카테고리는 아이콘 안에 영어 텍스트 표시
-  { key:'etc',    label:'기타', short:'ETC' },
-]
-
-
-const mapCat = Object.fromEntries(categories.map(c=>[c.key,c.label]))
+/* ---------- 카테고리 (관리자/사용자 공용 9 카테고리) ----------
+ * 단일 소스: src/lib/partnerCategories.js
+ * 진단: docs/audit/2026-06-18-제휴업체-순서-top5-진단.md §4
+ */
+const categories = PARTNER_CATEGORIES
+const mapCat = PARTNER_CATEGORY_LABEL
 const cat = ref('all')
 const toggleCat = (k)=>{ cat.value = (cat.value===k ? 'all' : k) }
 const visibleCategories = computed(() => (cat.value === 'all' ? categories : categories.filter(c => c.key === cat.value)))
 const bizCategory = computed(() => cat.value === 'all' ? '' : cat.value)
 
-/* 카테고리 정규화 */
-function normCat(raw=''){
-  const v = String(raw).trim().toLowerCase()
-  if (!v) return 'etc'
-  const hit = (...words)=> words.some(w => v.includes(w))
-
-  // 성형
-  if (['ps','plastic','plastics'].includes(v) || hit('성형','성형외과')) return 'ps'
-  // 피부
-  if (['skin','derma','dermatology'].includes(v) || hit('피부','피부과')) return 'skin'
-  // 미용(헤어/살롱 포함, 기존 salon → beauty로 흡수)
-  if (['beauty','salon','hair'].includes(v) || hit('미용','헤어','살롱','미용실')) return 'beauty'
-  // 네일
-  if (['nail'].includes(v) || hit('네일')) return 'nail'
-  // 부동산
-  if (['real','estate','realestate'].includes(v) || hit('부동산')) return 'real'
-  // 피트니스
-  if (['fit','fitness','pt','gym'].includes(v) || hit('피트니스','헬스','pt','짐')) return 'fit'
-  // 공동구매(공구)
-  if (['deal','groupbuy'].includes(v) || hit('공동구매','공구')) return 'deal'
-  // 상품관(스토어/샵)
-  if (['shop','store','market'].includes(v) || hit('상품관','상품','스토어','샵','마켓')) return 'shop'
-
-  // 과거 카테고리(카페/렌탈 등)는 기타로
-  return 'etc'
-}
+/* 카테고리 정규화 — 레거시(salon/cafe/rental) → 새 키 자동 변환 포함 */
+const normCat = normalizePartnerCategory
 
 
 /* ---------- 지역 드롭다운 ---------- */
