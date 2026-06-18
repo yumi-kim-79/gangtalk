@@ -134,6 +134,44 @@ firebase deploy --only hosting:admin
 
 ## 작업 로그
 
+### 2026-06-18: [DIAG] 인증 복원 추적 로그 임시 추가 (`diag/auth-logout-trace`)
+- **목적**: PR #80 배포 후에도 새로고침 시 마이페이지가 "로그인이 필요합니다" 로 튕기는 증상 — 정확한 단계를 잡기 위한 진단 로그. **로직/기능 변경 없음, `console.log` 만**. 원인 확정 후 별도 PR 로 제거 예정
+- **확정된 사실**:
+  - persistence 정상 — `firebaseLocalStorageDb` 생성됨
+  - `localStorage.app:user:auth` = `{ loggedIn:true, email:'yusung090909@naver.com', nickname:'게스트' ... }` 로 저장돼 있음
+  - 그런데도 새로고침하면 마이페이지가 "로그인이 필요합니다" 표시
+- **심은 로그 (`[DIAG]` 프리픽스 + `performance.now()`)**:
+  | 위치 | 로그 이름 | 추적 대상 |
+  |---|---|---|
+  | `src/main.js:23-50` | `APP START` | 앱 진입 시각 + LS_AUTH 의 loggedIn/email/type/nickname |
+  | `src/firebase.js:152-175` | `persistenceReady START/=indexedDB/=browserLocal/=inMemory` | 어느 폴백 적용됐는지 (IIFE silent catch 가시화) |
+  | `src/firebase.js:177-195` | `onAuthStateChanged` / `onIdTokenChanged` | 매 발화 user 객체 (has_user/uid/email/isAnonymous) |
+  | `src/store/user.js:209-219` | `LS WRITE app:user:auth` | `me.save()` 의 모든 호출 — caller stack hint 포함 |
+  | `src/store/user.js:248-310` | `me.init onAuthStateChanged` / `grace timer START/CANCEL/expired` / `ANON user` / `실계정 처리 시작` | u 발화별 분기 + grace 흐름 |
+  | `src/store/user.js:430-440` | `me.auth.value SET (실계정 처리 완료)` | 최종 me.auth 의 loggedIn/email/type/nickname |
+  | `src/router/index.js:441-485` | `GUARD REDIRECT to /auth (...)` | 어느 분기에서 redirect 했는지 + 판정값 (logged/rawLogged/email/myType) |
+  | `src/pages/MyPage.vue:375-393` | `MyPage effectiveLoggedIn changed` / `MYPAGE LOGIN REQUIRED rendered` | LoggedOutSection 렌더 시점 + state 값 |
+  | `src/pages/ChatOpen.vue:182-191` | `ANON SIGNIN (ChatOpen.onMounted)` | 회원 사이트에서 익명 호출 일어나는지 |
+- **건드리지 않음**:
+  - persistence 코드 / 인증 로직 / 라우터 가드 분기 조건
+  - 다른 기능 / 룰 / Functions / Storage / 관리자 빌드
+  - 로그만 추가. 동작 변화 0
+- **예상 콘솔 출력 (새로고침 1회)**:
+  ```
+  [DIAG] APP START                  loggedIn:true email:yusung...
+  [DIAG] persistenceReady START
+  [DIAG] persistenceReady = indexedDB
+  [DIAG] onAuthStateChanged         has_user:?, email:?
+  [DIAG] me.init onAuthStateChanged has_user:?, email:?
+  [DIAG] me.init grace timer START  (또는 실계정 처리 시작)
+  [DIAG] LS WRITE app:user:auth     loggedIn:?, email:?
+  [DIAG] GUARD REDIRECT to /auth    (또는 통과) — logged:?, email:?
+  [DIAG] MyPage effectiveLoggedIn changed  next:?, state_email:?
+  ```
+- **빌드 검증**: `npm run build` ✓ (회원 index 215→219KB, +4KB 로그 코드) / `npm run build:admin` ✓ (admin 영향 없음)
+- **배포 범위**: `firebase deploy --only hosting:prod`
+- **다음 단계**: 사용자가 새로고침 후 콘솔 로그 캡처 → 원인 단계 확정 → 별도 PR 로 진짜 수정 + 본 진단 로그 제거
+
 ### 2026-06-18: GangTalkPage 잔존 setPersistence 제거 — 토큰 저장 실패 근본 차단 (`fix/gangtalk-persistence-conflict`)
 - **목적**: 진단(`docs/audit/2026-06-18-토큰저장실패-진단.md` §1-1) 의 PR #79 가 놓친 3번째 setPersistence 호출 제거
 - **결정적 단서**: `grep -rn setPersistence src/` 결과 회원 빌드에 `GangTalkPage.vue:2423` 잔존 호출 발견. 사용자가 강톡 탭 한 번이라도 진입하면 `setPersistence(browserLocal)` 가 firebase.js 의 `indexedDB` 설정 위에 덮어써 토큰이 localStorage 에 저장됨 → 새로고침 시 SDK 가 indexedDB 만 보고 복원 실패 → 게스트 표시
