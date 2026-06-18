@@ -2492,18 +2492,21 @@ onUnmounted(() => {
   padding:4px 0 12px;
   position:relative;
 }
+/* 5열 × 2줄 격자 (이전 가로 스크롤 → 한눈에 보기).
+ * 진단: docs/audit/2026-06-18-현황판-카테고리-2줄-진단.md
+ * PR #101 (StoreFinder/PartnersPage) 와 동일 패턴, prefix 만 mp-.
+ * mpCategories 10개 → 정확히 5×2 균일 격자.
+ */
 .mp-cat-scroll{
-  display:flex;
-  align-items:flex-start;
-  gap:14px;
-  overflow-x:auto;
+  display:grid;
+  grid-template-columns:repeat(5, minmax(0, 1fr));
+  align-items:start;
+  gap:12px 8px;
+  overflow:visible;
   padding:4px 4px 8px;
-  scrollbar-width:none;
-  -webkit-overflow-scrolling:touch;
 }
-.mp-cat-scroll::-webkit-scrollbar{ display:none; }
 .mp-cat-item{
-  flex:none;
+  flex:initial;
   display:flex;
   flex-direction:column;
   align-items:center;
@@ -2512,7 +2515,7 @@ onUnmounted(() => {
   border:none;
   padding:0;
   cursor:pointer;
-  min-width:54px;
+  min-width:0;
 }
 .mp-cat-ic{
   width:48px; height:48px;
@@ -2533,21 +2536,18 @@ onUnmounted(() => {
   font-size:11px;
   font-weight:600;
   color:var(--muted, #999);
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  max-width:100%;
 }
 .mp-cat-item.on .mp-cat-label{
   color:#ff4d8d;
   font-weight:800;
 }
+/* expand "더보기" 버튼 — 가로 스크롤 시절 잔존. 격자 모드에선 의미 없음. */
 .mp-cat-expand{
-  flex:none;
-  width:32px; height:48px;
-  border:none;
-  background:none;
-  display:grid; place-items:center;
-  color:var(--muted, #bbb);
-  cursor:pointer;
-  align-self:flex-start;
-  margin-top:0;
+  display:none;
 }
 
 /* ===== 강남 인기 업소 섹션 ===== */

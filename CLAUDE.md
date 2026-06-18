@@ -134,6 +134,47 @@ firebase deploy --only hosting:admin
 
 ## 작업 로그
 
+### 2026-06-18: 현황판 카테고리 5×2 격자 (`fix/mainpage-category-2row-grid`)
+- **목적**: 진단(`docs/audit/2026-06-18-현황판-카테고리-2줄-진단.md`) — PR #101 이 가게찾기/제휴관 만 적용해 현황판은 가로 스크롤 1줄 상태. 동일 패턴으로 통일
+- **변경 폭이 작은 이유**: MainPage 의 `.mp-cat-*` 셀렉터는 다른 페이지/관리자 빌드 어디서도 사용 안 함 (`grep` 결과 0건). PR #101 와 100% 동일 마크업 + 100% 동일 CSS 변수 → prefix `sf-` → `mp-` 만
+- **수정 — `src/pages/MainPage.vue` (CSS만)**:
+  - `.mp-cat-scroll`:
+    - `display: flex` + `overflow-x: auto` → `display: grid; grid-template-columns: repeat(5, minmax(0, 1fr))`
+    - `gap: 14px` → `gap: 12px 8px` (행/열 간격)
+    - `overflow: visible` (스크롤 제거)
+    - `align-items: start` 추가
+    - `scrollbar-width: none` + `-webkit-overflow-scrolling: touch` + `::-webkit-scrollbar` 룰 삭제 (스크롤 없으니 불필요)
+  - `.mp-cat-item`:
+    - `flex: none; min-width: 54px` → `flex: initial; min-width: 0`
+  - `.mp-cat-label`:
+    - `white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%` 추가
+  - `.mp-cat-expand`:
+    - 더보기 버튼 → `display: none` (격자 모드에선 의미 없는 dead 분기, 진단 §6-4)
+  - `mp-cat-ic / .on / .mp-cat-item.on .mp-cat-label` 핑크 강조 룰 모두 그대로
+  - 마크업 / `mpCategories` 데이터 / `setType` 클릭 핸들러 / `expandCategories` ref 모두 그대로
+- **모바일 412px 결과**:
+  - 가용 폭: 412 - 32 = 380px
+  - 한 칸: 380 / 5 = 76px (gap 8px 별도)
+  - **정확히 5×2 = 2줄 균일 격자, 빈칸 0**
+  - 한글 라벨 최대 4글자 (가라오케) 또는 `바(Bar)` 6글자 → 잘림 없음
+- **건드리지 않음**:
+  - `setType` / `type` ref / `mpCategories` / `expandCategories` ref
+  - 클릭/필터/검색/배너/Top 섹션 / CTA / 알림벨 / 헤더
+  - StoreFinder / PartnersPage (PR #101) — 셀렉터 분리
+  - 다른 페이지 — `mp-cat-*` 셀렉터는 MainPage 전용 (grep 검증)
+  - 관리자 빌드 / firestore.rules / Cloud Functions
+  - 다크모드 보정 (`.mp-cat-ic` 다크 룰 그대로 작동)
+- **빌드 검증**: `npm run build` ✓ (index CSS 98.22→98.06KB, **-0.16KB** 감소 — 스크롤 관련 룰 정리. JS 변동 없음)
+- **배포 범위**: `firebase deploy --only hosting:prod` (회원 빌드만)
+- **검증 시나리오 (사용자 수동)**:
+  - [x] 현황판(gangtox.com 메인) → 카테고리 10개 전부 5×2 격자로 한눈에 보임 (가로 스크롤 없음)
+  - [x] 카테고리 클릭 → 정상 필터링 (회귀 0)
+  - [x] 선택된 카테고리 핑크 강조 (`mp-cat-ic.on`) 그대로
+  - [x] 한글 라벨 (가라오케/바(Bar)/텐카페 등) 안 잘림
+  - [x] "더보기" 꺽쇠 안 보임
+  - [x] PR #101 의 가게찾기/제휴관 5×2 격자도 정상 (회귀 0)
+  - [x] 다른 페이지 (MyPage / GangTalkPage 등) 영향 없음
+
 ### 2026-06-18: 카테고리 영역 5×2 격자 (`fix/category-2row-grid`)
 - **목적**: 진단(`docs/audit/2026-06-18-카테고리-2줄-진단.md` 방법 B) — 가게찾기/제휴관의 카테고리가 가로 스크롤 1줄로 일부만 보이던 것을 5열 × 2줄 균일 격자로 전환. 한눈에 전체 카테고리 노출
 - **공유 없음**: 두 페이지가 별개 CSS 클래스 (`.sf-cat-*` / `.pp-cat-*`) 사용 → 각자 따로 수정
