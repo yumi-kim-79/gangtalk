@@ -134,6 +134,55 @@ firebase deploy --only hosting:admin
 
 ## 작업 로그
 
+### 2026-06-18: 즐겨찾기 저장처 통일 + favorites 룰 추가 (`fix/favorites-unify-rules`)
+- **목적**: 진단(`docs/audit/2026-06-18-로그아웃-즐겨찾기-진단.md` §2) 의 두 문제 동시 해결
+  1. MainPage 하트가 `localStorage(mp:favs)` 만 사용 → FavoritesPage (Firestore) 와 분리
+  2. `firestore.rules` 에 `favorites` 매치 룰 부재 → PartnerDetail / FavoritesPage 의 Firestore 쓰기/읽기 default deny
+- **통일 패턴 (PartnerDetail 의 기존 키 형식 유지)**:
+  - 컬렉션: 루트 `/favorites/{favId}`
+  - favId: `${uid}__${type}__${targetId}` (`PartnerDetail.vue:176` 와 동일)
+  - payload: `{ ownerId, type, targetId, createdAt }`
+  - type: `'store' | 'partner'`
+- **수정 1 — `src/pages/MainPage.vue`**:
+  - import 에 `where`, `deleteDoc` 추가
+  - 기존 `favSet` 블록 (localStorage 기반) 제거 → Firestore onSnapshot 구독으로 재작성
+    - `subscribeFavorites(uid)` — `query(favorites where ownerId==uid && type=='store')` 구독, `targetId` 를 Set 에 모음
+    - `currentUser` watch (immediate:true) → uid 변동 시 재구독
+    - `onUnmounted` 에서 unsubscribe
+    - TDZ 회피 위해 watch 등록을 onMounted 안으로
+  - `toggleFav(s)` — 비로그인 시 `/auth` 로 안내, 로그인 시 favorites doc set/delete + 낙관적 UI + 에러 시 롤백
+  - `isFav(s)` — 동작 동일 (favSet 변동만 Firestore 가 됨)
+- **수정 2 — `firestore.rules` favorites 매치 룰 추가** (`:73` 이전에 삽입):
+  ```
+  match /favorites/{favId} {
+    allow read: if signedIn() && (resource.data.ownerId == request.auth.uid || isAdmin());
+    allow create: if signedIn() && request.resource.data.ownerId == request.auth.uid;
+    allow delete: if signedIn() && (resource.data.ownerId == request.auth.uid || isAdmin());
+    allow update: if signedIn()
+                  && resource.data.ownerId == request.auth.uid
+                  && request.resource.data.ownerId == resource.data.ownerId
+                  && request.resource.data.type == resource.data.type
+                  && request.resource.data.targetId == resource.data.targetId;
+  }
+  ```
+  - 본인 doc 만 read/write
+  - update 시 ownerId/type/targetId 변경 금지 (스푸핑 차단)
+  - list 쿼리는 클라이언트가 `where(ownerId, ==, uid)` 강제 (Firestore 가 doc 별 read 룰 적용)
+- **건드리지 않음 (의도적)**:
+  - 별점 / 로그인 (별도 진단/PR)
+  - StoreDetail / PartnersPage / FavoritesPage 자체 — 이미 정상 패턴 사용 중. 룰 추가만으로 정상 작동 회복
+  - `users/{uid}/favorites` 서브컬렉션 폴백 — FavoritesPage 의 폴백 분기는 그대로 유지 (옛 데이터 보존), 단 새 쓰기는 모두 루트 favorites 로 통일
+  - admin 빌드 / functions / storage.rules
+- **동작 흐름 (수정 후)**:
+  - 비로그인: MainPage 하트 클릭 → `/auth` 로 리다이렉트
+  - 로그인: 하트 클릭 → favorites doc set/delete → onSnapshot 이 favSet 갱신 → 같은 페이지의 다른 카드도 동기 표시
+  - 마이페이지 (`/favorites`) 진입 → 같은 `favorites where ownerId==uid` 구독 → 즉시 표시
+  - 다른 기기/새로고침 → Firestore 가 진실 → 동일 표시
+- **빌드 검증**: `npm run build` ✓ (index 215KB, +1KB 증가)
+- **배포 범위**: `firebase deploy --only firestore:rules,hosting:prod` 두 가지 함께 필요
+  - firestore.rules 만 배포하면 코드가 옛 버전이라 MainPage 가 여전히 localStorage
+  - hosting 만 배포하면 코드가 새 favorites 쓰기 시도하지만 룰 부재로 거부 → 화면에서 토글 안 됨
+
 ### 2026-06-18: 회원 사이트 자동 로그아웃 race 차단 (`fix/member-auth-persistence`)
 - **목적**: 진단(`docs/audit/2026-06-18-로그아웃-즐겨찾기-진단.md` §1) 의 인증 race 2가지 차단
   1. `firebase.js ensureSignedIn` 의 첫 콜백 null 즉시 익명 로그인 → 복원 중인 실계정 위에 익명 user 덮어쓰는 race
