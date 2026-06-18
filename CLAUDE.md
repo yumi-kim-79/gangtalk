@@ -134,6 +134,54 @@ firebase deploy --only hosting:admin
 
 ## 작업 로그
 
+### 2026-06-18: 추천코드 seq=1 회귀 수정 — me.init else 분기 제거 (`fix/referral-seq-race`)
+- **목적**: 진단 (`docs/audit/2026-06-18-refcode-카운터-읽기누락-진단.md` + `docs/audit/2026-06-18-userseq-카운터-진단.md`) 의 원인 제거. 모든 신규 가입자가 `prefix+'00001'` 받는 회귀 차단
+- **원인 (race 메커니즘)**:
+  - `_fbSignupUser` 가 `await createUserWithEmailAndPassword(...)` 완료
+  - Firebase Auth SDK 가 `onAuthStateChanged` 발화 → **me.init 콜백이 `_fbSignupUser` 의 `runTransaction` 보다 먼저 실행**
+  - me.init else 분기 (`store/user.js:377-410`) 가 `seq=1` 하드코딩으로 users doc 자동 생성 → `myJoinSeq:1, myRefCode:'prefix00001'`
+  - `_fbSignupUser` 트랜잭션 도달 시 `uSnap.exists()===true, myJoinSeq=1` → **`already` 분기로 early return → `meta/counters.userSeq` 갱신 안 됨**
+- **수정 — `src/store/user.js me.init else` (`:377-408`)**:
+  - **`seq=1` 하드코딩 + `setDoc` 으로 users doc 자동 생성하는 로직 전체 제거**
+  - 대신 `_ready=true` + `return` 만:
+    ```js
+    } else {
+      console.warn('[me.init] users doc not found — skip auto-create (signup race protection)')
+      _ready.value = true
+      return
+    }
+    ```
+  - 신규 가입자의 users doc 생성은 `_fbSignupUser` 의 runTransaction (`:472-490`) 에 일임
+  - me.auth 갱신도 `_fbSignupUser` 가 직접 처리 (`:532-540`) — me.init else 에서 me.auth 안 건드려도 안전
+  - 주석에 race 메커니즘 + 진단 참조 + 매우 드문 데이터 손상 케이스 설명 명시
+- **수정 후 흐름**:
+  - **t1**: `createUserWithEmailAndPassword` 완료
+  - **t2**: `onAuthStateChanged` 발화 → me.init else 분기 → `_ready=true` + return (users doc 안 만듬)
+  - **t3**: `_fbSignupUser` runTransaction 진입 → `uSnap.exists()===false` → counters 분기 → `cSnap.exists()===true, userSeq=38` → seq=39 → `tx.update({ userSeq: 39 })` + `tx.set(users, { myJoinSeq:39, myRefCode:'y00039' })`
+  - **t4**: `_fbSignupUser` 가 me.auth 직접 갱신 (`:532-540`) — 화면에 새 가입 정보 정상 반영
+  - **t5**: counters +1 정상 누적. 다음 가입자 seq=40
+- **건드리지 않음**:
+  - `_fbSignupUser` 트랜잭션 흐름 — 정상 카운터 분기 진입 가능해진 것만 다름
+  - `_fbSignupBiz`, `_fbLoginWithRole` 등 다른 가입/로그인 흐름 — 모두 me.auth 직접 갱신 패턴이라 영향 없음
+  - `makeMyCodeV2` / `applyReferralNow` / 리워드 지급 로직
+  - PR #85 의 `main.js beforeunload signOut` 제거 — 유지
+  - PR #88 의 닉네임 회귀 수정 4건 (`ProfileEditSheet`, `MyPage handleProfileSave`, `_listenUserDoc`, me.init getDoc try/catch) — 유지
+  - `firebase.js` persistence / 인증 / 가드 / 룰 / Functions / Storage / 관리자 빌드
+- **드문 예외 — Auth user 만 있고 users doc 없는 데이터 손상 케이스**:
+  - 이전: me.init else 가 자동 doc 생성으로 복구
+  - 이후: me.auth 가 LS_AUTH 캐시 그대로 → 사용자가 다시 가입 시도하거나 관리자가 수동 복구 필요
+  - **정상 가입 흐름에서는 영향 없음** — `_fbSignupUser` 가 트랜잭션으로 doc 생성
+- **빌드 검증**: `npm run build` ✓ (회원 index 215.66→215.41KB, **-0.25KB**) / `npm run build:admin` ✓ (admin 영향 없음, me.init 호출 안 함)
+- **배포 범위**: `firebase deploy --only hosting:prod` (회원 빌드만, 룰/Functions 변경 없음)
+- **검증 시나리오 (사용자 수동)**:
+  - [x] 새 계정 2~3개 연속 가입 → 추천코드가 `prefix00039`, `prefix00040`, `prefix00041`... 로 증가 (사용자 환경의 현재 userSeq=38 다음부터)
+  - [x] Firebase Console 에서 `meta/counters.userSeq` 가 가입마다 +1 증가 확인
+  - [x] 기존 로그인 (PR #85) 회귀 없음 — 새로고침 시 로그인 유지
+  - [x] 닉네임 회귀 (PR #88) 회귀 없음 — 프로필 저장 후 새로고침 시 닉네임 유지
+- **후속 작업 (별도 PR)**:
+  - 기존 중복 코드 (`prefix00001` 다수) 받은 계정 재발급 마이그레이션 — 진단 §5-2 참고 (`createdAt` 순으로 정렬 후 `myJoinSeq` 재할당 + `meta/counters.userSeq` 갱신)
+  - `referral_counters` dead 컬렉션 정리 (선택)
+
 ### 2026-06-18: 닉네임 회귀 버그 수정 — 4건 (`fix/nickname-empty-overwrite`)
 - **목적**: 진단(`docs/audit/2026-06-18-닉네임-회귀-진단.md`) 의 원인 제거. 프로필 저장 후 새로고침/재방문 시 '게스트' 회귀 차단
 - **원인 (DIAG 추적)**: `ProfileEditSheet.vue:608` 의 `props.edit.nickname ?? props.state.profile?.nickname ?? ''` 에서 `??` 가 빈 문자열 `''` 통과 → users.profile.nickname='' 저장 → 새로고침 시 `useMyPageCore.js:1655` 의 8순위 폴백 `'게스트'` 발동
