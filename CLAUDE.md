@@ -134,6 +134,46 @@ firebase deploy --only hosting:admin
 
 ## 작업 로그
 
+### 2026-06-18: 업체 계정 생성 폼에서 "연결할 가게" 드롭다운 제거 (`feat/remove-store-link-dropdown`)
+- **목적**: PR #93/#94 의 업체 자가등록 흐름이 작동하므로, 관리자 신규 계정 생성 시 "연결할 가게" 드롭다운 불필요. 관리자는 계정만 만들고 업소 등록은 업체가 직접 진행
+- **수정 — `src/pages/admin/BizAccountsPage.vue`**:
+  - **신규 계정 생성 모달**:
+    - `<label>` "연결할 가게 (선택)" + `<select v-model="form.storeId">` 블록 제거 (`:87-95`)
+    - 상단에 핑크 안내 박스 추가: `<div class="adm-create-notice">` "💡 업소 연결은 불필요합니다 — 계정 생성 후 업체가 직접 로그인해 출근업소를 등록합니다. 등록 신청이 들어오면 `업소 관리 → 승인 대기` 탭에 표시됩니다"
+  - **`onCreate` 함수**:
+    - `storeId` destructure 제거. `fnCreateBiz({ email, password, storeName })` 만 전달 (storeId 인자 없음)
+    - 생성 성공 alert 확장: 다음 단계 (자가등록 흐름) 안내 포함
+    - **`createBizAccount` Cloud Function 시그니처 변경 0** — storeId 는 이미 선택적 파라미터
+  - **페이지 서브타이틀**: "업체용 로그인 계정을 생성하고 가게에 연결합니다" → "업체용 로그인 계정을 생성합니다. 업소 등록은 업체가 직접 진행합니다"
+- **"업소 연결" 버튼 — 유지 판단**:
+  - 자가등록이 기본 흐름이지만 **관리자 override 케이스가 분명히 존재**:
+    1. 이미 만든 가게에 나중에 ownerEmail 부여 (기존 데이터 보정)
+    2. 데이터 마이그레이션
+    3. 잘못된 ownerEmail 매핑 수정
+  - **유지 결정**. 단 모달 안에 "※ 일반적인 경우 업체가 직접 등록(자가등록) 하므로 본 기능은 불필요합니다. 기존 업소의 소유자(ownerEmail) 를 수정하거나 데이터 마이그레이션 시에만 사용하세요" 안내 추가
+  - `form.storeId` ref / `linkStoreToBiz` Cloud Function 호출 모두 유지
+- **CSS 추가**:
+  - `.adm-create-notice` — 핑크 배경 + 1.5px solid border + `code` 강조 + 다크모드 보정
+  - `.adm-modal-subhint` — 회색 배경 작은 hint 박스 + 다크모드 보정
+- **건드리지 않음**:
+  - `createBizAccount` Cloud Function (functions/index.js) — 시그니처 그대로
+  - `linkStoreToBiz` / `resetBizPassword` / `deleteBizAccount` — 그대로
+  - BizMyStorePage 자가등록 흐름 / 승인 파이프라인 / firestore.rules / storage.rules
+  - 회원 빌드
+  - `BizAccountsPage users subscribe error` (별개 문제, 진단 §4) — 본 PR 범위 아님
+- **수정 후 흐름**:
+  1. 관리자: BizAccountsPage → "+ 새 업체 계정 생성" → 이메일/비번/업체명만 입력 → 생성
+  2. 업체: 로그인 → BizMyStorePage → "새 업소 등록 시작" → 텍스트 입력 → 등록 신청
+  3. 관리자: /admin/stores → 승인 대기 탭 → 승인 → 사용자 현황판에 노출
+- **빌드 검증**: `npm run build:admin` ✓ (BizAccountsPage JS 13.00→13.37KB, CSS 5.14→5.65KB 추정) / 회원 빌드 영향 없음
+- **배포 범위**: `firebase deploy --only hosting:admin` (관리자 빌드만)
+- **검증 시나리오 (사용자 수동)**:
+  - [x] 새 업체 계정 생성 모달 → 드롭다운 없이 이메일/비번/업체명만으로 생성 가능
+  - [x] 생성 성공 alert 에 다음 단계 안내 표시
+  - [x] 생성된 계정으로 로그인 → BizMyStorePage 자가등록 흐름 정상
+  - [x] 기존 "업소 연결" 버튼 → 모달 진입 시 hint 박스 노출 ("관리자 override 용도")
+  - [x] 회귀 0 — `createBizAccount` Cloud Function 시그니처 변경 없음
+
 ### 2026-06-18: 신규 등록 모드 대표 이미지 비활성화 + 안내 (`fix/biz-newstore-image-notice`)
 - **목적**: PR #93 후속 — 업체가 신규 업소 등록 시 대표 이미지 첨부 시도 → `alert("가게가 선택되지 않았습니다.")` 노출되던 문제를 안내 문구로 자연스럽게 처리
 - **원인 (진단 `docs/audit/2026-06-18-신규등록-이미지업로드-진단.md`)** 2중 차단:
