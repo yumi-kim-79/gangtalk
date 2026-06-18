@@ -134,6 +134,26 @@ firebase deploy --only hosting:admin
 
 ## 작업 로그
 
+### 2026-06-18: [TEST] persistence 순서 변경 — browserLocal 1순위로 격리 (`test/persistence-browserlocal-first`)
+- **목적**: PR #83 (App Check 끔) 후에도 새로고침 시 `onAuthStateChanged has_user:false`. App Check 영향 배제됐으니 `indexedDBLocalPersistence` 자체가 이 환경에서 토큰 복원을 못 하는지 확인하는 격리 테스트
+- **수정 — `src/firebase.js`**:
+  - `initializeAuth` 의 `persistence` 배열 순서 변경:
+    - 이전: `[indexedDB, browserLocal, inMemory]`
+    - 이후: `[browserLocal, indexedDB, inMemory]`
+  - DIAG 로그 라벨도 `[DIAG] initializeAuth OK (persistence=[browserLocal, indexedDB, inMemory]) — TEST` 로 업데이트
+  - 주석에 격리 테스트 사유 명시 (원인 확정 후 정상 순서 복귀 예정)
+- **건드리지 않음**:
+  - App Check 스위치 (PR #83) 그대로 유지 (`VITE_DISABLE_APPCHECK` 기본 true)
+  - 관리자 빌드
+  - 다른 코드 / DIAG 로그
+- **검증 시나리오**:
+  - [x] 배포 후 로그인 → 새로고침
+  - **유지되면**: indexedDB 가 이 환경에서 복원 불가 — 원인 확정. 정석은 localStorage 우선 또는 indexedDB 동작 환경 점검
+  - **여전히 실패**: persistence 종류 무관 — 더 깊은 SDK / 환경 / 도메인 문제
+- **빌드 검증**: `npm run build` ✓ (회원 219KB) / `npm run build:admin` ✓ (admin 영향 없음)
+- **배포 범위**: `firebase deploy --only hosting:prod` (회원 빌드만)
+- **다음 단계**: 사용자 검증 결과에 따라 원인 확정 → 정상 순서 복귀 또는 다른 원인 추적
+
 ### 2026-06-18: [TEST] App Check 임시 비활성 스위치 — 새로고침 로그아웃 원인 격리 (`test/disable-appcheck-auth`)
 - **목적**: PR #82 (initializeAuth) 후에도 새로고침 시 로그아웃 잔존 — App Check 가 인증 토큰 refresh 를 방해하는지 확정하기 위한 격리 테스트
 - **정황**:

@@ -175,14 +175,21 @@ if (typeof document !== 'undefined' && appCheck) {
 let auth
 try {
   console.log('[DIAG] initializeAuth START', { t: performance.now().toFixed(1) })
+  // ⚠️ 2026-06-18 복원 원인 격리 테스트 — indexedDB vs browserLocal.
+  //   PR #82 에서 indexedDB 를 1순위로 뒀지만 새로고침 시 토큰 복원 실패 지속.
+  //   indexedDBLocalPersistence 자체가 이 환경에서 복원을 못 하는지 확인하기 위해
+  //   browserLocal(localStorage)을 1순위로 변경.
+  //   - 유지되면: indexedDB 가 원인 → 정석은 localStorage 유지 또는 indexedDB 동작 환경 점검
+  //   - 여전히 실패: persistence 종류 무관 — 더 깊은 SDK/환경 문제
+  //   원인 확정 후 정상 순서 (indexedDB 1순위) 로 복귀 예정.
   auth = initializeAuth(app, {
     persistence: [
-      indexedDBLocalPersistence,
       browserLocalPersistence,
+      indexedDBLocalPersistence,
       inMemoryPersistence,
     ],
   })
-  console.log('[DIAG] initializeAuth OK (persistence=[indexedDB, browserLocal, inMemory])', {
+  console.log('[DIAG] initializeAuth OK (persistence=[browserLocal, indexedDB, inMemory]) — TEST', {
     t: performance.now().toFixed(1),
   })
 } catch (e) {
