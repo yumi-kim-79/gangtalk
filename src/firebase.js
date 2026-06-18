@@ -18,6 +18,9 @@ import {
   browserLocalPersistence,
   inMemoryPersistence,
 } from 'firebase/auth'
+
+// signInAnonymously 는 ChatOpen 등 익명이 꼭 필요한 곳에서 명시 호출.
+// 회원 부트스트랩(ensureSignedIn / firebaseReady) 은 익명 자동 호출 금지.
 import { getFirestore } from 'firebase/firestore'
 import { getStorage } from 'firebase/storage'
 import {
@@ -160,28 +163,30 @@ const persistenceReady = (async () => {
 })().catch(() => {})
 
 /* ──────────────────────────────────────────────────────────
-   4) 익명 로그인 보장 + 외부 준비 Promise
+   4) 인증 부트스트랩 — 익명 자동 로그인 폐지 (2026-06-18)
    ──────────────────────────────────────────────────────────
-   race 차단 (2026-06-18):
-   - 이전: onAuthStateChanged 첫 콜백이 null 이면 즉시 signInAnonymously
-     → SDK 가 indexedDB/localStorage 에서 실계정 복원 중인 동안 익명 user 가
-       currentUser 점유 → 실계정 잃음
-   - 이후:
-     ① persistence 설정 완료 대기
-     ② 첫 콜백이 user 면 즉시 채택, null 이면 grace period (2500ms) 대기
-     ③ grace 동안 두 번째 콜백이 user 주면 그 user 채택
-     ④ grace 후에도 user 없으면 그제야 익명 로그인 (진짜 비로그인)
+   변경 이력:
+   - PR #76: 첫 null 발화에 grace 도입 (2500ms)
+   - 본 PR: 익명 자동 호출 자체 폐지.
+     실계정 복원 실패해도 익명 user 로 덮지 않음 (= 비로그인 상태 유지).
+     익명이 꼭 필요한 곳(ChatOpen.vue 등)은 호출자가 명시 호출.
+     이렇게 해야 me.init 가 익명 user 를 정상 user 로 처리해 LS_AUTH 를
+     email='' 로 덮는 사고를 차단할 수 있음 (진단 §1-2, §1-3).
+
+   동작:
+   ① persistence 설정 완료 대기 (단일 setPersistence — indexedDBLocalPersistence)
+   ② onAuthStateChanged 의 첫 user 발화를 대기. null 발화는 grace (2500ms) 동안 무시
+   ③ grace 후에도 user 없으면 null 반환 — **익명 호출 안 함**
    ────────────────────────────────────────────────────────── */
 const RESTORE_GRACE_MS = 2500
 
 async function ensureSignedIn() {
-  // ① persistence 설정 완료까지 대기 — 미설정 상태에서 signInAnonymously 호출 시
-  //    in-memory 폴백으로 저장될 수 있어 새로고침 시 사라짐.
+  // ① persistence 설정 완료까지 대기 — 미설정 상태에서 signIn 시 in-memory 폴백
   await persistenceReady
 
   if (auth.currentUser) return auth.currentUser
 
-  // ② onAuthStateChanged 의 첫 user 발화를 대기. null 발화는 grace 동안 무시.
+  // ② onAuthStateChanged 의 첫 user 발화 대기. null 발화는 grace 동안 무시.
   const restored = await new Promise((resolve) => {
     let done = false
     let unsub = () => {}
@@ -195,20 +200,13 @@ async function ensureSignedIn() {
     const timer = setTimeout(() => finish(auth.currentUser || null), RESTORE_GRACE_MS)
     unsub = onAuthStateChanged(auth, (u) => {
       if (u) finish(u)
-      // u=null 일 때는 SDK 가 아직 복원 중일 수 있으므로 timer 만료까지 더 기다림.
+      // u=null 은 SDK 가 복원 중일 수 있어 timer 만료까지 기다림.
     })
   })
 
-  if (restored) return restored
-
-  // ③ 진짜 비로그인 → 익명 로그인
-  try {
-    const cred = await signInAnonymously(auth)
-    return cred.user ?? null
-  } catch (e) {
-    console.warn('[Auth] anonymous sign-in failed:', e?.message || e)
-    return null
-  }
+  // ③ grace 만료 후 user 없으면 그대로 null 반환 — 익명 호출 안 함.
+  //    호출자(ChatOpen 등)가 익명이 필요하면 자체적으로 signInAnonymously 호출.
+  return restored || null
 }
 
 const firebaseReady = (async () => {

@@ -134,6 +134,13 @@ async function ensureFirebase() {
   if (FB !== null) return FB // 이미 시도한 적 있음(성공/실패)
   try {
     const mod = await import(/* @vite-ignore */ '@/firebase')
+    // ✨ 2026-06-18: firebaseReady 를 await — persistence(indexedDBLocalPersistence)
+    //   설정 완료 후에 signIn 호출되도록 보장. 이전에는 setPersistence 가 끝나기
+    //   전에 signInWithEmailAndPassword 호출 시 default persistence 로 저장돼
+    //   새로고침 시 복원 실패하는 race 발생.
+    if (mod.firebaseReady) {
+      try { await mod.firebaseReady } catch {}
+    }
     const fbAuth = mod.auth
     const fbDb   = mod.db
     const fx     = mod.fx || {}
@@ -260,6 +267,22 @@ export const me = {
 
       // user 가 오면 pending null reset 취소
       if (_nullPending) { clearTimeout(_nullPending); _nullPending = null }
+
+      // ✨ 2026-06-18: 익명 user 는 "로그인 사용자" 로 취급하지 않음.
+      //   이전에는 ensureSignedIn 의 자동 signInAnonymously 가 실계정 토큰
+      //   복원 실패 후 익명 user 를 currentUser 로 만들고, 여기서 me.init 가
+      //   users/{익명uid} 문서를 자동 생성해 me.auth.value = { loggedIn:true,
+      //   profile:{ email:'' }, ... } 로 LS_AUTH 를 덮었음. 그 결과 라우터
+      //   가드의 `rawLogged = loggedIn && !!email` 가 false → /auth redirect.
+      //   본 PR 은 firebase.js 의 익명 자동 호출을 폐지했으므로 평상시엔
+      //   여기로 익명 user 가 들어오지 않지만, ChatOpen 등 명시 호출 경로가
+      //   있어 방어적으로 분기.
+      if (u.isAnonymous === true) {
+        // 익명 — me.auth 는 LS_AUTH 캐시 그대로 두고, _ready 만 켬.
+        // (기존 실계정 LS_AUTH 가 캐시에 있어도 보존)
+        _ready.value = true
+        return
+      }
 
       const userRef = doc(db, 'users', u.uid)
       let data
