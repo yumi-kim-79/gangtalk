@@ -1353,21 +1353,22 @@ function refresh(){ loadPartners() }
   width:18px; border-radius:999px;
 }
 
-/* ===== Category 가로 스크롤 (sf-cat-scroll 톤) ===== */
+/* ===== Category 5열 × 2줄 격자 (가로 스크롤 → 한눈에 보기) =====
+ * 진단: docs/audit/2026-06-18-카테고리-2줄-진단.md (방법 B)
+ * 칩 수 10개 (지역 1 + partner 9) → 정확히 5×2 균일 격자.
+ * 옛 .cat-grid grid 룰 (`:1549`) 과 충돌 — 본 룰의 !important 가 우선.
+ */
 .pp-cat{ padding:4px 0 12px; position:relative; }
 .pp-cat-scroll{
-  display:flex !important;
-  align-items:flex-start;
-  gap:14px;
-  overflow-x:auto;
+  display:grid !important;
+  grid-template-columns:repeat(5, minmax(0, 1fr)) !important;
+  align-items:start;
+  gap:12px 8px !important;
+  overflow:visible;
   padding:4px 4px 8px;
-  scrollbar-width:none;
-  -webkit-overflow-scrolling:touch;
-  grid-template-columns:none !important;
 }
-.pp-cat-scroll::-webkit-scrollbar{ display:none; }
 .pp-cat-scroll .cat{
-  flex:none !important;
+  flex:initial !important;
   display:flex !important;
   flex-direction:column !important;
   align-items:center !important;
@@ -1375,7 +1376,7 @@ function refresh(){ loadPartners() }
   background:none !important;
   border:none !important;
   padding:0 !important;
-  min-width:60px;
+  min-width:0 !important;
   box-shadow:none !important;
   outline:none !important;
 }
@@ -1400,6 +1401,10 @@ function refresh(){ loadPartners() }
   font-weight:600 !important;
   color:var(--muted, #999) !important;
   margin:0 !important;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  max-width:100%;
 }
 .pp-cat-scroll .cat.active .lbl{
   color:#ff4d8d !important;
