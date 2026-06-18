@@ -134,6 +134,44 @@ firebase deploy --only hosting:admin
 
 ## 작업 로그
 
+### 2026-06-18: 별점(ratings) 룰 추가 — PR #74 부수효과 회복 (`fix/ratings-rules`)
+- **목적**: 진단(`docs/audit/2026-06-18-로그아웃-즐겨찾기-진단.md` §3) 의 별점 미동작 해결
+  - StoreDetail.vue:488-535 의 `runTransaction` 은 정상 (변경 없음)
+  - PR #74 가 stores 의 빈 ownerId 점유 구멍을 닫으면서, 별점 사용자가 stores update 통과 못 함
+  - ratings 서브컬렉션도 처음부터 룰 부재로 default deny
+- **수정 1 — `firestore.rules` stores 매치 (`:116-128`)**:
+  - update 분기에 화이트리스트 추가:
+    ```
+    || changesAreOnly(['rating', 'ratingSum', 'ratingCount', 'updatedAt'])
+    ```
+  - `changesAreOnly` 헬퍼 (`:26-28`) 가 변경 키를 허용 set 으로 제한 → ownerId/ownerEmail/name/match 등 다른 필드 변조 시 통과 못 함
+  - signedIn 사용자면 본인 owner 가 아니어도 별점 4필드만 갱신 가능
+  - 빈 ownerId 점유 구멍은 그대로 닫힌 채 유지 (구멍 다시 안 열림)
+- **수정 2 — `firestore.rules` ratings 서브컬렉션 신설 (`:131-138`)**:
+  ```
+  match /stores/{storeId}/ratings/{uid} {
+    allow read: if true;
+    allow create, update, delete: if isOwner(uid);
+  }
+  ```
+  - read 공개 (개별 doc 노출돼도 score 외 민감정보 없음, 평균은 stores.rating 사용)
+  - write 는 `isOwner(uid)` = `signedIn() && request.auth.uid == uid` — 한 사람당 자기 doc 만
+- **건드리지 않음**:
+  - 별점 코드 (StoreDetail.vue:488-535) — 그대로 작동
+  - 즐겨찾기 / 로그인 / Storage / Functions
+  - PartnerDetail 의 `partners/{id}/ratings/{uid}` — 사용자 요청은 stores 만. 별도 PR 필요
+- **공격 차단 매트릭스**:
+  | 시나리오 | 차단? | 위치 |
+  |---|---|---|
+  | 본인 아닌 사용자가 다른 사람 ratings doc 쓰기 | ✓ | `isOwner(uid)` |
+  | 별점 분기로 ownerId 변경 시도 | ✓ | `changesAreOnly` 가 ownerId 미포함 |
+  | 별점 분기로 match/persons 등 다른 필드 변조 | ✓ | 동일 |
+  | 빈 ownerId stores 점유 시도 (PR #74 차단 구멍) | ✓ | 빈 ownerId 절은 추가 안 함 |
+  | 별점 4필드만 본인 owner 가 아닌 사용자가 변경 | ✓ 허용 (의도) | 화이트리스트 |
+- **검증**: `firebase deploy --only firestore:rules --dry-run` 권한 부족으로 실제 deploy 직전 단계 거부. 룰 syntax 자체는 직접 검토 완료 (모든 함수/변수/배열 표준)
+- **배포 범위**: `firebase deploy --only firestore:rules` 만 필요
+  - hosting / functions / storage 변경 없음
+
 ### 2026-06-18: 즐겨찾기 저장처 통일 + favorites 룰 추가 (`fix/favorites-unify-rules`)
 - **목적**: 진단(`docs/audit/2026-06-18-로그아웃-즐겨찾기-진단.md` §2) 의 두 문제 동시 해결
   1. MainPage 하트가 `localStorage(mp:favs)` 만 사용 → FavoritesPage (Firestore) 와 분리
