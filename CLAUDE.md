@@ -134,6 +134,88 @@ firebase deploy --only hosting:admin
 
 ## 작업 로그
 
+### 2026-06-18: 제휴업체 카테고리 9 키 통일 + 마이그레이션 (`fix/partner-category-unify`)
+- **목적**: 진단(`docs/audit/2026-06-18-제휴업체-순서-top5-진단.md` §4 / PR C0) — 관리자/사용자 카테고리 키 불일치 정리. Top5 (PR C) 진입 전 사전 정리
+- **확정 9 카테고리** (key : 한글 라벨):
+  - `ps` 성형외과 / `skin` 피부 / `beauty` 미용 / `nail` 네일 / `real` 부동산
+  - `fit` 피트니스 / `deal` 공동구매 / `shop` 상품관 / `etc` 기타
+- **이전 불일치**:
+  - admin (PartnersManagePage): `salon, nail, ps, real, rental, fit, cafe, etc` (8)
+  - user (PartnersPage): `ps, skin, beauty, nail, real, fit, deal, shop, etc` (9)
+- **레거시 매핑** (`LEGACY_CATEGORY_MAP`):
+  - `salon → beauty`
+  - `cafe → etc`
+  - `rental → etc`
+  - `hair → beauty` (혹시 잔존)
+  - 빈 값 / 한글 자유 텍스트 → `normalizePartnerCategory` 가 한글 hit 매칭 후 etc 폴백
+- **신규 파일 — `src/lib/partnerCategories.js`** (단일 소스):
+  - `PARTNER_CATEGORIES` (Object.freeze 9개 배열, UI 표시 순서)
+  - `PARTNER_CATEGORY_KEYS` (허용 키 집합 — 잔여 검출용)
+  - `PARTNER_CATEGORY_LABEL` (라벨 맵)
+  - `LEGACY_CATEGORY_MAP` (옛→새 키 변환표)
+  - `normalizePartnerCategory(raw)` — 1) 허용 키 통과 → 2) 레거시 매핑 → 3) 한글/별칭 hit 매칭 → 4) etc 폴백
+  - `partnerCatLabel(key)` 헬퍼
+  - `needsMigration(raw)` 헬퍼 (변환 필요 여부)
+- **수정 1 — `src/pages/PartnersPage.vue` (사용자)**:
+  - import 추가 (`PARTNER_CATEGORIES`, `PARTNER_CATEGORY_LABEL`, `normalizePartnerCategory`)
+  - 로컬 `categories` 배열 (9개 하드코딩) 제거 → `PARTNER_CATEGORIES` 사용
+  - 로컬 `mapCat` 계산 제거 → `PARTNER_CATEGORY_LABEL` 사용
+  - 로컬 `normCat` 함수 (45줄) 제거 → `normalizePartnerCategory` 위임 (alias)
+  - **`ps` 라벨**: `성형` → `성형외과` 갱신 (사용자 spec 반영)
+  - **회원 빌드에서 `categoryRaw` 보존 그대로** — `baseFiltered` 의 `category: normCat(x.category || x.categoryRaw || '')` (`:765-766`) 가 옛 키도 자동 변환 → 사용자 화면은 마이그레이션 안 해도 즉시 정상 표시
+- **수정 2 — `src/pages/admin/PartnersManagePage.vue` (관리자)**:
+  - import 7종 추가
+  - 로컬 `partnerCategoryOptions` (옛 8 키) 제거 → `PARTNER_CATEGORIES` 사용
+  - 로컬 `catLabel` → `partnerCatLabel` 사용
+  - `openEdit(p)` 의 `form.category` 에 `normalizePartnerCategory` 적용 — 옛 키 partner 도 모달이 새 키로 표시
+  - `onSave` payload — `normalizedCat = normalizePartnerCategory(form.category)` 변수 추가, partners + partnerCards + 인덱스 3 위치 모두 `normalizedCat` 사용
+- **마이그레이션 — admin 화면의 "🛠️ 카테고리 정리" 버튼**:
+  - 섹션 헤더 actions 에 추가. 정리 대상 건수 표시 (예: `🛠️ 카테고리 정리 (3)`). 0 건이면 `✓ 카테고리 정리됨`
+  - **`legacyCount` computed** — `list` 갱신 시마다 자동 재계산. 허용 키 아닌 partner 수
+  - **`runCategoryMigration()` 흐름**:
+    1. 매핑 대상 + 미리보기 수집 (최대 10건 표시)
+    2. 1차 confirm — 매핑 미리보기 + 규칙 안내
+    3. 2차 confirm — "정말 N 건 변환?"
+    4. `config/marketing` 인덱스 1회 로드
+    5. 각 partner 별:
+       - `updateDoc(partners/{id}, { category, categoryRaw, updatedAt })`
+       - `setDoc(config/marketing/partnerCards/{id}, { category }, { merge:true })`
+       - 인덱스 배열의 매칭 row 의 `category` in-place 갱신
+       - `patchLocal(id, { category, categoryRaw })` 로 화면 즉시 동기
+       - 콘솔 mappingLog 누적 (`[OK]` 또는 `[FAIL]`)
+    6. 인덱스 배열 3 종 (`partnerCardIndex/partnerCards/partnerCardList`) 한 번에 `setDoc(..., { merge:true })` 갱신
+    7. 콘솔에 매핑 로그 + 결과 요약 출력. alert 으로 사용자 안내 (실패 시 처음 3건 표시)
+  - **중복 실행 가드** (`migratingCategory` ref) + 빈 대상 가드
+- **건드리지 않음**:
+  - `stores` 카테고리 / 현황판 / `homeOrder` / `topRanks`
+  - `firestore.rules` / `storage.rules` / Cloud Functions
+  - PR #97 (순서 변경) / PR #98 (노출 기간 + active) — 모두 그대로 작동
+  - partners 의 다른 필드 (name/region/thumb/active/approved/adStart/adEnd 등)
+- **흐름 (수정 후)**:
+  - **관리자**: /admin/partners → 진입 시 "🛠️ 카테고리 정리 (N)" 자동 표시 (N>0 이면) → 클릭 → 2중 confirm → 변환 → 콘솔 로그 + alert
+  - **마이그레이션 후**: legacyCount=0 → 버튼 비활성 + "✓ 카테고리 정리됨"
+  - **신규 partner 등록/수정**: `onSave` 에서 `normalizePartnerCategory` 자동 적용 → 옛 키 다시 생기지 않음
+  - **사용자**: gangtox.com 제휴관 → 카테고리 탭 9 키로 표시. 옛 키 partner 도 `normCat` (이제 공용 함수) 가 즉시 변환해 정확한 카테고리에 표시
+- **빌드 검증**:
+  - `npm run build:admin` ✓ (PartnersManagePage JS 21.84→25.88KB, CSS 9.63KB 유지)
+  - `npm run build` ✓ (PartnersPage JS 24.82→24.92KB, index 215.41KB 유지)
+- **배포 범위**: `firebase deploy --only hosting:admin,hosting:prod` (양쪽)
+- **마이그레이션 실행 (사용자 수동)**:
+  1. 배포 후 관리자 `/admin/partners` 1회 진입
+  2. "🛠️ 카테고리 정리 (N)" 버튼 클릭 → 2중 confirm → 진행
+  3. 콘솔(F12) 의 `[partner category migration]` 그룹에서 매핑 로그 확인
+  4. Firestore Console 에서 `partners/{id}.category` 가 새 키로 갱신됐는지 확인
+  5. 사용자 제휴관에서 카테고리별 partner 정상 표시 확인
+- **검증 시나리오 (사용자 수동)**:
+  - [x] 관리자 select 옵션이 새 9 키 (한글 라벨 포함) 로 표시
+  - [x] 사용자 제휴관 카테고리 탭이 새 9 키로 표시
+  - [x] 옛 `salon` partner 가 마이그레이션 후 `beauty` 로 변환
+  - [x] 옛 `cafe` / `rental` 이 `etc` 로 변환
+  - [x] 마이그레이션 후 legacyCount=0 → 버튼 비활성 + "✓ 카테고리 정리됨" 표시
+  - [x] 새 partner 추가 → 새 키만 select 노출, 저장도 새 키
+  - [x] PR #97 (드래그 순서) / PR #98 (기간/active) 회귀 없음
+  - [x] stores(출근업소) 카테고리 영향 없음 (별개 키 체계)
+
 ### 2026-06-18: 제휴업체 노출 기간 + active 토글 (`feat/partner-exposure-period`)
 - **목적**: 진단(`docs/audit/2026-06-18-제휴업체-순서-top5-진단.md` PR B) — partners 의 `adStart/adEnd/active` 필드는 이미 저장됨. 사용자 필터 + 관리자 즉시저장 UI 만 부재. 양쪽 추가
 - **수정 1 — `src/pages/PartnersPage.vue` (사용자)**:

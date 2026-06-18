@@ -27,6 +27,13 @@
           <button
             class="adm-btn"
             type="button"
+            :disabled="!legacyCount || migratingCategory"
+            @click="runCategoryMigration"
+            :title="legacyCount ? `${legacyCount} 건의 옛 카테고리를 새 키로 변환합니다` : '정리 대상 없음'"
+          >{{ migratingCategory ? '정리 중…' : (legacyCount ? `🛠️ 카테고리 정리 (${legacyCount})` : '✓ 카테고리 정리됨') }}</button>
+          <button
+            class="adm-btn"
+            type="button"
             :disabled="!orderDirty || savingOrder"
             @click="savePartnerOrder"
             :title="orderDirty ? '순서 변경사항을 저장합니다' : '변경된 순서 없음'"
@@ -260,19 +267,21 @@ import {
   ref as sRef, uploadBytes, getDownloadURL, listAll, deleteObject,
 } from 'firebase/storage'
 import Sortable from 'sortablejs'
+import {
+  PARTNER_CATEGORIES,
+  PARTNER_CATEGORY_KEYS,
+  PARTNER_CATEGORY_LABEL,
+  LEGACY_CATEGORY_MAP,
+  normalizePartnerCategory,
+  partnerCatLabel,
+} from '@/lib/partnerCategories'
 
-/* ───────── 카테고리 + 헬퍼 (useMyPageCore 에서 발췌) ───────── */
-const partnerCategoryOptions = [
-  { key:'salon',  label:'미용실' },
-  { key:'nail',   label:'네일' },
-  { key:'ps',     label:'성형외과' },
-  { key:'real',   label:'부동산' },
-  { key:'rental', label:'렌탈샵' },
-  { key:'fit',    label:'피트니스' },
-  { key:'cafe',   label:'카페' },
-  { key:'etc',    label:'기타' },
-]
-const catLabel = (k) => (partnerCategoryOptions.find(o => o.key === k)?.label || '기타')
+/* ───────── 카테고리 — 공용 9 카테고리 (관리자/사용자 단일 소스)
+ * 진단: docs/audit/2026-06-18-제휴업체-순서-top5-진단.md §4
+ * 이전: salon/cafe/rental 등 사용자 화면과 불일치 → 정리 (LEGACY_CATEGORY_MAP).
+ */
+const partnerCategoryOptions = PARTNER_CATEGORIES
+const catLabel = partnerCatLabel
 
 function ensurePtId(s) {
   const v = String(s || '').replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 80)
@@ -586,6 +595,147 @@ async function toggleActive(p) {
   }
 }
 
+/* ───────── 카테고리 마이그레이션 (1회성 정리) =====
+ * 옛 키 (salon/cafe/rental 등) 로 저장된 partner 의 category 를 새 9 키로 변환.
+ * 정규화 결과 = 입력값과 같으면 skip. 다르면 다음 3 위치 모두 갱신:
+ *   1) partners/{id}.category + categoryRaw
+ *   2) config/marketing/partnerCards/{id}.category
+ *   3) config/marketing.partnerCardIndex / partnerCards / partnerCardList 의 row.category
+ *
+ * 진단: docs/audit/2026-06-18-제휴업체-순서-top5-진단.md §4 / 매핑: LEGACY_CATEGORY_MAP
+ */
+const migratingCategory = ref(false)
+
+/* 마이그레이션 필요 건수 — list 가 갱신될 때마다 자동 재계산 */
+const legacyCount = computed(() => {
+  let n = 0
+  for (const p of list.value) {
+    const cur = String(p.category || p.categoryRaw || '').trim().toLowerCase()
+    if (!cur) { n++; continue }
+    // 허용 키가 아니면 마이그레이션 필요
+    if (!PARTNER_CATEGORY_KEYS.includes(cur)) n++
+  }
+  return n
+})
+
+async function runCategoryMigration() {
+  if (migratingCategory.value) return
+  if (!legacyCount.value) return
+
+  // 마이그레이션 대상 + 매핑 미리보기 수집
+  const targets = []
+  for (const p of list.value) {
+    const cur = String(p.category || p.categoryRaw || '').trim().toLowerCase()
+    if (!cur || !PARTNER_CATEGORY_KEYS.includes(cur)) {
+      const next = normalizePartnerCategory(cur)
+      targets.push({ id: p.id, name: p.name || '(이름 없음)', from: cur || '(빈값)', to: next })
+    }
+  }
+
+  // 1차 confirm — 매핑 미리보기 표시 (최대 10건)
+  const preview = targets.slice(0, 10)
+    .map(t => `  · ${t.name} : ${t.from} → ${t.to}`)
+    .join('\n')
+  const more = targets.length > 10 ? `\n  …외 ${targets.length - 10} 건` : ''
+  const c1 = window.confirm(
+    `옛 카테고리 ${targets.length} 건을 새 9 키로 변환합니다.\n\n` +
+    `매핑 미리보기:\n${preview}${more}\n\n` +
+    `매핑 규칙: salon→beauty, cafe→etc, rental→etc, 빈값→etc, 그 외 한글 매칭 후 etc 폴백\n\n` +
+    `진행하시겠습니까?`
+  )
+  if (!c1) return
+
+  // 2차 confirm
+  const c2 = window.confirm(
+    `정말 ${targets.length} 건을 변환하시겠습니까?\n` +
+    `각 partner 의 본 doc + partnerCards 사본 + config/marketing 의 인덱스 3 배열 모두 갱신됩니다.`
+  )
+  if (!c2) return
+
+  migratingCategory.value = true
+  const results = { ok: 0, fail: [], skipped: 0 }
+  const mappingLog = []
+
+  try {
+    // 먼저 config/marketing 의 현재 인덱스 배열 1회 로드
+    const mkRef = doc(fbDb, 'config', 'marketing')
+    const mkSnap = await getDoc(mkRef)
+    const mkData = mkSnap.exists() ? (mkSnap.data() || {}) : {}
+    const idxList = Array.isArray(mkData.partnerCardIndex) ? mkData.partnerCardIndex.slice() : []
+
+    for (const t of targets) {
+      try {
+        // 1) partners/{id}
+        await updateDoc(doc(fbDb, 'partners', t.id), {
+          category: t.to,
+          categoryRaw: t.to,
+          updatedAt: serverTimestamp(),
+        })
+
+        // 2) config/marketing/partnerCards/{id} (사본이 없을 수 있음 → setDoc merge)
+        await setDoc(
+          doc(fbDb, 'config', 'marketing', 'partnerCards', t.id),
+          { category: t.to, updatedAt: serverTimestamp() },
+          { merge: true },
+        )
+
+        // 3) 인덱스 배열의 매칭 row 의 category 갱신 (in-place)
+        const pos = idxList.findIndex(x => String(x.id || '') === t.id)
+        if (pos >= 0) idxList[pos] = { ...idxList[pos], category: t.to }
+
+        // 로컬 list 즉시 동기
+        patchLocal(t.id, { category: t.to, categoryRaw: t.to })
+
+        mappingLog.push(`[OK] ${t.name} (${t.id}): ${t.from} → ${t.to}`)
+        results.ok++
+      } catch (e) {
+        console.warn('[migrate] partner fail', t.id, e)
+        mappingLog.push(`[FAIL] ${t.name} (${t.id}): ${t.from} → ${t.to} — ${e?.message || e}`)
+        results.fail.push({ id: t.id, name: t.name, error: e?.message || e })
+      }
+    }
+
+    // 4) config/marketing 의 3 인덱스 배열 한 번에 갱신
+    if (results.ok > 0) {
+      try {
+        await setDoc(mkRef, {
+          partnerCardIndex: idxList,
+          partnerCards: idxList,
+          partnerCardList: idxList,
+          updatedAt: serverTimestamp(),
+        }, { merge: true })
+      } catch (e) {
+        console.warn('[migrate] index batch fail', e)
+        mappingLog.push(`[FAIL] config/marketing 인덱스 일괄 갱신 — ${e?.message || e}`)
+        results.fail.push({ id: '(인덱스)', name: 'config/marketing 인덱스', error: e?.message || e })
+      }
+    }
+
+    // 콘솔에 매핑 로그 출력 (진단용)
+    console.group('[partner category migration]')
+    mappingLog.forEach(l => console.log(l))
+    console.log(`결과: 성공 ${results.ok}, 실패 ${results.fail.length}`)
+    console.groupEnd()
+
+    // 사용자 알림
+    if (results.fail.length === 0) {
+      alert(`✅ 카테고리 정리 완료\n변환된 partner: ${results.ok} 건\n\n자세한 로그는 콘솔에서 확인하세요.`)
+    } else {
+      alert(
+        `⚠️ 일부 실패\n성공: ${results.ok} 건 / 실패: ${results.fail.length} 건\n\n` +
+        `실패 항목 (처음 3):\n` +
+        results.fail.slice(0, 3).map(f => `  · ${f.name}: ${f.error}`).join('\n') +
+        `\n\n자세한 로그는 콘솔에서 확인하세요.`
+      )
+    }
+  } catch (e) {
+    console.error('[migrate] global fail', e)
+    alert('카테고리 정리 실패: ' + (e?.message || e))
+  } finally {
+    migratingCategory.value = false
+  }
+}
+
 /* ───────── 모달 열기 ───────── */
 function openCreate() {
   resetForm()
@@ -602,7 +752,8 @@ function openEdit(p) {
   form.manager = p.manager || p.managerName || ''
   form.region = p.region || ''
   form.address = p.address || ''
-  form.category = p.category || p.categoryRaw || 'etc'
+  // 옛 키(salon/cafe/rental) 로 저장된 partner 도 모달에선 새 키로 표시
+  form.category = normalizePartnerCategory(p.category || p.categoryRaw || 'etc')
   form.link = p.link || ''
   form.rating = Number(p.rating || 4.5)
   form.hours = p.hours || ''
@@ -715,14 +866,17 @@ async function onSave() {
     const tags = parseTags(form.tagsStr)
     const thumb = form.thumb || form.images[0] || ''
 
+    // category 정규화 — UI 가 9 키만 보내지만 안전 가드
+    const normalizedCat = normalizePartnerCategory(form.category)
+
     // 1) partners/{id} — source
     const partnerBody = {
       name: form.name,
       manager: form.manager,
       region: form.region,
       address: form.address,
-      category: form.category,
-      categoryRaw: form.category,
+      category: normalizedCat,
+      categoryRaw: normalizedCat,
       link: form.link,
       rating: Number(form.rating || 4.5),
       hours: form.hours,
@@ -748,7 +902,7 @@ async function onSave() {
     await setDoc(doc(fbDb, 'config', 'marketing', 'partnerCards', id), {
       name: form.name,
       region: form.region,
-      category: form.category,
+      category: normalizedCat,
       thumb,
       images: form.images.slice(),
       desc: form.desc,
@@ -772,7 +926,7 @@ async function onSave() {
       id,
       name: form.name,
       region: form.region,
-      category: form.category,
+      category: normalizedCat,
       thumb,
       adStart: startMs,
       adEnd: endMs,
