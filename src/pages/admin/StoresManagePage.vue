@@ -55,6 +55,13 @@
               <span class="adm-toggle-track"><span class="adm-toggle-thumb"></span></span>
               <span class="adm-toggle-label">{{ effExposed(s) ? '노출' : '숨김' }}</span>
             </label>
+            <button
+              type="button"
+              class="adm-btn danger sm"
+              :disabled="!!deleting[s.id]"
+              @click="deleteStore(s)"
+              title="이 출근업소를 삭제합니다 (연관 데이터 모두 정리)"
+            >{{ deleting[s.id] ? '삭제 중…' : '삭제' }}</button>
           </div>
 
           <!-- 노출 기간 UI -->
@@ -156,6 +163,13 @@
           <div class="adm-row-actions">
             <button class="adm-btn primary" type="button" @click="approveStore(s)">승인</button>
             <button class="adm-btn ghost" type="button" @click="rejectStore(s)">거절</button>
+            <button
+              class="adm-btn danger"
+              type="button"
+              :disabled="!!deleting[s.id]"
+              @click="deleteStore(s)"
+              title="신청 자체를 삭제 (연관 데이터 모두 정리)"
+            >{{ deleting[s.id] ? '삭제 중…' : '삭제' }}</button>
           </div>
         </li>
       </ul>
@@ -173,6 +187,7 @@ import {
   collection, doc, onSnapshot, setDoc, updateDoc, getDoc,
   writeBatch, query, limit, serverTimestamp,
 } from 'firebase/firestore'
+import { getFunctions, httpsCallable } from 'firebase/functions'
 
 const route = useRoute()
 const tab = ref(['expose','metrics','pending'].includes(route.query.tab) ? route.query.tab : 'expose')
@@ -541,6 +556,72 @@ async function rejectStore(s){
   }
 }
 
+/* ===== 출근업소 완전 삭제 (Cloud Function deleteStoreFull) =====
+ * 2중 confirm + 중복 클릭 방지. 백엔드가 5종 연관 데이터 정리.
+ * partners(제휴처) 는 백엔드 함수가 절대 건드리지 않음 (PR #90).
+ */
+const deleting = ref({})
+const fnDeleteStore = httpsCallable(
+  getFunctions(undefined, 'asia-northeast3'),
+  'deleteStoreFull',
+)
+
+async function deleteStore(s){
+  if (!s?.id || deleting.value[s.id]) return
+  const label = s.name || s.id
+
+  // 1차 확인
+  const c1 = window.confirm(
+    `'${label}' 출근업소를 삭제하시겠습니까?\n\n` +
+    `다음 데이터가 모두 함께 삭제됩니다:\n` +
+    `· 현황판 지표 (rooms_biz)\n` +
+    `· 별점 (ratings)\n` +
+    `· 사용자 즐겨찾기 (favorites)\n` +
+    `· 가게 이미지 (Storage)\n` +
+    `· 노출 순서 (homeOrder / topRanks / listOrders)\n` +
+    `· 업소 자체 (stores)\n\n` +
+    `※ 제휴처(partners) 는 영향받지 않습니다.`
+  )
+  if (!c1) return
+
+  // 2차 확인 — 더 강한 경고
+  const c2 = window.confirm(
+    `정말 '${label}' 을(를) 삭제하시겠습니까?\n` +
+    `되돌릴 수 없습니다.`
+  )
+  if (!c2) return
+
+  deleting.value = { ...deleting.value, [s.id]: true }
+  try {
+    const res = await fnDeleteStore({ storeId: s.id })
+    const r = res?.data?.result
+    // 단계별 결과 — 실패 단계 있으면 경고
+    const fails = []
+    if (r) {
+      if (r.storage && !r.storage.ok) fails.push(`Storage(${r.storage.error || 'unknown'})`)
+      if (r.roomsBiz && !r.roomsBiz.ok) fails.push(`rooms_biz(${r.roomsBiz.error || 'unknown'})`)
+      if (r.ratings && !r.ratings.ok) fails.push(`ratings(${r.ratings.error || 'unknown'})`)
+      if (r.favorites && !r.favorites.ok) fails.push(`favorites(${r.favorites.error || 'unknown'})`)
+      if (r.marketingRefs && !r.marketingRefs.ok) fails.push(`marketingRefs(${r.marketingRefs.error || 'unknown'})`)
+      if (r.storeDoc && !r.storeDoc.ok) fails.push(`stores(${r.storeDoc.error || 'unknown'})`)
+    }
+    if (fails.length) {
+      alert(`'${label}' 삭제 — 일부 단계 실패:\n` + fails.join('\n'))
+    } else {
+      alert(`'${label}' 업소를 삭제했습니다.`)
+    }
+    // 로컬 stores ref 도 갱신 (onSnapshot 이 자동 갱신하지만 즉시 제거로 UX 향상)
+    stores.value = stores.value.filter(x => x.id !== s.id)
+  } catch (e) {
+    console.error('[deleteStore] fail', e)
+    alert(`삭제 실패: ${e?.message || e}`)
+  } finally {
+    const next = { ...deleting.value }
+    delete next[s.id]
+    deleting.value = next
+  }
+}
+
 /* ===== 시간 포맷 ===== */
 function fmtTime(v){
   if (!v) return ''
@@ -603,6 +684,14 @@ function fmtTime(v){
 }
 .adm-btn.primary:disabled{ opacity:.6; cursor:not-allowed; }
 .adm-btn.ghost{ background:#fff; }
+.adm-btn.danger{
+  background:#fff; color:#d92626; border-color:#f3b0b0;
+}
+.adm-btn.danger:hover:not(:disabled){
+  background:#d92626; color:#fff; border-color:#d92626;
+}
+.adm-btn.danger:disabled{ opacity:.5; cursor:not-allowed; }
+.adm-btn.sm{ height:28px; padding:0 10px; font-size:12px; }
 
 .adm-store-list{ list-style:none; margin:0; padding:0; }
 .adm-store-row{
