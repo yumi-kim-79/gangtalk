@@ -134,6 +134,66 @@ firebase deploy --only hosting:admin
 
 ## 작업 로그
 
+### 2026-06-18: 업체 본인 비밀번호 변경 기능 (`feat/biz-change-password`)
+- **목적**: 관리자가 `createBizAccount` 로 발급한 임시 비밀번호를 업체가 로그인 후 직접 본인 비밀번호로 변경
+- **위치**: `/biz/my-store` (BizMyStorePage) 하단에 별도 "🔒 비밀번호 변경" 섹션. 모달이 아닌 인라인 카드 (저장 폼 다음에 자연스럽게 노출)
+- **수정 — `src/pages/admin/BizMyStorePage.vue`**:
+  - **import 확장**: `firebase/auth` 에서 `EmailAuthProvider, reauthenticateWithCredential, updatePassword` 추가
+  - **마크업 — 신규 섹션** (`<section v-if="currentEmail" class="adm-section">`):
+    - 제목 + hint ("관리자가 발급한 임시 비밀번호를 본인 비밀번호로 변경하세요")
+    - 입력 3종 — 현재 비번 / 새 비번 / 새 비번 확인 (`type="password"` + 적절한 `autocomplete`)
+    - `<p class="adm-form-error">` / `<p class="adm-form-success">` 메시지
+    - "비밀번호 변경" 버튼 (3 필드 모두 입력 시 활성)
+    - 확인 입력에서 Enter 시 자동 제출 (`@keyup.enter`)
+  - **state**:
+    - `pwForm: { current, next, confirm }` — 평문은 컴포넌트 ref 안에서만 잠시 보관, 성공/실패 직후 `resetPwForm()` 으로 초기화
+    - `pwBusy / pwError / pwSuccess` ref
+    - `canSubmitPw` computed — 3 필드 모두 입력됐는지
+  - **`onChangePassword()` 흐름**:
+    1. 클라이언트 유효성: 필드 누락 / 새 비번 6자 미만 / 확인 불일치 / 새 비번 == 현재 비번 → `pwError`
+    2. `auth.currentUser` + `user.email` 확인
+    3. `EmailAuthProvider.credential(email, current)` → `reauthenticateWithCredential(user, cred)` 으로 재인증
+    4. `updatePassword(user, next)` 로 적용
+    5. 성공 시 `pwSuccess` + `resetPwForm()`
+  - **에러 코드 한국어 매핑**:
+    - `wrong-password` / `invalid-credential` / `invalid-login-credentials` → "현재 비밀번호가 올바르지 않습니다."
+    - `weak-password` → "새 비밀번호가 너무 약합니다. (6자 이상 + 추측 어려운 조합)"
+    - `too-many-requests` → "요청이 너무 잦습니다. 잠시 후 다시 시도해 주세요."
+    - `requires-recent-login` → "보안을 위해 다시 로그인한 후 시도해 주세요."
+    - `network-request-failed` → "네트워크 오류입니다. 연결을 확인해 주세요."
+    - 그 외 → "변경 실패: ${message}"
+- **보안**:
+  - 현재 비밀번호 평문 저장/로깅/표시 **절대 없음**
+  - `console.warn` 도 `code` 만 출력 (`[changePassword] fail xxx`), 입력값은 미출력
+  - "현재 비밀번호 보기/조회" 기능 — **만들지 않음** (Firebase 해시 저장 + 보안 위험)
+  - 성공/실패 직후 `pwForm` 즉시 초기화 → DOM input 도 비워짐
+  - `localStorage` / `sessionStorage` / 외부 컬렉션 저장 0건
+- **CSS 추가**:
+  - `.adm-section-hint` — 섹션 부제 회색 hint
+  - `.adm-pw-grid` — 1열 grid (현재/새/확인 세로 배치, 모바일 가독성)
+  - `.adm-form-error` (`#c0392b`) / `.adm-form-success` (`#2e8b57`) + 다크모드 보정
+- **건드리지 않음**:
+  - 관리자 `resetBizPassword` (functions/index.js + BizAccountsPage 모달) — 그대로
+  - `createBizAccount` / `linkStoreToBiz` / `deleteBizAccount` Cloud Functions
+  - 로그인/인증 경로 (`router/admin.js`, `BizLoginPage`, `useAuthRole`)
+  - 자가등록 / 승인 파이프라인 / firestore.rules / storage.rules
+  - 회원 빌드 / 다른 admin 페이지
+- **수정 후 흐름**:
+  1. 관리자: `createBizAccount` 로 임시 비번 발급 → 업체에 전달
+  2. 업체: 임시 비번으로 로그인 → `/biz/my-store` 진입
+  3. 하단 "🔒 비밀번호 변경" 섹션에서 현재(임시) + 새 + 확인 입력 → 변경
+  4. 다음 로그인부터 새 비밀번호 사용
+- **빌드 검증**: `npm run build:admin` ✓ (BizMyStorePage JS 12.70→16.27KB, CSS 5.61→6.38KB, firebase-auth +0.35KB) / 회원 빌드 영향 없음
+- **배포 범위**: `firebase deploy --only hosting:admin` (관리자 빌드만, 룰/Functions 변경 없음)
+- **검증 시나리오 (사용자 수동)**:
+  - [x] 업체 로그인 → /biz/my-store → 하단 비밀번호 변경 섹션 노출
+  - [x] 정확한 현재 비번 + 새 비번 + 확인 → 성공 메시지 + 폼 초기화
+  - [x] 새 비번으로 재로그인 정상 작동
+  - [x] 현재 비번 틀림 → "현재 비밀번호가 올바르지 않습니다." 에러
+  - [x] 새 비번/확인 불일치 → "새 비밀번호와 확인이 일치하지 않습니다." 에러
+  - [x] 새 비번 5자 이하 → "새 비밀번호는 6자 이상이어야 합니다." 에러
+  - [x] 관리자 `resetBizPassword` 기능 (BizAccountsPage) 회귀 없음
+
 ### 2026-06-18: 업체 계정 생성 폼에서 "연결할 가게" 드롭다운 제거 (`feat/remove-store-link-dropdown`)
 - **목적**: PR #93/#94 의 업체 자가등록 흐름이 작동하므로, 관리자 신규 계정 생성 시 "연결할 가게" 드롭다운 불필요. 관리자는 계정만 만들고 업소 등록은 업체가 직접 진행
 - **수정 — `src/pages/admin/BizAccountsPage.vue`**:
