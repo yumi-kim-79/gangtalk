@@ -43,19 +43,35 @@
           <input v-model.trim="form.phone" type="tel" placeholder="010-0000-0000" />
         </label>
 
-        <label class="adm-field">
+        <div class="adm-field adm-field-chips full">
           <span>카테고리</span>
-          <select v-model="form.category">
-            <option v-for="c in categoryOptions" :key="c.key" :value="c.key">{{ c.label }}</option>
-          </select>
-        </label>
+          <div class="adm-chip-grid adm-chip-grid--cols2">
+            <button
+              v-for="c in categoryOptions"
+              :key="c.key"
+              type="button"
+              class="adm-chip"
+              :class="{ on: form.category === c.key }"
+              @click="form.category = c.key"
+              :aria-pressed="form.category === c.key"
+            >{{ c.label }}</button>
+          </div>
+        </div>
 
-        <label class="adm-field">
+        <div class="adm-field adm-field-chips full">
           <span>지역</span>
-          <select v-model="form.region">
-            <option v-for="r in regionOptions" :key="r" :value="r">{{ r }}</option>
-          </select>
-        </label>
+          <div class="adm-chip-grid">
+            <button
+              v-for="r in regionOptions"
+              :key="r"
+              type="button"
+              class="adm-chip"
+              :class="{ on: form.region === r }"
+              @click="form.region = r"
+              :aria-pressed="form.region === r"
+            >{{ r }}</button>
+          </div>
+        </div>
 
         <label class="adm-field full">
           <span>한 줄 소개</span>
@@ -82,12 +98,20 @@
           <input v-model.trim="form.closed" type="text" placeholder="예: 매주 일요일" />
         </label>
 
-        <label class="adm-field">
+        <div class="adm-field adm-field-chips full">
           <span>시급 / 일급 / 월급</span>
-          <select v-model="form.wageType">
-            <option v-for="w in wageTypeOptions" :key="w.key" :value="w.key">{{ w.label }}</option>
-          </select>
-        </label>
+          <div class="adm-chip-grid">
+            <button
+              v-for="w in wageTypeOptions"
+              :key="w.key"
+              type="button"
+              class="adm-chip"
+              :class="{ on: form.wageType === w.key }"
+              @click="form.wageType = w.key"
+              :aria-pressed="form.wageType === w.key"
+            >{{ w.label }}</button>
+          </div>
+        </div>
 
         <label class="adm-field">
           <span>금액 (원)</span>
@@ -413,6 +437,49 @@ async function onSave() {
   outline:none; border-color:#ff2e7e;
 }
 
+/* ===== 칩 그룹 (select 대체) =====
+ * 네이티브 <select> 의 OS picker 가 모바일에서 글씨가 너무 작아 사용자가 옵션 구분 불가.
+ * 옵션을 항상 펼친 칩(버튼) 그룹으로 교체. 글씨/터치영역 자유 제어.
+ * - .adm-field-chips: chip 컨테이너용 field (label 이 아닌 div 라서 select height/padding 룰 영향 없음)
+ * - .adm-chip-grid: 칩 배치 (기본 flex wrap, --cols2 modifier 로 2열 그리드)
+ * - .adm-chip: 개별 칩 (높이 44px, font-size 16px, .on 시 핑크 배경)
+ * 본 파일 전용 클래스 (다른 admin 페이지 / 공용 admin.css 영향 0).
+ */
+.adm-field-chips { gap: 8px; }
+.adm-chip-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.adm-chip-grid--cols2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.adm-chip {
+  min-height: 44px;
+  padding: 0 16px;
+  border: 1.5px solid #eee;
+  border-radius: 10px;
+  background: #fff;
+  color: #333;
+  font-size: 16px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: border-color .12s, background .12s, color .12s;
+}
+.adm-chip:hover { border-color: #ffd6e4; }
+.adm-chip.on {
+  background: #ff2e7e;
+  border-color: #ff2e7e;
+  color: #fff;
+}
+.adm-chip:focus-visible {
+  outline: 2px solid #ff2e7e;
+  outline-offset: 2px;
+}
+
 .adm-thumb-row{
   display:flex; gap:8px; align-items:center;
   margin-bottom:8px;
@@ -457,4 +524,22 @@ async function onSave() {
 :root[data-theme="black"] .adm-field textarea,
 :root[data-theme="black"] .adm-field select,
 :root[data-theme="black"] .adm-selector select{ background:#222; border-color:#2a2a2a; color:#eee; }
+
+/* 칩 다크모드 — 선택 시 핑크는 라이트와 동일 톤 유지 */
+:root[data-theme="dark"] .adm-chip,
+:root[data-theme="black"] .adm-chip{
+  background: #222;
+  border-color: #2a2a2a;
+  color: #eee;
+}
+:root[data-theme="dark"] .adm-chip:hover,
+:root[data-theme="black"] .adm-chip:hover{
+  border-color: #ff4d8d;
+}
+:root[data-theme="dark"] .adm-chip.on,
+:root[data-theme="black"] .adm-chip.on{
+  background: #ff2e7e;
+  border-color: #ff2e7e;
+  color: #fff;
+}
 </style>
