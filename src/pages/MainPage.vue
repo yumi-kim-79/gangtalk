@@ -127,15 +127,18 @@
                 <div class="mp-metric-label">필요인원</div>
               </div>
               <div class="mp-metric">
+                <!-- 혼잡도 표시 — wifiColor(s) 가 computeStatus 결과 반환 (ok/mid/busy)
+                     CSS 클래스명(mp-metric-wifi)/함수명(wifiColor/wifiText)은 회귀 방지 위해 유지.
+                     아이콘은 3단계 신호 막대 (좋음=낮음 / 보통=중간 / 나쁨=높음). -->
                 <div class="mp-metric-wifi" :class="wifiColor(s)">
-                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-                    <path d="M5 12.55a11 11 0 0 1 14.08 0"/>
-                    <path d="M8.5 16a6 6 0 0 1 7 0"/>
-                    <path d="M12 20h.01"/>
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round">
+                    <rect x="3"  y="14" width="4" height="6"  rx="1"/>
+                    <rect x="10" y="9"  width="4" height="11" rx="1"/>
+                    <rect x="17" y="4"  width="4" height="16" rx="1"/>
                   </svg>
                   <span>{{ wifiText(s) }}</span>
                 </div>
-                <div class="mp-metric-label">와이파이</div>
+                <div class="mp-metric-label">혼잡도</div>
               </div>
             </div>
           </div>
