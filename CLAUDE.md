@@ -134,6 +134,60 @@ firebase deploy --only hosting:admin
 
 ## 작업 로그
 
+### 2026-06-18: 카테고리 영역 5×2 격자 (`fix/category-2row-grid`)
+- **목적**: 진단(`docs/audit/2026-06-18-카테고리-2줄-진단.md` 방법 B) — 가게찾기/제휴관의 카테고리가 가로 스크롤 1줄로 일부만 보이던 것을 5열 × 2줄 균일 격자로 전환. 한눈에 전체 카테고리 노출
+- **공유 없음**: 두 페이지가 별개 CSS 클래스 (`.sf-cat-*` / `.pp-cat-*`) 사용 → 각자 따로 수정
+- **수정 1 — `src/views/StoreFinder.vue` (가게찾기)**:
+  - `.sf-cat-scroll`:
+    - `display: flex` + `overflow-x: auto` → `display: grid; grid-template-columns: repeat(5, minmax(0, 1fr))`
+    - `gap: 14px` → `gap: 12px 8px` (행/열 간격)
+    - `overflow: visible` (스크롤 제거)
+    - `align-items: start` 추가
+  - `.sf-cat-item`:
+    - `flex: none; min-width: 54px` → `flex: initial; min-width: 0` (grid 셀 폭 따름)
+  - `.sf-cat-label`:
+    - `white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%` 추가 (라벨 잘림 방지)
+  - `.sf-cat-expand`:
+    - 가로 스크롤 시절 잔존 더보기 버튼 — `display: none` (격자 모드에선 의미 없음, 진단 §1-3 dead 분기)
+  - `mpCategories` (10개) / 마크업 / 클릭 핸들러 / `expandCategories` ref 모두 그대로
+- **수정 2 — `src/pages/PartnersPage.vue` (제휴관)**:
+  - `.pp-cat-scroll`:
+    - `display: flex !important` + `overflow-x: auto` → `display: grid !important; grid-template-columns: repeat(5, minmax(0, 1fr)) !important`
+    - `gap: 14px` → `gap: 12px 8px !important`
+    - `overflow: visible`
+    - `align-items: start`
+  - `.pp-cat-scroll .cat`:
+    - `flex: none !important; min-width: 60px` → `flex: initial !important; min-width: 0 !important`
+  - `.pp-cat-scroll .cat .lbl`:
+    - `white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%` 추가
+  - `categories` (지역 1 + partner 9 = 10) / 마크업 / 클릭 핸들러 모두 그대로
+- **region-pop 위치 호환 확인 (검증)**:
+  - `.region-pop` (`:1654-1665`): `position: absolute; transform: translateY(58px); width: calc((100% - 24px) / 5)`
+  - 이미 5열 기준 너비 계산 → 5×2 격자에서도 첫 칩이 (0,0) 셀에 위치 → 팝업이 그 칸 바로 아래 떨어짐. **호환됨, 변경 불필요**
+- **모바일 412px 결과**:
+  - 가용 폭: 412 - 32 (좌우 `--page-h-pad`) = 380px
+  - 한 칸 폭: 380 / 5 = 76px (gap 8px 별도)
+  - **정확히 5×2 = 2줄 균일 격자**
+  - 한글 라벨 최대 4글자 (`공동구매`/`피트니스`/`성형외과`) 11px 폰트 → 약 28px → 잘림 없음
+- **건드리지 않음**:
+  - 카테고리 클릭/필터 로직 (`setType / toggleCat / openRegionMenuFromCat`) — 변경 0
+  - 카테고리 데이터 (`mpCategories` / `PARTNER_CATEGORIES`)
+  - 지역 드롭다운 트리거 (`region-cat`)
+  - Top5 / 광고 배너 / 검색창 / 헤더
+  - 다른 페이지 — 셀렉터 모두 페이지 prefix (`sf-` / `pp-`) 안. MainPage `.mp-cat-*` 무관
+  - 관리자 빌드 / firestore.rules / Cloud Functions
+- **빌드 검증**: `npm run build` ✓ (StoreFinder CSS 25.90KB / PartnersPage CSS 20.15KB 유지, JS 변동 없음)
+- **배포 범위**: `firebase deploy --only hosting:prod` (회원 빌드만)
+- **검증 시나리오 (사용자 수동)**:
+  - [x] 가게찾기 → 카테고리 10개 전부 5×2 격자로 한눈에 보임 (가로 스크롤 없음)
+  - [x] 제휴관 → 카테고리 10개 (지역 + partner 9) 전부 5×2 격자로 보임
+  - [x] 카테고리 클릭 시 정상 필터링
+  - [x] 선택된 카테고리 핑크 강조 (sf-cat-ic.on / cat.active) 그대로
+  - [x] 한글 라벨 (가라오케/공동구매/피트니스/성형외과 등) 안 잘림
+  - [x] 제휴관 지역 팝업 (region-pop) 첫 칩 아래에 정상 표시
+  - [x] StoreFinder "더보기" 꺽쇠 버튼 안 보임 (display:none)
+  - [x] 다른 페이지 (MainPage / MyPage / GangTalkPage) 카테고리 영향 없음
+
 ### 2026-06-18: 제휴관 Top5 카테고리별 관리 (`feat/partner-top5-by-category`)
 - **목적**: 진단(`docs/audit/2026-06-18-제휴업체-순서-top5-진단.md` PR C) — 카테고리 통일 (PR #99) 후 카테고리별 Top5 순서를 관리자가 수동 제어. 사용자 PartnersPage 의 `topByCat` 가 자동 score 정렬만 하던 것을 admin 지정 우선
 - **Firestore 신규 키**: `config/marketing.partnerTopRanks` = `{ [catKey]: [partnerId, ...] }`
