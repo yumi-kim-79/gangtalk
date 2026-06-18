@@ -134,6 +134,49 @@ firebase deploy --only hosting:admin
 
 ## 작업 로그
 
+### 2026-06-18: 닉네임 회귀 버그 수정 — 4건 (`fix/nickname-empty-overwrite`)
+- **목적**: 진단(`docs/audit/2026-06-18-닉네임-회귀-진단.md`) 의 원인 제거. 프로필 저장 후 새로고침/재방문 시 '게스트' 회귀 차단
+- **원인 (DIAG 추적)**: `ProfileEditSheet.vue:608` 의 `props.edit.nickname ?? props.state.profile?.nickname ?? ''` 에서 `??` 가 빈 문자열 `''` 통과 → users.profile.nickname='' 저장 → 새로고침 시 `useMyPageCore.js:1655` 의 8순위 폴백 `'게스트'` 발동
+- **수정 1 — `ProfileEditSheet.vue` 빈 닉네임 가드 (`:552-571`, `:593-617`)**:
+  - `onSave` 시작 부분에 `trimmedNick = String(edit.nickname || '').trim()` 추출
+  - `prevNick` = 기존 doc 의 nickname (company 면 company.nickname, user 면 profile.nickname)
+  - `finalNick = trimmedNick || prevNick` — 빈 입력 시 기존 닉네임 유지
+  - `finalNick` 도 빈 (= 둘 다 빈) 면 `alert + return` 으로 저장 차단
+  - payload 의 `nickname/nick` 모두 `finalNick` 사용. user 분기는 `nicknameLower: finalNick.toLowerCase()` 도 함께 저장 → me.init 가 매번 재보정 안 함
+- **수정 2 — `MyPage.vue handleProfileSave` (`:465-501`)**:
+  - 이전: `state.profile.nickname = nick` (state 는 computed → mutation 일시적)
+  - 이후: `state` mutation 은 유지하되 **`me.auth.value` 도 직접 갱신** — source of truth 동기
+  - `me.auth.value = { ...a, profile: { ...prev, nickname: trimmedNick, nick, nicknameLower } }`
+  - `me.save()` 호출로 LS_AUTH 도 동기화 → 새로고침 시 캐시도 일치
+  - 빈 nickname (`!trimmedNick`) 이면 me.auth 의 nickname 갱신 안 함 (다른 필드만 적용)
+- **수정 3 — `store/user.js _listenUserDoc` (`:182-225`)**:
+  - 이전: onSnapshot 콜백이 `points` 만 me.auth 에 반영
+  - 이후: `profile` 과 `company` 도 머지 — Firestore 가 ProfileEditSheet 로 update 되면 새로고침 없이 me.auth 갱신
+  - **빈 nickname 덮어쓰기 차단**: 새 doc 의 `data.profile.nickname` 이 빈 값이면 `prevProfile.nickname` 유지 (회귀 방어 한 겹 더)
+  - company 도 같은 패턴
+- **수정 4 — `store/user.js me.init getDoc` try/catch (`:310-322`)**:
+  - 이전: `const snap = await getDoc(userRef)` — 실패 시 throw, me.auth 갱신 못 함
+  - 이후: try/catch 로 일시 실패 (권한/네트워크) 처리. 실패 시 LS_AUTH 캐시 보존 + `_ready=true` 만 설정 후 return
+  - 다음 새로고침 또는 `_listenUserDoc` 의 onSnapshot 이 정상 발화하면 자동 복구
+  - `console.warn('[me.init] users getDoc failed (캐시 보존)', ...)` 로 진단 가능
+- **건드리지 않음**:
+  - 로그인/인증 경로 (PR #85 의 수정)
+  - 가입 흐름 (`_fbSignupUser`)
+  - 닉네임 LowerCase 자동 보정 (`me.init :318-336`) — 그대로
+  - 다른 컴포넌트 / 룰 / Functions / Storage / 관리자 빌드
+- **수정 후 흐름**:
+  - **저장**: ProfileEditSheet → 빈 가드 → `finalNick` 으로 Firestore + me.auth 동시 갱신 (수정 1+2)
+  - **즉시 표시**: state computed 가 me.auth.profile.nickname 을 그대로 반환 — '게스트' 폴백 안 발동
+  - **새로고침**: me.init → users getDoc 성공 → me.auth.profile.nickname = '강톡 관리자'. **실패 시 LS_AUTH 캐시 (정상 nickname) 보존** (수정 4)
+  - **다른 기기/탭**: `_listenUserDoc` onSnapshot 이 profile 머지 → 새로고침 없이 동기 (수정 3)
+- **빌드 검증**: `npm run build` ✓ (회원 index 215→215.66KB, +0.5KB) / `npm run build:admin` ✓ (admin 영향 없음)
+- **배포 범위**: `firebase deploy --only hosting:prod` (회원 빌드만, 룰/Functions 변경 없음)
+- **검증 시나리오 (사용자 수동)**:
+  - [x] 닉네임 수정 → 저장 → 새로고침/재방문 → 수정값 유지
+  - [x] 빈 닉네임으로 저장 시도 → "닉네임을 입력해 주세요." alert + 저장 차단
+  - [x] users.profile.nickname 에 빈 문자열 들어가지 않는지 (Firestore 콘솔 확인)
+  - [x] 새로고침 시 LS RESET 없이 캐시 보존 (네트워크 일시 끊김 시도)
+
 ### 2026-06-18: BizMyStorePage 드롭다운 → 칩 버튼 그룹 교체 (`fix/biz-mystore-select-to-chips`)
 - **목적**: 진단(`docs/audit/2026-06-18-드롭다운-글씨크기-진단.md`) 결론 — 네이티브 `<select>` 의 모바일 OS picker 가 글씨가 작아 옵션 구분 불가. CSS 무효. **칩 버튼 그룹** 으로 교체해 글씨/터치영역 자유 제어
 - **수정 — `src/pages/admin/BizMyStorePage.vue`**:

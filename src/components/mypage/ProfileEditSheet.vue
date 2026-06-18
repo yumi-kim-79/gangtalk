@@ -554,6 +554,21 @@ async function onSave() {
   const uid = props.state?.uid
   if (!uid) { alert('로그인이 필요합니다.'); return }
 
+  // ✨ 2026-06-18: 빈 닉네임 저장 차단.
+  //   기존 코드의 `?? state.profile?.nickname ?? ''` 가 빈 문자열을 통과시켜
+  //   users.profile.nickname='' 으로 저장 → 새로고침 시 8순위 폴백 '게스트' 회귀.
+  //   - edit.nickname 이 공백/빈 문자열이면 기존 닉네임 유지
+  //   - 기존 닉네임도 없으면 저장 차단 (alert 후 return)
+  const trimmedNick = String(props.edit?.nickname || '').trim()
+  const prevNick = (props.type === 'company')
+    ? String(props.state.company?.nickname || '').trim()
+    : String(props.state.profile?.nickname || '').trim()
+  const finalNick = trimmedNick || prevNick
+  if (!finalNick) {
+    alert('닉네임을 입력해 주세요.')
+    return
+  }
+
   try {
     savingInner.value = true
 
@@ -595,7 +610,7 @@ async function onSave() {
         ...(props.state.company || {}),
         logo: photoUrl || null,
         logoPath: photoPath || null,
-        nickname: props.edit.nickname ?? props.state.company?.nickname ?? '',
+        nickname: finalNick,   // ← 빈 문자열 방지 (가드 통과한 값)
         companyName: props.edit.companyName ?? props.state.company?.companyName ?? '',
         brn: props.edit.brn ?? props.state.company?.brn ?? '',
         manager: props.edit.manager ?? props.state.company?.manager ?? '',
@@ -605,8 +620,9 @@ async function onSave() {
     } else {
       payload.profile = {
         ...(props.state.profile || {}),
-        nickname: props.edit.nickname ?? props.state.profile?.nickname ?? '',
-        nick: props.edit.nickname ?? props.state.profile?.nick ?? '',
+        nickname: finalNick,                                              // ← 빈 문자열 방지
+        nick: finalNick,                                                  // ← 빈 문자열 방지
+        nicknameLower: finalNick.toLowerCase(),                           // me.init 가 매번 재보정 안 하도록 함께 저장
         phone: props.edit.phone ?? props.state.profile?.phone ?? null,
         photoUrl: photoUrl || null,   // 🔹 긴 base64 대신 짧은 URL
         photoPath: photoPath || null, // 🔹 Storage 경로

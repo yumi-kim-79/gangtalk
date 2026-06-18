@@ -461,35 +461,51 @@ const previewAvatarStyleWithBg = computed(() => {
   return () => styleObj
 })
 
-/* 저장 후 state.profile 즉시 반영 */
+/* 저장 후 즉시 반영
+ * - state 는 computed (useMyPageCore) → mutation 효과 일시적
+ * - me.auth.value 를 직접 갱신해야 새로고침 전에도 일관 표시 유지
+ *   (LS_AUTH 도 me.save 로 동기화 → 새로고침 시 캐시도 일치)
+ */
 const handleProfileSave = () => {
   try {
+    const nickname = getEditField('nickname')
+    const phone = getEditField('phone')
+    const bgColor = getEditField('bgColor')
+    const textColor = getEditField('textColor')
+
+    const trimmedNick = String(nickname || '').trim()
+
+    // 1) state (computed) 일시 패치 — UI 즉시 반영용
     const store = state?.value ?? state
     if (store) {
       if (!store.profile) store.profile = {}
       const p = store.profile
+      if (nickname !== undefined && trimmedNick) {
+        p.nickname = trimmedNick
+        p.nick = trimmedNick
+      }
+      if (phone !== undefined) p.phone = String(phone || '').trim()
+      if (bgColor !== undefined) p.bgColor = bgColor || null
+      if (textColor !== undefined) p.textColor = textColor || '#FF2C8A'
+    }
 
-      const nickname = getEditField('nickname')
-      const phone = getEditField('phone')
-      const bgColor = getEditField('bgColor')
-      const textColor = getEditField('textColor')
+    // 2) me.auth.value 직접 갱신 — source of truth. LS_AUTH 도 me.save 로 동기화.
+    //    이렇게 해야 새로고침 없이도 useMyPageCore.state computed 가 다음 트리거에
+    //    me.auth.profile 의 값을 그대로 반환 → 폴백 '게스트' 안 발동.
+    if (me?.auth?.value) {
+      const a = me.auth.value
+      const nextProfile = { ...(a.profile || {}) }
+      if (nickname !== undefined && trimmedNick) {
+        nextProfile.nickname = trimmedNick
+        nextProfile.nick = trimmedNick
+        nextProfile.nicknameLower = trimmedNick.toLowerCase()
+      }
+      if (phone !== undefined) nextProfile.phone = String(phone || '').trim()
+      if (bgColor !== undefined) nextProfile.bgColor = bgColor || null
+      if (textColor !== undefined) nextProfile.textColor = textColor || '#FF2C8A'
 
-      if (nickname !== undefined) {
-        const nick = String(nickname || '').trim()
-        if (nick) {
-          p.nickname = nick
-          p.nick = nick
-        }
-      }
-      if (phone !== undefined) {
-        p.phone = String(phone || '').trim()
-      }
-      if (bgColor !== undefined) {
-        p.bgColor = bgColor || null
-      }
-      if (textColor !== undefined) {
-        p.textColor = textColor || '#FF2C8A'
-      }
+      me.auth.value = { ...a, profile: nextProfile }
+      if (typeof me.save === 'function') me.save()
     }
   } catch (e) {
     console.warn('local profile patch failed:', e)
