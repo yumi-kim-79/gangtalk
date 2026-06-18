@@ -143,28 +143,39 @@
 
         <div class="adm-field full">
           <span>대표 이미지</span>
-          <div class="adm-thumb-row">
-            <input
-              ref="fileInputRef"
-              type="file"
-              accept="image/*"
-              class="adm-thumb-file"
-              :disabled="uploading"
-              @change="onPickImage"
-            />
-            <button
-              type="button"
-              class="adm-btn"
-              :disabled="uploading"
-              @click="triggerFilePick"
-            >{{ uploading ? '업로드 중…' : '사진 선택' }}</button>
+
+          <!-- 신규 등록 모드: 업로드 비활성 + 안내 (storage.rules 의 isStoreOwner 가
+               firestore.exists(stores/{id}) 를 요구하므로 stores doc 생성 전엔 업로드 불가) -->
+          <div v-if="creating" class="biz-image-notice">
+            <strong>📷 대표 이미지는 등록 승인 후 업로드할 수 있습니다.</strong>
+            <span>먼저 텍스트 정보만 입력해 등록을 신청해 주세요. 승인 후 본 화면에서 사진을 첨부할 수 있습니다.</span>
           </div>
-          <input
-            v-model.trim="form.thumb"
-            type="text"
-            placeholder="또는 이미지 URL 직접 입력 (https://...)"
-          />
-          <img v-if="form.thumb" :src="form.thumb" class="adm-thumb-preview" alt="대표 이미지" />
+
+          <!-- 수정 모드 (기존 store 보유): 기존 업로드 흐름 그대로 -->
+          <template v-else>
+            <div class="adm-thumb-row">
+              <input
+                ref="fileInputRef"
+                type="file"
+                accept="image/*"
+                class="adm-thumb-file"
+                :disabled="uploading"
+                @change="onPickImage"
+              />
+              <button
+                type="button"
+                class="adm-btn"
+                :disabled="uploading"
+                @click="triggerFilePick"
+              >{{ uploading ? '업로드 중…' : '사진 선택' }}</button>
+            </div>
+            <input
+              v-model.trim="form.thumb"
+              type="text"
+              placeholder="또는 이미지 URL 직접 입력 (https://...)"
+            />
+            <img v-if="form.thumb" :src="form.thumb" class="adm-thumb-preview" alt="대표 이미지" />
+          </template>
         </div>
       </div>
 
@@ -320,6 +331,8 @@ const uploading = ref(false)
 
 function triggerFilePick() {
   if (uploading.value) return
+  // 신규 등록 모드는 마크업에서 업로드 영역 자체를 가림 — 방어 차원 silent no-op
+  if (creating.value) return
   if (!currentStore.value?.id) {
     alert('가게가 선택되지 않았습니다.')
     return
@@ -350,6 +363,11 @@ async function fileToJpegBlob(file, maxW = 1280, quality = 0.85) {
 async function onPickImage(e) {
   const file = (e.target.files || [])[0]
   if (!file) return
+  // 신규 등록 모드 방어 — 마크업에서 input 자체가 숨어있지만 race 시 silent no-op
+  if (creating.value) {
+    try { e.target.value = '' } catch {}
+    return
+  }
   const storeId = currentStore.value?.id
   if (!storeId) {
     alert('가게가 선택되지 않았습니다.')
@@ -553,6 +571,27 @@ async function createNewStore() {
 }
 :root[data-theme='dark'] .biz-pending-banner span,
 :root[data-theme='black'] .biz-pending-banner span{ color:#aaa; }
+
+/* 신규 등록 모드 — 대표 이미지 비활성 안내
+ * storage.rules 의 isStoreOwner 가 firestore.exists(stores/{id}) 를 요구하므로
+ * 신규 모드(stores doc 미생성)에서는 업로드 불가. 텍스트 정보만 먼저 등록 신청 → 승인 후 첨부.
+ * 진단: docs/audit/2026-06-18-신규등록-이미지업로드-진단.md */
+.biz-image-notice{
+  display:flex; flex-direction:column; gap:4px;
+  padding:14px 16px;
+  background:#fff5f8;
+  border:1.5px dashed #ffd6e4;
+  border-radius:10px;
+  color:#ff2e7e;
+}
+.biz-image-notice strong{ font-size:14px; font-weight:800; }
+.biz-image-notice span{ font-size:12px; color:#888; line-height:1.5; }
+:root[data-theme='dark'] .biz-image-notice,
+:root[data-theme='black'] .biz-image-notice{
+  background:#2a1620; border-color:#3a2030; color:#ff86b9;
+}
+:root[data-theme='dark'] .biz-image-notice span,
+:root[data-theme='black'] .biz-image-notice span{ color:#999; }
 .adm-selector label{ display:flex; flex-direction:column; gap:6px; }
 .adm-selector span{ font-size:12px; font-weight:700; color:#666; }
 .adm-selector select{
