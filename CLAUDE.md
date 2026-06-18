@@ -134,6 +134,55 @@ firebase deploy --only hosting:admin
 
 ## 작업 로그
 
+### 2026-06-18: 관리자 삭제 백엔드 — `deleteStoreFull` + `deleteBizAccount` (`feat/admin-delete-backend`)
+- **목적**: 진단(`docs/audit/2026-06-18-관리자-삭제기능-진단.md` + `docs/audit/2026-06-18-업체-가게-개념구분-진단.md`) 후속 PR (a) 백엔드. 출근업소(stores) + 업체계정 안전한 삭제. 프론트 UI 는 다음 PR
+- **개념 확정 (반드시 준수)**:
+  - `stores` = 출근업소 (사용자 정의 "업체")
+  - `partners` / `config/marketing/partnerCards` = 제휴처 (사용자 정의 "가게") — **절대 건드리지 않음**
+- **수정 1 — `firestore.rules:141-145` ratings 룰**:
+  - `stores/{storeId}/ratings/{uid}` 의 `create, update, delete` 권한에 `|| isAdmin()` 추가
+  - 이유: `deleteStoreFull` 이 ratings 서브컬렉션 일괄 정리 시 관리자 권한 필요
+- **수정 2 — `functions/index.js` 헬퍼 + 2개 onCall 함수 추가**:
+  - `deleteSubcollection(collRef, batchSize=300)` — 서브컬렉션 batched delete (500 limit 대비 청크)
+  - `_deleteStoreFullCore(storeId)` — 의존성 역순 6단계 정리:
+    1. Storage `stores/{storeId}/*` 전체 (`admin.storage().bucket().getFiles({prefix})` → 각 `delete()`)
+    2. `rooms_biz/{storeId}` 서브컬렉션 (listCollections) → 본 doc
+    3. `stores/{storeId}/ratings/*` 서브컬렉션
+    4. `favorites where targetId==storeId` 일괄 (400 단위 batch)
+    5. `config/marketing` 의 `homeOrder` (array) / `topRanks` (map of arrays) / `listOrders` (map of arrays) 에서 storeId 제거
+    6. `stores/{storeId}` 본 doc
+  - 각 단계 실패해도 다음 진행. 단계별 ok/error 결과 누적
+- **`exports.deleteStoreFull`** (onCall, ADMIN_CORS):
+  - `assertCallerIsAdmin(req)` — gangtalk815@gmail.com 만
+  - `storeId` 필수
+  - `_deleteStoreFullCore(storeId)` 호출 → 결과 반환
+- **`exports.deleteBizAccount`** (onCall, ADMIN_CORS):
+  - `assertCallerIsAdmin(req)` 검증
+  - `uid` 필수
+  - **관리자 본인 가드 2중**: `uid === req.auth.uid` 차단 + `admin.auth().getUser(uid).email === ADMIN_EMAIL` 차단
+  - 흐름:
+    1. `stores where ownerId==uid` 조회 → 각각 `_deleteStoreFullCore` 호출 (옵션 B — 가게도 함께 삭제)
+    2. `users/{uid}` 삭제
+    3. `admin.auth().deleteUser(uid)`
+  - 각 단계 결과 누적 후 summary 반환
+- **건드리지 않음 (코드 사실 검증)**:
+  - `grep "partners\|partnerCards" functions/index.js` → 본 PR 추가 매칭 3건 모두 **주석** (실제 호출 0건)
+  - `createBizAccount` / `resetBizPassword` / `linkStoreToBiz` / 로그인 / 추천코드 로직 변경 없음
+  - 회원 빌드 / 관리자 빌드 / 클라이언트 코드 — 변경 0
+- **검증**:
+  - `node -e "require('./index.js')"` ✓ — 문법 통과
+  - `exports.deleteStoreFull` / `exports.deleteBizAccount` / `exports.createBizAccount` 모두 function 확인
+  - `firebase deploy --dry-run` 은 IAM 권한 부족으로 거부 (사용자가 deploy 시 IAM 프롬프트 가능)
+- **배포 범위**:
+  - `firebase deploy --only functions,firestore:rules`
+  - IAM `Service Account User` 권한 요구 가능성 — Firebase Console 에서 부여 후 재시도
+- **테스트 시나리오 (사용자 수동, Functions 콘솔 또는 Firebase emulator)**:
+  - isAdmin 아닌 호출 → `permission-denied`
+  - 관리자 본인 계정 삭제 시도 → `failed-precondition`
+  - 테스트 store 1개 생성 후 `deleteStoreFull({storeId})` → Storage / rooms_biz / ratings / favorites / config/marketing 정리 확인 + stores 본 doc 삭제 확인
+  - partners 컬렉션 데이터 1개 사전 확인 → 함수 호출 후 partners 그대로 (변화 없음) 확인
+- **다음 PR (b)**: StoresManagePage / BizAccountsPage 에 삭제 UI + 2중 확인 모달 (typing 확인) — UI 표기는 "업소 삭제" 로 일관 (개념 진단 §5-4)
+
 ### 2026-06-18: 추천코드 seq=1 회귀 수정 — me.init else 분기 제거 (`fix/referral-seq-race`)
 - **목적**: 진단 (`docs/audit/2026-06-18-refcode-카운터-읽기누락-진단.md` + `docs/audit/2026-06-18-userseq-카운터-진단.md`) 의 원인 제거. 모든 신규 가입자가 `prefix+'00001'` 받는 회귀 차단
 - **원인 (race 메커니즘)**:
