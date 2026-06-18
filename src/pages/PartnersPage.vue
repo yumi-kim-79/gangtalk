@@ -1001,9 +1001,15 @@ function baseFiltered(){
   })
 }
 
-/* ===== 파트너 노출 순서 저장/적용 ===== */
+/* ===== 파트너 노출 순서 + 카테고리별 Top5 저장/적용 =====
+ * 같은 config/marketing onSnapshot 으로 두 필드 모두 구독 (Firestore 비용 절약).
+ *   - partnerOrder: 전체 정렬 (PR #97)
+ *   - partnerTopRanks: 카테고리별 Top5 순서 ({ catKey: [partnerId, ...] }) — 이번 PR
+ */
 const PARTNER_ORDER_FIELD = 'partnerOrder'
+const PARTNER_TOP_RANKS_FIELD = 'partnerTopRanks'
 const partnerOrder = ref([])
+const partnerTopRanks = ref({})
 let unsubOrder = null
 function subPartnerOrder(){
   try{
@@ -1012,6 +1018,9 @@ function subPartnerOrder(){
       partnerOrder.value = Array.isArray(data[PARTNER_ORDER_FIELD])
         ? data[PARTNER_ORDER_FIELD].map(String)
         : []
+      partnerTopRanks.value = (data[PARTNER_TOP_RANKS_FIELD] && typeof data[PARTNER_TOP_RANKS_FIELD] === 'object')
+        ? data[PARTNER_TOP_RANKS_FIELD]
+        : {}
     })
   }catch(e){ console.warn('subPartnerOrder error:', e) }
 }
@@ -1237,15 +1246,39 @@ function tagPosStyle(b, idx){
   return { left: `${clamp01(p.x) * 100}%`, top:  `${clamp01(p.y) * 100}%`, transform:'translate(-50%, -50%)' }
 }
 
-/* ---------- 카테고리 인기(지역 필터 적용) ---------- */
-const topByCat = (k) => (
-  partners.value
+/* ---------- 카테고리 인기 ---------- *
+ * 우선순위:
+ *   1) 관리자가 partnerTopRanks 에 카테고리별 순서 지정한 경우 — 그 순서로
+ *      (단 partner 가 partners 목록에 없거나 isPartnerApproved/isActiveAdPartner 통과 못 하면 건너뜀)
+ *   2) 빈 카테고리 또는 통과 항목 0개면 — 기존 score 자동 정렬 폴백
+ * 두 경우 모두 지역 필터 (region) 적용. 상위 5개.
+ */
+const topByCat = (k) => {
+  const ids = Array.isArray(partnerTopRanks.value?.[k]) ? partnerTopRanks.value[k] : []
+
+  // 1) 관리자 지정 순서 우선
+  if (ids.length) {
+    const idToPartner = new Map(partners.value.map(p => [String(p.id), p]))
+    const ordered = []
+    for (const id of ids) {
+      const p = idToPartner.get(String(id))
+      if (!p) continue                                            // 삭제됨
+      if (p.category !== k) continue                              // 카테고리 변경됨
+      if (region.value !== 'all' && normRegion(p.region) !== region.value) continue  // 지역 필터
+      ordered.push(p)
+      if (ordered.length >= 5) break
+    }
+    if (ordered.length) return ordered
+  }
+
+  // 2) 폴백 — 자동 score 정렬 (기존 동작 보존)
+  return partners.value
     .filter(p => p.category === k)
-    .filter(p => (region.value==='all') || (normRegion(p.region)===region.value))
+    .filter(p => (region.value === 'all') || (normRegion(p.region) === region.value))
     .slice()
-    .sort((a,b) => score(b) - score(a))
+    .sort((a, b) => score(b) - score(a))
     .slice(0, 5)
-)
+}
 
 /* ---------- 카드 표시 유틸 ---------- */
 const ratingTextP = (p)=> Number(p?.rating || 0).toFixed(1)

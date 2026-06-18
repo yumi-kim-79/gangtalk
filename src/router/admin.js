@@ -29,6 +29,7 @@ const StoresManage     = () => import('@/pages/admin/StoresManagePage.vue')
 const Top5Manage       = () => import('@/pages/admin/Top5ManagePage.vue')
 const BannersManage    = () => import('@/pages/admin/BannersManagePage.vue')
 const PartnersManage   = () => import('@/pages/admin/PartnersManagePage.vue')
+const PartnerTop5      = () => import('@/pages/admin/PartnerTop5ManagePage.vue')
 const NewsManage       = () => import('@/pages/admin/NewsManagePage.vue')
 const InboxPage        = () => import('@/pages/admin/InboxPage.vue')
 const BizAccountsPage  = () => import('@/pages/admin/BizAccountsPage.vue')
@@ -58,6 +59,7 @@ const routes = [
       { path: 'top5',          name: 'adminTop5',         component: Top5Manage },
       { path: 'banners',       name: 'adminBanners',      component: BannersManage },
       { path: 'partners',      name: 'adminPartners',     component: PartnersManage },
+      { path: 'partner-top5',  name: 'adminPartnerTop5',  component: PartnerTop5 },
       { path: 'news',          name: 'adminNews',         component: NewsManage },
       { path: 'inbox',         name: 'adminInboxPage',    component: InboxPage },
       { path: 'biz-accounts',  name: 'adminBizAccounts',  component: BizAccountsPage },

@@ -134,6 +134,62 @@ firebase deploy --only hosting:admin
 
 ## 작업 로그
 
+### 2026-06-18: 제휴관 Top5 카테고리별 관리 (`feat/partner-top5-by-category`)
+- **목적**: 진단(`docs/audit/2026-06-18-제휴업체-순서-top5-진단.md` PR C) — 카테고리 통일 (PR #99) 후 카테고리별 Top5 순서를 관리자가 수동 제어. 사용자 PartnersPage 의 `topByCat` 가 자동 score 정렬만 하던 것을 admin 지정 우선
+- **Firestore 신규 키**: `config/marketing.partnerTopRanks` = `{ [catKey]: [partnerId, ...] }`
+  - 출근업소 `topRanks` 와 완전 분리 — 같은 문서 안에서 `merge: true` 로 공존
+  - 카테고리 키는 PR #99 의 `PARTNER_CATEGORIES` 9 키 (ps/skin/beauty/nail/real/fit/deal/shop/etc)
+- **신규 파일 — `src/pages/admin/PartnerTop5ManagePage.vue`** (Top5ManagePage 패턴 이식):
+  - 카테고리 탭 9개 + 각 탭 옆에 현재 순위 개수 표시
+  - 본문: 드래그(☰) 정렬 + 순위 번호 뱃지 (상위 5개 핑크) + 제거 버튼
+  - "+ 제휴업체 추가" 모달 — 현재 카테고리의 partner 만 후보 (자동 카테고리 일치 보장)
+    - 검색 입력 (이름/지역) + 빈 입력 시 카테고리 내 전체 표시 (최대 50)
+    - 이미 추가된 partner 는 "이미 추가됨" 비활성 버튼
+    - **`active === false` partner 는 후보에서 제외** (admin override 안전망)
+  - 본문에 부가 상태 배지 — `삭제됨` / `만료` / `비활성` (사용자 화면 노출 안 되는 항목을 한눈에 식별)
+  - SortableJS 동일 패턴 (`handle:'.adm-drag-handle'`, `onEnd` 에서 DOM 되돌리고 reactive 만 갱신)
+  - 저장 시 **빈 카테고리는 payload 에서 제외** (`cleaned`) → 사용자 화면이 자동 정렬 폴백으로 전환
+  - 첫 onSnapshot 만 로컬 시드 (`loadedOnce`) → 로컬 드래그 보호
+  - 옛 키 partner 도 `normalizePartnerCategory` 로 즉시 변환해 표시
+- **라우터 등록 — `src/router/admin.js`**:
+  - `PartnerTop5` lazy import 추가
+  - `/admin/partner-top5` → `adminPartnerTop5` 라우트 1 줄 추가
+- **사이드바 메뉴 — `src/layouts/AdminLayout.vue`**:
+  - `platformMenus` 에 `{ to: '/admin/partner-top5', emoji: '🏆', label: '제휴관 Top5' }` 추가 (제휴업체 관리 바로 아래)
+- **수정 — `src/pages/PartnersPage.vue` (사용자)**:
+  - 기존 `subPartnerOrder` onSnapshot 콜백에 `partnerTopRanks` 도 함께 채움 — **Firestore 비용 절약 (한 문서 1 구독으로 두 필드 동시 수신)**
+  - `partnerTopRanks` ref 신규 + `PARTNER_TOP_RANKS_FIELD = 'partnerTopRanks'` 상수
+  - **`topByCat(k)` 교체** — 함수 형태로 변환, 우선순위:
+    1. `partnerTopRanks[k]` 에 ID 배열 있으면 → 순서대로 `partners.value` 매칭 → 카테고리/지역 필터 통과 항목만 → 상위 5개
+    2. 1단계가 비거나 통과 항목 0개면 → 기존 `score(p)` 자동 정렬 폴백 (회귀 0)
+  - **방어 (만료/삭제/비활성)**: `partners.value` 가 이미 `isPartnerApproved` + `isActiveAdPartner` 통과 항목만 보유 → `idToPartner.get(id)` 실패 시 자동 건너뜀
+  - `category !== k` 도 보호 (관리자가 카테고리를 바꾼 partner 가 옛 Top5 에 남아있어도 노출 안 됨)
+- **건드리지 않음**:
+  - 출근업소 `topRanks` / `homeOrder` / Top5ManagePage
+  - PR #97 `partnerOrder` 드래그 / PR #98 노출 기간·active / PR #99 카테고리 통일 — 모두 그대로
+  - `firestore.rules` / `storage.rules` / Cloud Functions / 회원 빌드 (PartnersPage 외)
+  - partners 컬렉션 / config/marketing 의 `partnerCardIndex` / 사본
+- **흐름 (수정 후)**:
+  - **관리자**: `/admin/partner-top5` → 카테고리 탭 (예: 성형외과) → "+ 제휴업체 추가" → 카테고리 내 partner 선택 → 드래그 정렬 → "저장"
+  - **Firestore**: `config/marketing.partnerTopRanks = { ps: [id1, id2, id3], skin: [...], ... }` + `partnerTopRanksSavedAt`
+  - **사용자**: gangtox.com 제휴관 → 카테고리 섹션 (예: 성형외과 Top 5) → admin 지정 순서대로 표시
+  - **빈 카테고리**: 자동 score 정렬 (회귀 없음)
+  - **삭제/만료/비활성 partner**: Top5 에 ID 남아 있어도 사용자 화면 자동 건너뜀
+- **빌드 검증**:
+  - `npm run build:admin` ✓ (신규 PartnerTop5ManagePage JS 7.90KB + CSS 6.70KB)
+  - `npm run build` ✓ (PartnersPage JS 24.92→25.31KB, index 215.41KB 유지)
+- **배포 범위**: `firebase deploy --only hosting:admin,hosting:prod` (양쪽)
+- **검증 시나리오 (사용자 수동)**:
+  - [x] 관리자 사이드바에 "🏆 제휴관 Top5" 메뉴 보임
+  - [x] /admin/partner-top5 진입 → 9 카테고리 탭 표시
+  - [x] 카테고리 선택 → "+ 제휴업체 추가" → 같은 카테고리 partner 만 후보
+  - [x] 드래그 정렬 + 저장 → Firestore `config/marketing.partnerTopRanks` 갱신
+  - [x] gangtox.com 제휴관 새로고침 → 해당 카테고리 Top 5 가 admin 지정 순서로
+  - [x] 빈 카테고리 (저장 안 함) → 기존 score 자동 정렬 폴백
+  - [x] partner 삭제 / `adEnd` 과거 set / `active=false` → 사용자 화면에서 자동 미노출 (Top5 ID 잔존해도 안전)
+  - [x] 출근업소 `topRanks` (가게찾기 Top5) 변화 없음 — 별도 키 확인
+  - [x] PR #97 / #98 / #99 회귀 없음
+
 ### 2026-06-18: 제휴업체 카테고리 9 키 통일 + 마이그레이션 (`fix/partner-category-unify`)
 - **목적**: 진단(`docs/audit/2026-06-18-제휴업체-순서-top5-진단.md` §4 / PR C0) — 관리자/사용자 카테고리 키 불일치 정리. Top5 (PR C) 진입 전 사전 정리
 - **확정 9 카테고리** (key : 한글 라벨):
