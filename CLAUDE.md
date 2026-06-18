@@ -134,6 +134,43 @@ firebase deploy --only hosting:admin
 
 ## 작업 로그
 
+### 2026-06-18: 신규 등록 모드 대표 이미지 비활성화 + 안내 (`fix/biz-newstore-image-notice`)
+- **목적**: PR #93 후속 — 업체가 신규 업소 등록 시 대표 이미지 첨부 시도 → `alert("가게가 선택되지 않았습니다.")` 노출되던 문제를 안내 문구로 자연스럽게 처리
+- **원인 (진단 `docs/audit/2026-06-18-신규등록-이미지업로드-진단.md`)** 2중 차단:
+  1. 클라이언트 가드 — `BizMyStorePage.vue:321-328 triggerFilePick` + `:350-357 onPickImage` 가 `currentStore.value?.id` null 체크. 신규 모드는 `selectedStoreId=''` 라 무조건 null
+  2. Storage Rules — `storage.rules:29-33 isStoreOwner` 가 `firestore.exists(stores/{id})` 를 요구. 신규 모드는 stores doc 미생성 → 통과 불가
+  - 클라 가드만 풀어도 storage rule 이 차단하므로 **stores doc 먼저 생성** 외에는 안전한 우회 경로 없음
+- **결정**: storage.rules 변경 없이 (보안 유지) UX 로 자연스럽게 처리 — 신규 모드에서 이미지 업로드 영역 자체를 가리고 안내
+- **수정 — `src/pages/admin/BizMyStorePage.vue`**:
+  - **마크업** (`.adm-field full` 대표 이미지 영역):
+    - `<div v-if="creating" class="biz-image-notice">` — 핑크 dashed 배너 + "📷 대표 이미지는 등록 승인 후 업로드할 수 있습니다." + 안내 문구
+    - `<template v-else>` 로 기존 업로드 흐름 (파일 input + URL input + 미리보기) 감쌈 → 수정 모드는 회귀 0
+  - **핸들러 가드** (방어 차원):
+    - `triggerFilePick()` — `if (creating.value) return` 추가 (silent no-op). 기존 `currentStore.value?.id` null 체크 alert 는 수정 모드에서만 가능
+    - `onPickImage(e)` — `if (creating.value) { e.target.value=''; return }` 추가. 마크업 race 로 input 이 잠깐 보이는 경우 방어
+  - **CSS — `.biz-image-notice`** (기존 `.biz-pending-banner` 톤과 일관):
+    - 핑크 배경 `#fff5f8` + 1.5px dashed `#ffd6e4` + 진핑크 텍스트 `#ff2e7e`
+    - strong 14/800, span 12/회색
+    - 다크모드 보정 (`:root[data-theme='dark|black']`) — `#2a1620` 배경
+- **건드리지 않음**:
+  - `storage.rules` / `firestore.rules` — 보안 그대로
+  - 수정 모드 이미지 업로드 흐름 (기존 store 보유 업체) — 회귀 0
+  - 승인/노출 파이프라인 (applyStatus / approved / exposure.gangtalk)
+  - `createNewStore()` payload — PR #93 그대로
+  - `BizAccountsPage users subscribe error` — 별개 문제 (진단 §4). 본 PR 범위 아님
+- **수정 후 흐름**:
+  1. 신규 등록 모드 진입 → 텍스트 정보만 입력 + 핑크 안내 박스 ("승인 후 업로드 가능")
+  2. "등록 신청" 클릭 → `createNewStore()` → stores doc 생성 → `creating=false; selectedStoreId=newId` 자동 전환
+  3. 같은 화면이 수정 모드로 전환 → 이미지 업로드 영역 노출 → storage rule 통과 → 첨부 가능
+- **빌드 검증**: `npm run build:admin` ✓ (BizMyStorePage JS 12.29→12.70KB, CSS 4.97→5.61KB) / 회원 빌드 영향 없음
+- **배포 범위**: `firebase deploy --only hosting:admin` (관리자 빌드만)
+- **검증 시나리오 (사용자 수동)**:
+  - [x] 신규 등록 모드 진입 → 대표 이미지 자리에 핑크 안내 박스 노출, 파일 선택 버튼/URL input 안 보임
+  - [x] 텍스트만 입력 → "등록 신청" 성공 (이미지 없이 등록 가능)
+  - [x] 등록 신청 직후 화면이 수정 모드로 자동 전환 → 이미지 업로드 영역 노출 → 파일 첨부 정상
+  - [x] 기존 store 보유 업체 (수정 모드) → 이미지 업로드 영역 그대로, 회귀 없음
+  - [x] "가게가 선택되지 않았습니다" alert 가 신규 모드에서 안 뜨는지
+
 ### 2026-06-18: 업체 자가 등록 흐름 — BizMyStorePage 신규 등록 모드 (`feat/biz-self-store-register`)
 - **목적**: 진단(`docs/audit/2026-06-18-업체자가입력-승인흐름-진단.md`) 의 빠진 부분 — "업체가 본인 출근업소를 신규 생성하는 UI/로직" 추가
 - **운영 흐름 (구현 후)**:
