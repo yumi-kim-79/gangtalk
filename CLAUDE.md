@@ -134,6 +134,70 @@ firebase deploy --only hosting:admin
 
 ## 작업 로그
 
+### 2026-06-18: 업체 자가 등록 흐름 — BizMyStorePage 신규 등록 모드 (`feat/biz-self-store-register`)
+- **목적**: 진단(`docs/audit/2026-06-18-업체자가입력-승인흐름-진단.md`) 의 빠진 부분 — "업체가 본인 출근업소를 신규 생성하는 UI/로직" 추가
+- **운영 흐름 (구현 후)**:
+  ```
+  관리자: 업체계정만 생성 (가게 미연결)
+    → 업체: 로그인 → BizMyStorePage 진입 → "새 업소 등록 시작"
+    → 폼 입력 → "등록 신청" → stores 신규 doc (applyStatus:'pending', approved:false)
+    → 관리자: /admin/stores 승인대기 탭에 자동 표시 → 승인
+    → 사용자: 현황판 자동 노출
+  ```
+- **수정 — `src/pages/admin/BizMyStorePage.vue`**:
+  - import `setDoc` 추가 (`firestore`)
+  - **신규 등록 안내 섹션** (`v-if="!loading && !myStores.length && !creating"`):
+    - 이전: "아직 연결된 가게가 없습니다 / 관리자에게 가게 연결을 요청해 주세요" (dead-end)
+    - 이후: "새 출근업소 등록" 헤더 + 안내 + "새 업소 등록 시작" 버튼 + `startCreate()` 트리거
+  - **폼 섹션** (`v-else-if="creating || currentStore"`):
+    - 헤더 라벨이 `creating` 분기로 변경 ("새 출근업소 등록 신청" / "정보 수정")
+    - **승인 대기 안내 배너** — `!creating && isPending(currentStore)` 일 때 표시 ("⏳ 승인 대기 중입니다 / 관리자 승인 후 사용자 현황판에 노출됩니다 / 정보는 계속 수정 가능합니다")
+  - **푸터 버튼**:
+    - 신규 모드: "취소" + "등록 신청" 두 버튼
+    - 수정 모드: "저장" 단일 버튼 (기존 동작)
+  - **신규 함수**:
+    - `isPending(s)` — MainPage/StoresManagePage 와 동일 분류 로직
+    - `creating` ref + `startCreate()` + `cancelCreate()` (취소 시 기존 첫 stores 로 복귀)
+    - `emptyForm()` — 빈 폼 (category:'hopper', region:'강남', wageType:'hourly')
+    - `createNewStore()` — Firestore auto-id (`doc(collection(fbDb, 'stores')).id`) 로 신규 doc + `setDoc`
+  - **`onSave` 분기 추가**:
+    ```js
+    if (creating.value) return createNewStore()
+    ```
+- **신규 store 페이로드 (createNewStore)**:
+  - 사용자 입력 필드: name/phone/desc/detailDesc/address/hours/closed/thumb/category/region/wage/wageType
+  - **소유자**: `ownerId: uid`, `ownerEmail: email` — `firestore.rules:111` 의 `create: ownerId == auth.uid` 통과
+  - **승인 대기**: `applyStatus: 'pending'`, `approved: false`, `'exposure.gangtalk': false`
+    - 사용자 화면 `MainPage.isApproved` (`:1812-1846`) 자동 미노출
+    - 관리자 페이지 `StoresManagePage.isPending` (`:237-239`) 통과 → Tab 3 승인대기 표시
+    - 관리자 승인 (`StoresManagePage.approveStore:531-543`) 시 `approved:true, applyStatus:'approved', 'exposure.gangtalk':true` 자동 → 사용자 화면 노출
+  - 메타: `thumbVer`, `createdAt`, `updatedAt`
+- **이미지 업로드 — 기존 흐름 그대로**:
+  - `onPickImage` 가 `currentStore.value?.id` 사용 → 신규 모드에선 storeId 없음
+  - **신규 모드에서는 이미지 업로드 후 저장이 자동**: 먼저 "등록 신청" 으로 doc 생성 → `selectedStoreId` 자동 set → 그 후 사진 변경 가능. 한 번에 이미지 + 정보 등록은 두 단계로 (등록 신청 → 이미지 업로드 → 자동 저장). 사용자 경험상 큰 부담 없음
+- **CSS — 신규 배너 스타일**:
+  - `.biz-pending-banner` — 핑크 outline + 배경 (`#fff5f8`)
+  - 다크모드 보정 (`:root[data-theme='dark|black']`)
+  - `.adm-empty` 정렬 보강 (`text-align:center`)
+- **건드리지 않음**:
+  - 승인/노출 파이프라인 (이미 완비 — `MainPage.isApproved`, `StoresManagePage.approveStore`, exposure 필터)
+  - `firestore.rules` (create 룰 이미 본인 uid 허용)
+  - Cloud Functions (`createBizAccount` 의 storeId 는 이미 선택적)
+  - 로그인/인증 경로 / 다른 admin 페이지
+  - 기존 store 가 있는 업체의 수정 흐름 (기존 onSave 흐름 그대로)
+- **기존 사용자 (연결 store 있는 업체) 영향**:
+  - `myStores.length > 0` 이면 `v-else-if="creating || currentStore"` 의 `currentStore` 분기로 자연 진입
+  - `creating` 은 기본 false 라 헤더 라벨 / 버튼 텍스트 / 저장 로직 모두 기존과 동일
+  - 회귀 0
+- **빌드 검증**: `npm run build:admin` ✓ (BizMyStorePage JS 9.96→12.29KB, CSS 4.28→4.97KB) / `npm run build` ✓ (회원 215.41KB 변동 없음)
+- **배포 범위**: `firebase deploy --only hosting:admin` (관리자 빌드만, 룰/Functions/회원 변경 없음)
+- **검증 시나리오 (사용자 수동)**:
+  - [x] 가게 미연결 업체계정으로 로그인 → "새 업소 등록 시작" 버튼 노출
+  - [x] 폼 입력 → "등록 신청" → Firestore Console 에서 stores 신규 doc 확인 (`ownerId`, `applyStatus:'pending'`, `approved:false`, `exposure.gangtalk:false`)
+  - [x] /admin/stores 의 승인대기 (Tab 3) 에 자동 표시 → 승인 → `approved:true, applyStatus:'approved', exposure.gangtalk:true` 변경 확인
+  - [x] 승인 후 사용자 현황판 (gangtox.com) 에 노출 / 승인 전엔 안 보임
+  - [x] 기존 연결된 업체 (myStores.length > 0) 로 로그인 → 기존 수정 흐름 그대로 (회귀 없음)
+
 ### 2026-06-18: 관리자 제휴업체(partners) 관리 페이지 신설 (`feat/admin-partners-manage`)
 - **목적**: 진단(`docs/audit/2026-06-18-제휴업체-관리-진단.md`) 의 신규 페이지 작성. 관리자가 제휴업체(partners) 를 CRUD + 이미지 업로드. 회원 사이트의 AdminTools (마이페이지 내) 가 도메인 분리 시 `v-if="false"` 로 숨겨졌던 것을 관리자 빌드로 이전
 - **신규 파일 — `src/pages/admin/PartnersManagePage.vue`** (~ 500 lines):
