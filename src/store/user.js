@@ -179,7 +179,13 @@ const _uid = ref('')
 const _points = ref( Number(loadJSON(LS_AUTH, { loggedIn:false })?.points || 0) )
 let _unsubUserDoc = null
 
-/** Firestore users/{uid} 문서 실시간 구독 → points 반영 */
+/** Firestore users/{uid} 문서 실시간 구독 → points + profile/company 반영
+ * ✨ 2026-06-18: 이전엔 points 만 반영해서 ProfileEditSheet 가 users 를 update 해도
+ *   me.auth.value 의 profile.nickname 이 안 갱신됨. 새로고침 없이 화면이 옛 값 표시
+ *   또는 게스트 폴백 발동. 이제 profile/company 도 함께 머지.
+ *   - 빈 값 덮어쓰기 차단: 새 doc 의 nickname/nick 이 빈 문자열이면 기존 값 유지.
+ *   - 다른 필드는 새 doc 값으로 덮어씀 (Firestore 가 source of truth).
+ */
 function _listenUserDoc(FBOK, uid){
   if (typeof _unsubUserDoc === 'function') { _unsubUserDoc(); _unsubUserDoc = null }
   _points.value = 0
@@ -195,7 +201,32 @@ function _listenUserDoc(FBOK, uid){
       _points.value = p
 
       if (me.auth.value?.loggedIn) {
-        me.auth.value = { ...(me.auth.value || {}), points: p }
+        const cur = me.auth.value || {}
+        const next = { ...cur, points: p }
+
+        // profile 머지 — 빈 nickname 덮어쓰기 방지
+        if (data.profile) {
+          const prevProfile = cur.profile || {}
+          const nextProfile = { ...prevProfile, ...data.profile }
+          // nickname/nick 이 새 doc 에서 빈 값이면 기존 값 유지 (회귀 차단)
+          const newNick = String(data.profile.nickname || '').trim()
+          if (!newNick) {
+            nextProfile.nickname = prevProfile.nickname || newNick
+            nextProfile.nick = prevProfile.nick || prevProfile.nickname || newNick
+          }
+          next.profile = nextProfile
+        }
+
+        // company 도 같은 방식
+        if (data.company) {
+          const prevCompany = cur.company || {}
+          const nextCompany = { ...prevCompany, ...data.company }
+          const newCNick = String(data.company.nickname || '').trim()
+          if (!newCNick) nextCompany.nickname = prevCompany.nickname || newCNick
+          next.company = nextCompany
+        }
+
+        me.auth.value = next
         me.save()
       }
     },
@@ -278,7 +309,18 @@ export const me = {
 
       const userRef = doc(db, 'users', u.uid)
       let data
-      const snap = await getDoc(userRef)
+      let snap
+      try {
+        snap = await getDoc(userRef)
+      } catch (e) {
+        // ✨ 2026-06-18: 일시 실패(권한/네트워크) 시 캐시 보존.
+        //   이전엔 throw 발생 시 me.auth 가 갱신 안 되어 LS_AUTH 캐시가 빈 상태로
+        //   유지될 수 있었음. 이제 명시적으로 _ready 만 켜고 빠짐 — 다음 새로고침
+        //   또는 _listenUserDoc 의 onSnapshot 이 정상 발화하면 자동 복구.
+        console.warn('[me.init] users getDoc failed (캐시 보존):', e?.code || e?.message)
+        _ready.value = true
+        return
+      }
 
       if (snap.exists()) {
         data = snap.data() || {}
