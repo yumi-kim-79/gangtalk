@@ -228,15 +228,38 @@ export const me = {
       deleteField,
     } = FBOK
 
+    // 인증 복원 race 차단 (2026-06-18):
+    //  - 새로고침 직후 onAuthStateChanged 가 null 로 먼저 발화한 뒤
+    //    indexedDB/localStorage 에서 실계정을 복원해 두 번째 콜백으로 user 전달하는
+    //    Firebase Auth SDK 의 알려진 동작이 있음.
+    //  - 이전 코드는 첫 null 발화 즉시 LS_AUTH={loggedIn:false} 로 덮어써 다음
+    //    새로고침 시 화면이 비로그인으로 시작되던 문제 발생.
+    //  - 이후 코드는 null 발화 시 NULL_GRACE_MS 동안 후속 user 발화를 기다린 뒤
+    //    그래도 user 가 없을 때만 reset. 명시적 signOut 은 별도 경로(line 1148)에서
+    //    처리하므로 grace 의 영향을 받지 않음.
+    const NULL_GRACE_MS = 2500
+    let _nullPending = null
+
     onAuthStateChanged(auth, async (u) => {
       if (!u) {
-        me.auth.value = { loggedIn: false }
-        me.save()
-        _uid.value = ''
-        _listenUserDoc(FBOK, '')
+        if (_nullPending) clearTimeout(_nullPending)
+        // _ready 는 즉시 true 로 (다른 컴포넌트가 hang 되지 않게).
+        // me.auth.value 는 grace 후 진짜 null 일 때만 reset → LS_AUTH 보존.
         _ready.value = true
+        _nullPending = setTimeout(() => {
+          _nullPending = null
+          if (!auth.currentUser) {
+            me.auth.value = { loggedIn: false }
+            me.save()
+            _uid.value = ''
+            _listenUserDoc(FBOK, '')
+          }
+        }, NULL_GRACE_MS)
         return
       }
+
+      // user 가 오면 pending null reset 취소
+      if (_nullPending) { clearTimeout(_nullPending); _nullPending = null }
 
       const userRef = doc(db, 'users', u.uid)
       let data

@@ -134,6 +134,43 @@ firebase deploy --only hosting:admin
 
 ## 작업 로그
 
+### 2026-06-18: 회원 사이트 자동 로그아웃 race 차단 (`fix/member-auth-persistence`)
+- **목적**: 진단(`docs/audit/2026-06-18-로그아웃-즐겨찾기-진단.md` §1) 의 인증 race 2가지 차단
+  1. `firebase.js ensureSignedIn` 의 첫 콜백 null 즉시 익명 로그인 → 복원 중인 실계정 위에 익명 user 덮어쓰는 race
+  2. `store/user.js me.init` 의 u=null 즉시 LS_AUTH reset → 새로고침 시 화면 비로그인으로 시작
+- **수정 1 — `src/firebase.js` `ensureSignedIn` (`:144-194`)**:
+  - **`persistenceReady` 모듈 스코프 promise 노출** — 기존 비동기 즉시실행 함수에서 promise 로 변환
+  - `ensureSignedIn` 진입 시 ① `await persistenceReady` 로 persistence 설정 완료 보장 → 익명 호출이 inMemory 폴백으로 빠지지 않게
+  - ② `onAuthStateChanged` 의 첫 user 발화 대기 — `null` 발화는 **무시**, `RESTORE_GRACE_MS = 2500ms` 동안 후속 user 콜백 기다림
+  - ③ grace 후에도 user 없으면 그제야 `signInAnonymously` 호출 (진짜 비로그인 케이스)
+- **수정 2 — `src/store/user.js` `me.init` (`:231-262`)**:
+  - `_nullPending` ref + `NULL_GRACE_MS = 2500ms` 도입
+  - `u=null` 발화 시 즉시 LS_AUTH reset 하지 않고 setTimeout 으로 grace 대기
+  - grace 동안 user 발화가 오면 `clearTimeout` → reset 취소 → 실계정 유지
+  - grace 만료 시점에 `auth.currentUser` 가 여전히 null 일 때만 LS_AUTH reset
+  - `_ready.value = true` 는 첫 null 발화 시 즉시 set (다른 컴포넌트 hang 방지) — LS_AUTH 보존과 분리
+  - 명시적 signOut 흐름 (`:1148`) 은 별도 경로라 grace 영향 없음
+- **건드리지 않음**:
+  - 즐겨찾기 / 별점 / 룰 (별도 PR 예정)
+  - admin 빌드 (`useAuthRole`, `router/admin.js`, `AdminLayout`) — 회원 빌드만 영향
+  - 다른 `me.auth.value = ...` 호출처 (가입/로그인 성공 시 등)
+- **수정 후 데이터 흐름**:
+  - **t=0 새로고침**: `firebase.js` 모듈 로드, `persistenceReady` 시작
+  - **t~수십ms**: `persistenceReady` 완료, `firebaseReady` 가 `ensureSignedIn` 호출
+  - **t~100-500ms**: SDK 가 indexedDB/localStorage 에서 실계정 복원 시도
+    - 첫 `onAuthStateChanged` 콜백이 `null` 이라도 익명 호출 안 함 (grace 대기)
+    - 두 번째 콜백에서 실계정 발화 → grace timer 취소 → 그 user 채택
+    - 동시에 `me.init` 의 `onAuthStateChanged` 도 grace 적용으로 LS_AUTH 보존
+  - **t=2500ms (grace 만료, user 없음)**: 진짜 비로그인 확정 → 익명 로그인 + LS_AUTH reset
+  - **명시적 signOut**: 별도 경로 (`store/user.js:1148`) 라 즉시 reset (UX 정확)
+- **검증 시나리오 (사용자 수동)**:
+  1. 실계정 로그인 → 새로고침 → 여전히 로그인 (실계정 유지) ✓
+  2. 비로그인 진입 → 익명 user 로 표시 ✓
+  3. 명시적 로그아웃 → 즉시 비로그인 ✓
+  4. 몇 분 후 새로고침 → 실계정 유지 ✓
+- **빌드 검증**: `npm run build` ✓ (회원 index 214KB) / `npm run build:admin` ✓ (영향 없음)
+- **배포 범위**: `firebase deploy --only hosting:prod` (회원 빌드만)
+
 ### 2026-06-18: BizMyStorePage 풀 입력 — 시급/카테고리/지역 + 이미지 파일 업로드 (`feat/biz-mystore-wage-image-upload`)
 - **목적**: 진단(`docs/audit/2026-06-18-지표불일치-업체구조-진단.md` §2-4 C/D) 의 누락 필드 보완
 - **수정 — `src/pages/admin/BizMyStorePage.vue`**:
