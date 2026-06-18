@@ -134,6 +134,50 @@ firebase deploy --only hosting:admin
 
 ## 작업 로그
 
+### 2026-06-18: BizMyStorePage 드롭다운 → 칩 버튼 그룹 교체 (`fix/biz-mystore-select-to-chips`)
+- **목적**: 진단(`docs/audit/2026-06-18-드롭다운-글씨크기-진단.md`) 결론 — 네이티브 `<select>` 의 모바일 OS picker 가 글씨가 작아 옵션 구분 불가. CSS 무효. **칩 버튼 그룹** 으로 교체해 글씨/터치영역 자유 제어
+- **수정 — `src/pages/admin/BizMyStorePage.vue`**:
+  - **카테고리 (9개)** (`:46-51`): `<select>` → `.adm-chip-grid--cols2` 2열 그리드 + `<button class="adm-chip">` 칩
+  - **지역 (4개)** (`:53-58`): `<select>` → `.adm-chip-grid` flex wrap + 칩
+  - **시급 유형 (4개)** (`:85-90`): `<select>` → `.adm-chip-grid` flex wrap + 칩
+  - `<label class="adm-field">` → `<div class="adm-field adm-field-chips full">` 로 변경 (label 클릭 시 첫 칩 ghost 활성화 등 이상 동작 방지)
+  - `:aria-pressed` 추가 (접근성)
+- **CSS 추가 (BizMyStorePage 전용)**:
+  ```css
+  .adm-chip {
+    min-height: 44px;
+    padding: 0 16px;
+    border: 1.5px solid #eee;
+    border-radius: 10px;
+    background: #fff;
+    color: #333;
+    font-size: 16px;        /* 모바일 OS picker 보다 명확히 큰 글씨 */
+    font-weight: 600;
+    transition: border-color .12s, background .12s, color .12s;
+  }
+  .adm-chip.on { background: #ff2e7e; border-color: #ff2e7e; color: #fff; }
+  .adm-chip:focus-visible { outline: 2px solid #ff2e7e; outline-offset: 2px; }
+  ```
+  - `.adm-chip-grid` flex wrap (지역/시급) — 4개라 자연스럽게 한 줄
+  - `.adm-chip-grid--cols2` grid 2열 (카테고리 9개 — 5+4 또는 4+5 배치)
+  - 다크모드 보정 추가 (`:root[data-theme="dark|black"] .adm-chip`)
+- **저장 로직 변경 0**:
+  - `v-model` 이 아닌 `:class={ on: form.x === val }` + `@click="form.x = val"` 패턴 — 저장 값은 그대로
+  - 필드명 (`category` / `region` / `wage` / `wageType`) 불변
+  - `onSave` payload 변경 없음 — 사용자 화면 (`StoreFinder` / `MainPage` / `StoreDetail`) 영향 0
+- **건드리지 않음**:
+  - 공용 `.adm-field select` CSS (`styles/admin.css:34-41` + 본 페이지의 `.adm-field select{...}`) — 그대로. **`BizMetricsPage` / `BizAccountsPage` 의 select 영향 0**
+  - 회원 빌드 / `firebase.js` / 인증 / 룰 / Functions / Storage
+  - 다른 admin 페이지 / 다른 컴포넌트
+- **빌드 검증**: `npm run build:admin` ✓ (BizMyStorePage chunk JS 9.64→9.96KB, CSS 3.17→4.28KB) / `npm run build` ✓ (회원 영향 없음, 215KB 유지)
+- **배포 범위**: `firebase deploy --only hosting:admin` (관리자 빌드만)
+- **검증 시나리오 (사용자 수동)**:
+  - [x] /biz/my-store 진입 → 카테고리/지역/시급유형이 칩 그룹으로 펼쳐서 표시됨
+  - [x] 칩 클릭 → 선택된 칩이 핑크 강조됨
+  - [x] 저장 → stores 문서의 `category`/`region`/`wageType` 필드에 정상 반영
+  - [x] 사용자 화면(가게 카드 등)에 동일 값 표시됨
+  - [x] BizMetricsPage / BizAccountsPage 의 select 외관 변화 없음
+
 ### 2026-06-18: 인증 진단 로그 + 우회 변경 정리 (`chore/cleanup-auth-diag-revert-workarounds`)
 - **목적**: PR #85 의 진짜 수정 (`beforeunload signOut` 제거) 검증 완료 후 진단/우회 임시 변경 정상화
 - **정리 1 — PR #81 DIAG 로그 전체 제거**:
