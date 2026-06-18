@@ -9,7 +9,7 @@
   <div class="adm-page">
     <header class="adm-page-head">
       <h2 class="adm-page-title">👥 업체 계정 관리</h2>
-      <p class="adm-page-sub">업체용 로그인 계정을 생성하고 가게에 연결합니다.</p>
+      <p class="adm-page-sub">업체용 로그인 계정을 생성합니다. 업소 등록은 업체가 직접 진행합니다.</p>
     </header>
 
     <!-- 권한/구독 오류 배너 -->
@@ -72,6 +72,10 @@
           <button class="adm-modal-close" type="button" @click="modal = ''">✕</button>
         </header>
         <div class="adm-modal-body">
+          <div class="adm-create-notice">
+            <strong>💡 업소 연결은 불필요합니다</strong>
+            <span>계정 생성 후 업체가 직접 로그인해 출근업소를 등록합니다. 등록 신청이 들어오면 <code>업소 관리 → 승인 대기</code> 탭에 표시됩니다.</span>
+          </div>
           <label class="adm-field">
             <span>업체명 *</span>
             <input v-model.trim="form.storeName" type="text" placeholder="예: 라운지 G" />
@@ -83,15 +87,6 @@
           <label class="adm-field">
             <span>임시 비밀번호 (6자 이상) *</span>
             <input v-model="form.password" type="text" placeholder="업체에 전달할 임시 비번" />
-          </label>
-          <label class="adm-field">
-            <span>연결할 가게 (선택)</span>
-            <select v-model="form.storeId">
-              <option value="">연결 안 함</option>
-              <option v-for="s in stores" :key="s.id" :value="s.id">
-                {{ s.name || '(이름 없음)' }} · {{ s.region || '-' }}
-              </option>
-            </select>
           </label>
           <p v-if="form.error" class="adm-form-error">{{ form.error }}</p>
         </div>
@@ -136,9 +131,13 @@
           <button class="adm-modal-close" type="button" @click="modal = ''">✕</button>
         </header>
         <div class="adm-modal-body">
-          <p class="adm-modal-hint">{{ form.targetEmail }} 에 가게를 연결합니다.</p>
+          <p class="adm-modal-hint">{{ form.targetEmail }} 에 업소를 연결합니다.</p>
+          <p class="adm-modal-subhint">
+            ※ 일반적인 경우 업체가 직접 등록(자가등록) 하므로 본 기능은 불필요합니다.
+            기존 업소의 소유자(ownerEmail) 를 수정하거나 데이터 마이그레이션 시에만 사용하세요.
+          </p>
           <label class="adm-field">
-            <span>연결할 가게 *</span>
+            <span>연결할 업소 *</span>
             <select v-model="form.storeId">
               <option value="">선택…</option>
               <option v-for="s in stores" :key="s.id" :value="s.id">
@@ -269,16 +268,22 @@ function openLink(a) {
 async function onCreate() {
   if (form.value.busy) return
   form.value.error = ''
-  const { storeName, email, password, storeId } = form.value
+  const { storeName, email, password } = form.value
   if (!storeName || !email || !password) {
     form.value.error = '필수 항목을 입력해 주세요.'
     return
   }
   form.value.busy = true
   try {
-    const res = await fnCreateBiz({ email, password, storeName, storeId: storeId || undefined })
+    // storeId 전달 안 함 — 업체가 자가등록 (BizMyStorePage 신규 등록 모드).
+    // createBizAccount 의 storeId 는 선택적 파라미터라 함수 시그니처 변경 0.
+    const res = await fnCreateBiz({ email, password, storeName })
     console.log('[createBizAccount] ok', res?.data)
-    alert(`업체 계정 생성 완료: ${email}`)
+    alert(
+      `업체 계정 생성 완료: ${email}\n\n` +
+      `이제 업체가 로그인해 직접 출근업소를 등록할 수 있습니다.\n` +
+      `등록 신청이 들어오면 '업소 관리 → 승인 대기' 탭에서 승인해 주세요.`
+    )
     modal.value = ''
     resetForm()
   } catch (e) {
@@ -514,6 +519,43 @@ function fmtTime(v) {
   border-top:1px solid #eee;
 }
 .adm-modal-hint{ font-size:13px; color:#666; margin:0 0 4px; }
+.adm-modal-subhint{
+  font-size:12px; color:#999; line-height:1.5;
+  margin:0 0 4px;
+  padding:8px 10px;
+  background:#fafafa; border-radius:8px;
+}
+
+/* 신규 계정 생성 모달 — 자가등록 안내 박스 */
+.adm-create-notice{
+  display:flex; flex-direction:column; gap:4px;
+  padding:12px 14px;
+  background:#fff5f8;
+  border:1.5px solid #ffd6e4;
+  border-radius:10px;
+  color:#ff2e7e;
+  margin-bottom:4px;
+}
+.adm-create-notice strong{ font-size:13px; font-weight:800; }
+.adm-create-notice span{ font-size:12px; color:#666; line-height:1.5; }
+.adm-create-notice code{
+  background:#fff; padding:1px 5px; border-radius:4px;
+  font-size:11px; color:#ff2e7e; border:1px solid #ffd6e4;
+}
+:root[data-theme="dark"] .adm-create-notice,
+:root[data-theme="black"] .adm-create-notice{
+  background:#2a1620; border-color:#3a2030; color:#ff86b9;
+}
+:root[data-theme="dark"] .adm-create-notice span,
+:root[data-theme="black"] .adm-create-notice span{ color:#999; }
+:root[data-theme="dark"] .adm-create-notice code,
+:root[data-theme="black"] .adm-create-notice code{
+  background:#1c1c1c; border-color:#3a2030; color:#ff86b9;
+}
+:root[data-theme="dark"] .adm-modal-subhint,
+:root[data-theme="black"] .adm-modal-subhint{
+  background:#222; color:#888;
+}
 
 .adm-field{ display:flex; flex-direction:column; gap:4px; }
 .adm-field span{ font-size:12px; font-weight:700; color:#666; }
