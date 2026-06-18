@@ -591,7 +591,9 @@ import { getStorage, ref as sRef, uploadBytes, getDownloadURL } from 'firebase/s
 import { sanitizeUserPayload } from '@/lib/author'
 import { safeAdd, safeUpdate, safeDelete } from '@/lib/firestoreSafe'
 
-import { getAuth, onAuthStateChanged, setPersistence, browserLocalPersistence } from 'firebase/auth'
+// setPersistence 는 firebase.js 가 단일 책임으로 indexedDBLocalPersistence 적용.
+// 여기서 다시 호출하면 race + persistence 충돌 (진단 §1-1) → 새로고침 시 토큰 복원 실패.
+import { getAuth, onAuthStateChanged } from 'firebase/auth'
 
 const AUTO_OPEN_CAT = false
 const EMOJIS = ['😀','😁','😂','🤣','😊','😍','😘','😎','🤔','😮','😢','😡','👍','👎','🙏','👏','🔥','✨','🎉','💯','🥹','🤝','🫶','💪','😴','🤩','😇','🙌']
@@ -2417,11 +2419,11 @@ const composeCats = computed(() => {
   return base
 })
 
-/* 퍼시스턴스 + 인증 가드 */
+/* 인증 가드 — setPersistence 는 firebase.js 만 단일 책임으로 indexedDBLocalPersistence
+   적용. 여기서 browserLocalPersistence 로 덮으면 토큰 저장처 race 가 발생해 새로고침 시
+   복원 실패 (진단 docs/audit/2026-06-18-토큰저장실패-진단.md §1). */
 onBeforeMount(()=>{
   const auth = getAuth()
-  setPersistence(auth, browserLocalPersistence).catch(()=>{})
-
   const u = auth.currentUser
   // ✅ 비회원이어도 강톡 페이지 진입은 허용
   if (u) {
