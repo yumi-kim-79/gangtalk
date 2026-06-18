@@ -39,17 +39,25 @@
             <span class="adm-acc-email">{{ a.profile?.email || '-' }}</span>
             <span class="adm-acc-store">
               <template v-if="storesByEmail[(a.profile?.email||'').toLowerCase()]?.length">
-                연결된 가게: <strong>{{ storesByEmail[(a.profile?.email||'').toLowerCase()].map(s => s.name).join(', ') }}</strong>
+                연결된 업소: <strong>{{ storesByEmail[(a.profile?.email||'').toLowerCase()].map(s => s.name).join(', ') }}</strong>
               </template>
               <template v-else>
-                <span class="adm-acc-unlinked">연결된 가게 없음</span>
+                <span class="adm-acc-unlinked">연결된 업소 없음</span>
               </template>
             </span>
             <span class="adm-acc-time">{{ fmtTime(a.createdAt) }} 생성</span>
           </div>
           <div class="adm-acc-actions">
             <button class="adm-btn small" type="button" @click="openReset(a)">비번 재설정</button>
-            <button class="adm-btn small" type="button" @click="openLink(a)">가게 연결</button>
+            <button class="adm-btn small" type="button" @click="openLink(a)">업소 연결</button>
+            <button
+              v-if="!isAdminEmail(a.profile?.email)"
+              class="adm-btn small danger"
+              type="button"
+              :disabled="!!deleting[a.id]"
+              @click="deleteAccount(a)"
+              title="이 업체 계정과 연결된 출근업소를 모두 삭제합니다"
+            >{{ deleting[a.id] ? '삭제 중…' : '계정 삭제' }}</button>
           </div>
         </li>
       </ul>
@@ -164,6 +172,12 @@ const fns = getFunctions(undefined, 'asia-northeast3')
 const fnCreateBiz = httpsCallable(fns, 'createBizAccount')
 const fnResetPw   = httpsCallable(fns, 'resetBizPassword')
 const fnLinkStore = httpsCallable(fns, 'linkStoreToBiz')
+const fnDeleteBiz = httpsCallable(fns, 'deleteBizAccount')
+
+const ADMIN_EMAIL = 'gangtalk815@gmail.com'
+function isAdminEmail(email) {
+  return String(email || '').toLowerCase() === ADMIN_EMAIL
+}
 
 const accounts = ref([])
 const stores = ref([])
@@ -300,7 +314,7 @@ async function onLink() {
   if (form.value.busy) return
   form.value.error = ''
   if (!form.value.storeId) {
-    form.value.error = '연결할 가게를 선택해 주세요.'
+    form.value.error = '연결할 업소를 선택해 주세요.'
     return
   }
   form.value.busy = true
@@ -310,7 +324,7 @@ async function onLink() {
       bizUid: form.value.targetUid,
       bizEmail: form.value.targetEmail,
     })
-    alert('가게가 연결되었습니다.')
+    alert('업소가 연결되었습니다.')
     modal.value = ''
     resetForm()
   } catch (e) {
@@ -318,6 +332,75 @@ async function onLink() {
     form.value.error = '실패: ' + (e?.message || e?.code || e)
   } finally {
     form.value.busy = false
+  }
+}
+
+/* ===== 업체 계정 완전 삭제 (Cloud Function deleteBizAccount) =====
+ * Auth 계정 + users 문서 + 연결된 출근업소(stores) 모두 삭제.
+ * 2중 confirm + 중복 클릭 방지.
+ * 관리자 본인(gangtalk815) 계정은 v-if 로 버튼 자체가 숨겨짐 + 백엔드도 차단.
+ */
+const deleting = ref({})
+
+async function deleteAccount(a) {
+  if (!a?.id || deleting.value[a.id]) return
+  // 가드 — UI 에서도 한 번 더 차단 (v-if 외 추가 안전망)
+  if (isAdminEmail(a.profile?.email)) {
+    alert('관리자 본인 계정은 삭제할 수 없습니다.')
+    return
+  }
+
+  const email = a.profile?.email || '(이메일 없음)'
+  const companyName = a.company?.name || a.profile?.nickname || '(이름 없음)'
+  const linkedStores = storesByEmail.value[(email || '').toLowerCase()] || []
+  const linkedNames = linkedStores.map(s => s.name).filter(Boolean).join(', ') || '(연결된 업소 없음)'
+
+  // 1차 확인
+  const c1 = window.confirm(
+    `'${companyName}' (${email}) 업체 계정을 삭제하시겠습니까?\n\n` +
+    `다음 항목이 모두 삭제됩니다:\n` +
+    `· Firebase Auth 계정 (로그인 영구 차단)\n` +
+    `· users 문서\n` +
+    `· 연결된 출근업소: ${linkedNames}\n` +
+    `  (각 업소의 지표/별점/즐겨찾기/이미지도 함께 정리)\n\n` +
+    `※ 제휴처(partners) 는 영향받지 않습니다.`
+  )
+  if (!c1) return
+
+  // 2차 확인 — 더 강한 경고
+  const c2 = window.confirm(
+    `정말 '${email}' 업체 계정과 연결된 모든 데이터를 삭제하시겠습니까?\n` +
+    `되돌릴 수 없습니다.`
+  )
+  if (!c2) return
+
+  deleting.value = { ...deleting.value, [a.id]: true }
+  try {
+    const res = await fnDeleteBiz({ uid: a.id })
+    const summary = res?.data?.summary
+    const fails = []
+    if (summary) {
+      if (summary.usersDoc && !summary.usersDoc.ok) fails.push(`users(${summary.usersDoc.error || 'unknown'})`)
+      if (summary.authUser && !summary.authUser.ok) fails.push(`auth(${summary.authUser.error || 'unknown'})`)
+      const storesFails = (summary.stores || []).filter(s =>
+        !s.storeDoc?.ok || !s.storage?.ok || !s.roomsBiz?.ok || !s.ratings?.ok || !s.favorites?.ok || !s.marketingRefs?.ok
+      )
+      if (storesFails.length) fails.push(`stores(${storesFails.length}건 일부 실패)`)
+    }
+    if (fails.length) {
+      alert(`'${email}' 삭제 — 일부 단계 실패:\n` + fails.join('\n'))
+    } else {
+      alert(`'${email}' 업체 계정을 삭제했습니다.\n연결된 업소 ${summary?.stores?.length || 0}개도 함께 정리되었습니다.`)
+    }
+    // 로컬 리스트 즉시 제거 (onSnapshot 이 곧 반영)
+    accounts.value = accounts.value.filter(x => x.id !== a.id)
+  } catch (e) {
+    console.error('[deleteAccount] fail', e)
+    alert(`삭제 실패: ${e?.message || e?.code || e}`)
+  } finally {
+    const next = { ...deleting.value }
+    delete next[a.id]
+    deleting.value = next
   }
 }
 
@@ -369,6 +452,13 @@ function fmtTime(v) {
 .adm-btn.primary{ background:#ff2e7e; border-color:#ff2e7e; color:#fff; }
 .adm-btn.primary:disabled{ opacity:.6; cursor:not-allowed; }
 .adm-btn.small{ height:30px; padding:0 10px; font-size:12px; border-radius:8px; }
+.adm-btn.danger{
+  color:#d92626; border-color:#f3b0b0; background:#fff;
+}
+.adm-btn.danger:hover:not(:disabled){
+  background:#d92626; color:#fff; border-color:#d92626;
+}
+.adm-btn.danger:disabled{ opacity:.5; cursor:not-allowed; }
 
 .adm-acc-list{ list-style:none; margin:0; padding:0; }
 .adm-acc-row{

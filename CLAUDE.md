@@ -134,6 +134,55 @@ firebase deploy --only hosting:admin
 
 ## 작업 로그
 
+### 2026-06-18: 관리자 삭제 UI — 출근업소/업체계정 2중 확인 (`feat/admin-delete-ui`)
+- **목적**: PR #90 백엔드 (deleteStoreFull / deleteBizAccount) 의 프론트 UI. 2중 확인 + 중복 클릭 방지 + 관리자 자기계정 가드
+- **수정 1 — `StoresManagePage.vue`**:
+  - import 에 `getFunctions`, `httpsCallable` 추가
+  - **Tab 1 (노출관리)** 의 카드 우상단에 "삭제" 버튼 (`adm-btn danger sm`) — 노출 토글 옆
+  - **Tab 3 (승인대기)** 의 액션 그룹에 "삭제" 버튼 — 승인/거절 옆
+  - `deleting` ref (storeId 별 로딩 상태) + `fnDeleteStore` = `httpsCallable('deleteStoreFull')`
+  - `deleteStore(s)` 함수:
+    - 1차 confirm: 연관 데이터 6종 (rooms_biz/ratings/favorites/Storage/marketing/stores) 안내 + **partners 영향 없음 명시**
+    - 2차 confirm: "되돌릴 수 없습니다" 강한 경고
+    - 호출 후 단계별 결과 (`r.storage` / `r.roomsBiz` / `r.ratings` / `r.favorites` / `r.marketingRefs` / `r.storeDoc`) 점검 → 실패 단계 있으면 alert 에 나열
+    - 성공 시 로컬 `stores.value` 에서 즉시 제거 (UX), onSnapshot 이 자동 확정
+  - 새 CSS: `.adm-btn.danger` (빨간 outline + hover 시 채움) + `.adm-btn.sm` (28px 높이)
+- **수정 2 — `BizAccountsPage.vue`**:
+  - import 에 `fnDeleteBiz = httpsCallable('deleteBizAccount')` 추가
+  - `ADMIN_EMAIL = 'gangtalk815@gmail.com'` + `isAdminEmail(email)` 헬퍼
+  - 각 업체 카드 액션에 "계정 삭제" 버튼 — **`v-if="!isAdminEmail(a.profile?.email)"`** 로 관리자 본인 계정 숨김 (1차 가드 — UI 레벨)
+  - `deleting` ref + `deleteAccount(a)` 함수:
+    - **2차 가드 — UI 레벨**: `isAdminEmail` 체크 후 alert 차단 (v-if 우회 시 방어)
+    - **3차 가드 — 백엔드**: PR #90 의 `deleteBizAccount` 가 caller.uid 일치 + Auth email 검사
+    - 1차 confirm: Auth + users + 연결 업소 안내 + 각 업소의 연관 데이터 정리 + partners 영향 없음
+    - 2차 confirm: "되돌릴 수 없습니다"
+    - 호출 후 summary 점검 → `usersDoc` / `authUser` / `stores` 각 항목별 실패 경고
+    - 로컬 `accounts.value` 에서 즉시 제거
+- **수정 3 — UI 표기 "가게" → "업소" 통일 (삭제 관련 + 인접 메시지)**:
+  - `BizAccountsPage.vue`:
+    - 카드의 "연결된 가게" → "연결된 업소" (line 41-46)
+    - "가게 연결" 버튼 → "업소 연결" (line 52)
+    - `onLink` 의 alert "가게가 연결되었습니다" → "업소가 연결되었습니다"
+    - `onLink` 의 에러 "연결할 가게를 선택" → "연결할 업소를 선택"
+  - 모달 헤더/내부의 "가게" 표기 등 비삭제 영역은 그대로 유지 (사용자 명시 외 변경 자제)
+  - **코드 식별자(`store` / `Store` / `stores`) 는 그대로 유지** — 컬렉션명/변수명/페이지명
+- **건드리지 않음**:
+  - 백엔드 함수 시그니처 (`deleteStoreFull({storeId})`, `deleteBizAccount({uid})`)
+  - `createBizAccount` / `resetBizPassword` / `linkStoreToBiz` 호출/모달 흐름
+  - 로그인 / 인증 / 룰 / Functions / Storage / 회원 빌드
+  - partners (제휴처) — 코드 / UI / 호출 모두 0
+- **건드리지 않음 검증**:
+  - 회원 빌드 `npm run build` ✓ (index 215.41KB 변동 없음)
+  - admin 빌드: StoresManagePage chunk +~3KB, BizAccountsPage +~2KB
+- **검증 시나리오 (사용자 수동)**:
+  - [x] 더미 업소 삭제 → 목록에서 사라짐 + Firebase Console 에서 연관 데이터 정리 확인 (rooms_biz/ratings/favorites/Storage/marketing)
+  - [x] 더미 업체 계정 삭제 → users + Auth 삭제 + 연결된 stores 함께 사라짐
+  - [x] 관리자 본인 계정 (gangtalk815) → 삭제 버튼 보이지 않음 (`v-if` 차단)
+  - [x] 2차 confirm 거치지 않고 ESC → 삭제 안 됨
+  - [x] partners 컬렉션 → 변화 없음 (Firebase Console 확인)
+- **빌드 검증**: `npm run build:admin` ✓ (StoresManagePage / BizAccountsPage chunk 증가) / `npm run build` ✓ (회원 영향 없음)
+- **배포 범위**: `firebase deploy --only hosting:admin` (관리자 빌드만, 룰/Functions/회원 변경 없음)
+
 ### 2026-06-18: 관리자 삭제 백엔드 — `deleteStoreFull` + `deleteBizAccount` (`feat/admin-delete-backend`)
 - **목적**: 진단(`docs/audit/2026-06-18-관리자-삭제기능-진단.md` + `docs/audit/2026-06-18-업체-가게-개념구분-진단.md`) 후속 PR (a) 백엔드. 출근업소(stores) + 업체계정 안전한 삭제. 프론트 UI 는 다음 PR
 - **개념 확정 (반드시 준수)**:
