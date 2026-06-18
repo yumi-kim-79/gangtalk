@@ -375,36 +375,34 @@ export const me = {
           }
         }
       } else {
-        // (예외) 문서가 없을 때 최소 생성 — 이 경우도 V2 포맷 사용
-        const seq = 1
-        const myCode = makeMyCodeV2(u.email || '', seq)
-        const nickname = u.displayName || ''
-        const hasNickname = !!nickname
-
-        data = {
-          type: 'user',
-          profile: {
-            email: u.email || '',
-            nickname,
-            nick: nickname || '',
-            // ✅ 닉네임이 있을 때만 nicknameLower 필드를 추가
-            ...(hasNickname
-              ? { nicknameLower: nickname.toLowerCase() }
-              : {}),
-            uid: u.uid,
-          },
-          points: 0,
-          referral: { myCode, codeVersion: 2, refBy: null, refApplied: false },
-          myJoinSeq: seq,
-          myRefCode: myCode,
-          myRefCreatedAt: serverTimestamp(),
-          createdAt: Date.now(),
-        }
-        await setDoc(userRef, {
-          ...data,
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-        })
+        // ✨ 2026-06-18: 신규 가입자의 users doc 자동 생성 제거 (옵션 A).
+        //
+        // 이전 코드 (제거됨):
+        //   const seq = 1
+        //   const myCode = makeMyCodeV2(u.email || '', seq)
+        //   ... setDoc(userRef, { ..., myJoinSeq: 1, myRefCode: 'prefix00001' })
+        //
+        // 문제:
+        //   createUserWithEmailAndPassword 직후 onAuthStateChanged 가 발화하면서
+        //   이 콜백이 _fbSignupUser 의 runTransaction 보다 먼저 실행됨.
+        //   여기서 seq=1 하드코딩으로 users doc 을 자동 생성하면, 직후 도달하는
+        //   _fbSignupUser 의 트랜잭션이 uSnap.exists()===true, myJoinSeq>0 →
+        //   "already" 분기로 early return → meta/counters.userSeq 가 안 오름.
+        //   결과: 모든 신규 가입자가 'prefix00001' 받는 회귀.
+        //   진단: docs/audit/2026-06-18-refcode-카운터-읽기누락-진단.md
+        //
+        // 새 동작:
+        //   me.init 은 users doc 을 "읽기" 만 하고, 없으면 자동 생성하지 않음.
+        //   신규 가입자의 doc 은 _fbSignupUser 의 runTransaction (:472-490) 이
+        //   생성하며, me.auth 갱신은 _fbSignupUser 가 직접 처리 (:532-540).
+        //   여기선 _ready=true 만 set 하고 return — LS_AUTH 캐시는 그대로 보존.
+        //
+        // 매우 드문 예외 케이스 (Auth user 만 있고 users doc 없는 데이터 손상)
+        // 에서는 me.auth 가 캐시 그대로지만, 정상 가입 흐름에서는 _fbSignupUser
+        // 가 곧 doc 을 생성하므로 영향 없음.
+        console.warn('[me.init] users doc not found — skip auto-create (signup race protection)')
+        _ready.value = true
+        return
       }
 
       // 🔹 company인데 accountKind 없으면 기본 storeOwner로 보정
