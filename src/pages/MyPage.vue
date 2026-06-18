@@ -662,6 +662,13 @@ const onLogout = async () => {
   background: #fdf8fa !important;
 }
 
+/* 다크 모드 페이지 배경 — 라이트 #fdf8fa !important 를 다크 토큰으로 덮어씀.
+ * 진단: docs/audit/2026-06-18-다크모드-누락보정-진단.md §2-4-B */
+:root[data-theme='dark'] .page-flat.mypage-page,
+:root[data-theme='black'] .page-flat.mypage-page{
+  background: var(--bg, #0f1013) !important;
+}
+
 /* 섹션 간 간격 통일 (16px) */
 .page-flat.mypage-page :deep(.section){
   margin: 0 0 16px;

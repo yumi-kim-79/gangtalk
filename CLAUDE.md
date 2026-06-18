@@ -134,6 +134,72 @@ firebase deploy --only hosting:admin
 
 ## 작업 로그
 
+### 2026-06-19: 다크모드 누락 보정 — 제휴관 카테고리 PNG + 마이페이지 카드 (`fix/darkmode-missing-corrections`)
+- **목적**: 진단(`docs/audit/2026-06-18-다크모드-누락보정-진단.md`) — PR #103 의 다크 토글 작동 시 제휴관 카테고리 아이콘 안 보임 + 마이페이지 일부만 다크 적용 문제. CSS 다크 셀렉터만 추가 (로직/마크업/라이트 모드 변경 0)
+- **(1) 제휴관 카테고리 아이콘 — `src/pages/PartnersPage.vue`**:
+  - **원인**: `.cat-icon` 이 **PNG 배경 이미지** (`/img/partners/cat-*.png` 9종) — StoreFinder 의 SVG + `currentColor` 와 달리 `color` / 다크 토큰 무효
+  - **해결 (`:1646-1651` 기존 다크 보정 블록 다음에 추가)**:
+    ```css
+    :root[data-theme="dark"] .pp-cat-scroll .cat-icon,
+    :root[data-theme="black"] .pp-cat-scroll .cat-icon{
+      filter: brightness(0) invert(1);
+    }
+    ```
+  - `.cat.active .cat-icon` 이 라이트/다크 양쪽에서 이미 같은 filter 적용 중 (`:1422-1424`) → 충돌 없음, 흰색 일관
+  - 라이트 모드는 영향 0 — 다크 셀렉터 안에서만 적용
+- **(2-1) UserSection 카드/텍스트/구분선 — `src/components/mypage/UserSection.vue`**:
+  - **원인 3건**:
+    - `:755 .card/.profile-card/.mypanel/.us-menu-card { background: #fff }` 하드코딩
+    - `:791 .info .nick { color: #111 }` (닉네임 검정)
+    - `:839 .val { color: #222 }` (행 값 검정)
+    - `:811 .row { border-top: #f3f3f5 }` (행 구분선 라이트)
+  - **해결 — 기존 다크 토글 보정 블록 (`:1132-1143`) 직후에 신규 5 블록 추가**:
+    ```css
+    /* 카드 5종 background — .promo 핑크는 제외 (의도된 강조) */
+    [data-theme=dark|black] .user-section .card,
+    .profile-card, .mypanel, .us-menu-card {
+      background: var(--surface, #15161a);
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+    }
+    /* 닉네임 / 값 → --fg, 행 구분선 → --line, active → #1f1c20 */
+    ```
+  - 5 셀렉터 블록 — 카드 background / `.info .nick` / `.val` / `.row` / `.row.row-clickable:active`
+- **(2-2) MyPage 페이지 배경 — `src/pages/MyPage.vue`**:
+  - **원인 (`:662`)**: `background: #fdf8fa !important` 하드코딩 + `!important` 라 다크에서도 라이트 그대로
+  - **해결 (라이트 룰 바로 다음에)**:
+    ```css
+    :root[data-theme='dark'] .page-flat.mypage-page,
+    :root[data-theme='black'] .page-flat.mypage-page{
+      background: var(--bg, #0f1013) !important;
+    }
+    ```
+  - `!important` 충돌 회피 — 다크 셀렉터에도 `!important` 함께 적용 (specificity 동일 + cascade 후순위로 덮어쓰기)
+- **건드리지 않음**:
+  - `.promo` 핑크 (`#FFE4EF !important`) — 의도된 강조 그대로
+  - `.ref-code-box` / `.val.code b` 핑크 톤 — 다크에서도 잘 어울림
+  - `theme.js` store / 다크 토큰 (`theme.css:39-55`)
+  - 마크업 / 로직 / `wifiColor` / `setTheme` / `isDark` ref
+  - 라이트 모드 룰 — 모든 보정이 `:root[data-theme="dark|black"]` 안에서만
+  - HeaderBar / LoggedOutSection / mypanel 내부 (이미 `var(--bg/--line/--muted)` 사용 → 자동 다크)
+  - 관리자 빌드 / 룰 / Functions
+- **영향 범위 — scope 검증 완료**:
+  - `.user-section .card` 셀렉터 → 다른 `.card` 사용처 11개 (PartnerCard, QuickTilesPrimary, BestRanking, StoreGridView 등) 영향 0
+  - `.profile-card / .promo / .mypanel / .us-menu-card` 모두 UserSection 단독 사용
+  - `.page-flat.mypage-page` — `mypage-page` 클래스는 `MyPage.vue:3` 한 곳만
+  - `.pp-cat-scroll .cat-icon` — PartnersPage 전용 scope
+- **빌드 검증**: `npm run build` ✓
+  - PartnersPage CSS 20.15→20.31KB (+0.16KB, PNG 다크 1블록)
+  - MyPage CSS 32.12→33.51KB (+1.39KB, UserSection 5블록 + 페이지 배경 1블록)
+  - JS 변동 없음 (CSS only)
+- **배포 범위**: `firebase deploy --only hosting:prod` (회원 빌드만)
+- **검증 시나리오 (사용자 수동)**:
+  - [x] 다크 모드 → 제휴관 카테고리 아이콘이 흰색으로 잘 보임 (가게찾기 수준)
+  - [x] 다크 모드 → 마이페이지 상단 카드 (포인트/등급/추천코드) 다크 배경 + 밝은 글씨
+  - [x] 닉네임 / 행 값 / 행 구분선 다크에서 정상 표시
+  - [x] `.promo` 핑크 배너 / 추천코드 핑크 박스 그대로 유지
+  - [x] 라이트 모드 → 기존과 동일 (회귀 0)
+  - [x] 다른 페이지 (.card 사용처) 영향 없음
+
 ### 2026-06-19: 와이파이→혼잡도 라벨 + 마이페이지 다크모드 토글 (`feat/congestion-label-darkmode-toggle`)
 - **목적**: 진단(`docs/audit/2026-06-18-혼잡도-다크모드-진단.md`) 의 두 작업 단일 PR
   - (1) 현황판 "와이파이" 라벨 정정 → "혼잡도" (데이터/로직은 이미 혼잡도, 라벨만 틀렸음)

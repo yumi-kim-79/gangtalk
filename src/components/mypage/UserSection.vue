@@ -1142,6 +1142,44 @@ html[data-theme='black'] :where(.btn.primary.sm) {
 :root[data-theme='dark'] .us-theme-switch.on,
 :root[data-theme='black'] .us-theme-switch.on { background: #ff4da3; }
 
+/* ===== 다크모드 카드/텍스트/구분선 보정 =====
+ * 라이트 하드코딩 (#fff, #111, #222, #f3f3f5) 을 다크 토큰으로 덮어씀.
+ * 라이트는 영향 0 — 다크 셀렉터 안에서만 적용.
+ * .promo 핑크(#FFE4EF) / .ref-code-box 핑크 톤 / .val.code b 핑크 박스 는 의도된 강조 → 제외.
+ * 진단: docs/audit/2026-06-18-다크모드-누락보정-진단.md §2
+ */
+:root[data-theme='dark'] .user-section .card,
+:root[data-theme='dark'] .user-section .profile-card,
+:root[data-theme='dark'] .user-section .mypanel,
+:root[data-theme='dark'] .user-section .us-menu-card,
+:root[data-theme='black'] .user-section .card,
+:root[data-theme='black'] .user-section .profile-card,
+:root[data-theme='black'] .user-section .mypanel,
+:root[data-theme='black'] .user-section .us-menu-card {
+  background: var(--surface, #15161a);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+}
+
+:root[data-theme='dark'] .user-section .info .nick,
+:root[data-theme='black'] .user-section .info .nick {
+  color: var(--fg, #f5f6f9);
+}
+
+:root[data-theme='dark'] .user-section .val,
+:root[data-theme='black'] .user-section .val {
+  color: var(--fg, #f5f6f9);
+}
+
+:root[data-theme='dark'] .user-section .row,
+:root[data-theme='black'] .user-section .row {
+  border-top-color: var(--line, #2a2d35);
+}
+
+:root[data-theme='dark'] .user-section .row.row-clickable:active,
+:root[data-theme='black'] .user-section .row.row-clickable:active {
+  background: #1f1c20;
+}
+
 /* ===== 내 활동 패널 ===== */
 .mypanel {
   margin-top: 12px;
