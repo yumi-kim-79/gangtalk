@@ -429,13 +429,30 @@ watch(exposedStores, (list) => {
   const next = { ...metricEdits.value }
   for (const s of list) {
     if (!next[s.id]) {
+      // baseline (시드) 보존 — saveAllMetrics 에서 dirty 비교용.
+      // 진단: docs/audit/2026-06-19-rooms_biz-입력경로-진단.md
+      // (이전 버그: 시드 그대로 일괄 저장 → 13개 모두 0/0/manualSaved 덮어쓰기)
+      const seedMatch      = Number(s.match || 0)
+      const seedPersons    = Number(s.persons || 0)
+      const seedTotalRooms = Number(s.totalRooms || 0)
+      const seedMaxPersons = Number(s.maxPersons || 0)
+      const seedStatusMode = String(s.statusMode || 'auto')
+      const seedStatus     = String(s.status || '좋음')
+
       next[s.id] = {
-        match: Number(s.match || 0),
-        persons: Number(s.persons || 0),
-        totalRooms: Number(s.totalRooms || 0),
-        maxPersons: Number(s.maxPersons || 0),
-        statusMode: String(s.statusMode || 'auto'),
-        status: String(s.status || '좋음'),
+        match: seedMatch,
+        persons: seedPersons,
+        totalRooms: seedTotalRooms,
+        maxPersons: seedMaxPersons,
+        statusMode: seedStatusMode,
+        status: seedStatus,
+        // dirty 비교용 baseline (관리자 수정 시 변경 안 됨)
+        _seedMatch:      seedMatch,
+        _seedPersons:    seedPersons,
+        _seedTotalRooms: seedTotalRooms,
+        _seedMaxPersons: seedMaxPersons,
+        _seedStatusMode: seedStatusMode,
+        _seedStatus:     seedStatus,
       }
     }
   }
@@ -461,6 +478,49 @@ function statusBadgeClass(label){
 
 async function saveAllMetrics(){
   if (savingMetrics.value) return
+
+  // dirty 추적 + 0/0 confirm 가드 (2026-06-21 추가).
+  // 진단: docs/audit/2026-06-19-rooms_biz-입력경로-진단.md
+  // 배경: 시드 그대로 일괄 저장 시 모든 노출 store 가 0/0/manualSaved 로 덮어써짐.
+  //   - dirty 필터: _seed* baseline 과 현재 값이 모두 같으면 commit 제외
+  //   - 0/0 confirm: dirty store 중 match=0 + persons=0 저장이 있으면 사용자 확인
+  const allItems = exposedStores.value
+    .map(s => ({ s, e: metricEdits.value[s.id] }))
+    .filter(({ e }) => !!e)
+
+  // 1) dirty 추적 — 시드 그대로면 스킵
+  const dirtyItems = allItems.filter(({ e }) => {
+    return Number(e.match)      !== Number(e._seedMatch)
+        || Number(e.persons)    !== Number(e._seedPersons)
+        || Number(e.totalRooms) !== Number(e._seedTotalRooms)
+        || Number(e.maxPersons) !== Number(e._seedMaxPersons)
+        || String(e.statusMode) !== String(e._seedStatusMode)
+        || String(e.status)     !== String(e._seedStatus)
+  })
+  const skipped = allItems.length - dirtyItems.length
+
+  if (!dirtyItems.length) {
+    alert(`변경된 업소가 없습니다. (전체 ${allItems.length}개 중 0개 변경)\n\n` +
+          `값을 수정한 뒤 다시 저장해 주세요.`)
+    return
+  }
+
+  // 2) 0/0 저장 confirm — 의도치 않은 0 덮어쓰기 경고
+  const zeroItems = dirtyItems.filter(({ e }) =>
+    Number(e.match || 0) === 0 && Number(e.persons || 0) === 0
+  )
+  if (zeroItems.length) {
+    const sampleNames = zeroItems.slice(0, 5).map(({ s }) => s.name || s.id).join(', ')
+    const more = zeroItems.length > 5 ? ` 외 ${zeroItems.length - 5}개` : ''
+    const ok = window.confirm(
+      `⚠️ ${zeroItems.length}개 업소를 맞출방 0 / 필요인원 0 으로 저장합니다.\n\n` +
+      `· ${sampleNames}${more}\n\n` +
+      `마감/휴업 등 의도가 맞으면 [확인], 아니면 [취소] 후 값을 입력하세요.\n` +
+      `(0/0 저장 시 사용자 현황판에 0 으로 표시되며 manualSaved 플래그가 적용됩니다.)`
+    )
+    if (!ok) return
+  }
+
   savingMetrics.value = true
   let okCount = 0, failCount = 0
   const errors = []
@@ -468,9 +528,8 @@ async function saveAllMetrics(){
     // 가게당 (stores + rooms_biz) 2 writes 를 writeBatch 로 묶어 원자성 보장.
     // - 한쪽만 성공하고 다른쪽 실패하는 부분 실패 불가 → 사용자 화면에서 두 컬렉션이 어긋남 차단.
     // - Firestore batch 한도 = 500 writes / commit. 250 가게 마다 chunk.
-    const items = exposedStores.value
-      .map(s => ({ s, e: metricEdits.value[s.id] }))
-      .filter(({ e }) => !!e)
+    // - 2026-06-21: dirty 만 commit (allItems → dirtyItems)
+    const items = dirtyItems
 
     const CHUNK = 250
     for (let i = 0; i < items.length; i += CHUNK) {
@@ -517,10 +576,30 @@ async function saveAllMetrics(){
       }
     }
 
+    // 성공한 dirty entry 의 seed baseline 갱신 — 같은 화면에서 또 저장 시 dirty 비교 정확
+    if (okCount > 0) {
+      const nextEdits = { ...metricEdits.value }
+      for (const { s, e } of dirtyItems) {
+        const cur = nextEdits[s.id]
+        if (!cur) continue
+        nextEdits[s.id] = {
+          ...cur,
+          _seedMatch:      Number(e.match || 0),
+          _seedPersons:    Number(e.persons || 0),
+          _seedTotalRooms: Number(e.totalRooms || 0),
+          _seedMaxPersons: Number(e.maxPersons || 0),
+          _seedStatusMode: String(e.statusMode || 'auto'),
+          _seedStatus:     String(e.status || '좋음'),
+        }
+      }
+      metricEdits.value = nextEdits
+    }
+
+    const skipMsg = skipped > 0 ? ` (변경 안 함 ${skipped}건 스킵)` : ''
     if (failCount > 0) {
-      alert(`저장 완료: 성공 ${okCount} / 실패 ${failCount}\n\n실패 사유 (처음 3건):\n${errors.slice(0,3).join('\n')}`)
+      alert(`저장 완료: 성공 ${okCount} / 실패 ${failCount}${skipMsg}\n\n실패 사유 (처음 3건):\n${errors.slice(0,3).join('\n')}`)
     } else {
-      alert(`저장 완료: ${okCount}건`)
+      alert(`저장 완료: ${okCount}건${skipMsg}`)
     }
   } finally {
     savingMetrics.value = false

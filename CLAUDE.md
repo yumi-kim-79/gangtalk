@@ -134,6 +134,57 @@ firebase deploy --only hosting:admin
 
 ## 작업 로그
 
+### 2026-06-21: admin "일괄 저장" 빈 시드 0/0 덮어쓰기 가드 (`fix/admin-bulk-metrics-guard`)
+- **목적**: 진단(`docs/audit/2026-06-19-rooms_biz-입력경로-진단.md`) — DIAG (PR #108) 결과 13개 store 모두 `manualSaved:true + 0/0` 으로 저장된 원인 = `StoresManagePage.saveAllMetrics` 의 빈 시드 일괄 commit. 이후 사고 방지
+- **배경**: 관리자가 Tab 2 진입만 해도 `metricEdits` 가 stores 본 doc 으로 자동 시드 (대부분 0/0) → 입력 안 하고 "일괄 저장" 누르면 **모든 노출 store 13개에 0/0/manualSaved:true batch.set** → PR #107 의 `rbActive = ... || _manualSaved` 통과 → 사용자 화면 0 표시
+- **수정 — `src/pages/admin/StoresManagePage.vue` 만**:
+  - **(1) `metricEdits` 시드에 baseline 보존** (`:432-454`):
+    - 기존 6 필드 (`match / persons / totalRooms / maxPersons / statusMode / status`) 외에
+    - `_seedMatch / _seedPersons / _seedTotalRooms / _seedMaxPersons / _seedStatusMode / _seedStatus` 동시 저장 (dirty 비교용)
+    - 시드는 관리자 수정 시 변경 안 됨 (`v-model` 은 `match` 등 비-seed 필드만 바인딩)
+  - **(2) `saveAllMetrics` 에 dirty 필터 + 0/0 confirm 가드** (`:462` 부근):
+    - **dirty 추적**: `Number(e.match) !== Number(e._seedMatch)` 등 6 필드 비교 — 하나라도 다르면 dirty
+    - 시드 그대로면 commit 제외 → 입력 안 한 store 보호
+    - dirty 0건이면 alert "변경된 업소가 없습니다" 후 즉시 종료 (batch 미실행)
+    - **0/0 confirm**: dirty 중 `match=0 && persons=0` 인 store 가 1개 이상이면 confirm:
+      ```
+      ⚠️ N개 업소를 맞출방 0 / 필요인원 0 으로 저장합니다.
+      · 가게A, 가게B 외 N개
+      마감/휴업 등 의도가 맞으면 [확인], 아니면 [취소] 후 값을 입력하세요.
+      ```
+    - 의도된 0 저장은 confirm 통과 시 진행 (마감/휴업 케이스 존중)
+  - **(3) 저장 후 seed baseline 갱신** (`:548` 부근):
+    - 성공한 dirty entry 의 `_seed*` 를 새 저장값으로 갱신 — 같은 화면에서 또 저장 시 dirty 비교 정확
+    - 실패 entry 는 seed 유지 (다음 시도에서 dirty 판정 그대로)
+  - **(4) alert 메시지에 skipped 정보**:
+    - "저장 완료: 5건 (변경 안 함 8건 스킵)" 형태
+    - 사용자가 의도된 동작인지 즉시 확인 가능
+- **건드리지 않음**:
+  - **`BizMetricsPage.onSave`** — 업체 본인 1건 의도 저장, 그대로 정상 작동
+  - PR #107 / PR #108 의 rooms_biz 구독/표시 로직 (MainPage)
+  - 시드 watch 의 동작 (변경 사항 — 시드 추가 필드만)
+  - 다른 admin 페이지 / 회원 빌드 / firestore.rules / Functions
+  - statusMode='manual' 모드 동작 (시드/dirty 비교가 자연스레 처리)
+- **수정 후 흐름**:
+  - **시나리오 1 (의도치 않은 빈 저장)**: 관리자가 Tab 2 진입 후 "일괄 저장" 즉시 클릭 → dirty=0 → "변경된 업소가 없습니다" → batch 실행 0 → **stores/rooms_biz 변경 0 ✓**
+  - **시나리오 2 (일부 입력 후 저장)**: 1~2 store 만 수정 → dirty=1~2 → 입력값이 양수면 바로 commit → 다른 store 무영향
+  - **시나리오 3 (입력값이 0/0)**: 관리자가 match=0/persons=0 으로 명시 수정 → dirty=true + 0/0 → confirm 표시 → 확인 시 저장 (마감/휴업 등 의도)
+  - **시나리오 4 (재저장)**: 첫 저장 후 같은 화면에서 또 수정 → seed baseline 이 첫 저장값으로 갱신됐으므로 두 번째 dirty 정확
+- **빌드 검증**: `npm run build:admin` ✓ (StoresManagePage JS 16.79→18.31KB, +1.52KB)
+  - 회원 빌드 영향 없음
+- **배포 범위**: `firebase deploy --only hosting:admin` (관리자 빌드만, 룰/Functions 변경 없음)
+- **사용자 수동 정정 (이번 사고 데이터)**:
+  - Firestore Console → `rooms_biz` 13개 doc 삭제 (또는 양수로 재저장)
+  - Firestore Console → `stores` 13개 doc 의 `match`/`persons` 도 양수로 정정 (legacy 폴백)
+  - 또는 업체별로 `/biz/metrics` 에서 본인 가게 실값 입력 요청
+- **검증 시나리오 (사용자 수동)**:
+  - [x] /admin/stores Tab 2 진입 → "일괄 저장" 즉시 클릭 → "변경된 업소가 없습니다" alert, batch 실행 0
+  - [x] 1개 store 만 입력 후 저장 → 그 1개만 commit, 다른 store 무영향
+  - [x] 입력값 0/0 으로 명시 수정 후 저장 → confirm 표시
+  - [x] confirm 취소 → 저장 안 됨 / 확인 → 0/0 저장 진행 (마감 의도)
+  - [x] 첫 저장 후 같은 화면에서 또 수정 → dirty 비교 정확 (seed 갱신됨)
+  - [x] BizMetricsPage 업체 입력 → 그대로 작동 (이 PR 무관)
+
 ### 2026-06-21: [DIAG] 현황판 지표 0 덮어쓰기 추적 로그 임시 추가 (`diag/mainpage-zero-source`)
 - **목적**: PR #107 배포 후에도 새로고침 시 맞출방/필요인원이 0 으로 돌아오는 증상 잔존 → 진단(`docs/audit/2026-06-19-현황판-실시간데이터-0덮어쓰기-진단.md`) 의 시나리오 A/B/C 외 다른 0 경로가 있을 가능성. **런타임에서 실제 0 이 들어오는 경로 포착용 DIAG 로그**. 동작 변경 최소
 - **수정 — `src/pages/MainPage.vue` 만 (DIAG 로그만, 로직 변경 0)**:
