@@ -1232,9 +1232,14 @@ function applyRoomsBiz(){
     //    - 🔥 이전 버그: Number.isFinite(byRb?.rooms) 가 0 도 finite 로 인정해
     //      빈 rooms_biz 문서의 rooms=0 이 stores.match 실값을 덮어써서
     //      "10초 후 지표 0" 이 발생. _hasInput 으로 "진짜 0" vs "데이터 없음" 구분.
+    //    - 🔥 2026-06-21 추가 보호 (defense in depth):
+    //      _hasInput=true 라도 rooms/people 둘 다 0 이고 manualSaved 도 아니면 legacy 폴백.
+    //      _hasInput 정의가 헐거워졌을 경우의 안전망 (현재는 같이 PR #71/2026-06-21 보호와 중복).
+    //      진단: docs/audit/2026-06-19-현황판-실시간데이터-0덮어쓰기-진단.md
     const legacyMatch   = Number(s?.match ?? s?.needRooms ?? 0)
     const legacyPersons = Number(s?.persons ?? s?.needPeople ?? 0)
-    const rbActive      = !!byRb?._hasInput
+    const rbHasPositive = (Number(byRb?.rooms || 0) > 0) || (Number(byRb?.people || 0) > 0)
+    const rbActive      = !!byRb?._hasInput && (rbHasPositive || !!byRb?._manualSaved)
 
     const match = rbActive && Number.isFinite(byRb?.rooms)
       ? Number(byRb.rooms)
@@ -1511,13 +1516,20 @@ function subscribeRoomsBiz(){
         people = Math.max(0, Number(people || 0))
       }
 
-      // ✨ [수정 2 — PR #71] "실제 활성 입력 여부" 플래그 강화.
-      //   - manualSaved 면 무조건 true (관리자/업체가 명시적으로 저장한 의도)
-      //   - 그 외엔 pastedText 또는 양수일 때만 true
+      // ✨ [수정 2 — PR #71 + 2026-06-21 보호 구멍 메우기]
+      //   "실제 활성 입력 여부" 플래그.
+      //   - manualSaved=true 면 무조건 true (관리자/업체가 명시적으로 저장한 의도, 0/0 도 존중)
+      //   - 그 외엔 inputRooms / inputPeople 양수일 때만 true
+      //   - 🔥 이전 버그: `!!pastedText` 가 단독 신호라 ChatBiz 의 "응" / "ㅇㅇ" 같은
+      //     의미 없는 1줄 메시지가 fetchLatestMessageText 로 들어오면 _hasInput=true →
+      //     rooms=0, people=0 으로 stores 의 진짜 값을 덮어쓰는 race 발생.
+      //     진단: docs/audit/2026-06-19-현황판-실시간데이터-0덮어쓰기-진단.md (시나리오 A)
+      //   - pastedText 자체는 정보 (parse 결과가 양수면 rooms/people 가 양수가 되어 통과)
       const hasInput = manualSaved
-        || !!pastedText
         || inputRooms  > 0
         || inputPeople > 0
+        || rooms       > 0     // pastedText 파싱 결과가 양수면 통과 (정상 케이스)
+        || people      > 0
 
       return [id, {
         rooms,

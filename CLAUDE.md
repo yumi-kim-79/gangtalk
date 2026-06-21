@@ -134,6 +134,55 @@ firebase deploy --only hosting:admin
 
 ## 작업 로그
 
+### 2026-06-21: 현황판 실시간 지표 0 덮어쓰기 race 차단 (`fix/mainpage-realtime-zero-overwrite`)
+- **목적**: 진단(`docs/audit/2026-06-19-현황판-실시간데이터-0덮어쓰기-진단.md`) — PR #71 의 `_hasInput` 보호에 구멍 발견 (`!!pastedText` 단독 신호). 진단 권장 1 + 3 동시 적용
+- **증상**: 현황판 진입 시 맞출방/필요인원/혼잡도가 진짜 값으로 잠깐 보이다가 0/0/나쁨으로 덮어써짐. 페이지 왔다갔다 반복해도 대부분 0/0/나쁨 표시
+- **원인 (race + 보호 우회)**:
+  - t~100ms: stores 콜백 → `applyRoomsBiz` 1차 → `byRb=null` → legacy 사용 → 진짜 값 표시 ✓
+  - t~수초: rooms_biz `Promise.all` (각 store fetchLatestMessageText) 완료 → 2차 `applyRoomsBiz`
+  - 위험 케이스: ChatBiz 에 "응" / "ㅇㅇ" 같은 의미 없는 1줄 메시지 → `fetchLatestMessageText` 가 반환 → `pastedText` 있음
+  - 진단 §2-1: `hasInput = manualSaved || !!pastedText || inputRooms > 0 || inputPeople > 0` 의 `!!pastedText` 가 단독 통과 → **`_hasInput=true` + `rooms=0, people=0`** → legacy 진짜 값 무시 → 0 덮어쓰기
+  - 혼잡도: `computeStatus` 의 `rangeByCategory` 가 카테고리 내 모든 store match/persons=0 → normalize=0 → availability=0 → **'나쁨'**
+- **수정 — `src/pages/MainPage.vue` 만 (2 곳)**:
+  - **(1) `_hasInput` 정의 강화** (`:1517-1521`, 진단 권장 1):
+    - 이전: `manualSaved || !!pastedText || inputRooms > 0 || inputPeople > 0`
+    - 이후: `manualSaved || inputRooms > 0 || inputPeople > 0 || rooms > 0 || people > 0`
+    - **핵심**: `!!pastedText` 단독 신호 제거. pastedText 가 있어도 parse 결과 (`rooms` / `people`) 가 양수일 때만 통과 → "응" 같은 1줄은 통과 안 됨
+    - manualSaved 분기 그대로 유지 — 관리자가 의도적으로 0/0 저장한 경우 존중
+  - **(2) `applyRoomsBiz rbActive` 강화** (`:1237`, 진단 권장 3, defense in depth):
+    - 이전: `const rbActive = !!byRb?._hasInput`
+    - 이후:
+      ```js
+      const rbHasPositive = (Number(byRb?.rooms || 0) > 0) || (Number(byRb?.people || 0) > 0)
+      const rbActive      = !!byRb?._hasInput && (rbHasPositive || !!byRb?._manualSaved)
+      ```
+    - 의미: `_hasInput=true` 라도 rooms/people 둘 다 0 이고 `_manualSaved` 도 아니면 legacy 폴백
+    - (1) 의 보호와 중복되지만 **defense in depth** — `_hasInput` 정의가 헐거워졌을 경우의 안전망
+    - manualSaved=true + 0/0 케이스는 통과 (관리자 의도 존중)
+- **건드리지 않음**:
+  - `computeStatus / wifiColor / wifiText / rangeByCategory / normalize01` — 혼잡도 계산 로직 그대로. 0 덮어쓰기만 고치면 혼잡도도 자동 정상화
+  - vendors 구독 (별개, 차후 시트 연동용)
+  - PR #71 의 빈 doc 보호 — 여전히 작동 (둘 다 빈 경우 `_hasInput=false`)
+  - PR #71 의 중복 storeId 머지 (tier 기반)
+  - manualSaved=true + 0/0 저장 의도 — 통과 유지
+  - 다른 페이지 / 관리자 빌드 / firestore.rules / Functions
+- **수정 후 시나리오별 결과**:
+  - **시나리오 A** (ChatBiz "응" 1줄 + 양수 입력 없음): `pastedText` 있지만 parse=0/0 → `_hasInput=false` → legacy 진짜 값 사용 ✓
+  - **시나리오 B** (manualSaved=true + 0/0): `_hasInput=true` + `_manualSaved=true` → rbActive=true → 0 표시 (의도 존중) ✓
+  - **시나리오 C** (둘 다 빈 doc): `_hasInput=false` (PR #71 보호 유지) → legacy 사용 ✓
+  - **정상 시나리오** (pastedText 양수 또는 inputRooms 양수): `_hasInput=true` + rbHasPositive=true → rooms_biz 값 표시 ✓
+- **빌드 검증**: `npm run build` ✓ (index JS 215.03→215.16KB, +0.13KB)
+  - 관리자 빌드 영향 없음
+- **배포 범위**: `firebase deploy --only hosting:prod` (회원 빌드만, 룰/Functions 변경 없음)
+- **검증 시나리오 (사용자 수동)**:
+  - [x] 현황판 진입 → 업소 실시간 값이 진짜 값으로 표시, 0/0 으로 안 덮어써짐
+  - [x] 페이지 왔다갔다 반복 → 진짜 값 유지
+  - [x] ChatBiz 에 "응" 1줄 메시지 있는 업소 → 진짜 방/인원 표시 (시나리오 A 해결)
+  - [x] 관리자가 의도적으로 0/0 저장 (manualSaved) → 0 으로 표시 (의도 존중)
+  - [x] 혼잡도 '나쁨' 고정 해소 — 진짜 값 기준으로 정상 계산
+  - [x] PR #71 의 빈 doc 보호 — 여전히 작동
+  - [x] vendors 권한 에러 (의도된 콘솔 노이즈) 그대로 잔존 — 별개 문제
+
 ### 2026-06-19: 가입 시 reserveReferralCode 콘솔 에러 제거 (dead 호출 정리) (`chore/remove-dead-reserve-referral`)
 - **목적**: 출시 전 점검 보고서(`docs/audit/2026-06-19-출시전-전체점검-보고서.md` C-1) 해결 — 방안 (B) 채택
 - **배경**:
