@@ -1203,12 +1203,20 @@ async function subscribe(){
         return { ...raw, _thumb: resolved, adTitle }
       })
     )
+    // [DIAG-stores] baseStores.value 갱신 — stores onSnapshot 마다 발화
+    //   진짜 값 (match/persons 양수) 보유 store 수 요약 → 0 회귀 추적
+    try {
+      const positive = rows.filter(r => Number(r?.match || 0) > 0 || Number(r?.persons || 0) > 0)
+      // eslint-disable-next-line no-console
+      console.log(`[DIAG-stores] baseStores SET — total=${rows.length}, positive=${positive.length}`)
+    } catch {}
+
     baseStores.value = rows
     // 이름/벤더키 인덱스 갱신
     rebuildStoreIndexes()
     // ✅ stores 로딩 후 rooms_biz 다시 구독/매핑 (이름·벤더키 기반 매칭 보장)
     subscribeRoomsBiz()
-    applyRoomsBiz()
+    applyRoomsBiz('stores')
   })
 }
 
@@ -1216,10 +1224,20 @@ async function subscribe(){
 //    - rooms_biz 값이 있으면 그 값을 우선 사용
 //    - rooms_biz 가 없으면 기존 stores.match / stores.persons 를 폴백으로 그대로 사용
 //    - vendors 집계는 최대방수/최대인원, 혼잡도 보조용으로만 사용
-function applyRoomsBiz(){
+function applyRoomsBiz(_caller = '?'){
   const bases = Array.isArray(baseStores.value) ? baseStores.value : []
   const rbMap = roomsBiz.value || {}
   const agg   = labelsAgg.value || {}
+
+  // [DIAG-apply] 0 덮어쓰기 추적용 임시 진입 로그
+  //   - _caller: 어디서 호출됐는지 (stores | rb | vendors | vendor-status | ?)
+  //   - 진단: docs/audit/2026-06-19-현황판-실시간데이터-0덮어쓰기-진단.md
+  //   - 출시 전 제거 예정
+  try {
+    const bc = bases.length, rc = Object.keys(rbMap).length, ac = Object.keys(agg).length
+    // eslint-disable-next-line no-console
+    console.log(`[DIAG-apply from=${_caller}] bases=${bc} rb=${rc} agg=${ac}`)
+  } catch {}
 
   const out = bases.map((s) => {
     const id   = String(s.id || '')
@@ -1241,13 +1259,41 @@ function applyRoomsBiz(){
     const rbHasPositive = (Number(byRb?.rooms || 0) > 0) || (Number(byRb?.people || 0) > 0)
     const rbActive      = !!byRb?._hasInput && (rbHasPositive || !!byRb?._manualSaved)
 
+    const matchSource = (rbActive && Number.isFinite(byRb?.rooms)) ? 'rb' : 'legacy'
     const match = rbActive && Number.isFinite(byRb?.rooms)
       ? Number(byRb.rooms)
       : (Number.isFinite(legacyMatch) ? legacyMatch : 0)
 
+    const personsSource = (rbActive && Number.isFinite(byRb?.people)) ? 'rb' : 'legacy'
     const persons = rbActive && Number.isFinite(byRb?.people)
       ? Number(byRb.people)
       : (Number.isFinite(legacyPersons) ? legacyPersons : 0)
+
+    // [DIAG-apply per-store] 매 store 의 결정 분기 — caller 별 추적용.
+    //   - 콘솔 폭주 방지: 진짜 값 (legacy 양수) → 0 으로 떨어지는 경우만 ⚠️ 출력
+    //   - 전체 출력 원하면: window.__DIAG_APPLY_ALL = true
+    //   - 특정 store 만: window.__DIAG_APPLY_ID = '<storeId>'
+    try {
+      const verbose = typeof window !== 'undefined' && window.__DIAG_APPLY_ALL === true
+      const focus   = typeof window !== 'undefined' ? window.__DIAG_APPLY_ID : null
+      const isZeroOverwrite = legacyMatch > 0 && match === 0
+      if (verbose || (focus && id === String(focus)) || isZeroOverwrite) {
+        const tag = isZeroOverwrite ? '⚠️ ZERO-OVERWRITE' : ''
+        // eslint-disable-next-line no-console
+        console.log(`[DIAG-apply per-store from=${_caller}] ${tag}`, {
+          id, name: s?.name,
+          byRb: byRb ? {
+            rooms: byRb.rooms, people: byRb.people,
+            _hasInput: byRb._hasInput, _manualSaved: byRb._manualSaved, _hasPastedText: byRb._hasPastedText,
+            congestion: byRb.congestion,
+          } : null,
+          rbActive, rbHasPositive,
+          legacyMatch, legacyPersons,
+          matchSource, personsSource,
+          match, persons,
+        })
+      }
+    } catch {}
 
     // ✅ 2) 최대방수/최대인원은 필요 시 vendors 집계를 참고하되,
     //       없으면 stores 필드에서만 가져옴 (예전 match/persons 와는 독립)
@@ -1285,6 +1331,30 @@ function applyRoomsBiz(){
       updatedAt: byRb?.updatedAt || byAg?.updatedAt || s.updatedAt || null,
     }
   })
+
+  // [DIAG-apply summary] 진짜 값 → 0 으로 떨어진 store 집계 (caller 추적)
+  try {
+    const prev = stores.value || []
+    const prevById = new Map(prev.map(p => [String(p.id || ''), p]))
+    const regressions = []
+    for (const o of out) {
+      const p = prevById.get(String(o.id || ''))
+      if (!p) continue
+      const prevMatch = Number(p.match || 0)
+      const prevPersons = Number(p.persons || 0)
+      if ((prevMatch > 0 && o.match === 0) || (prevPersons > 0 && o.persons === 0)) {
+        regressions.push({
+          id: o.id, name: o.name,
+          prev: { match: prevMatch, persons: prevPersons, status: p.status },
+          next: { match: o.match,   persons: o.persons,   status: o.status },
+        })
+      }
+    }
+    if (regressions.length) {
+      // eslint-disable-next-line no-console
+      console.warn(`[DIAG-apply summary from=${_caller}] ⚠️ ZERO-OVERWRITE ${regressions.length} stores`, regressions)
+    }
+  } catch {}
 
   stores.value = out
 }
@@ -1579,8 +1649,19 @@ function subscribeRoomsBiz(){
       if (tsOf(v) >= tsOf(prev)) map[id] = v
     }
 
+    // [DIAG-rb] roomsBiz.value 갱신 직전 — 매핑 결과 요약
+    try {
+      const entries = Object.entries(map)
+      const summary = entries.map(([k, v]) => ({
+        id: k, rooms: v?.rooms, people: v?.people,
+        _hasInput: v?._hasInput, _manualSaved: v?._manualSaved, _hasPastedText: v?._hasPastedText,
+      }))
+      // eslint-disable-next-line no-console
+      console.log(`[DIAG-rb] roomsBiz.value SET — total=${entries.length}`, summary)
+    } catch {}
+
     roomsBiz.value = map
-    applyRoomsBiz()
+    applyRoomsBiz('rb')
 
     // 🔹 서버 스냅샷까지 한 번 이상 처리한 뒤에만
     //    실제 숫자를 노출하도록 플래그 ON
@@ -1624,9 +1705,15 @@ function subscribeVendorsSummary(){
       }
     })
 
+    // [DIAG-vendors] vendors agg 갱신 (권한 실패 시엔 발화 안 함)
+    try {
+      // eslint-disable-next-line no-console
+      console.log(`[DIAG-vendors] labelsAgg SET — names=${Object.keys(agg).length}`)
+    } catch {}
+
     labelsMap.value = vMap
     labelsAgg.value = { ...(labelsAgg.value || {}), ...agg }
-    applyRoomsBiz()
+    applyRoomsBiz('vendors')
   })
 }
 
@@ -1714,7 +1801,12 @@ function subscribeVendorStatusPerVendor(){
           updatedAt:    latestMs ? new Date(latestMs) : (cur.updatedAt || null),
         }
       }
-      applyRoomsBiz()
+      // [DIAG-vendors-status] vendor 별 status 콜백 (권한 실패 시 발화 안 함)
+      try {
+        // eslint-disable-next-line no-console
+        console.log(`[DIAG-vendors-status] ${vendorId}/${name} match=${matchRooms} persons=${personsSum} cg=${cg}`)
+      } catch {}
+      applyRoomsBiz('vendor-status')
     })
     statusUnsubs.set(vendorId, u)
   }
@@ -2019,12 +2111,22 @@ function computeStatus(s){
   const mN = normalize01(match,   mMin, mMax)
   const pN = normalize01(persons, pMin, pMax)
 
+  // [DIAG-status] computeStatus 호출 — 결과 '나쁨' 인 경우만 입력값 출력
+  //   window.__DIAG_STATUS_ALL = true 면 전부
+  const __diagInputs = { id: s?.id, name: s?.name, cat, match, persons, mMin, mMax, pMin, pMax }
+
   // ① 카테고리 기준 정규화 값 있는 경우
   if (mN != null && pN != null){
     const availability = (mN + pN) / 2
-    if (availability >= 0.60) return '좋음'
-    if (availability >= 0.30) return '보통'
-    return '나쁨'
+    const result = availability >= 0.60 ? '좋음' : (availability >= 0.30 ? '보통' : '나쁨')
+    try {
+      const all = typeof window !== 'undefined' && window.__DIAG_STATUS_ALL === true
+      if (all || result === '나쁨') {
+        // eslint-disable-next-line no-console
+        console.log(`[DIAG-status branch=① ${result}]`, { ...__diagInputs, mN, pN, availability })
+      }
+    } catch {}
+    return result
   }
 
   // ② 최대방수/최대인원 기반 비율 계산
@@ -2039,9 +2141,15 @@ function computeStatus(s){
   else if (rRooms  != null)                  availability = rRooms
   else                                       availability = 1
 
-  if (availability >= 0.60) return '좋음'
-  if (availability >= 0.30) return '보통'
-  return '나쁨'
+  const result = availability >= 0.60 ? '좋음' : (availability >= 0.30 ? '보통' : '나쁨')
+  try {
+    const all = typeof window !== 'undefined' && window.__DIAG_STATUS_ALL === true
+    if (all || result === '나쁨') {
+      // eslint-disable-next-line no-console
+      console.log(`[DIAG-status branch=② ${result}]`, { ...__diagInputs, totalRooms, maxPersons, rRooms, rPeople, availability })
+    }
+  } catch {}
+  return result
 }
 
 const wifiColor = (storeOrStatus)=>{
