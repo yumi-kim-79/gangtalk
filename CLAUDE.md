@@ -134,6 +134,57 @@ firebase deploy --only hosting:admin
 
 ## 작업 로그
 
+### 2026-06-21: [DIAG] 현황판 지표 0 덮어쓰기 추적 로그 임시 추가 (`diag/mainpage-zero-source`)
+- **목적**: PR #107 배포 후에도 새로고침 시 맞출방/필요인원이 0 으로 돌아오는 증상 잔존 → 진단(`docs/audit/2026-06-19-현황판-실시간데이터-0덮어쓰기-진단.md`) 의 시나리오 A/B/C 외 다른 0 경로가 있을 가능성. **런타임에서 실제 0 이 들어오는 경로 포착용 DIAG 로그**. 동작 변경 최소
+- **수정 — `src/pages/MainPage.vue` 만 (DIAG 로그만, 로직 변경 0)**:
+  - **(A) `applyRoomsBiz` 시그니처 `_caller` 추가**:
+    - 4개 호출처에서 caller 라벨 전달:
+      - `subscribe` (stores onSnapshot 끝) → `applyRoomsBiz('stores')`
+      - `subscribeRoomsBiz` 콜백 끝 → `applyRoomsBiz('rb')`
+      - `subscribeVendorsSummary` 콜백 끝 → `applyRoomsBiz('vendors')`
+      - `subscribeVendorStatusPerVendor.listenOne` 끝 → `applyRoomsBiz('vendor-status')`
+    - 진입 시 `[DIAG-apply from=${caller}] bases=N rb=N agg=N`
+  - **(B) `applyRoomsBiz` 내 store 별 분기 로그**:
+    - `matchSource` / `personsSource` 추적 (rb vs legacy)
+    - 콘솔 폭주 방지: 진짜 값 (legacy 양수) → 0 으로 떨어지는 경우만 `⚠️ ZERO-OVERWRITE` 출력
+    - 전체 출력 토글: `window.__DIAG_APPLY_ALL = true`
+    - 특정 store 만: `window.__DIAG_APPLY_ID = '<storeId>'`
+    - 출력 필드: id/name/byRb(rooms/people/_hasInput/_manualSaved/_hasPastedText/congestion)/rbActive/rbHasPositive/legacyMatch/legacyPersons/matchSource/personsSource/match/persons
+  - **(C) `applyRoomsBiz` summary — 진짜 값 → 0 회귀 집계**:
+    - 이전 `stores.value` 대비 새 `out` 비교 → match/persons 양수 → 0 으로 떨어진 store 들 모아 `console.warn` (눈에 띄게)
+    - 출력 필드: id/name/prev{match/persons/status}/next{match/persons/status}
+    - **이 로그가 가장 핵심** — 어느 caller 가 어느 store 의 진짜 값을 0 으로 덮었는지 한눈에
+  - **(D) 각 setter 진입 라벨**:
+    - `[DIAG-stores] baseStores SET — total=N, positive=N` (stores onSnapshot)
+    - `[DIAG-rb] roomsBiz.value SET — total=N` + 각 entry 의 rooms/people/_hasInput/_manualSaved/_hasPastedText 요약
+    - `[DIAG-vendors] labelsAgg SET — names=N` (vendors 권한 실패 시 발화 안 함)
+    - `[DIAG-vendors-status] vendorId/name match=N persons=N cg=X` (각 vendor status)
+  - **(E) `computeStatus` 결과 '나쁨' 시 입력값**:
+    - branch ①/② 별 입력값 (cat/match/persons/mMin~pMax/normalize 결과/availability)
+    - 토글: `window.__DIAG_STATUS_ALL = true` 면 전부, 기본은 '나쁨' 결과만
+- **건드리지 않음**:
+  - 로직 0 — `_hasInput` 계산식 (PR #107 유지) / `rbActive` 가드 (PR #107 유지) / `computeStatus` 본체 / vendors 구독 / firestore.rules / Functions
+  - `applyRoomsBiz` 의 분기/매핑 결과 모두 그대로. 로그만 추가
+  - 다른 페이지 / 관리자 빌드
+- **콘솔에서 보는 방법 (사용자 수동)**:
+  1. 회원 빌드 배포 후 `https://www.gangtox.com/` (현황판) 진입
+  2. F12 → Console 열고 새로고침
+  3. 로그 순서대로 읽기:
+     - `[DIAG-apply from=stores]` (1차, 진짜 값 시점)
+     - `[DIAG-rb] roomsBiz.value SET` (rooms_biz 도착)
+     - `[DIAG-apply from=rb] ⚠️ ZERO-OVERWRITE` (있다면 — 어느 store 가 0 으로?)
+     - `[DIAG-apply summary from=rb] ⚠️ ZERO-OVERWRITE N stores` (한눈에 회귀 집계)
+     - `[DIAG-status branch=① 나쁨]` 또는 `branch=②`
+  4. 특정 store 만 보고 싶으면 `window.__DIAG_APPLY_ID = '<storeId>'` 후 새로고침
+  5. 전체 store 다 보고 싶으면 `window.__DIAG_APPLY_ALL = true` 후 새로고침
+  6. status 전체: `window.__DIAG_STATUS_ALL = true`
+- **다음 단계 (사용자 결과 확인 후)**:
+  - 로그 캡처 → 어느 caller (stores/rb/vendors/vendor-status) 가 0 덮어쓰는지 확정
+  - 그 caller 의 어느 분기 (rbActive=true 인데 byRb.rooms=0? byRb=null 인데 legacy=0?) 인지 파악
+  - 진짜 수정 PR + 본 DIAG 제거 PR 분리
+- **빌드 검증**: `npm run build` ✓ (index JS 215.16→217.68KB, +2.52KB — DIAG 코드)
+- **배포 범위**: `firebase deploy --only hosting:prod` (회원 빌드만, 룰/Functions 변경 없음)
+
 ### 2026-06-21: 현황판 실시간 지표 0 덮어쓰기 race 차단 (`fix/mainpage-realtime-zero-overwrite`)
 - **목적**: 진단(`docs/audit/2026-06-19-현황판-실시간데이터-0덮어쓰기-진단.md`) — PR #71 의 `_hasInput` 보호에 구멍 발견 (`!!pastedText` 단독 신호). 진단 권장 1 + 3 동시 적용
 - **증상**: 현황판 진입 시 맞출방/필요인원/혼잡도가 진짜 값으로 잠깐 보이다가 0/0/나쁨으로 덮어써짐. 페이지 왔다갔다 반복해도 대부분 0/0/나쁨 표시
