@@ -134,6 +134,40 @@ firebase deploy --only hosting:admin
 
 ## 작업 로그
 
+### 2026-06-21: 현황판 DIAG 로그 전체 제거 (원인 규명 완료) (`chore/remove-mainpage-diag`)
+- **목적**: PR #108 로 추가한 [DIAG-*] 로그가 PR #109 (admin 일괄 저장 가드) 로 원인 규명 완료. DIAG 임무 종료 → 정리
+- **수정 — `src/pages/MainPage.vue` 만 (제거만)**:
+  - **(1) `[DIAG-stores]` baseStores 진입 로그 제거** (`:1206-1212`)
+  - **(2) `[DIAG-apply]` 진입 로그 + `_caller` 인자 제거** — `applyRoomsBiz()` 시그니처 원복, 4개 호출처에서 `'stores'/'rb'/'vendors'/'vendor-status'` 인자도 함께 제거
+  - **(3) `[DIAG-apply per-store]` 분기 로그 제거** — `matchSource` / `personsSource` 변수, `window.__DIAG_APPLY_ALL` / `__DIAG_APPLY_ID` 토글 모두 제거
+  - **(4) `[DIAG-apply summary]` ZERO-OVERWRITE 집계 제거** — `prevById` 비교 로직 통째로 제거
+  - **(5) `[DIAG-rb]` roomsBiz.value 진입 로그 제거**
+  - **(6) `[DIAG-vendors]` labelsAgg 진입 로그 제거**
+  - **(7) `[DIAG-vendors-status]` vendor 별 status 로그 제거**
+  - **(8) `[DIAG-status]` computeStatus '나쁨' 입력 로그 제거** — `__diagInputs` 변수, `window.__DIAG_STATUS_ALL` 토글 모두 제거. computeStatus 본체는 DIAG 추가 전 원본 형태로 복원 (`if (mN != null && pN != null) { ... return '좋음/보통/나쁨' }` 단순 분기)
+- **건드리지 않음 (PR #107 의 실제 수정 보존)**:
+  - **`_hasInput` 정의** (`:1539` 근처): `manualSaved || inputRooms>0 || inputPeople>0 || rooms>0 || people>0` — 그대로
+  - **`rbActive` 가드** (`:1241-1242`): `rbHasPositive = (Number(byRb?.rooms || 0) > 0) || ...` + `rbActive = !!byRb?._hasInput && (rbHasPositive || !!byRb?._manualSaved)` — 그대로 (defense in depth 유지)
+  - tier 머지의 `_manualSaved` 처리 (`:1555`)
+- **그 외 미변경**:
+  - vendors 구독 / firestore.rules / Functions / 다른 페이지 / 관리자 빌드
+- **검증**:
+  - `grep "DIAG\\|__DIAG_\\|__diagInputs\\|matchSource\\|personsSource" src/pages/MainPage.vue` → **0 hits**
+  - PR #107 가드 (rbHasPositive / rbActive) 그대로 유지 확인 (`:1241-1242`)
+- **빌드 검증**: `npm run build` ✓ (index JS **217.68→215.16KB, -2.52KB** — DIAG 코드 완전 제거, PR #107 직후 사이즈와 동일)
+  - 관리자 빌드 영향 없음
+- **배포 범위**: `firebase deploy --only hosting:prod` (회원 빌드만)
+- **DIAG 시리즈 종결**:
+  - PR #107 (`fix/mainpage-realtime-zero-overwrite`): `_hasInput` 보호 구멍 차단 + rbActive 강화
+  - PR #108 (`diag/mainpage-zero-source`): DIAG 로그 추가 → 사용자가 콘솔 확인 → "13개 모두 from=rb, _hasInput=true, rbHasPositive=false" 캡처
+  - 진단 (`docs/audit/2026-06-19-rooms_biz-입력경로-진단.md`): admin saveAllMetrics 의 빈 시드 일괄 저장이 원인 확정
+  - PR #109 (`fix/admin-bulk-metrics-guard`): dirty 추적 + 0/0 confirm 으로 사고 방지
+  - **PR #110 (본 PR)**: DIAG 정리 — 임무 종료
+- **검증 시나리오 (사용자 수동)**:
+  - [x] 현황판 진입 → 콘솔에 `[DIAG-*]` 로그 안 뜸
+  - [x] 현황판 정상 표시 — PR #107 의 보호 + PR #109 의 가드 모두 작동
+  - [x] 새로고침 반복해도 회귀 없음
+
 ### 2026-06-21: admin "일괄 저장" 빈 시드 0/0 덮어쓰기 가드 (`fix/admin-bulk-metrics-guard`)
 - **목적**: 진단(`docs/audit/2026-06-19-rooms_biz-입력경로-진단.md`) — DIAG (PR #108) 결과 13개 store 모두 `manualSaved:true + 0/0` 으로 저장된 원인 = `StoresManagePage.saveAllMetrics` 의 빈 시드 일괄 commit. 이후 사고 방지
 - **배경**: 관리자가 Tab 2 진입만 해도 `metricEdits` 가 stores 본 doc 으로 자동 시드 (대부분 0/0) → 입력 안 하고 "일괄 저장" 누르면 **모든 노출 store 13개에 0/0/manualSaved:true batch.set** → PR #107 의 `rbActive = ... || _manualSaved` 통과 → 사용자 화면 0 표시
