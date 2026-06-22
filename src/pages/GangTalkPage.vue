@@ -2691,9 +2691,9 @@ const FALLBACK_BIZ_IMG = 'https://images.unsplash.com/photo-1517248135467-4c7edc
 /* 우측 하단 화살표 (강톡 카드 전용) */
 .gc-arrow{
   position: absolute;
-  /* PR 3 (2026-06-22): 12 → 10 (카드 height 축소와 균형) */
-  right: 10px;
-  bottom: 10px;
+  /* PR 3b (2026-06-22): 92px 카드 균형 → 10 → 6 */
+  right: 6px;
+  bottom: 6px;
   z-index: 2;
   color: rgba(255,255,255,.9);
 }
@@ -2703,18 +2703,19 @@ const FALLBACK_BIZ_IMG = 'https://images.unsplash.com/photo-1517248135467-4c7edc
   position: absolute;
   inset: 0;
   z-index: 2;
-  /* PR 3 (2026-06-22): padding 12 → 10 (토큰) */
-  padding: var(--gc-card-padding, 10px);
+  /* PR 3b (2026-06-22): padding 토큰 (10 → 8) */
+  padding: var(--gc-card-padding, 8px);
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 4px;
+  /* PR 3b (2026-06-22): gap 4 → 2 (92px 카드 균형) */
+  gap: 2px;
   text-align: center;
 }
 .gc-title{
-  /* PR 3 (2026-06-22): font 18 → 16 (토큰), 카드 height 축소와 균형 */
-  font-size: var(--gc-title-size, 16px);
+  /* PR 3b (2026-06-22): font 토큰 (16 → 15), 카드 height 92 와 균형 */
+  font-size: var(--gc-title-size, 15px);
   font-weight: 900;
   letter-spacing: -0.3px;
   line-height: 1.1;
@@ -2722,7 +2723,8 @@ const FALLBACK_BIZ_IMG = 'https://images.unsplash.com/photo-1517248135467-4c7edc
 .gc-title.white{ color: #fff; text-shadow: 0 2px 6px rgba(0,0,0,.35); }
 .gc-title.pink{ color: #ff2e7e; }
 .gc-sub{
-  font-size: 12px;
+  /* PR 3b (2026-06-22): font 12 → 11 (92px 카드 안 잘리게) */
+  font-size: 11px;
   font-weight: 600;
   line-height: 1.3;
 }
@@ -2733,15 +2735,15 @@ const FALLBACK_BIZ_IMG = 'https://images.unsplash.com/photo-1517248135467-4c7edc
 .gc-soon{
   position: absolute;
   left: 50%;
-  /* PR 3 (2026-06-22): bottom 10 → 8 (카드 height 축소와 균형) */
-  bottom: 8px;
+  /* PR 3b (2026-06-22): bottom 8 → 5 + padding 4 10 → 3 8 (92px 카드 균형) */
+  bottom: 5px;
   transform: translateX(-50%);
   z-index: 2;
-  padding: 4px 10px;
+  padding: 3px 8px;
   border-radius: 999px;
   background: rgba(255,77,141,.12);
   color: #ff2e7e;
-  font-size: 11px;
+  font-size: 10.5px;
   font-weight: 800;
   white-space: nowrap;
 }
