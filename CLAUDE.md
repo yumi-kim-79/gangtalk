@@ -134,6 +134,69 @@ firebase deploy --only hosting:admin
 
 ## 작업 로그
 
+### 2026-06-22: BizSignupPage 회원 빌드(gangtox.com)로 이동 — SMS App Check 호환 (`refactor/biz-signup-to-member-build`)
+- **목적**: 진단(`docs/audit/2026-06-22-biz-signup-회원빌드-이동-진단.md`) — PR #112 의 BizSignupPage 가 admin 빌드(gangtalk815) 에 있어 `sendSmsCode`/`verifySmsCode` 의 `enforceAppCheck: true` 와 충돌해 "Unauthenticated" 발생. 회원 빌드는 App Check 정상(AuthPage SMS 가입 = 증거) → 회원 빌드로 이동
+- **파일 이동 (git mv)**:
+  - `src/pages/admin/BizSignupPage.vue` → `src/pages/BizSignupPage.vue`
+  - admin 의존성 없음 (AdminLayout/admin CSS import 0). 핵심 로직(SMS/`me.signupBiz`/stores 생성) 그대로
+- **수정 — `src/pages/BizSignupPage.vue`**:
+  - 헤더 주석 갱신 — 위치/사유/도메인 분리 정책 명시
+  - **`useRouter` import 제거** + `goLogin()` 함수 제거 (회원 빌드에 admin 라우트 없음)
+  - **`ADMIN_LOGIN_URL = 'https://gangtalk815.com/biz/login'` 상수** 신규 (도메인 분리 정책)
+  - **`<a href="/biz/login">` 2건 → 외부 도메인 링크**:
+    - 성공 패널 버튼: `<a :href="ADMIN_LOGIN_URL" class="biz-btn biz-btn-primary">gangtalk815.com 로그인 페이지로 이동 →</a>`
+    - 하단 풋: `<a :href="ADMIN_LOGIN_URL">gangtalk815.com 로그인</a>`
+  - **성공 패널 안내 강화**:
+    - "업체 관리 / 로그인은 **gangtalk815.com** 에서 진행됩니다." (점선 박스, 핑크 강조)
+  - **가입 성공 후 자동 `me.signOut()`** (runCreateStore 성공 분기 끝):
+    - 회원 빌드(gangtox.com)에 업체(type=company) 세션을 남기지 않음 — 도메인 분리 정책
+    - Auth 는 도메인별 indexedDB 분리이므로 사용자가 admin 도메인에서 다시 로그인 필요
+    - 실패 시 무시 (`try { await me.signOut() } catch {}`)
+  - **CSS**:
+    - `.biz-success-panel a.biz-btn` — anchor 도 button 스타일 동일 (display:inline-flex 등)
+    - `.biz-success-domain-note` — 작은 dashed 박스 + gangtalk815.com 핑크 강조
+- **수정 — `src/router/index.js` (회원 빌드)**:
+  - `import BizSignupPage from '@/pages/BizSignupPage.vue'` (정적 import, AuthPage 패턴)
+  - 라우트 추가: `{ path: '/biz-signup', name: 'bizSignup', component: BizSignupPage }`
+  - **`publicForGuests = new Set(['auth', 'support', 'bizSignup'])`** — 비로그인 진입 허용
+- **수정 — `src/App.vue`**:
+  - `hideTopBar` computed 에 `'bizSignup'` + `/biz-signup` 추가 — 자체 brand header 있으니 TopBar 숨김 (AuthPage 와 같은 패턴)
+- **수정 — `src/router/admin.js` (admin 빌드 정리)**:
+  - `BizSignup` lazy import 제거 (주석으로 사유 명시)
+  - `/biz/signup` 라우트 제거 (admin 빌드에서는 fallback `/:pathMatch(.*)*` 로 `/` redirect)
+  - `beforeEach` 가드의 `|| to.name === 'bizSignup'` 제거
+- **수정 — `src/pages/admin/BizLoginPage.vue`**:
+  - `<router-link :to="{ name: 'bizSignup' }">` → `<a href="https://www.gangtox.com/biz-signup">업체 회원가입</a>` (외부 도메인 링크)
+  - 사유 주석 추가
+- **건드리지 않음**:
+  - 여성회원 로그인/가입 (`AuthPage.vue` / `_fbSignupUser`) — 100% 그대로
+  - `firestore.rules` / `storage.rules` / Cloud Functions (`sendSmsCode`/`verifySmsCode` 의 `enforceAppCheck: true` 유지)
+  - SMS 호출 / `me.signupBiz` / `_fbSignupBiz` / stores 생성 로직 — 그대로 이동만
+  - BizMyStorePage / BizAccountsPage / StoresManagePage / 기존 (A)(B) 흐름 (PR e 에서 처리 예정)
+  - 회원 빌드의 다른 라우트 / 가드 분기
+  - admin 빌드의 다른 페이지 / 기능
+- **흐름 (수정 후)**:
+  - **사용자**: `https://www.gangtox.com/biz-signup` 직접 접근 (비로그인) → 전화/이메일/비번 + SMS 인증 (회원 빌드 App Check 통과) → 업소 정보 → 제출
+  - **제출**: `me.signupBiz` → `_fbSignupBiz` (Auth + users(type=company) + counters) → `setDoc(stores/{newId}, ownerId:본인 uid, applyStatus:'pending')`
+  - **성공**: `me.signOut()` 자동 호출 → 회원 사이트에 업체 세션 남지 않음
+  - **안내**: "관리는 gangtalk815.com 에서" + "로그인 페이지로 이동 →" 버튼 (외부 도메인)
+  - **그 후**: 사용자가 gangtalk815.com/biz/login 에서 가입한 계정으로 다시 로그인 → BizMyStorePage 등 사용
+  - **승인**: 관리자(`/admin/stores` 승인대기 탭) 가 승인 → 사용자 현황판 노출
+- **빌드 검증**: `npm run build` ✓ / `npm run build:admin` ✓
+- **배포 범위**: `firebase deploy --only hosting:prod,hosting:admin` (양쪽 모두 — 회원에 페이지 추가 + admin 에서 페이지 제거, 룰/Functions 변경 없음)
+- **검증 시나리오 (사용자 수동)**:
+  - [ ] `www.gangtox.com/biz-signup` 비로그인 접근 가능
+  - [ ] 전화 → "인증번호 발송" → 실제 문자 수신 → 코드 확인 → "인증 완료" (회원 빌드 App Check 통과, "Unauthenticated" 안 뜸)
+  - [ ] 업소+계정 입력 → "회원가입 + 업소 등록 신청" → Firebase Console 에 Auth + users(type=company) + stores(pending) 자동 생성
+  - [ ] 가입 직후 회원 빌드 me.auth 비로그인 상태 (자동 signOut 확인)
+  - [ ] 성공 패널에 "gangtalk815.com 로그인" 외부 링크 노출 → 클릭 시 admin 도메인 이동
+  - [ ] gangtalk815.com/biz/login 에서 가입 이메일/비번으로 로그인 → BizMyStorePage 정상 진입
+  - [ ] pending 이라 gangtox.com 현황판 미노출
+  - [ ] 관리자 승인 → 현황판 자동 노출
+  - [ ] gangtalk815.com/biz/signup 직접 접근 시 fallback 으로 `/` redirect (admin 라우트 제거됨)
+  - [ ] 여성회원 가입/로그인 회귀 없음
+  - [ ] admin 빌드의 다른 페이지 회귀 없음
+
 ### 2026-06-22: 업체 자가 회원가입 페이지 신규 — gangtalk815/biz/signup (`feat/biz-self-signup`)
 - **목적**: 진단(`docs/audit/2026-06-22-C통일-제거및구현-진단.md` PR b) — gangtalk815.com 에 업체가 직접 계정 + 업소 정보를 한번에 등록할 수 있는 공개 라우트 신설. 룰 / Cloud Functions / BizMyStorePage / (A)(B) 기존 흐름 변경 0
 - **신규 파일 — `src/pages/admin/BizSignupPage.vue` (~580 lines)**:

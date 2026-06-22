@@ -51,7 +51,8 @@
 
       <p class="adm-login-signup">
         업체 계정이 없으신가요?
-        <router-link :to="{ name: 'bizSignup' }">업체 회원가입</router-link>
+        <!-- 회원가입은 회원 빌드(gangtox.com) 에서 처리 (SMS App Check 호환). -->
+        <a href="https://www.gangtox.com/biz-signup">업체 회원가입</a>
       </p>
 
       <p class="adm-login-foot">© 강남톡방</p>

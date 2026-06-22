@@ -1,7 +1,13 @@
 <!--
-  src/pages/admin/BizSignupPage.vue
-  업체 자가 회원가입 (gangtalk815.com/biz/signup) — 공개 라우트, 로그인 불필요.
-  진단: docs/audit/2026-06-22-C통일-제거및구현-진단.md (PR b)
+  src/pages/BizSignupPage.vue
+  업체 자가 회원가입 — 회원 빌드(gangtox.com/biz-signup), 공개 라우트, 로그인 불필요.
+  진단: docs/audit/2026-06-22-biz-signup-회원빌드-이동-진단.md
+
+  왜 회원 빌드?
+    - sendSmsCode/verifySmsCode 는 enforceAppCheck: true 강제
+    - admin 빌드(gangtalk815) 는 App Check 초기화 스킵 (firebase.js:115) → unauthenticated
+    - 회원 빌드는 reCAPTCHA Enterprise 정상 → SMS 통과 (AuthPage 가 증거)
+    → BizSignupPage 만 회원 빌드로 이동. 업체 관리/로그인은 gangtalk815.com 유지
 
   흐름:
     1. 이메일/비밀번호/전화 입력
@@ -9,20 +15,23 @@
     3. 업소 정보 입력 (출근업소 9 카테고리 / 지역 4 / 시급 등 — 이미지 제외)
     4. 제출:
        a. SMS 인증 완료 확인
-       b. me.signupBiz() 호출 → _fbSignupBiz (store/user.js:548) → Auth + users(type=company) + counters
+       b. me.signupBiz() → _fbSignupBiz (store/user.js:1092) → Auth + users(type=company) + counters
        c. setDoc(stores/{newId}, { ...form, ownerId: 본인 uid, applyStatus:'pending', approved:false })
           - firestore.rules:111 `ownerId == auth.uid` 통과
-       d. "관리자 승인 대기" 안내 + /biz/login 으로 이동
+       d. 성공 → me.signOut() (회원 빌드에 업체 세션 남기지 않음 — 도메인 분리 정책) →
+          안내 패널 + "gangtalk815.com 로그인" 버튼 (외부 도메인 이동)
     5. 부분 실패: 계정 생성됐는데 stores 실패 → 재시도 버튼 (고아 stores 방지)
 
   보안:
     - pending → MainPage.isApproved 자동 미노출 (회원 화면 차단)
     - SMS 인증 통과 전엔 제출 비활성 (봇/스팸 방어)
+    - 가입 후 자동 signOut → 회원 사이트(여성회원 영역) 에 업체 계정 머물지 않음
 
   하지 않음:
     - 이미지 업로드 (storage.rules 의 isStoreOwner 가 stores doc 존재 확인 — 승인 후 가능)
     - 룰 / Cloud Functions 변경
     - BizMyStorePage / BizAccountsPage / 기존 (A)(B) 흐름 건드림
+    - 여성회원 로그인/가입 로직 건드림
 -->
 <template>
   <main class="biz-signup-shell">
@@ -273,15 +282,18 @@
         <h3>✅ 등록 신청 완료</h3>
         <p>관리자 승인 후 강남톡방 현황판에 노출됩니다.</p>
         <p>승인 전에도 <strong>업체 정보 수정</strong> 화면에서 정보 변경이 가능합니다.</p>
-        <button
-          type="button"
+        <p class="biz-success-domain-note">
+          업체 관리 / 로그인은 <strong>gangtalk815.com</strong> 에서 진행됩니다.
+        </p>
+        <a
           class="biz-btn biz-btn-primary"
-          @click="goLogin"
-        >로그인 페이지로 이동</button>
+          :href="ADMIN_LOGIN_URL"
+        >gangtalk815.com 로그인 페이지로 이동 →</a>
       </div>
 
       <p class="biz-signup-foot">
-        이미 계정이 있나요? <a href="/biz/login">로그인</a>
+        이미 계정이 있나요?
+        <a :href="ADMIN_LOGIN_URL">gangtalk815.com 로그인</a>
       </p>
     </section>
   </main>
@@ -289,7 +301,6 @@
 
 <script setup>
 import { ref, reactive, computed } from 'vue'
-import { useRouter } from 'vue-router'
 import { getAuth } from 'firebase/auth'
 import {
   collection, doc, setDoc, serverTimestamp,
@@ -298,7 +309,9 @@ import { getFunctions, httpsCallable } from 'firebase/functions'
 import { db as fbDb } from '@/firebase'
 import { me } from '@/store/user'
 
-const router = useRouter()
+// 회원 빌드(gangtox.com) 에서 가입 후 안내할 admin 도메인 로그인 URL.
+// 도메인 분리 정책: 가입은 공개 도메인(gangtox), 운영/로그인은 분리 도메인(gangtalk815).
+const ADMIN_LOGIN_URL = 'https://gangtalk815.com/biz/login'
 
 /* ===== 카테고리 / 지역 / 시급 옵션 — 출근업소 9키 (BizMyStorePage 와 동일) ===== */
 const categoryOptions = [
@@ -531,6 +544,11 @@ async function runCreateStore(uid, email) {
     submitting.value = false
     retryStoreCreate.value = null
     successPanel.value = true
+
+    // 회원 빌드(gangtox.com) 에 업체(type=company) 세션을 남기지 않음.
+    // 도메인 분리 정책: 운영/로그인은 gangtalk815.com 에서.
+    // Auth 가 도메인별 indexedDB 라 사용자는 어차피 admin 도메인에서 재로그인 필요.
+    try { await me.signOut() } catch {}
   } catch (e) {
     submitting.value = false
     // 부분 실패 — Auth+users 는 살아있고 stores 만 실패
@@ -549,10 +567,6 @@ async function onRetryStoreCreate() {
   errorMsg.value = ''
   const { uid, email } = retryStoreCreate.value
   await runCreateStore(uid, email)
-}
-
-function goLogin() {
-  router.replace({ name: 'bizLogin' }).catch(() => {})
 }
 </script>
 
@@ -700,7 +714,18 @@ function goLogin() {
 .biz-success-panel p{
   margin:4px 0; font-size:13px; color:#444;
 }
-.biz-success-panel button{ margin-top:12px; width:100%; }
+.biz-success-panel button,
+.biz-success-panel a.biz-btn{
+  margin-top:12px; width:100%;
+  display:inline-flex; align-items:center; justify-content:center;
+  text-decoration:none;
+}
+.biz-success-domain-note{
+  margin-top:10px !important; padding:8px 10px;
+  background:#fff; border:1px dashed #ffd6e4; border-radius:8px;
+  font-size:12px !important; color:#666 !important;
+}
+.biz-success-domain-note strong{ color:#ff2e7e; }
 
 .biz-signup-foot{
   text-align:center; font-size:13px; color:#666;
