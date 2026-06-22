@@ -134,6 +134,59 @@ firebase deploy --only hosting:admin
 
 ## 작업 로그
 
+### 2026-06-22: 업체 자가 회원가입 페이지 신규 — gangtalk815/biz/signup (`feat/biz-self-signup`)
+- **목적**: 진단(`docs/audit/2026-06-22-C통일-제거및구현-진단.md` PR b) — gangtalk815.com 에 업체가 직접 계정 + 업소 정보를 한번에 등록할 수 있는 공개 라우트 신설. 룰 / Cloud Functions / BizMyStorePage / (A)(B) 기존 흐름 변경 0
+- **신규 파일 — `src/pages/admin/BizSignupPage.vue` (~580 lines)**:
+  - **공개 라우트** (로그인 불필요) `/biz/signup`
+  - **계정 정보**: 이메일 / 비밀번호 / 휴대폰 + SMS 인증
+  - **SMS 인증** — AuthPage.vue 패턴 그대로 재활용:
+    - `httpsCallable(fns, 'sendSmsCode')` / `httpsCallable(fns, 'verifySmsCode')`
+    - 에러 매핑: `functions/resource-exhausted` → 잔액 부족 안내, `no_request` / `expired` / `mismatch` 분기
+    - 인증 통과(`smsVerified=true`) 전엔 제출 비활성 (봇/스팸 방어)
+  - **업소 정보**: 가게명 / 매장 전화 / **카테고리 (출근업소 9키 hopper/point5/ten/tenpro/onep/nrb/kara/bar/etc)** / 지역 (강남/비강남/경기/인천) / 한줄 소개 / 상세 소개 / 주소 / 영업시간 / 휴무일 / **시급 (number, +/- 입력)** / 시급 유형 (시급/일급/월급/기타) — 칩 버튼 그룹 (BizMyStorePage 패턴 재사용)
+  - **이미지 업로드 제외** — `storage.rules` 의 `isStoreOwner(storeId)` 가 `firestore.exists(stores/{storeId})` 요구. 가입 시점에는 stores doc 미존재 → 업로드 불가. 승인 후 BizMyStorePage 에서 등록 (PR #93 패턴)
+  - **제출 흐름** (2단계 분리, 부분 실패 방어):
+    1. `me.signupBiz({ email, password, nick: storeName, phone, storeName, businessNo:'', address, accountKind:'storeOwner' })` → `_fbSignupBiz` (store/user.js:1092) → Auth `createUserWithEmailAndPassword` + `users/{uid}` (type:'company', accountKind:'storeOwner', company.name=storeName) + counters userSeq +1 + me.auth 갱신
+    2. `setDoc(doc(collection(fbDb, 'stores')).id, { ...업소폼, ownerId: 본인 uid, ownerEmail, applyStatus:'pending', approved:false, 'exposure.gangtalk':false, thumb:'', createdAt/updatedAt })` — **firestore.rules:111 `ownerId == request.auth.uid` 통과**
+  - **에러 매핑** (signupBiz):
+    - `email-already-in-use` → "이미 가입된 이메일입니다. 로그인 페이지에서 로그인해 주세요."
+    - `weak-password` / `invalid-email` → 한글 안내
+  - **부분 실패 처리** (1단계 성공 + 2단계 실패):
+    - `retryStoreCreate = { uid, email, message }` 상태로 보존
+    - "다시 시도" 버튼 + "잠시 후 로그인하여 업체 정보 수정 화면에서 등록해 주세요" 안내
+    - 고아 계정 (Auth+users 만 있고 stores 없음) 방지
+  - **성공 패널**:
+    - "회원가입이 완료되었습니다 / 관리자 승인 대기 중 (사용자 현황판은 승인 후 노출) / 정보 수정은 로그인 후 가능"
+    - "로그인 페이지로 이동" 버튼 → `/biz/login`
+- **수정 — `src/router/admin.js`**:
+  - `BizSignup` lazy import 추가 (`@/pages/admin/BizSignupPage.vue`)
+  - `{ path: '/biz/signup', name: 'bizSignup', component: BizSignup }` 공개 라우트 추가 (meta 없음)
+  - `beforeEach` 가드: `if (to.name === 'bizLogin' || to.name === 'adminLogin' || to.name === 'bizSignup') return true` — 인증 상태와 무관 통과
+- **수정 — `src/pages/admin/BizLoginPage.vue`**:
+  - 폼 하단에 `<router-link :to="{ name: 'bizSignup' }">업체 회원가입</router-link>` 추가 (자가 가입 진입점 노출)
+  - `.adm-login-signup` 스타일 추가 (핑크 링크)
+- **건드리지 않음**:
+  - `firestore.rules` / `storage.rules` / Cloud Functions (`sendSmsCode/verifySmsCode/createBizAccount` 등) — 모두 기존 그대로
+  - `BizMyStorePage.vue` (자가 등록 모드 그대로 — 로그인된 업체용)
+  - `BizAccountsPage.vue` / `StoresManagePage.vue` (관리자 등록 모드 그대로)
+  - 회원 사이트 / `useMyPageCore` / 다른 admin 페이지
+  - (A) BizMyStorePage 자가 / (B) StoresManagePage 관리자 직접 등록 — 두 경로 모두 유지 (PR e 에서 제거 예정)
+- **승인/노출 파이프라인 — 변경 없음, 기존 그대로 작동**:
+  - `applyStatus:'pending'` + `approved:false` → `MainPage.isApproved` (`:1812-1846`) 자동 미노출
+  - 관리자 `/admin/stores` 승인대기 탭 (Tab 3, `:237-239`) 에 자동 표시
+  - 승인 (`approveStore:531-543`) → `approved:true, applyStatus:'approved', exposure.gangtalk:true` → 사용자 현황판 자동 노출
+- **빌드 검증**: `npm run build:admin` ✓ / `npm run build` ✓ (회원 영향 없음)
+- **배포 범위**: `firebase deploy --only hosting:admin` (관리자 빌드만, 룰/Functions/회원 변경 없음)
+- **검증 시나리오 (사용자 수동)**:
+  - [ ] `/biz/signup` 로그인 없이 접근 가능
+  - [ ] 이메일/비번/전화 입력 → "인증번호 발송" → 코드 입력 → "확인" → 인증 완료
+  - [ ] 업소 정보 입력 + 제출 → Auth + users(type=company) + stores(pending) 자동 생성 (Firebase Console 확인)
+  - [ ] `/admin/stores` 승인대기 탭에 자동 표시
+  - [ ] 사용자 현황판 (`gangtox.com`) 에 미노출 (승인 전)
+  - [ ] 관리자 승인 → `exposure.gangtalk:true` → 사용자 현황판 노출
+  - [ ] 이메일 중복 가입 → "이미 가입된 이메일" 한글 안내
+  - [ ] stores 생성 실패 (네트워크 강제 차단 등) → "다시 시도" 버튼 노출 → 누르면 성공
+
 ### 2026-06-22: 관리자 새 업소 등록 모달 — 계정 생성 + 연결 통합 (`feat/admin-store-register-with-account`)
 - **목적**: 진단(`docs/audit/2026-06-22-관리자-업소등록-계정생성-연결-진단.md`) — 관리자가 출근업소(stores) 직접 등록 + 업체 계정 생성/연결을 한 모달에서 처리. createBizAccount + linkStoreToBiz 재활용. 룰/Cloud Function 변경 0
 - **수정 — `src/pages/admin/StoresManagePage.vue` 만**:
