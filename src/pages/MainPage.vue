@@ -2469,10 +2469,11 @@ onUnmounted(() => {
   display:flex;
   align-items:center;
   gap:10px;
-  padding:12px 16px;
+  /* PR 1b (2026-06-22): padding 12 16 → 8 14, margin 0 0 14 → 0 0 8 */
+  padding: var(--hot-card-padding, 8px 14px);
   background:var(--surface, #fff);
   border-radius:14px;
-  margin:0 0 14px;
+  margin: var(--hot-card-margin, 0 0 8px);
   box-shadow:0 2px 10px rgba(0,0,0,.04);
   cursor:pointer;
 }
@@ -2504,7 +2505,8 @@ onUnmounted(() => {
 
 /* ===== Category Tabs ===== */
 .mp-cat{
-  padding:4px 0 12px;
+  /* PR 1b (2026-06-22): padding 4 0 12 → 2 0 6 컴팩트 */
+  padding:2px 0 6px;
   position:relative;
 }
 /* 5열 × 2줄 격자 (이전 가로 스크롤 → 한눈에 보기).
@@ -2551,7 +2553,8 @@ onUnmounted(() => {
   box-shadow:0 4px 12px rgba(255,77,141,.3);
 }
 .mp-cat-label{
-  font-size:11px;
+  /* PR 1b (2026-06-22): font 11 → 10.5 (토큰) */
+  font-size: var(--cat-label-size, 10.5px);
   font-weight:600;
   color:var(--muted, #999);
   white-space:nowrap;
@@ -2570,13 +2573,15 @@ onUnmounted(() => {
 
 /* ===== 강남 인기 업소 섹션 ===== */
 .mp-section{
-  padding:8px 4px 16px;
+  /* PR 1b (2026-06-22): padding 8 4 16 → 4 4 16 — 위쪽만 축소 */
+  padding: var(--section-top-pad, 4px) 4px 16px;
 }
 .mp-section-head{
   display:flex;
   align-items:center;
   justify-content:space-between;
-  margin-bottom:14px;
+  /* PR 1b (2026-06-22): margin-bottom 14 → 10 (토큰) */
+  margin-bottom: var(--section-head-mb, 10px);
   padding:0 2px;
 }
 .mp-section-title{
