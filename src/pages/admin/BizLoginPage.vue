@@ -49,6 +49,11 @@
         <p v-if="errorMsg" class="adm-login-error">{{ errorMsg }}</p>
       </form>
 
+      <p class="adm-login-signup">
+        업체 계정이 없으신가요?
+        <router-link :to="{ name: 'bizSignup' }">업체 회원가입</router-link>
+      </p>
+
       <p class="adm-login-foot">© 강남톡방</p>
     </section>
   </main>
@@ -223,6 +228,14 @@ async function onLogin() {
   font-size:12px;
   text-align:center;
 }
+.adm-login-signup{
+  margin:18px 0 0; text-align:center;
+  font-size:13px; color:#666;
+}
+.adm-login-signup a{
+  color:#ff2e7e; font-weight:700; text-decoration:none; margin-left:6px;
+}
+.adm-login-signup a:hover{ text-decoration:underline; }
 .adm-login-foot{
   margin:20px 0 0; text-align:center;
   font-size:11px; color:#bbb;

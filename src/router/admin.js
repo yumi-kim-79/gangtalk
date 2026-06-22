@@ -35,6 +35,7 @@ const InboxPage        = () => import('@/pages/admin/InboxPage.vue')
 const BizAccountsPage  = () => import('@/pages/admin/BizAccountsPage.vue')
 
 const BizLogin         = () => import('@/pages/admin/BizLoginPage.vue')
+const BizSignup        = () => import('@/pages/admin/BizSignupPage.vue')
 const BizDashboard     = () => import('@/pages/admin/BizDashboardPage.vue')
 const BizMetrics       = () => import('@/pages/admin/BizMetricsPage.vue')
 const BizMyStore       = () => import('@/pages/admin/BizMyStorePage.vue')
@@ -46,6 +47,9 @@ const routes = [
   // 통합 로그인. /login 은 호환용 redirect.
   { path: '/biz/login', name: 'bizLogin', component: BizLogin },
   { path: '/login',     name: 'adminLogin', redirect: { name: 'bizLogin' } },
+
+  // 업체 자가 회원가입 — 공개 라우트 (로그인 불필요)
+  { path: '/biz/signup', name: 'bizSignup', component: BizSignup },
 
   // /admin/* — 플랫폼 관리자 전용
   {
@@ -94,8 +98,8 @@ const router = createRouter({
 })
 
 router.beforeEach(async (to) => {
-  // 로그인 페이지는 무조건 통과 (auth 상태와 무관)
-  if (to.name === 'bizLogin' || to.name === 'adminLogin') return true
+  // 로그인 / 자가 회원가입 페이지는 무조건 통과 (auth 상태와 무관)
+  if (to.name === 'bizLogin' || to.name === 'adminLogin' || to.name === 'bizSignup') return true
 
   // 인증 상태 확정 대기 (토큰 갱신 race 시 lastKnownUser 로 폴백)
   const user = await authReady()
