@@ -134,6 +134,72 @@ firebase deploy --only hosting:admin
 
 ## 작업 로그
 
+### 2026-06-22: 관리자 승인 화면 확장 — 검토 모달 (저장만/저장+승인/거절) (`feat/admin-review-approve-form`)
+- **목적**: 진단(`docs/audit/2026-06-22-관리자-승인화면-수정승인-진단.md` PR d) — 업체가 `/biz-signup` (PR #113) 으로 제출한 pending 업소를 관리자가 "검토" 클릭 시 입력 11 필드를 폼으로 보여주고, 수정 후 저장만/저장+승인/거절(사유) 처리. 룰/Cloud Function 변경 0
+- **이전 갭**: pending 카드 (`StoresManagePage.vue:159-178`) 가 4 필드(name/region/category/ownerEmail/createdAt) 만 표시, 클릭 핸들러 없음, 액션 3 버튼(승인/거절/삭제) 만. 사용자 입력 7 필드(phone/desc/detailDesc/address/hours/closed/wage/wageType) 확인 불가
+- **수정 — `src/pages/admin/StoresManagePage.vue` 단일 파일**:
+  - **Tab 3 카드 액션 그룹에 "검토" 버튼 추가** (`primary`) — 기존 승인/거절/삭제 버튼은 `ghost`/`danger` 로 격하 (검토가 1차 기본)
+  - **신규 검토 모달** (`adm-modal-wide` 720px, 기존 패턴 재사용):
+    - **상단 신청자 정보** (읽기 전용):
+      - 이메일 (stores.ownerEmail, 폴백 users.profile.email)
+      - 휴대폰 (users.profile.phone — SMS 인증한 번호. `openReview` 시 `getDoc(users/{ownerId})` 1회 추가 조회)
+      - 신청일 (stores.createdAt, `fmtTime` 헬퍼 재사용)
+    - **업소 정보 폼 11 필드** (수정 가능, BizSignupPage 와 동일 구성):
+      - name / phone / category(칩 9) / region(칩 4) / desc / detailDesc(textarea) / address / hours / closed / wageType(칩 4) / wage(금액)
+      - 옵션 상수 (`storeCategoryOptions` / `storeRegionOptions` / `storeWageTypeOptions`) 기존 것 재사용
+      - 인라인 마크업 (PR #111 패턴, 컴포넌트 분리 안 함 — 회귀 위험 차단)
+    - **이미지 안내** (`.adm-review-image-note` 핑크 dashed 박스): "📷 대표 이미지는 승인 후 업체가 직접 업로드합니다 (BizMyStore). 관리자 검토 단계에서는 이미지를 수정하지 않습니다." — 폼에서 제외 (정책 유지)
+    - **거절 사유 textarea** (선택, 거절 시 함께 저장)
+    - **결과 메시지** (`.adm-result-error` 빨강 / `.adm-result-success` 초록)
+  - **푸터 4 버튼**:
+    1. **취소** (`ghost`) — 닫기, 변경 0
+    2. **거절** (`danger`) — `onReviewReject`. 폼 변경사항 + `rejectedReason` + `applyStatus:'rejected'` 한 트랜잭션 저장. stores/users/Auth 보존 (삭제 아님)
+    3. **저장만 (pending 유지)** (`adm-btn` 기본) — `onReviewSaveOnly`. 11 필드만 update. applyStatus 'pending' 유지 → 나중에 다시 검토 가능
+    4. **저장 + 승인** (`primary`) — `onReviewSaveAndApprove`. 11 필드 + `approved:true, applyStatus:'approved', exposure.gangtalk:true, approvedAt, updatedAt` 한 트랜잭션 update. 진단 §3-4 의 한 업데이트 패턴
+  - **스크립트**:
+    - `review = reactive({ open, busy, storeId, applicant{email,phone,createdAt}, form{11필드}, rejectReason, errorMsg, successMsg })`
+    - `reviewWageDisplay` computed + `onReviewWageInput` (BizSignupPage 동일 패턴)
+    - `openReview(s)` — 폼 11 필드 채우기 + 신청자 정보 (stores + users 1회 추가 조회, users 실패해도 모달 자체는 열림)
+    - `closeReview()` — busy 중 차단
+    - `buildReviewFormPayload()` — **소유자/상태/노출 필드 제외 11 필드만 추출 (이중 안전)**. `ownerId` / `ownerEmail` / `applyStatus` / `approved` / `exposure.*` 누락 보장
+    - 3 핸들러 모두 try/catch + busy 가드 + 가게명 비면 errorMsg
+    - 승인/거절 후 800ms 뒤 모달 자동 닫기 (UX — pending 에서 사라지므로)
+  - **CSS** 신규:
+    - `.adm-review-applicant` — 회색 박스 (신청자 정보)
+    - `.adm-review-row` + `.adm-review-label` (110px) + `.adm-review-value`
+    - `.adm-review-image-note` — 핑크 dashed 안내 박스
+    - `.adm-review-foot` — flex-wrap 으로 4 버튼 줄바꿈 허용
+    - `.adm-result-error` / `.adm-result-success`
+    - 모바일 (≤560px): row 세로 stack, 버튼 flex:1 (4 버튼 균등)
+    - 다크모드 보정 6 셀렉터
+- **건드리지 않음**:
+  - `firestore.rules` / `storage.rules` / Cloud Functions (`approveStore`/`rejectStore` 의 핵심 update 와 정합한 직접 updateDoc — 함수 재호출 안 함, form 통합 차이)
+  - `approveStore` / `rejectStore` / `deleteStore` 함수 본체 — 기존 버튼 그대로 작동 (검토 모달은 추가 경로)
+  - BizSignupPage / BizMyStorePage (이미지 업로드 정책 유지 — 승인 후 업체가 직접)
+  - partners (제휴처) / 회원 빌드 / 다른 admin 페이지
+  - Tab 1 노출 관리 / Tab 2 수동 지표 / 새 업소 등록 모달 (createStore)
+- **흐름 (수정 후)**:
+  - 관리자 → `/admin/stores` Tab 3 (승인 대기) → pending 카드 "검토" 클릭 → 모달 오픈
+  - 신청자 정보 확인 (이메일/SMS 인증 휴대폰/신청일) + 11 필드 검토 + 필요 시 수정
+  - **저장만**: 수정 반영 + pending 유지 → 사용자 화면 미노출 → 같은 카드 다시 검토 가능
+  - **저장 + 승인**: 수정 + 승인 + 노출 한 번에 → gangtox.com 현황판 자동 등장
+  - **거절**: 사유 함께 저장 → 카드 Tab 3 에서 사라짐 + stores/users/Auth 보존 → 재신청 가능 (업체가 BizMyStore 에서 수정 후 다시 pending — 별도 PR 필요)
+- **신규 Firestore 필드**: `stores/{id}.rejectedReason` (string) — 거절 시만 set. 사용자 측 표시 (BizMyStorePage 안내) 는 별도 PR
+- **빌드 검증**: `npm run build:admin` ✓ (StoresManagePage JS 32.80→41.66KB, +8.86KB)
+- **배포 범위**: `firebase deploy --only hosting:admin` (관리자 빌드만, 룰/Functions/회원 변경 없음)
+- **검증 시나리오 (사용자 수동)**:
+  - [ ] /admin/stores Tab 3 → pending 카드에 "검토" 버튼 보임 (primary)
+  - [ ] 클릭 → 모달 오픈 → 신청자 정보 (이메일/휴대폰/신청일) 표시
+  - [ ] 업소 11 필드 모두 입력값 채워진 상태 + 수정 가능 (칩/input/textarea)
+  - [ ] "저장만" → stores 수정 반영, pending 유지 (현황판 미노출, Tab 3 에 그대로)
+  - [ ] "저장 + 승인" → 수정 + 승인 동시, Tab 3 에서 사라지고 Tab 1 노출 관리에 등장, gangtox.com 현황판 노출
+  - [ ] "거절" + 사유 입력 → applyStatus 'rejected', rejectedReason 저장, Tab 3 에서 사라짐
+  - [ ] 사유 미입력 거절 → confirm 분기 메시지 다름
+  - [ ] 이미지 폼 없음, 안내만 (정책 유지)
+  - [ ] 기존 승인/거절/삭제 버튼 회귀 없음
+  - [ ] Tab 1 노출 관리 / Tab 2 수동 지표 회귀 없음
+  - [ ] BizSignupPage / BizMyStore 회귀 없음
+
 ### 2026-06-22: AuthPage 에 "업체 회원가입" 진입 링크 추가 (`feat/gangtox-biz-signup-button`)
 - **목적**: 진단(`docs/audit/2026-06-22-C통일-제거및구현-진단.md` PR c) — gangtox.com 로그인/회원가입 화면에 업체 자가가입(`/biz-signup`, PR #113) 진입점 노출. 같은 회원 빌드의 내부 라우트 이동
 - **수정 — `src/pages/AuthPage.vue` 만**:
