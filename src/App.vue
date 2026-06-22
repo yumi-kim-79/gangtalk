@@ -63,9 +63,10 @@ onMounted(async () => {
  *   AppHeader.vue 가 이 토큰을 그대로 사용하므로, 모든 페이지의 헤더+검색 영역
  *   총 높이가 동일하게 잠긴다. 값을 바꾸려면 여기서만 수정. */
 :root{
-  --app-header-height: 64px;   /* 헤더 영역 최소 높이 (로고+타이틀+버튼 한 줄) */
-  --app-search-height: 48px;   /* 검색창 박스 높이 */
-  --app-header-total:  130px;  /* 헤더 + 검색창 + 위·아래 패딩 합계 */
+  /* ===== 헤더/검색 (PR 1b 컴팩트 적용 — 64/48/130 → 56/42/114) ===== */
+  --app-header-height: 56px;   /* 헤더 영역 최소 높이 (64 → 56) */
+  --app-search-height: 42px;   /* 검색창 박스 높이 (48 → 42) */
+  --app-header-total:  114px;  /* 헤더 + 검색창 + 위·아래 패딩 합계 (130 → 114) */
   --page-h-pad:        16px;   /* 모든 페이지의 좌우 패딩 단일 토큰 — .page 가 책임 */
 
   /* ===== 모바일 컴팩트 토큰 (PR 1: 비율 유지 축소) =====
@@ -74,8 +75,19 @@ onMounted(async () => {
    *   마케팅 자료 비율 12/5 (2.4:1) 표준화. 변경 시 본 토큰만 수정. */
   --banner-aspect:     12 / 5;       /* StoreFinder/PartnersPage 광고 배너 */
   --gt-slider-aspect:  12 / 5;       /* 강톡 상단 슬라이더 (배너와 시각 일관) */
-  --cat-icon-size:     44px;          /* 카테고리 원형 아이콘 (3 페이지 공통, 48→44) */
-  --cat-grid-gap:      8px 6px;       /* 카테고리 5x2 그리드 간격 (12 8 → 8 6) */
+
+  /* ===== 카테고리 (PR 1b 추가 축소 — 44/8 6 → 40/6 4) =====
+   *   원형 40px = 터치 영역 최소 (WCAG 권장 40~44px). 그 아래로 안 감. */
+  --cat-icon-size:     40px;          /* 카테고리 원형 아이콘 (44 → 40, 터치 최소선) */
+  --cat-grid-gap:      6px 4px;       /* 카테고리 5x2 그리드 간격 (8 6 → 6 4) */
+  --cat-label-size:    10.5px;        /* 카테고리 라벨 폰트 (11 → 10.5) */
+
+  /* ===== PR 1b 신규 — 핫이슈/실시간순위/섹션 컴팩트 ===== */
+  --hot-card-min-h:    48px;          /* sf-hot min-height (62 → 48) */
+  --hot-card-padding:  8px 14px;      /* mp-hot/sf-hot padding (12 16 → 8 14) */
+  --hot-card-margin:   0 0 8px;       /* mp-hot/sf-hot margin (0 0 14 → 0 0 8) */
+  --section-top-pad:   4px;           /* mp-section 상단 패딩 (8 → 4) */
+  --section-head-mb:   10px;          /* section-head margin-bottom (14 → 10) */
 }
 
 /* 앱 루트 최소 높이 */

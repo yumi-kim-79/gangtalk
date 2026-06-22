@@ -134,6 +134,68 @@ firebase deploy --only hosting:admin
 
 ## 작업 로그
 
+### 2026-06-22: 모바일 컴팩트 1b — 검색창/핫이슈/카테고리 추가 압축 (`feat/mobile-compact-1b-tighter`)
+- **목적**: 진단(`docs/audit/2026-06-22-모바일-비율유지-축소-진단.md`) PR 1 (#118) 후속 — 위쪽 영역 더 압축해 인기업소 리스트가 더 위로. 배너 비율 (PR #118) 은 그대로 보존
+- **수정 — `src/App.vue` 전역 토큰 추가/조정 (7종)**:
+  - **헤더/검색 (기존 토큰 값 변경)**:
+    - `--app-header-height: 64 → 56` (-8)
+    - `--app-search-height: 48 → 42` (-6)
+    - `--app-header-total: 130 → 114` (-16)
+  - **카테고리 (기존 토큰 값 변경)**:
+    - `--cat-icon-size: 44 → 40` (-4, 터치 영역 최소 WCAG 40px 유지)
+    - `--cat-grid-gap: 8 6 → 6 4` (-2 / -2)
+  - **신규 토큰 5종**:
+    - `--cat-label-size: 10.5px` — 카테고리 라벨 (11 → 10.5)
+    - `--hot-card-min-h: 48px` — sf-hot min-height (62 → 48)
+    - `--hot-card-padding: 8px 14px` — mp-hot/sf-hot padding (12 16 → 8 14)
+    - `--hot-card-margin: 0 0 8px` — mp-hot/sf-hot margin (0 0 14 → 0 0 8)
+    - `--section-top-pad: 4px` — mp-section 상단 패딩 (8 → 4)
+    - `--section-head-mb: 10px` — section-head margin-bottom (14 → 10)
+- **수정 — `src/components/common/AppHeader.vue`**:
+  - `.app-header padding: 16/0/12 → 10/0/6` (-12)
+  - `.app-search padding-bottom: 10 → 6` (-4)
+  - `var(...)` fallback 값 동기화 (64→56, 130→114, 48→42)
+  - input 폰트 15 그대로 유지 (가독성)
+- **수정 — `src/pages/MainPage.vue`**:
+  - `.mp-hot padding/margin` → 토큰 참조
+  - `.mp-cat padding: 4/0/12 → 2/0/6` (-8)
+  - `.mp-cat-label font-size: 11 → var(--cat-label-size, 10.5)`
+  - `.mp-section padding: 8/4/16 → var(--section-top-pad, 4)/4/16` (-4)
+  - `.mp-section-head margin-bottom: 14 → var(--section-head-mb, 10)` (-4)
+- **수정 — `src/views/StoreFinder.vue`**:
+  - `.sf-hot padding/margin/min-height` → 토큰 참조 (3 토큰)
+  - `.sf-cat padding: 4/0/12 → 2/0/6`
+  - `.sf-cat-label font-size: 11 → var(--cat-label-size, 10.5)`
+- **수정 — `src/pages/PartnersPage.vue`**:
+  - `.pp-cat padding: 4/0/12 → 2/0/6`
+  - `.pp-cat-scroll .cat .lbl font-size: 11 → var(--cat-label-size, 10.5) !important`
+- **효과 (모바일 412px 누적 절감)**:
+  - 헤더+검색 영역: 130 → 114px (**-16**)
+  - 핫이슈/실시간순위: padding/margin/min-h 종합 약 **-22~30px**
+  - 카테고리: 원형 44→40, gap 축소, label 11→10.5, 컨테이너 padding -8 → 약 **-14**
+  - 섹션 상단 패딩 4 → 2 = **-4**
+  - **총 절감: 현황판 약 -50px / 가게찾기 약 -50px / 제휴관 약 -30px (배너 위 영역)**
+- **건드리지 않음**:
+  - **배너 / 슬라이더** (PR #118 의 aspect-ratio 그대로) — 비율 12/5 유지, 잘림 0 유지
+  - **카드** (Top5 sf-tops/pp-top-sec, 인기업소 mp-store) — PR 2 별도
+  - **커뮤니티 박스** (강톡 gc-card) — PR 3 별도
+  - 강톡 슬라이더 (PR #118 그대로)
+  - 기능 / 마크업 / 라우터 / 룰 / Functions / admin 빌드 / 회원 가입
+- **접근성**:
+  - 카테고리 원형 40×40px = WCAG 권장 최소 (40~44px)
+  - 그 아래로 줄이면 터치 어려움 → 40 이 안전 하한선
+  - 라벨 10.5px = 모바일 가독성 한계 (그 이하 권장 안 함)
+- **빌드 검증**: `npm run build` ✓ (회원 index 228KB 유지, CSS only)
+- **배포 범위**: `firebase deploy --only hosting:prod` (회원 빌드만)
+- **검증 시나리오 (사용자 수동)**:
+  - [ ] 4 페이지 (현황판/가게찾기/제휴관/강톡) 헤더 영역 -16px 축소 일관
+  - [ ] 핫이슈/실시간순위 카드 패딩+마진+높이 동시 축소
+  - [ ] 카테고리 5×2 그리드 — 원형 40px (터치 가능), 한글 라벨 안 잘림 (10.5px)
+  - [ ] 배너 (PR #118) 안 잘림 유지
+  - [ ] "강남 인기 업소" 제목이 더 위로 올라옴 (현황판)
+  - [ ] 다크모드 정상 (토큰 자동 적용)
+  - [ ] PC 등 큰 화면 회귀 없음
+
 ### 2026-06-22: 모바일 컴팩트 1단계 — 전역 토큰 + 배너 aspect-ratio + 카테고리 축소 (`feat/mobile-compact-1-banner-cat`)
 - **목적**: 진단(`docs/audit/2026-06-22-모바일-비율유지-축소-진단.md` PR 1+2+5 묶음) — 위쪽 영역 컴팩트화 1단계. 배너 잘림 해결(핵심) + 카테고리 축소. 카드(Top5/인기업소)/커뮤니티는 다음 PR (PR 2/3)
 - **수정 — `src/App.vue` (전역 토큰)**:

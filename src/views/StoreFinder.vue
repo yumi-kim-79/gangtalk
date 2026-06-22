@@ -1804,14 +1804,15 @@ function toggleSort(){ ui.value.sortOpen = !ui.value.sortOpen; if(ui.value.sortO
 /* ===== 실시간 순위 (MainPage .mp-hot 과 패딩/마진/radius 통일) ===== */
 .sf-hot{
   display:flex; align-items:center; gap:10px;
-  padding:12px 16px;
-  margin:0 0 14px;
+  /* PR 1b (2026-06-22): padding 12 16 → 8 14, margin 0 0 14 → 0 0 8, min-h 62 → 48 */
+  padding: var(--hot-card-padding, 8px 14px);
+  margin: var(--hot-card-margin, 0 0 8px);
   background:#fff;
   border:none;
   border-radius:14px;
   box-shadow:0 2px 10px rgba(0,0,0,.05);
   cursor:pointer; overflow:hidden;
-  min-height:62px;
+  min-height: var(--hot-card-min-h, 48px);
   box-sizing:border-box;
 }
 
@@ -1902,7 +1903,8 @@ function toggleSort(){ ui.value.sortOpen = !ui.value.sortOpen; if(ui.value.sortO
 /* ===== 카테고리: 2줄 그리드 복원 ===== */
 /* ===== Category (MainPage .mp-cat 와 동일 톤) ===== */
 .sf-cat{
-  padding:4px 0 12px;
+  /* PR 1b (2026-06-22): padding 4 0 12 → 2 0 6 컴팩트 */
+  padding:2px 0 6px;
   margin:0;
   position:relative;
 }
@@ -1949,7 +1951,8 @@ function toggleSort(){ ui.value.sortOpen = !ui.value.sortOpen; if(ui.value.sortO
   box-shadow:0 4px 12px rgba(255,77,141,.3);
 }
 .sf-cat-label{
-  font-size:11px;
+  /* PR 1b (2026-06-22): font 11 → 10.5 (토큰) */
+  font-size: var(--cat-label-size, 10.5px);
   font-weight:600;
   color:var(--muted, #999);
   white-space:nowrap;

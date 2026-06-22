@@ -1360,7 +1360,8 @@ function refresh(){ loadPartners() }
  * 칩 수 10개 (지역 1 + partner 9) → 정확히 5×2 균일 격자.
  * 옛 .cat-grid grid 룰 (`:1549`) 과 충돌 — 본 룰의 !important 가 우선.
  */
-.pp-cat{ padding:4px 0 12px; position:relative; }
+/* PR 1b (2026-06-22): padding 4 0 12 → 2 0 6 컴팩트 */
+.pp-cat{ padding:2px 0 6px; position:relative; }
 .pp-cat-scroll{
   display:grid !important;
   grid-template-columns:repeat(5, minmax(0, 1fr)) !important;
@@ -1402,7 +1403,8 @@ function refresh(){ loadPartners() }
   box-shadow:0 4px 12px rgba(255,77,141,.3);
 }
 .pp-cat-scroll .cat .lbl{
-  font-size:11px !important;
+  /* PR 1b (2026-06-22): font 11 → 10.5 (토큰) */
+  font-size: var(--cat-label-size, 10.5px) !important;
   font-weight:600 !important;
   color:var(--muted, #999) !important;
   margin:0 !important;

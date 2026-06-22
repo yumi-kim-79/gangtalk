@@ -274,11 +274,11 @@ watch(menuOpen, (on) => {
 <style scoped>
 /* 전체 컨테이너 — 페이지 전환 시 점프 방지용 최소 높이 */
 .app-header-wrap{
-  min-height: var(--app-header-total, 130px);
+  min-height: var(--app-header-total, 114px);
 }
 /* 검색창이 없는 페이지(예: 강톡)는 헤더만 점유 + 아래 콘텐츠가 바로 붙도록 */
 .app-header-wrap.no-search{
-  min-height: var(--app-header-height, 64px);
+  min-height: var(--app-header-height, 56px);
 }
 
 /* ===== Header ===== */
@@ -288,8 +288,9 @@ watch(menuOpen, (on) => {
   justify-content:space-between;
   gap:10px;
   /* 좌우는 페이지의 .page padding (var(--page-h-pad)) 가 단일 책임 → 여기선 0 */
-  padding:16px 0 12px;
-  min-height: var(--app-header-height, 64px);
+  /* PR 1b (2026-06-22): padding 16/0/12 → 10/0/6 컴팩트 */
+  padding:10px 0 6px;
+  min-height: var(--app-header-height, 56px);
   box-sizing:border-box;
 }
 /* 검색창 없는 모드: 하단 패딩 축소해 다음 콘텐츠가 바짝 붙도록 */
@@ -359,13 +360,14 @@ watch(menuOpen, (on) => {
 /* ===== Search ===== */
 .app-search{
   /* 좌우는 .page 가 책임 */
-  padding:0 0 10px;
+  /* PR 1b (2026-06-22): padding-bottom 10 → 6 */
+  padding:0 0 6px;
 }
 .app-search-box{
   display:flex;
   align-items:center;
   gap:8px;
-  height: var(--app-search-height, 48px);
+  height: var(--app-search-height, 42px);
   padding:0 14px;
   background:var(--surface, #fff);
   border-radius:14px;
