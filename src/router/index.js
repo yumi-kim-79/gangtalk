@@ -5,6 +5,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import MainPage          from '@/pages/MainPage.vue'
 import GangTalkPage      from '@/pages/GangTalkPage.vue'
 import AuthPage          from '@/pages/AuthPage.vue'
+import BizSignupPage     from '@/pages/BizSignupPage.vue'
 
 // ===== 비핵심 페이지 (동적 import → 코드 스플리팅) =====
 const PartnersPage      = () => import('@/pages/PartnersPage.vue')
@@ -309,6 +310,10 @@ const routes = [
   { path: '/auth',   name: 'auth',   component: AuthPage },
   { path: '/support', name: 'support', component: SupportPage },
 
+  // 업체 자가 회원가입 — 회원 빌드 공개 라우트 (admin 빌드의 App Check 제약으로 회원 빌드에서 처리).
+  // 가입 후 admin 도메인(gangtalk815.com)으로 안내. 진단: docs/audit/2026-06-22-biz-signup-회원빌드-이동-진단.md
+  { path: '/biz-signup', name: 'bizSignup', component: BizSignupPage },
+
   // 이벤트 상세
   {
     path: '/event',
@@ -426,8 +431,8 @@ router.beforeEach(async (to, from) => {
   const needLoginOnClick = !!to.meta?.needLoginOnClick
   const toName = String(to.name || '')
 
-  // 게스트 허용 페이지
-  const publicForGuests = new Set(['auth', 'support'])
+  // 게스트 허용 페이지 (비로그인 진입 허용)
+  const publicForGuests = new Set(['auth', 'support', 'bizSignup'])
 
   // 바텀 탭 루트 페이지(현황판/가게찾기/강톡/제휴관/마이페이지)는
   // 비로그인이어도 "페이지 진입"은 허용
