@@ -134,6 +134,42 @@ firebase deploy --only hosting:admin
 
 ## 작업 로그
 
+### 2026-06-22: AuthPage 에 "업체 회원가입" 진입 링크 추가 (`feat/gangtox-biz-signup-button`)
+- **목적**: 진단(`docs/audit/2026-06-22-C통일-제거및구현-진단.md` PR c) — gangtox.com 로그인/회원가입 화면에 업체 자가가입(`/biz-signup`, PR #113) 진입점 노출. 같은 회원 빌드의 내부 라우트 이동
+- **수정 — `src/pages/AuthPage.vue` 만**:
+  - **마크업** — 회원가입 form 닫힘 직후, `</section>` 안에 `.biz-entry` 블록 추가:
+    - `<p class="biz-entry-line">업소를 운영하시나요?</p>`
+    - `<router-link :to="{ name: 'bizSignup' }" class="biz-entry-link">업체 회원가입 →</router-link>`
+    - 로그인/회원가입 모드 양쪽에서 노출 (`action` ref 분기 안 함 — `</form>` 다음, `</section>` 안)
+    - 여성회원 가입과 명확히 구분: 점선 상단 구분선(`border-top: 1px dashed #ffd6e4`) + "업소를 운영하시나요?" 안내 + 핑크 알약 링크
+  - **CSS (scoped)**:
+    - `.biz-entry` — `margin-top:22px; padding:14px 16px; border-top:1px dashed #ffd6e4; text-align:center`
+    - `.biz-entry-line` — `font-size:13px; color:#666`
+    - `.biz-entry-link` — 핑크 알약 (`background:#fff5f8; border:1.5px solid #ffd6e4; color:#ff2e7e; border-radius:999px; padding:8px 16px`). hover 시 핑크 채움
+  - **CSS (전역, 다크모드 보정)**:
+    - `[data-theme='dark|black'] .biz-entry { border-top-color:#3a2030 }`
+    - `.biz-entry-link` 다크 배경(`#2a1620`) + 핑크 보더(`#ff4da3`) + 옅은 핑크 텍스트(`#ff86b9`), hover 시 진핑크 채움
+- **건드리지 않음 (사용자 명시)**:
+  - 여성회원 로그인/가입 로직 — `onLogin` / `onSignup` / SMS 인증 / `who` ref / `signupUser` / `signupBiz` / 가드
+  - `script setup` 전체 (`router` / `route` / 모든 ref / 함수)
+  - 회원유형 탭 구조 (기업/관리자 `v-if="false"` 잔존 그대로 — 도메인 분리 PR 패턴)
+  - `firestore.rules` / `storage.rules` / Cloud Functions
+  - admin 빌드 (`router/admin.js`, `BizLoginPage`, AdminLayout 등)
+  - `/biz-signup` 페이지 (PR #113 그대로)
+- **동작**:
+  - gangtox.com/auth 진입 → 로그인 또는 회원가입 폼 하단에 "업소를 운영하시나요? [업체 회원가입 →]" 노출
+  - 링크 클릭 → 같은 회원 빌드 SPA 내부 이동 → `/biz-signup` (전체 새로고침 없음)
+  - SMS 인증 정상 (PR #113 검증 완료 — 회원 빌드 App Check 통과)
+- **빌드 검증**: `npm run build` ✓ (회원 index 227.76→228.06KB, +0.3KB CSS/HTML)
+- **배포 범위**: `firebase deploy --only hosting:prod` (회원 빌드만, admin/룰/Functions 변경 없음)
+- **검증 시나리오 (사용자 수동)**:
+  - [ ] gangtox.com/auth 로그인 모드 → 폼 하단에 "업소를 운영하시나요?" + 핑크 알약 링크 노출
+  - [ ] gangtox.com/auth 회원가입 모드 → 같은 위치에 동일 링크 노출
+  - [ ] 링크 클릭 → SPA 내부 이동으로 `/biz-signup` 진입 (브라우저 새로고침 없음)
+  - [ ] `/biz-signup` SMS 인증 정상 (PR #113 회귀 없음)
+  - [ ] 여성회원 로그인/가입 기존 동작 회귀 없음
+  - [ ] 다크모드 다크 톤 적용 확인
+
 ### 2026-06-22: BizSignupPage 회원 빌드(gangtox.com)로 이동 — SMS App Check 호환 (`refactor/biz-signup-to-member-build`)
 - **목적**: 진단(`docs/audit/2026-06-22-biz-signup-회원빌드-이동-진단.md`) — PR #112 의 BizSignupPage 가 admin 빌드(gangtalk815) 에 있어 `sendSmsCode`/`verifySmsCode` 의 `enforceAppCheck: true` 와 충돌해 "Unauthenticated" 발생. 회원 빌드는 App Check 정상(AuthPage SMS 가입 = 증거) → 회원 빌드로 이동
 - **파일 이동 (git mv)**:
