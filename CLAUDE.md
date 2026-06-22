@@ -134,6 +134,47 @@ firebase deploy --only hosting:admin
 
 ## 작업 로그
 
+### 2026-06-22: 모바일 컴팩트 3 — 강톡 커뮤니티 4박스 + 베스트탭/섹션 헤더 컴팩트 (`feat/mobile-compact-3-community`)
+- **목적**: 진단(`docs/audit/2026-06-22-모바일-비율유지-축소-진단.md` §5) — 강톡 주제별 커뮤니티 4박스(강톡/힐링톡/우리가게/이벤트톡) 축소 → 아래 인기글/리스트가 보이게. PR #118/#119/#120 밀도와 일관
+- **수정 — `src/App.vue` 토큰 6종 신규**:
+  - `--gc-card-height: 110px` — gc-card height (130 → 110)
+  - `--gc-card-padding: 10px` — gc-body padding (12 → 10)
+  - `--gc-title-size: 16px` — gc-title font (18 → 16)
+  - `--gc-grid-mb: 12px` — community-grid margin-bottom (18 → 12)
+  - `--gc-best-tabs-mb: 10px` — best-tabs margin-bottom (14 → 10)
+  - `--gt-section-head-mb: 8px` — gt-section-head margin (12 → 8)
+- **수정 — `src/pages/GangTalkPage.vue`**:
+  - **`.community-grid margin-bottom: 18 → var(--gc-grid-mb, 12px)`** (-6)
+  - **`.gc-card height: 130 → var(--gc-card-height, 110px)`** (-20) — 솔리드 배경, 이미지 없음 → height 자유
+  - **`.gc-body padding: 12 → var(--gc-card-padding, 10px)`** — 내부 여백 컴팩트
+  - **`.gc-title font: 18 → var(--gc-title-size, 16px)`** — 카드 height 축소와 균형
+  - **`.gc-arrow right/bottom: 12 → 10`** — 화살표 위치도 비례 조정
+  - **`.gc-soon bottom: 10 → 8`** — "서비스 준비중" pill 위치 균형
+  - **`.best-tabs margin-bottom: 14 → var(--gc-best-tabs-mb, 10px)`** (-4)
+  - **`.gt-section-head margin: 0 0 12 → 0 0 var(--gt-section-head-mb, 8px)`** (-4)
+- **효과 (모바일 412px)**:
+  - **4 카드 영역**: (130×2 + 8) = 268 → (110×2 + 8) = 228 → 그리드 margin -6 + section/탭 -8 = **약 -54px 절감**
+  - **카드 1개 height**: 130 → 110 (-20)
+  - **내부 균형**: title 18→16, padding 12→10, arrow 12→10, pill bottom 10→8 — 박스 안에서 비례 축소 (찌그러짐 없음)
+  - 인기글 리스트가 더 위로 노출
+- **건드리지 않음**:
+  - 배너/슬라이더 (PR #118 aspect-ratio 12/5)
+  - 헤더/검색/핫이슈/카테고리 (PR #119)
+  - Top5/인기업소 카드 (PR #120)
+  - 배경/이미지 (솔리드 배경 유지, gc-bg-img 룰은 이미 제거됨)
+  - 카테고리 시트 / 게시글 상세 / 댓글 입력 / 모달 등
+  - 기능 / 마크업 / 라우터 / 룰 / Functions / admin 빌드 / 회원 가입
+- **빌드 검증**: `npm run build` ✓ (회원 index 228KB 유지, CSS only)
+- **배포 범위**: `firebase deploy --only hosting:prod` (회원 빌드만)
+- **검증 시나리오 (사용자 수동)**:
+  - [ ] 강톡 진입 → 4 박스 (강톡/힐링톡/우리가게/이벤트톡) 더 작아짐
+  - [ ] 박스 내부 텍스트/화살표 균형 유지 (찌그러짐 없음)
+  - [ ] 인기글/인기댓글/인기추천수 탭이 더 위로
+  - [ ] 게시글 리스트가 한 화면에 더 많이 보임
+  - [ ] PR #118/#119/#120 회귀 없음
+  - [ ] 다크모드 정상
+  - [ ] PC 큰 화면 회귀 없음
+
 ### 2026-06-22: 모바일 컴팩트 2 — Top5/인기업소 카드 비율 유지 축소 + name-row 가로 (`feat/mobile-compact-2-cards`)
 - **목적**: 진단(`docs/audit/2026-06-22-모바일-비율유지-축소-진단.md` §4) — Top5 카드(sf-tops/pp-top-sec) thumb 의 `height:140 !important` + `padding-top:0 !important` 강제로 비율 무력화 → aspect-ratio 로 비율 유지(잘림 0) + 카드 폭 축소. 현황판 mp-store 썸네일 80 정사각. 가게찾기 Top5 의 "강남·하퍼" 가로 배치
 - **수정 — `src/App.vue` 토큰 5종 신규**:
