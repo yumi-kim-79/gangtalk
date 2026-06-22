@@ -2381,28 +2381,110 @@ exports.onJoinRemoved = onDocumentUpdated(
 );
 
 /* =========================================================
-   ★ 매일 07:00 리셋(옵션)
+   ★ 현황판 리셋 — 매시 정각 트리거 + resetHour 비교
+   ---------------------------------------------------------
+   진단: docs/audit/2026-06-19-리셋시간-관리자조정-진단.md (방법 B)
+
+   동작:
+     1) 매시 정각 (cron "0 * * * *", Asia/Seoul) 호출.
+     2) config/settings 의 resetHour(0~23, 기본 7) read.
+     3) 현재 KST 시각(hour) === resetHour 일 때만 리셋 후보.
+     4) config/settings.lastResetDate !== 오늘(KST) 일 때만 실제 리셋.
+        → 같은 날 두 번 이상 리셋 안 함 (중복 방지).
+     5) 리셋 본체 (rooms_biz needRooms/needPeople/matched=0) 는 기존과 동일.
+     6) 성공 후 config/settings 갱신: lastResetDate=오늘, lastResetAt=now,
+        lastResetHour=resetHour.
+
+   배포 주의: 기존 dailyReset0700 함수명에서 변경됨.
+              배포 후 옛 함수 수동 삭제 필수:
+                firebase functions:delete dailyReset0700
+              안 지우면 옛 7시 리셋 + 새 함수가 동시 동작 (이중 리셋 위험).
 ========================================================= */
-exports.dailyReset0700 = onSchedule(
-  { schedule: "0 7 * * *", timeZone: "Asia/Seoul", region: "asia-northeast3" },
+
+/** rooms_biz 전체 리셋 본체 — 스케줄러 / 즉시 리셋 콜러블 양쪽 재사용 */
+async function _runResetCore(reason = "scheduled") {
+  const col = db.collection("rooms_biz");
+  const qs = await col.get();
+  const bw = db.bulkWriter();
+  const today = new Date().toLocaleDateString("ko-KR", { timeZone: "Asia/Seoul" });
+  for (const doc of qs.docs) {
+    bw.set(doc.ref, {
+      needRooms: 0,
+      needPeople: 0,
+      matched: 0,
+      lastResetDate: today,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true });
+  }
+  await bw.close();
+  console.log(`[reset] ok — docs=${qs.size} today=${today} reason=${reason}`);
+  return { ok: true, count: qs.size, today };
+}
+
+/** config/settings cursor 갱신 — 중복 방지용 */
+async function _markResetDone(resetHour, by = "scheduler") {
+  const today = new Date().toLocaleDateString("ko-KR", { timeZone: "Asia/Seoul" });
+  await db.collection("config").doc("settings").set({
+    lastResetDate: today,
+    lastResetAt: admin.firestore.FieldValue.serverTimestamp(),
+    lastResetHour: Number(resetHour),
+    lastResetBy: String(by),
+  }, { merge: true });
+}
+
+exports.dailyResetHourly = onSchedule(
+  { schedule: "0 * * * *", timeZone: "Asia/Seoul", region: "asia-northeast3" },
   async () => {
-    const col = db.collection("rooms_biz");
-    const qs = await col.get();
-    const bw = db.bulkWriter();
-    const today = new Date().toLocaleDateString("ko-KR", { timeZone: "Asia/Seoul" });
-    for (const doc of qs.docs) {
-      bw.set(doc.ref, {
-        needRooms: 0,
-        needPeople: 0,
-        matched: 0,
-        lastResetDate: today,
-        updatedAt: admin.firestore.FieldValue.serverTimestamp()
-      }, { merge: true });
+    // 1) 설정 read
+    let resetHour = 7;
+    let lastResetDate = "";
+    try {
+      const snap = await db.collection("config").doc("settings").get();
+      if (snap.exists) {
+        const d = snap.data() || {};
+        const h = Number(d.resetHour);
+        if (Number.isFinite(h) && h >= 0 && h <= 23) resetHour = h;
+        lastResetDate = String(d.lastResetDate || "");
+      }
+    } catch (e) {
+      console.warn("[dailyResetHourly] config/settings read fail:", e?.code || e?.message);
+      // 폴백 — 기본 7시 적용 (보수적)
     }
-    await bw.close();
+
+    // 2) 현재 KST hour
+    const nowKstHour = Number(
+      new Date().toLocaleString("en-US", {
+        timeZone: "Asia/Seoul",
+        hour: "numeric",
+        hour12: false,
+      })
+    );
+    const today = new Date().toLocaleDateString("ko-KR", { timeZone: "Asia/Seoul" });
+
+    // 3) 시각 일치 + 4) 중복 방지
+    if (nowKstHour !== resetHour) {
+      console.log(`[dailyResetHourly] skip — nowHour=${nowKstHour}, resetHour=${resetHour}`);
+      return null;
+    }
+    if (lastResetDate === today) {
+      console.log(`[dailyResetHourly] skip — already reset today (${today})`);
+      return null;
+    }
+
+    // 5) 리셋 + 6) cursor 갱신
+    try {
+      await _runResetCore(`hourly-cron@${nowKstHour}h`);
+      await _markResetDone(resetHour, "scheduler");
+      console.log(`[dailyResetHourly] done — hour=${resetHour} date=${today}`);
+    } catch (e) {
+      console.error("[dailyResetHourly] reset fail:", e?.code || e?.message);
+    }
     return null;
   }
 );
+
+// triggerResetNow (관리자 즉시 리셋) 은 ADMIN_CORS / assertCallerIsAdmin 정의 후
+// 파일 아래쪽에 export. _runResetCore / _markResetDone 헬퍼는 hoisting 으로 접근 가능.
 /* =========================================================
    ★ 업체(Biz) 계정 관리 — 관리자 전용 콜러블 3종
    - gangtalk815@gmail.com (또는 ADMIN_EMAIL env) 만 호출 가능
@@ -2850,6 +2932,31 @@ exports.deleteBizAccount = onCall({ cors: ADMIN_CORS }, async (req) => {
   }
 
   return { ok: true, summary };
+});
+
+/* =========================================================
+   ★ 현황판 즉시 리셋 (관리자 콜러블)
+   - 설정 변경 직후 당일 즉시 적용 등 수동 트리거.
+   - isAdmin 가드 + ADMIN_CORS.
+   - _runResetCore 실행 + _markResetDone(현재 resetHour) cursor 갱신.
+   - lastResetDate=오늘 set → 같은 날 dailyResetHourly 스케줄러 중복 실행 안 함.
+========================================================= */
+exports.triggerResetNow = onCall({ cors: ADMIN_CORS }, async (req) => {
+  assertCallerIsAdmin(req);
+
+  // 현재 설정의 resetHour 함께 기록 (감사 용도)
+  let resetHour = 7;
+  try {
+    const snap = await db.collection("config").doc("settings").get();
+    if (snap.exists) {
+      const h = Number(snap.data()?.resetHour);
+      if (Number.isFinite(h) && h >= 0 && h <= 23) resetHour = h;
+    }
+  } catch {}
+
+  const result = await _runResetCore(`manual@${req?.auth?.token?.email || "?"}`);
+  await _markResetDone(resetHour, `manual:${req?.auth?.token?.email || "?"}`);
+  return { ok: true, ...result };
 });
 
 /* =========================================================
