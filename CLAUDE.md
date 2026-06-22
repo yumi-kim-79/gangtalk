@@ -134,6 +134,64 @@ firebase deploy --only hosting:admin
 
 ## 작업 로그
 
+### 2026-06-22: 모바일 컴팩트 1단계 — 전역 토큰 + 배너 aspect-ratio + 카테고리 축소 (`feat/mobile-compact-1-banner-cat`)
+- **목적**: 진단(`docs/audit/2026-06-22-모바일-비율유지-축소-진단.md` PR 1+2+5 묶음) — 위쪽 영역 컴팩트화 1단계. 배너 잘림 해결(핵심) + 카테고리 축소. 카드(Top5/인기업소)/커뮤니티는 다음 PR (PR 2/3)
+- **수정 — `src/App.vue` (전역 토큰)**:
+  - `:root` 에 신규 4 토큰 추가:
+    - `--banner-aspect: 12 / 5` — StoreFinder/PartnersPage 광고 배너 비율 (마케팅 자료 표준)
+    - `--gt-slider-aspect: 12 / 5` — 강톡 상단 슬라이더 (배너와 시각 일관)
+    - `--cat-icon-size: 44px` — 카테고리 원형 아이콘 (3 페이지 공통, 48→44)
+    - `--cat-grid-gap: 8px 6px` — 카테고리 5×2 그리드 간격 (12 8 → 8 6)
+  - 토큰 1 곳에서 4 페이지 일관 조정 → 마케팅 자료 비율 변경 시 토큰만 수정
+- **배너 잘림 해결 (핵심) — 3 곳 동시 동일 패턴**:
+  - **`src/views/StoreFinder.vue`** `.sf-banners :deep(.banner-img)`:
+    - 이전: `height:180px; min-height:180px; object-fit:cover` (고정 + 이미지 상하 잘림)
+    - 이후: `width:100%; height:auto; aspect-ratio: var(--banner-aspect, 12/5); object-fit:cover`
+    - `.sf-banner-skeleton` 도 같은 비율 토큰 적용 (점프 방지 유지)
+  - **`src/pages/PartnersPage.vue`** `.pp-banners .banner-img`: 동일 패턴 교체
+  - **`src/pages/GangTalkPage.vue`** `.gt-slider-bar`:
+    - 이전: `height: 180px`
+    - 이후: `width:100%; aspect-ratio: var(--gt-slider-aspect, 12/5)`
+    - `.gt-slide-img object-fit: cover` 그대로 — 컨테이너가 12/5 비율이라 12/5 이미지는 정확히 채움, 잘림 0
+- **카테고리 축소 — 3 페이지 동시**:
+  - **MainPage `.mp-cat-scroll / .mp-cat-ic`**:
+    - `gap: 12px 8px` → `var(--cat-grid-gap, 8px 6px)`
+    - 원형 `width/height: 48px` → `var(--cat-icon-size, 44px)`
+  - **StoreFinder `.sf-cat-scroll / .sf-cat-ic`**: 동일 패턴
+  - **PartnersPage `.pp-cat-scroll / .pp-cat-scroll .cat-ico-circle`**: 동일 패턴 (`!important` 유지 — 외부 CSS 충돌 방지)
+  - **원형 비율 1:1 자동 유지** (`border-radius:50%`) → width/height 동시 줄여도 비율 안정. 안 잘림
+  - 터치 영역 44×44px = WCAG 권장 최소 (40px 이상) 통과
+- **효과 (모바일 412px 폭 기준)**:
+  - **배너 height: 180 → ~172px** (-8px, 412 × 5/12 = 171.67)
+  - **카테고리 원형: 48 → 44** (-4px) + **gap: 12 → 8** (-4px)
+  - **위쪽 영역 절감**: 가게찾기/제휴관 약 -16px, 강톡 약 -8px, 현황판 약 -8px (카테고리만)
+  - **이미지 잘림 0** ✓ — 폭 따라 자동 height, 12/5 비율 정확히 채움
+- **건드리지 않음**:
+  - 카드 (Top5 / 인기업소 / 제휴관) — `sf-tops :deep(.m-thumb)`, `pp-top-sec .rs-thumb`, `mp-store-img` 그대로 (PR 2 에서 처리)
+  - 커뮤니티 박스 (강톡 4 카드 `.gc-card`) — PR 3 에서 처리
+  - 헤더 / 검색창 / 핫이슈 / 실시간 순위 / 카드 패딩 — 별도 PR
+  - 기능 로직 / 마크업 / 라우터 / 룰 / Functions / admin 빌드
+  - 회원 가입/로그인 / partners 데이터
+- **수정 후 흐름**:
+  - 폭 412px 기준 → 배너/슬라이더 자동 172px (12/5 비율)
+  - 폭 360px (작은 디바이스) → 자동 150px (비례)
+  - 폭 768px (태블릿) → 자동 320px (비례)
+  - 어느 폭에서도 12/5 비율 이미지는 잘림 0
+- **마케팅 자료 가이드** (사용자 액션):
+  - 모든 배너/슬라이더 이미지를 **12:5 비율** (예: 1200×500, 1080×450) 로 제작
+  - 비율이 다른 기존 자료는 미세 잘림 발생 가능 (cover) — 12:5 로 재크롭 권장
+  - 토큰 변경 시 `App.vue:--banner-aspect` 만 수정하면 4 페이지 동시 적용
+- **빌드 검증**: `npm run build` ✓ (회원 index 228KB 유지, CSS only)
+- **배포 범위**: `firebase deploy --only hosting:prod` (회원 빌드만)
+- **검증 시나리오 (사용자 수동)**:
+  - [ ] 가게찾기/제휴관 배너 — 작아지되 이미지 안 잘림 확인 (12/5 비율 이미지 기준)
+  - [ ] 강톡 상단 슬라이더 — 동일 효과, 잘림 0
+  - [ ] 카테고리 5×2 — 원형 44 + gap 축소, 한글 라벨 (가라오케/공동구매 등) 안 잘림
+  - [ ] 다크모드 정상 (토큰 자동 적용)
+  - [ ] PC (768px+) 에서 배너 비례 확대 (12/5 비율 유지)
+  - [ ] 12/5 비율 외 배너 이미지 (예: 16/9) — 좌우 잘림 발생 (의도 — 마케팅 통일 필요)
+  - [ ] PR 2 (카드 축소) / PR 3 (커뮤니티 축소) 진행 시 본 PR 회귀 없음
+
 ### 2026-06-22: 관리자 리셋 시각 조정 (현황판) — dailyResetHourly + 즉시 리셋 (`feat/admin-reset-hour-setting`)
 - **목적**: 진단(`docs/audit/2026-06-19-리셋시간-관리자조정-진단.md` 방법 B) — 현황판 리셋 시각(현재 매일 07:00 KST 고정)을 관리자가 0~23시 중 자유롭게 변경 가능하게. 주말 스킵/켜고끄기는 범위 외 (시각만)
 - **⚠️ 배포 주의 — functions 포함 배포 + 옛 함수 수동 삭제 필수**:

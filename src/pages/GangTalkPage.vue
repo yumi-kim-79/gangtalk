@@ -2561,7 +2561,10 @@ const FALLBACK_BIZ_IMG = 'https://images.unsplash.com/photo-1517248135467-4c7edc
   /* AppHeader 와 살짝의 숨 공간 */
   margin-top: 8px;
   margin-bottom: 16px;
-  height: 180px;
+  /* PR 1 (2026-06-22): height 고정 → aspect-ratio 로 비율 유지.
+     폭 따라 자동 높이 → 잘림 0. 배너와 동일 12/5 비율. */
+  width: 100%;
+  aspect-ratio: var(--gt-slider-aspect, 12 / 5);
   background: #f0f0f0;
 }
 .gt-slider-track{

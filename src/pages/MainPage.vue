@@ -2516,7 +2516,8 @@ onUnmounted(() => {
   display:grid;
   grid-template-columns:repeat(5, minmax(0, 1fr));
   align-items:start;
-  gap:12px 8px;
+  /* PR 1 (2026-06-22): gap 12 8 → 8 6 컴팩트 */
+  gap: var(--cat-grid-gap, 8px 6px);
   overflow:visible;
   padding:4px 4px 8px;
 }
@@ -2533,7 +2534,9 @@ onUnmounted(() => {
   min-width:0;
 }
 .mp-cat-ic{
-  width:48px; height:48px;
+  /* PR 1 (2026-06-22): 원형 48→44, 비율 1:1 자동 유지 (border-radius:50%) */
+  width: var(--cat-icon-size, 44px);
+  height: var(--cat-icon-size, 44px);
   border-radius:50%;
   display:grid; place-items:center;
   border:1.5px solid var(--line, #e8e8e8);

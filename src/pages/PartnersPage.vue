@@ -1334,9 +1334,11 @@ function refresh(){ loadPartners() }
   box-shadow:0 4px 14px rgba(0,0,0,.06);
 }
 .pp-banners .banner-img{
+  /* PR 1 (2026-06-22): height 고정 + cover → aspect-ratio 로 비율 유지.
+     폭 따라 자동 높이 → 잘림 0. 마케팅 12/5 비율. */
   width:100%;
-  height:180px;
-  min-height:180px;
+  height:auto;
+  aspect-ratio: var(--banner-aspect, 12 / 5);
   object-fit:cover;
   display:block;
 }
@@ -1363,7 +1365,8 @@ function refresh(){ loadPartners() }
   display:grid !important;
   grid-template-columns:repeat(5, minmax(0, 1fr)) !important;
   align-items:start;
-  gap:12px 8px !important;
+  /* PR 1 (2026-06-22): gap 12 8 → 8 6 컴팩트 */
+  gap: var(--cat-grid-gap, 8px 6px) !important;
   overflow:visible;
   padding:4px 4px 8px;
 }
@@ -1381,7 +1384,9 @@ function refresh(){ loadPartners() }
   outline:none !important;
 }
 .pp-cat-scroll .cat-ico-circle{
-  width:48px; height:48px;
+  /* PR 1 (2026-06-22): 원형 48→44, 비율 1:1 자동 유지 */
+  width: var(--cat-icon-size, 44px);
+  height: var(--cat-icon-size, 44px);
   border-radius:50%;
   display:grid; place-items:center;
   border:1.5px solid var(--line, #e8e8e8);

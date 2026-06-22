@@ -1870,14 +1870,19 @@ function toggleSort(){ ui.value.sortOpen = !ui.value.sortOpen; if(ui.value.sortO
   overflow:hidden;
 }
 .sf-banners :deep(.banner-img){
-  width:100%; height:180px; min-height:180px;
-  object-fit:cover; display:block;
+  /* PR 1 (2026-06-22): height 고정 + cover → aspect-ratio 로 비율 유지.
+     폭 따라 자동 높이 → 잘림 0. 마케팅 12/5 비율. */
+  width:100%;
+  height:auto;
+  aspect-ratio: var(--banner-aspect, 12 / 5);
+  object-fit:cover;
+  display:block;
 }
 
-/* 점프 방지용 배너 스켈레톤 — 동일 높이/모서리 */
+/* 점프 방지용 배너 스켈레톤 — 배너와 동일 비율 */
 .sf-banner-skeleton{
   width:100%;
-  height:180px;
+  aspect-ratio: var(--banner-aspect, 12 / 5);
   border-radius:16px;
   background:linear-gradient(135deg, #ffe4ef, #fff0f6);
 }
@@ -1909,7 +1914,8 @@ function toggleSort(){ ui.value.sortOpen = !ui.value.sortOpen; if(ui.value.sortO
   display:grid;
   grid-template-columns:repeat(5, minmax(0, 1fr));
   align-items:start;
-  gap:12px 8px;
+  /* PR 1 (2026-06-22): gap 12 8 → 8 6 컴팩트 */
+  gap: var(--cat-grid-gap, 8px 6px);
   overflow:visible;
   padding:4px 4px 8px;
 }
@@ -1926,7 +1932,9 @@ function toggleSort(){ ui.value.sortOpen = !ui.value.sortOpen; if(ui.value.sortO
   min-width:0;
 }
 .sf-cat-ic{
-  width:48px; height:48px;
+  /* PR 1 (2026-06-22): 원형 48→44, 비율 1:1 자동 유지 */
+  width: var(--cat-icon-size, 44px);
+  height: var(--cat-icon-size, 44px);
   border-radius:50%;
   display:grid; place-items:center;
   border:1.5px solid var(--line, #e8e8e8);
