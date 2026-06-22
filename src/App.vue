@@ -67,6 +67,15 @@ onMounted(async () => {
   --app-search-height: 48px;   /* 검색창 박스 높이 */
   --app-header-total:  130px;  /* 헤더 + 검색창 + 위·아래 패딩 합계 */
   --page-h-pad:        16px;   /* 모든 페이지의 좌우 패딩 단일 토큰 — .page 가 책임 */
+
+  /* ===== 모바일 컴팩트 토큰 (PR 1: 비율 유지 축소) =====
+   *   진단: docs/audit/2026-06-22-모바일-비율유지-축소-진단.md
+   *   배너/슬라이더는 aspect-ratio 로 비율 유지 → 폭 따라 자동 높이 → 잘림 0
+   *   마케팅 자료 비율 12/5 (2.4:1) 표준화. 변경 시 본 토큰만 수정. */
+  --banner-aspect:     12 / 5;       /* StoreFinder/PartnersPage 광고 배너 */
+  --gt-slider-aspect:  12 / 5;       /* 강톡 상단 슬라이더 (배너와 시각 일관) */
+  --cat-icon-size:     44px;          /* 카테고리 원형 아이콘 (3 페이지 공통, 48→44) */
+  --cat-grid-gap:      8px 6px;       /* 카테고리 5x2 그리드 간격 (12 8 → 8 6) */
 }
 
 /* 앱 루트 최소 높이 */
