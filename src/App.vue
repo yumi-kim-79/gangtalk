@@ -102,13 +102,14 @@ onMounted(async () => {
   /* ===== PR 3 (2026-06-22): 강톡 커뮤니티 박스 컴팩트 =====
    *   진단: docs/audit/2026-06-22-모바일-비율유지-축소-진단.md (§5)
    *   4박스 (강톡/힐링톡/우리가게/이벤트톡) height + 내부 폰트/간격 균형 축소.
-   *   비율 유지 (height 만 줄임 — 박스 내부는 솔리드 배경, 이미지 없음). */
-  --gc-card-height:    110px;          /* gc-card height (130 → 110) */
-  --gc-card-padding:   10px;           /* gc-body padding (12 → 10) */
-  --gc-title-size:     16px;           /* gc-title font (18 → 16) */
-  --gc-grid-mb:        12px;           /* community-grid margin-bottom (18 → 12) */
-  --gc-best-tabs-mb:   10px;           /* best-tabs margin-bottom (14 → 10) */
-  --gt-section-head-mb: 8px;           /* gt-section-head margin (12 → 8) */
+   *   비율 유지 (height 만 줄임 — 박스 내부는 솔리드 배경, 이미지 없음).
+   *   PR 3b (2026-06-22): 추가 압축 — 92px 카드 + 비례 내부 조정 */
+  --gc-card-height:    92px;           /* gc-card height (110 → 92) */
+  --gc-card-padding:   8px;            /* gc-body padding (10 → 8) */
+  --gc-title-size:     15px;           /* gc-title font (16 → 15) */
+  --gc-grid-mb:        8px;            /* community-grid margin-bottom (12 → 8) */
+  --gc-best-tabs-mb:   8px;            /* best-tabs margin-bottom (10 → 8) */
+  --gt-section-head-mb: 6px;           /* gt-section-head margin (8 → 6) */
 }
 
 /* 앱 루트 최소 높이 */
