@@ -134,6 +134,86 @@ firebase deploy --only hosting:admin
 
 ## 작업 로그
 
+### 2026-06-22: (A)(B) 기존 업소 등록 경로 제거 — C 일원화 완료 (`refactor/remove-legacy-store-register`)
+- **목적**: 진단(`docs/audit/2026-06-22-C통일-제거및구현-진단.md` PR e) — C 흐름(`/biz-signup` 자가가입 → PR #115 검토 → 승인 → 현황판) 전체 검증 완료. 기존 (A) BizMyStorePage 자가등록 + (B) StoresManagePage PR #111 직접 등록 모달 통째 제거. 룰/Cloud Functions/PR #115 검토 모달/BizAccountsPage 모두 보존
+- **(A) 제거 — `src/pages/admin/BizMyStorePage.vue`**:
+  - **마크업**:
+    - "신규 등록 안내" 섹션 (`!myStores.length && !creating`) → "연결된 업소가 없습니다" 안내 + "gangtox.com 업체 회원가입 →" 외부 링크로 교체
+    - 폼 섹션 `v-else-if="creating || currentStore"` → `v-else-if="currentStore"` (creating 분기 제거)
+    - 승인 대기 배너 `v-if="!creating && isPending(currentStore)"` → `v-if="isPending(currentStore)"` (의미 그대로)
+    - 폼 헤더 분기 → `{{ currentStore.name || '(이름 없음)' }} 정보 수정` 단순화
+    - 대표 이미지 `v-if="creating"` 안내 + `<template v-else>` wrapper → 직접 업로드 UI (수정 모드 일관)
+    - footer "취소" 버튼 (`v-if="creating"`) 제거
+    - footer 저장 라벨 분기 → `'저장'` 단순화
+  - **스크립트**:
+    - `creating = ref(false)` 제거
+    - `emptyForm()` / `startCreate()` / `cancelCreate()` 제거
+    - `triggerFilePick` 내 `if (creating.value) return` 가드 제거
+    - `onPickImage` 내 `if (creating.value) { ... }` 블록 제거
+    - `onSave` 내 `if (creating.value) return createNewStore()` 분기 제거
+    - **`createNewStore()` 본체 통째 제거** (~62 lines)
+    - import 에서 `setDoc` 제거 (createNewStore 외 미사용)
+  - **CSS**: `.biz-image-notice` 룰 + 다크모드 보정 제거 (마크업과 함께 사라진 orphan)
+  - **보존**: 가게 정보 수정 / 비밀번호 변경 / 이미지 업로드 / `myStores` select / `startStoresWatch` 전부 그대로
+- **(B) 제거 — `src/pages/admin/StoresManagePage.vue`**:
+  - **마크업**:
+    - Tab 1 헤더 `.adm-section-actions` 내 "+ 새 업소 등록" 버튼 제거 (저장 버튼만 남음, 그룹 div 보존)
+    - 검토 모달과 별개의 "새 업소 등록 모달" 통째 (193 라인) 제거 (`<div v-if="createStore.open">` 부터 `</div>` 까지)
+  - **스크립트** (~305 lines 제거):
+    - 주석 헤더 `/* 새 업소 등록 모달 — 관리자 직접 등록 + 계정 생성/연결 통합 */`
+    - `fnCreateBiz` / `fnLinkStore` httpsCallable
+    - `emptyCreateStoreForm()` / `createStore = reactive({...})` / `createStoreWageDisplay` / `onCreateStoreWageInput`
+    - `bizAccountsForDropdown` ref + `unsubBizAccounts` + `startBizAccountsWatch`
+    - `openCreateStore` / `closeCreateStore`
+    - `setResultStep` / `onSubmitCreateStore` / `runCreateBizForStore` / `runLinkExistingForStore` / `retryFailedStep` / `copyCreatedPassword`
+    - PR #111 전용 `onBeforeUnmount` 의 `unsubBizAccounts` 정리 (다른 unsubs 는 line :402 의 onBeforeUnmount 에 그대로)
+    - import 에서 `getAuth` 제거 (`firebase/auth` 자체 import 제거 — 다른 사용처 없음), `where` 제거 (PR #111 의 `users where type=='company'` 쿼리에서만 사용했음)
+    - `setDoc` 은 다른 곳 (`config/marketing` 저장) 에서 사용 중이라 import 유지
+  - **CSS** (~50 lines 제거):
+    - `.adm-radio-group / .adm-radio-row / .adm-radio-detail` (PR #111 라디오 3선택)
+    - `.adm-checkbox-row` (즉시 노출 옵션)
+    - `.adm-result-panel / .adm-result-steps / .adm-result-icon / .adm-result-label / .adm-result-detail / .adm-result-credentials / .adm-result-actions` (단계별 결과 패널)
+    - `.adm-form-error / .adm-hint-warning`
+    - 다크모드 보정: `.adm-radio-detail / .adm-result-panel / .adm-result-credentials / .adm-result-credentials code`
+  - **★ 보존 — PR #115 검토 모달과 공유**:
+    - 상수 `storeCategoryOptions` / `storeRegionOptions` / `storeWageTypeOptions` (PR #115 검토 모달 폼에서 사용 중)
+    - CSS `.adm-modal-mask / .adm-modal / .adm-modal-wide / .adm-modal-head / .adm-modal-close / .adm-modal-body / .adm-modal-foot / .adm-modal-section-title` (검토 모달도 같은 모달 클래스 사용)
+    - `.adm-form-grid-2 / .adm-field / .adm-chip-grid / .adm-chip` (폼 공용)
+    - `.adm-section-actions` (Tab 1 헤더 그룹, 저장 버튼만 남았지만 향후 확장 대비)
+    - 위 클래스들의 다크모드 보정 (`.adm-modal / .adm-field input / .adm-chip` 등)
+  - **★ 보존 — 기능**:
+    - Tab 1 노출/순서/기간 (SortableJS + adStart/adEnd) 그대로
+    - Tab 2 수동 지표 (PR #109 dirty 가드) 그대로
+    - Tab 3 승인대기 — 검토(PR #115) / 승인 / 거절 / 삭제 4 액션 그대로
+    - `approveStore` / `rejectStore` / `deleteStore` 함수 본체 그대로
+- **건드리지 않음**:
+  - **Cloud Functions** — `createBizAccount` / `linkStoreToBiz` / `resetBizPassword` / `deleteBizAccount` / `deleteStoreFull` 모두 보존 (BizAccountsPage 가 계속 사용 — 관리자 보조 도구)
+  - **BizAccountsPage** — 비밀번호 재설정 / 새 계정 생성 / 업소 연결 / 계정 삭제 모두 유지 (관리자 비상 도구)
+  - **PR #115 검토 모달** (`StoresManagePage` Tab 3) — 11 필드 폼 + 4 버튼 그대로 작동
+  - **PR #115 함수** `openReview / closeReview / onReviewSaveOnly / onReviewSaveAndApprove / onReviewReject / buildReviewFormPayload / reviewWageDisplay / onReviewWageInput`
+  - `firestore.rules` / `storage.rules` / partners (제휴처) / 여성회원 / 회원 빌드 다른 페이지
+  - BizMyStorePage 의 정보수정 / 이미지 업로드 / 비밀번호 변경
+- **흐름 (수정 후)**:
+  - 업체: **gangtox.com/biz-signup 만** 회원가입 진입점 (단일)
+  - 가입 → SMS 인증 → 업소 정보 → 제출 → Auth + users + stores(pending) 자동 생성
+  - 관리자: `/admin/stores` Tab 3 → 카드 "검토" → PR #115 모달 → 저장만 / 저장+승인 / 거절
+  - 승인 후 업체가 admin 도메인 로그인 → BizMyStorePage 에서 정보 수정 / 이미지 업로드 / 비번 변경
+  - 관리자 보조 — BizAccountsPage 에서 계정 생성/연결/비번 재설정 (자가가입 외 흐름 필요 시)
+- **빌드 검증**:
+  - `npm run build:admin` ✓ (**StoresManagePage JS 41.66→27.39KB, -14.27KB**, BizMyStorePage JS 16.40→14.40KB, -2.00KB)
+  - `npm run build` ✓ (회원 영향 없음)
+- **배포 범위**: `firebase deploy --only hosting:admin` (관리자 빌드만, 룰/Functions/회원 변경 없음)
+- **검증 시나리오 (사용자 수동)**:
+  - [ ] BizMyStorePage — 기존 업소 보유 업체 로그인 → 정보 수정 정상 / 이미지 업로드 정상 / 비번 변경 정상
+  - [ ] BizMyStorePage — 연결된 업소 없는 계정 로그인 → "gangtox.com 업체 회원가입" 외부 링크만 노출 (자가등록 모드 없음)
+  - [ ] StoresManagePage Tab 1 — "+ 새 업소 등록" 버튼 사라짐. 노출/순서/기간 정상
+  - [ ] StoresManagePage Tab 2 — 수동 지표 + PR #109 가드 정상
+  - [ ] StoresManagePage Tab 3 — pending 카드 "검토" 버튼 → PR #115 모달 정상 (11 필드 폼, 4 버튼)
+  - [ ] /biz-signup 가입 → Tab 3 등장 → 검토 → 승인 → gangtox.com 현황판 노출 (E2E)
+  - [ ] BizAccountsPage — 비번 재설정 / 새 계정 생성 / 업소 연결 / 계정 삭제 정상
+  - [ ] 여성회원 가입/로그인 회귀 없음
+  - [ ] partners (제휴처) 영향 없음
+
 ### 2026-06-22: 관리자 승인 화면 확장 — 검토 모달 (저장만/저장+승인/거절) (`feat/admin-review-approve-form`)
 - **목적**: 진단(`docs/audit/2026-06-22-관리자-승인화면-수정승인-진단.md` PR d) — 업체가 `/biz-signup` (PR #113) 으로 제출한 pending 업소를 관리자가 "검토" 클릭 시 입력 11 필드를 폼으로 보여주고, 수정 후 저장만/저장+승인/거절(사유) 처리. 룰/Cloud Function 변경 0
 - **이전 갭**: pending 카드 (`StoresManagePage.vue:159-178`) 가 4 필드(name/region/category/ownerEmail/createdAt) 만 표시, 클릭 핸들러 없음, 액션 3 버튼(승인/거절/삭제) 만. 사용자 입력 7 필드(phone/desc/detailDesc/address/hours/closed/wage/wageType) 확인 불가

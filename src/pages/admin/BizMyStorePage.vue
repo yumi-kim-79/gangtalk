@@ -22,31 +22,32 @@
       </label>
     </section>
 
-    <!-- 신규 등록 안내 (연결된 업소 없음 + 등록 모드 아님) -->
-    <section v-if="!loading && !myStores.length && !creating" class="adm-section">
-      <h3 class="adm-section-title">새 출근업소 등록</h3>
+    <!-- 연결된 업소 없음 안내 (PR e: 자가등록 제거 — 신규 등록은 gangtox.com/biz-signup) -->
+    <section v-if="!loading && !myStores.length" class="adm-section">
+      <h3 class="adm-section-title">연결된 업소가 없습니다</h3>
       <p class="adm-empty">
-        아직 등록된 업소가 없습니다.<br />
-        본인 출근업소 정보를 입력해 등록을 신청해 주세요.<br />
-        관리자 승인 후 사용자 화면(현황판)에 노출됩니다.
+        본 계정에 연결된 출근업소가 없습니다.<br />
+        새 업소 등록은 강남톡방 메인 사이트에서 진행해 주세요.<br />
+        이미 신청한 경우, 관리자 승인 후 본 화면에 자동으로 표시됩니다.
       </p>
       <div style="text-align:center; margin-top:12px;">
-        <button class="adm-btn primary big" type="button" @click="startCreate">
-          새 업소 등록 시작
-        </button>
+        <a
+          class="adm-btn primary big"
+          href="https://www.gangtox.com/biz-signup"
+        >gangtox.com 업체 회원가입 →</a>
       </div>
     </section>
 
-    <!-- 폼 (수정 모드 또는 신규 등록 모드) -->
-    <section v-else-if="creating || currentStore" class="adm-section">
+    <!-- 폼 (기존 업소 수정 모드) -->
+    <section v-else-if="currentStore" class="adm-section">
       <!-- 승인 대기 안내 (이미 등록됐지만 승인 전) -->
-      <div v-if="!creating && isPending(currentStore)" class="biz-pending-banner">
+      <div v-if="isPending(currentStore)" class="biz-pending-banner">
         <strong>⏳ 승인 대기 중입니다</strong>
         <span>관리자 승인 후 사용자 현황판에 노출됩니다. 정보는 계속 수정 가능합니다.</span>
       </div>
 
       <h3 class="adm-section-title">
-        {{ creating ? '새 출근업소 등록 신청' : `${currentStore.name || '(이름 없음)'} 정보 수정` }}
+        {{ currentStore.name || '(이름 없음)' }} 정보 수정
       </h3>
 
       <div class="adm-form-grid">
@@ -143,52 +144,34 @@
 
         <div class="adm-field full">
           <span>대표 이미지</span>
-
-          <!-- 신규 등록 모드: 업로드 비활성 + 안내 (storage.rules 의 isStoreOwner 가
-               firestore.exists(stores/{id}) 를 요구하므로 stores doc 생성 전엔 업로드 불가) -->
-          <div v-if="creating" class="biz-image-notice">
-            <strong>📷 대표 이미지는 등록 승인 후 업로드할 수 있습니다.</strong>
-            <span>먼저 텍스트 정보만 입력해 등록을 신청해 주세요. 승인 후 본 화면에서 사진을 첨부할 수 있습니다.</span>
-          </div>
-
-          <!-- 수정 모드 (기존 store 보유): 기존 업로드 흐름 그대로 -->
-          <template v-else>
-            <div class="adm-thumb-row">
-              <input
-                ref="fileInputRef"
-                type="file"
-                accept="image/*"
-                class="adm-thumb-file"
-                :disabled="uploading"
-                @change="onPickImage"
-              />
-              <button
-                type="button"
-                class="adm-btn"
-                :disabled="uploading"
-                @click="triggerFilePick"
-              >{{ uploading ? '업로드 중…' : '사진 선택' }}</button>
-            </div>
+          <div class="adm-thumb-row">
             <input
-              v-model.trim="form.thumb"
-              type="text"
-              placeholder="또는 이미지 URL 직접 입력 (https://...)"
+              ref="fileInputRef"
+              type="file"
+              accept="image/*"
+              class="adm-thumb-file"
+              :disabled="uploading"
+              @change="onPickImage"
             />
-            <img v-if="form.thumb" :src="form.thumb" class="adm-thumb-preview" alt="대표 이미지" />
-          </template>
+            <button
+              type="button"
+              class="adm-btn"
+              :disabled="uploading"
+              @click="triggerFilePick"
+            >{{ uploading ? '업로드 중…' : '사진 선택' }}</button>
+          </div>
+          <input
+            v-model.trim="form.thumb"
+            type="text"
+            placeholder="또는 이미지 URL 직접 입력 (https://...)"
+          />
+          <img v-if="form.thumb" :src="form.thumb" class="adm-thumb-preview" alt="대표 이미지" />
         </div>
       </div>
 
       <footer class="adm-section-foot">
-        <button
-          v-if="creating"
-          class="adm-btn"
-          type="button"
-          :disabled="saving"
-          @click="cancelCreate"
-        >취소</button>
         <button class="adm-btn primary big" type="button" :disabled="saving" @click="onSave">
-          {{ saving ? '저장 중…' : (creating ? '등록 신청' : '저장') }}
+          {{ saving ? '저장 중…' : '저장' }}
         </button>
       </footer>
     </section>
@@ -263,7 +246,7 @@ import {
 } from 'firebase/auth'
 import { db as fbDb, storage as fbStorage } from '@/firebase'
 import {
-  collection, doc, onSnapshot, updateDoc, setDoc,
+  collection, doc, onSnapshot, updateDoc,
   query, where, serverTimestamp,
 } from 'firebase/firestore'
 import {
@@ -393,8 +376,6 @@ const uploading = ref(false)
 
 function triggerFilePick() {
   if (uploading.value) return
-  // 신규 등록 모드는 마크업에서 업로드 영역 자체를 가림 — 방어 차원 silent no-op
-  if (creating.value) return
   if (!currentStore.value?.id) {
     alert('가게가 선택되지 않았습니다.')
     return
@@ -425,11 +406,6 @@ async function fileToJpegBlob(file, maxW = 1280, quality = 0.85) {
 async function onPickImage(e) {
   const file = (e.target.files || [])[0]
   if (!file) return
-  // 신규 등록 모드 방어 — 마크업에서 input 자체가 숨어있지만 race 시 silent no-op
-  if (creating.value) {
-    try { e.target.value = '' } catch {}
-    return
-  }
   const storeId = currentStore.value?.id
   if (!storeId) {
     alert('가게가 선택되지 않았습니다.')
@@ -472,35 +448,14 @@ function isPending(s) {
   return false
 }
 
-/* ───────── 신규 등록 모드 ───────── */
-const creating = ref(false)
-
-function emptyForm() {
-  return {
-    name: '', phone: '', desc: '', detailDesc: '',
-    address: '', hours: '', closed: '', thumb: '',
-    category: 'hopper', region: '강남',
-    wage: 0, wageType: 'hourly',
-  }
-}
-
-function startCreate() {
-  creating.value = true
-  selectedStoreId.value = ''
-  form.value = emptyForm()
-}
-
-function cancelCreate() {
-  creating.value = false
-  // 기존 stores 있으면 첫 번째로 복귀, 없으면 신규 안내 화면으로
-  if (stores.value[0]) selectedStoreId.value = stores.value[0].id
-}
-
+/* ───────── 저장 ─────────
+ * 신규 등록(creating/createNewStore) 은 PR e (2026-06-22) 에서 제거됨.
+ * 신규 등록 흐름은 회원 빌드의 /biz-signup (PR #112/#113) 으로 일원화.
+ * 본 페이지는 기존 업소 정보 수정 + 이미지 업로드 + 비밀번호 변경 전담.
+ */
 const saving = ref(false)
 async function onSave() {
   if (saving.value) return
-  if (creating.value) return createNewStore()
-
   const s = currentStore.value
   if (!s) return
   if (!form.value.name) {
@@ -532,70 +487,6 @@ async function onSave() {
   } catch (e) {
     console.error(e)
     alert('저장 실패: ' + (e?.message || e))
-  } finally {
-    saving.value = false
-  }
-}
-
-async function createNewStore() {
-  if (saving.value) return
-  if (!form.value.name) {
-    alert('업소명을 입력해 주세요.')
-    return
-  }
-  const uid = currentUid.value
-  const email = currentEmail.value
-  if (!uid) {
-    alert('로그인이 필요합니다.')
-    return
-  }
-
-  saving.value = true
-  try {
-    // Firestore auto-id 생성
-    const newId = doc(collection(fbDb, 'stores')).id
-
-    const payload = {
-      name:        form.value.name,
-      phone:       form.value.phone,
-      desc:        form.value.desc,
-      detailDesc:  form.value.detailDesc,
-      address:     form.value.address,
-      hours:       form.value.hours,
-      closed:      form.value.closed,
-      thumb:       form.value.thumb,
-      category:    form.value.category,
-      region:      form.value.region,
-      wage:        Number(form.value.wage || 0),
-      wageType:    form.value.wageType,
-
-      // 소유자 — firestore.rules:111 의 create 조건 (ownerId == auth.uid) 통과
-      ownerId:     uid,
-      ownerEmail:  email,
-
-      // 승인 대기 상태 — 사용자 화면(MainPage.isApproved) 자동 미노출
-      applyStatus: 'pending',
-      approved:    false,
-      'exposure.gangtalk': false,
-
-      thumbVer:    Date.now(),
-      createdAt:   serverTimestamp(),
-      updatedAt:   serverTimestamp(),
-    }
-    await setDoc(doc(fbDb, 'stores', newId), payload)
-
-    alert(
-      `'${form.value.name}' 업소 등록을 신청했습니다.\n` +
-      `관리자 승인 후 사용자 현황판에 노출됩니다.\n` +
-      `승인 전에도 정보는 계속 수정 가능합니다.`
-    )
-
-    // 신규 모드 종료 + 방금 만든 doc 자동 선택 (onSnapshot 이 곧 stores.value 갱신)
-    creating.value = false
-    selectedStoreId.value = newId
-  } catch (e) {
-    console.error(e)
-    alert('등록 실패: ' + (e?.message || e))
   } finally {
     saving.value = false
   }
@@ -715,26 +606,6 @@ async function onChangePassword() {
 :root[data-theme='dark'] .biz-pending-banner span,
 :root[data-theme='black'] .biz-pending-banner span{ color:#aaa; }
 
-/* 신규 등록 모드 — 대표 이미지 비활성 안내
- * storage.rules 의 isStoreOwner 가 firestore.exists(stores/{id}) 를 요구하므로
- * 신규 모드(stores doc 미생성)에서는 업로드 불가. 텍스트 정보만 먼저 등록 신청 → 승인 후 첨부.
- * 진단: docs/audit/2026-06-18-신규등록-이미지업로드-진단.md */
-.biz-image-notice{
-  display:flex; flex-direction:column; gap:4px;
-  padding:14px 16px;
-  background:#fff5f8;
-  border:1.5px dashed #ffd6e4;
-  border-radius:10px;
-  color:#ff2e7e;
-}
-.biz-image-notice strong{ font-size:14px; font-weight:800; }
-.biz-image-notice span{ font-size:12px; color:#888; line-height:1.5; }
-:root[data-theme='dark'] .biz-image-notice,
-:root[data-theme='black'] .biz-image-notice{
-  background:#2a1620; border-color:#3a2030; color:#ff86b9;
-}
-:root[data-theme='dark'] .biz-image-notice span,
-:root[data-theme='black'] .biz-image-notice span{ color:#999; }
 .adm-selector label{ display:flex; flex-direction:column; gap:6px; }
 .adm-selector span{ font-size:12px; font-weight:700; color:#666; }
 .adm-selector select{
