@@ -1417,10 +1417,15 @@ function refresh(){ loadPartners() }
   color:#ff4d8d !important;
   font-weight:800 !important;
 }
-/* 기존 .cat-icon (PNG 배경) 을 .cat-ico-circle 내부 32×32 로 표시 */
+/* 제휴관 카테고리 PNG 아이콘 — .cat-ico-circle (40px) 내부에 36×36 으로 표시.
+ * 진단: docs/audit/2026-06-22-제휴관-카테고리-라벨잘림-진단.md (PR fix/partners-cat-icon-crop)
+ *   사용자가 "라벨 잘림" 으로 본 진짜 원인은 라벨이 아니라 PNG 아이콘이
+ *   background-size 오버라이드 (50/40/35px) 로 32 컨테이너 밖으로 튀어 잘린 것.
+ *   해결: 컨테이너 32 → 36 (원형 40 의 90%) + background-size: contain 유지
+ *   + 4개 data-type (ps/skin/fit/deal) 의 background-size 강제 제거 (아래) */
 .pp-cat-scroll .cat-icon{
   display:block;
-  width:32px; height:32px;
+  width:36px; height:36px;
   background-size:contain;
   background-repeat:no-repeat;
   background-position:center;
@@ -1606,17 +1611,17 @@ function refresh(){ loadPartners() }
   background-size:80% auto;
 }
 
-/* 🔽 파일 이름은 예시야. 실제 만든 파일명에 맞게 수정하면 됨 */
+/* 9 카테고리 PNG 배경 — 컨테이너 36×36 + background-size: contain (위 정의) 일관 적용.
+ * 진단 fix (2026-06-22): 옛 background-size 오버라이드 (ps:35 / skin:50 / fit:40 / deal:50)
+ * 가 컨테이너 32 밖으로 튀어 잘렸음. 컨테이너 36 + contain 으로 통일 → 잘림 0. */
 /* 성형(ps) */
 .cat-icon[data-type="ps"]{
   background-image:url('/img/partners/cat-ps.png');
-  background-size:35px auto;  /* 기존 22px보다 크게 */
 }
 
 /* 피부(skin) */
 .cat-icon[data-type="skin"]{
   background-image:url('/img/partners/cat-skin.png');
-  background-size:50px auto;
 }
 
 /* 미용(beauty) */
@@ -1637,13 +1642,11 @@ function refresh(){ loadPartners() }
 /* 피트니스(fit) */
 .cat-icon[data-type="fit"]{
   background-image:url('/img/partners/cat-fit.png');
-  background-size:40px auto;
 }
 
 /* 공동구매(deal) */
 .cat-icon[data-type="deal"]{
   background-image:url('/img/partners/cat-deal.png');
-  background-size:50px auto;
 }
 
 /* 상품관(shop) */
