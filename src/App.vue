@@ -98,6 +98,17 @@ onMounted(async () => {
   --card-meta-padding: 10px;          /* Top5 카드 meta 패딩 (12 → 10) */
   --store-thumb-size:  80px;          /* 현황판 인기업소 정사각 썸네일 (96 → 80) */
   --store-card-pad:    10px 4px;      /* mp-store 패딩 (14/4 → 10/4) */
+
+  /* ===== PR 3 (2026-06-22): 강톡 커뮤니티 박스 컴팩트 =====
+   *   진단: docs/audit/2026-06-22-모바일-비율유지-축소-진단.md (§5)
+   *   4박스 (강톡/힐링톡/우리가게/이벤트톡) height + 내부 폰트/간격 균형 축소.
+   *   비율 유지 (height 만 줄임 — 박스 내부는 솔리드 배경, 이미지 없음). */
+  --gc-card-height:    110px;          /* gc-card height (130 → 110) */
+  --gc-card-padding:   10px;           /* gc-body padding (12 → 10) */
+  --gc-title-size:     16px;           /* gc-title font (18 → 16) */
+  --gc-grid-mb:        12px;           /* community-grid margin-bottom (18 → 12) */
+  --gc-best-tabs-mb:   10px;           /* best-tabs margin-bottom (14 → 10) */
+  --gt-section-head-mb: 8px;           /* gt-section-head margin (12 → 8) */
 }
 
 /* 앱 루트 최소 높이 */

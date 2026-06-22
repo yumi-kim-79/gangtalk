@@ -2630,7 +2630,8 @@ const FALLBACK_BIZ_IMG = 'https://images.unsplash.com/photo-1517248135467-4c7edc
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin: 0 0 12px 2px;
+  /* PR 3 (2026-06-22): margin-bottom 12 → 8 (토큰) */
+  margin: 0 0 var(--gt-section-head-mb, 8px) 2px;
 }
 .section-title{
   font-size: 17px;
@@ -2654,14 +2655,16 @@ const FALLBACK_BIZ_IMG = 'https://images.unsplash.com/photo-1517248135467-4c7edc
   grid-template-columns: 1fr 1fr;
   column-gap: 8px;
   row-gap: 8px;
-  margin-bottom: 18px;
+  /* PR 3 (2026-06-22): margin-bottom 18 → 12 (토큰) */
+  margin-bottom: var(--gc-grid-mb, 12px);
   background-color: var(--bg);
 }
 
 /* 카드 공통 */
 .gc-card{
   position: relative;
-  height: 130px;
+  /* PR 3 (2026-06-22): height 130 → 110 (토큰). 솔리드 배경, 이미지 없음 — 비율 자유 */
+  height: var(--gc-card-height, 110px);
   border-radius: 16px;
   overflow: hidden;
   cursor: pointer;
@@ -2688,8 +2691,9 @@ const FALLBACK_BIZ_IMG = 'https://images.unsplash.com/photo-1517248135467-4c7edc
 /* 우측 하단 화살표 (강톡 카드 전용) */
 .gc-arrow{
   position: absolute;
-  right: 12px;
-  bottom: 12px;
+  /* PR 3 (2026-06-22): 12 → 10 (카드 height 축소와 균형) */
+  right: 10px;
+  bottom: 10px;
   z-index: 2;
   color: rgba(255,255,255,.9);
 }
@@ -2699,7 +2703,8 @@ const FALLBACK_BIZ_IMG = 'https://images.unsplash.com/photo-1517248135467-4c7edc
   position: absolute;
   inset: 0;
   z-index: 2;
-  padding: 12px;
+  /* PR 3 (2026-06-22): padding 12 → 10 (토큰) */
+  padding: var(--gc-card-padding, 10px);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -2708,7 +2713,8 @@ const FALLBACK_BIZ_IMG = 'https://images.unsplash.com/photo-1517248135467-4c7edc
   text-align: center;
 }
 .gc-title{
-  font-size: 18px;
+  /* PR 3 (2026-06-22): font 18 → 16 (토큰), 카드 height 축소와 균형 */
+  font-size: var(--gc-title-size, 16px);
   font-weight: 900;
   letter-spacing: -0.3px;
   line-height: 1.1;
@@ -2727,7 +2733,8 @@ const FALLBACK_BIZ_IMG = 'https://images.unsplash.com/photo-1517248135467-4c7edc
 .gc-soon{
   position: absolute;
   left: 50%;
-  bottom: 10px;
+  /* PR 3 (2026-06-22): bottom 10 → 8 (카드 height 축소와 균형) */
+  bottom: 8px;
   transform: translateX(-50%);
   z-index: 2;
   padding: 4px 10px;
@@ -3268,7 +3275,8 @@ const FALLBACK_BIZ_IMG = 'https://images.unsplash.com/photo-1517248135467-4c7edc
 .best-tabs{
   display: flex;
   gap: 6px;
-  margin-bottom: 14px;
+  /* PR 3 (2026-06-22): margin-bottom 14 → 10 (토큰) */
+  margin-bottom: var(--gc-best-tabs-mb, 10px);
 }
 .pill-tab{
   height: 30px;
