@@ -134,6 +134,74 @@ firebase deploy --only hosting:admin
 
 ## 작업 로그
 
+### 2026-06-22: 관리자 새 업소 등록 모달 — 계정 생성 + 연결 통합 (`feat/admin-store-register-with-account`)
+- **목적**: 진단(`docs/audit/2026-06-22-관리자-업소등록-계정생성-연결-진단.md`) — 관리자가 출근업소(stores) 직접 등록 + 업체 계정 생성/연결을 한 모달에서 처리. createBizAccount + linkStoreToBiz 재활용. 룰/Cloud Function 변경 0
+- **수정 — `src/pages/admin/StoresManagePage.vue` 만**:
+  - **import 확장**: `vue` 에서 `reactive` 추가. `firebase/auth getAuth`, `firebase/firestore` 에서 `where` 추가
+  - **Tab 1 헤더에 "+ 새 업소 등록" 버튼** 추가 (저장 버튼 옆 `.adm-section-actions` 그룹)
+  - **모달 마크업** (~180줄) — wide 모달:
+    - 업소 정보 폼 (가게명/전화/카테고리 칩 9개/지역 칩 4개/한줄소개/상세/주소/영업시간/휴무일/시급 칩 4개+금액/대표이미지 URL)
+    - 업체 처리 라디오 3선택: 신규 계정 생성(이메일/비번) / 기존 계정 연결(드롭다운) / 미연결(default)
+    - 옵션: ☐ 즉시 승인+노출 (default OFF)
+    - 등록 결과 패널 (단계별 ✅/❌/⏳ 표시, 부분 실패 시 재시도 버튼)
+    - 새 계정 비번 안내 + 클립보드 복사 버튼
+  - **스크립트** (~280줄):
+    - `storeCategoryOptions` 9개 (hopper/point5/ten/tenpro/onep/nrb/kara/bar/etc — **출근업소 키 전용, partners 키 혼용 금지**)
+    - `storeRegionOptions` / `storeWageTypeOptions`
+    - `fnCreateBiz / fnLinkStore` httpsCallable
+    - `createStore` reactive 상태 (form, bizMode, newAccount, existingBizUid, immediateExpose, result)
+    - `bizAccountsForDropdown` ref — `users where type='company' && accountKind='storeOwner'` onSnapshot (BizAccountsPage 패턴 재활용)
+    - `openCreateStore / closeCreateStore` — 모달 토글 + 초기화
+    - `onSubmitCreateStore` — 진단 옵션 A 흐름:
+      1. `storeId = doc(collection('stores')).id` 미리 발급
+      2. `setDoc(stores/{storeId}, { ...form, ownerId: ADMIN_UID, applyStatus, approved, exposure.gangtalk })` — rules:111 통과
+      3. bizMode 분기:
+        - 'new': `fnCreateBiz({ email, password, storeName, storeId })` — Auth+users+stores 연결 한번에
+        - 'existing': `fnLinkStore({ storeId, bizUid, bizEmail })` — 업체 양도
+        - 'none': stores 생성만 (admin uid 잔존)
+    - `runCreateBizForStore` / `runLinkExistingForStore` — 분기 실행 + 결과 표시
+    - 에러 메시지 한국어 매핑:
+      - `email-already-exists` → "이미 가입된 이메일. '기존 업체 연결'로 전환 또는 다른 이메일"
+      - `invalid-argument` → "이메일/비밀번호 형식 재확인"
+      - `internal` (Firestore 실패) → "Auth 계정만 생성됐을 수 있습니다(고아). Firebase Console 또는 deleteBizAccount 정리"
+    - `retryFailedStep` — 실패한 단계만 재시도 (createBiz 또는 link)
+    - `copyCreatedPassword` — 비번 클립보드 복사
+  - **CSS** (~140줄):
+    - `.adm-modal-wide` (max-width 720px), `.adm-modal-section-title` (h4 톤), `.adm-form-grid-2` (2열 반응형)
+    - `.adm-chip` / `.adm-chip.on` (선택 핑크), `.adm-radio-group` / `.adm-radio-detail` (라디오 들여쓰기)
+    - `.adm-result-panel` / `.adm-result-steps` / `.adm-result-credentials` (비번 박스, 핑크 톤)
+    - 다크모드 보정
+- **흐름 검증 (진단 옵션 A 구현)**:
+  - **신규 업체**: storeId 발급 → `setDoc(stores, admin uid)` → `fnCreateBiz({ email, password, storeName, storeId })` → Auth + users + stores.ownerId 양도 (단일 함수 호출로 통합)
+  - **기존 업체**: storeId 발급 → setDoc → `fnLinkStore({ storeId, bizUid, bizEmail })` → 양도
+  - **미연결**: storeId 발급 → setDoc(stores, admin uid 잔존) — BizAccountsPage 에서 나중에 연결 가능
+- **부분 실패 처리**:
+  - 단계별 결과 패널에 ✅/❌/⏳ 표시 + 상세 메시지
+  - createBiz 실패 시 → "🔁 업체 계정 생성 재시도" 버튼 (같은 storeId 로 재시도)
+  - link 실패 시 → "🔁 업체 연결 재시도" 버튼
+  - stores write 실패 시 → 종료 (변경 0)
+- **건드리지 않음**:
+  - **Cloud Functions** — createBizAccount / linkStoreToBiz 모두 재활용 (변경 0)
+  - **firestore.rules** — stores create/update / users read 모두 통과 (변경 0)
+  - **BizMyStorePage** — 자가등록 흐름 그대로 (StoreFormFields 분리는 회귀 위험으로 비채택)
+  - **BizAccountsPage** — 기존 "새 계정 생성" / "업소 연결" 모달 그대로 (다른 진입점)
+  - **승인 파이프라인** — `approveStore`(Tab 3) 그대로. 즉시 승인 옵션은 등록 시 분기
+  - 회원 빌드 / 다른 admin 페이지
+- **카테고리 키 안전**: 출근업소 전용 (`hopper/point5/ten/tenpro/onep/nrb/kara/bar/etc`) — partners 카테고리 (`ps/skin/beauty/...`) 혼용 금지
+- **빌드 검증**: `npm run build:admin` ✓ (StoresManagePage JS 18.31→32.73KB +14.42KB, CSS 7.67→13.65KB +5.98KB) / 회원 빌드 영향 없음
+- **배포 범위**: `firebase deploy --only hosting:admin` (관리자 빌드만, Cloud Functions/룰 변경 없음)
+- **검증 시나리오 (사용자 수동)**:
+  - [x] /admin/stores Tab 1 헤더에 "+ 새 업소 등록" 버튼 노출
+  - [x] 모달: 업소 폼 + 라디오 3선택 + 즉시노출 체크박스 정상 표시
+  - [x] **신규 업체**: 이메일/비번/업소정보 입력 → 등록 → Auth + users + stores 연결 + 결과 패널에 비번 표시. 그 계정으로 로그인 시 BizMyStorePage 에 자기 업소로 보이고 수정 가능
+  - [x] **기존 업체 연결**: 드롭다운에서 선택 → 등록 → stores.ownerId 양도. 해당 업체에 보임
+  - [x] **미연결**: stores 만 admin 소유로 생성 (BizAccountsPage 에서 나중에 연결 가능)
+  - [x] **즉시노출 ON**: 사용자 현황판 즉시 표시
+  - [x] **즉시노출 OFF**: Tab 3 승인대기에 표시 → `approveStore` 로 노출
+  - [x] 이메일 중복 시 안내 표시 + stores 는 admin 소유로 잔존
+  - [x] 부분 실패 시 단계별 결과 + 재시도 버튼 작동
+  - [x] BizMyStorePage 자가등록 / BizAccountsPage 회귀 없음
+
 ### 2026-06-21: 현황판 DIAG 로그 전체 제거 (원인 규명 완료) (`chore/remove-mainpage-diag`)
 - **목적**: PR #108 로 추가한 [DIAG-*] 로그가 PR #109 (admin 일괄 저장 가드) 로 원인 규명 완료. DIAG 임무 종료 → 정리
 - **수정 — `src/pages/MainPage.vue` 만 (제거만)**:
