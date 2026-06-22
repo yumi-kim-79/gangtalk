@@ -1454,7 +1454,8 @@ function refresh(){ loadPartners() }
   padding-bottom:6px;
 }
 .pp-top-sec .rs-card{
-  min-width:200px;
+  /* PR 2 (2026-06-22): min-width 200 → 180 (토큰) */
+  min-width: var(--card-min-width, 180px);
   border:none !important;
   border-radius:14px !important;
   box-shadow:0 4px 14px rgba(0,0,0,.08) !important;
@@ -1462,8 +1463,12 @@ function refresh(){ loadPartners() }
   background:#fff;
 }
 .pp-top-sec .rs-thumb{
-  height:140px !important;
+  /* PR 2 (2026-06-22): height 고정 → aspect-ratio 로 비율 유지. 잘림 0 */
+  height:auto !important;
   padding-top:0 !important;
+  width:100%;
+  aspect-ratio: var(--card-thumb-aspect, 16 / 9);
+  /* contain 베이스 (rs-thumb :1801) 유지 — 잘림 0 + 빈 공간은 배경색 */
 }
 .pp-top-sec .rs-badge{
   left:10px; top:10px;
@@ -1471,7 +1476,8 @@ function refresh(){ loadPartners() }
   font-size:12px;
 }
 .pp-top-sec .rs-info{
-  padding:12px !important;
+  /* PR 2 (2026-06-22): padding 12 → 10 (토큰) */
+  padding: var(--card-meta-padding, 10px) !important;
   gap:4px;
 }
 .pp-top-sec .rs-title{

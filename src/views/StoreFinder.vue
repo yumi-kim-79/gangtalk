@@ -1992,15 +1992,19 @@ function toggleSort(){ ui.value.sortOpen = !ui.value.sortOpen; if(ui.value.sortO
   padding-bottom:6px;
 }
 .sf-tops :deep(.mini){
-  min-width:200px;
+  /* PR 2 (2026-06-22): min-width 200 → 180 (토큰) */
+  min-width: var(--card-min-width, 180px);
   border:none !important;
   border-radius:14px !important;
   box-shadow:0 4px 14px rgba(0,0,0,.08) !important;
   overflow:hidden;
 }
 .sf-tops :deep(.m-thumb){
+  /* PR 2 (2026-06-22): height 고정 → aspect-ratio 로 비율 유지. 잘림 0 */
   padding-top:0 !important;
-  height:140px !important;
+  height:auto !important;
+  aspect-ratio: var(--card-thumb-aspect, 16 / 9);
+  width:100%;
 }
 .sf-tops :deep(.rank){
   left:10px; top:10px;
@@ -2008,12 +2012,38 @@ function toggleSort(){ ui.value.sortOpen = !ui.value.sortOpen; if(ui.value.sortO
   font-size:12px;
 }
 .sf-tops :deep(.m-meta){
-  padding:12px !important;
+  /* PR 2 (2026-06-22): padding 12 → 10 (토큰) */
+  padding: var(--card-meta-padding, 10px) !important;
   gap:4px !important;
 }
+
+/* PR 2 (2026-06-22): "업체명 + 강남·하퍼" 한 줄 가로 배치 (마크업은 이미 의도, CSS 누락 보완).
+   진단: docs/audit/2026-06-22-모바일-비율유지-축소-진단.md §4-2 */
+.sf-tops :deep(.name-row){
+  display:flex;
+  align-items:baseline;
+  gap:6px;
+  min-width:0;
+}
+.sf-tops :deep(.m-sub){
+  flex:1;
+  min-width:0;
+  font-size:12px;
+  color:#888;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+
 .sf-tops :deep(.m-name){
   font-size:16px !important;
   font-weight:800 !important;
+  /* name-row 안에서 sub 가 자리 잡도록 max-width 제한 */
+  flex:0 1 auto;
+  max-width:65%;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
 }
 .sf-tops :deep(.ad-title){
   font-size:13px !important;
