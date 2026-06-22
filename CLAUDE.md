@@ -134,6 +134,46 @@ firebase deploy --only hosting:admin
 
 ## 작업 로그
 
+### 2026-06-22: 제휴관 카테고리 PNG 아이콘 잘림 해결 (`fix/partners-cat-icon-crop`)
+- **목적**: 진단(`docs/audit/2026-06-22-제휴관-카테고리-라벨잘림-진단.md`) — 사용자가 "라벨 잘림" 으로 본 진짜 원인은 라벨이 아니라 PNG 아이콘. `.cat-icon` 컨테이너 32px 안에서 `background-size: 50/40/35px` 오버라이드 강제로 PNG 가 좌우/상하 잘림 → 시각적 답답함 → "라벨 잘림" 인상. 라벨 자체는 412/360px 모두 잘림 0
+- **수정 — `src/pages/PartnersPage.vue` 단일 파일**:
+  - **`.pp-cat-scroll .cat-icon` 컨테이너 32 → 36 (`PartnersPage.vue:1420-1428`)**:
+    - `width: 32px → 36px`
+    - `height: 32px → 36px`
+    - 원형 `.cat-ico-circle` 40px 의 90% 활용 (안전 여유 4px)
+    - `background-size: contain` 그대로 유지 (비율 자동)
+  - **4개 카테고리 `background-size` 오버라이드 제거** (`:1611-1657`):
+    - `ps` (성형외과): `background-size: 35px auto` 삭제
+    - `skin` (피부): `background-size: 50px auto` 삭제 ← 가장 심한 잘림
+    - `fit` (피트니스): `background-size: 40px auto` 삭제
+    - `deal` (공동구매): `background-size: 50px auto` 삭제 ← 가장 심한 잘림
+    - 나머지 5개 (beauty/nail/real/shop/etc) 는 원래도 오버라이드 없음 → 영향 0
+  - 결과: 9 카테고리 모두 컨테이너 36×36 + `background-size: contain` 일관 적용 → PNG 비율 유지로 정확히 들어감, 잘림 0
+- **효과**:
+  - **잘림 0**: ps/skin/fit/deal 4개 모두 PNG 가 원본 비율 유지하며 컨테이너 안에 contain
+  - **사용자 인식 "라벨 잘림"** 해소 (사실 라벨이 아닌 아이콘 답답함이었음)
+  - 라벨/폰트/원형 size 변경 0 (사용자 명시 — 스케일 축소는 악화라 안 함)
+- **건드리지 않음**:
+  - `--cat-icon-size` / `--cat-label-size` 토큰 그대로 (40px / 10.5px)
+  - 라벨 자체 (`.lbl`) — 잘림 없음 검증됨 (진단 §3)
+  - MainPage / StoreFinder 카테고리 (SVG inline 아이콘, 별개)
+  - 카테고리 그리드 / 원형 / 라벨 / active 핑크 그라디언트
+  - 다른 페이지 / 기능 / 라우터 / 룰 / Functions / admin 빌드
+- **PNG 정상화 메커니즘**:
+  - 이전: 32 컨테이너 + 50 background → 좌우 9px 씩 잘림 (skin/deal)
+  - 이후: 36 컨테이너 + contain → PNG 가 원본 비율 유지하며 36 안에 맞춤 (잘림 0)
+  - contain 은 컨테이너보다 작은 PNG 면 그대로, 큰 PNG 면 비율 유지 축소
+- **빌드 검증**: `npm run build` ✓ (회원 index 228KB 유지, CSS only)
+- **배포 범위**: `firebase deploy --only hosting:prod` (회원 빌드만)
+- **검증 시나리오 (사용자 수동)**:
+  - [ ] 제휴관 진입 → 9 카테고리 아이콘 모두 원형 안에 정확히 (잘림 0)
+  - [ ] 피부/공동구매/성형외과/피트니스 4개 — 이전 잘렸던 부분이 온전히 보임
+  - [ ] 아이콘 크기 적절 (너무 작거나 크지 않음)
+  - [ ] 라벨 그대로 (변경 없음, 원래 안 잘렸음)
+  - [ ] active 시 핑크 그라디언트 + PNG 흰색 filter 정상
+  - [ ] 현황판/가게찾기 카테고리 — 영향 0 (SVG, 별개)
+  - [ ] 다크모드 정상
+
 ### 2026-06-22: 모바일 컴팩트 3b — 강톡 커뮤니티 4박스 추가 압축 (92px) (`feat/mobile-compact-3b-community-tighter`)
 - **목적**: 진단(`docs/audit/2026-06-22-모바일-비율유지-축소-진단.md` §5) PR #121 후속 — 4박스 더 축소 (110 → 92) 해 인기글 리스트가 더 위로. 92px 카드에 맞춰 내부 비례 재조정 (찌그러짐 없음)
 - **수정 — `src/App.vue` 토큰 값 6종 재조정** (PR #121 토큰 그대로 활용, 값만):
