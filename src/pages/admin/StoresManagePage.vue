@@ -164,7 +164,8 @@
             <span class="adm-store-sub muted">신청자: {{ s.ownerEmail || s.ownerId || '-' }} · {{ fmtTime(s.createdAt) }}</span>
           </div>
           <div class="adm-row-actions">
-            <button class="adm-btn primary" type="button" @click="approveStore(s)">승인</button>
+            <button class="adm-btn primary" type="button" @click="openReview(s)">검토</button>
+            <button class="adm-btn ghost" type="button" @click="approveStore(s)">승인</button>
             <button class="adm-btn ghost" type="button" @click="rejectStore(s)">거절</button>
             <button
               class="adm-btn danger"
@@ -178,6 +179,176 @@
       </ul>
       <p v-else class="adm-empty">대기 중인 신청이 없습니다.</p>
     </section>
+
+    <!-- ===== 검토 모달 (pending 업소 수정 + 승인/거절) ===== -->
+    <!-- 진단: docs/audit/2026-06-22-관리자-승인화면-수정승인-진단.md (PR d)
+         업체가 /biz-signup 으로 제출한 11 필드를 폼으로 표시 + 수정.
+         푸터 4 버튼: 저장만 / 저장+승인 / 거절(사유) / 취소.
+         이미지는 정책 유지(승인 후 BizMyStore 에서 업체가 직접 업로드). -->
+    <div v-if="review.open" class="adm-modal-mask" @click.self="closeReview">
+      <div class="adm-modal adm-modal-wide" role="dialog" aria-modal="true">
+        <header class="adm-modal-head">
+          <strong>업소 등록 신청 검토</strong>
+          <button class="adm-modal-close" type="button" @click="closeReview">✕</button>
+        </header>
+
+        <div class="adm-modal-body">
+          <!-- 신청자 정보 (읽기 전용) -->
+          <h4 class="adm-modal-section-title">신청자 정보</h4>
+          <div class="adm-review-applicant">
+            <div class="adm-review-row">
+              <span class="adm-review-label">이메일</span>
+              <span class="adm-review-value">{{ review.applicant.email || '-' }}</span>
+            </div>
+            <div class="adm-review-row">
+              <span class="adm-review-label">휴대폰 (SMS 인증)</span>
+              <span class="adm-review-value">{{ review.applicant.phone || '-' }}</span>
+            </div>
+            <div class="adm-review-row">
+              <span class="adm-review-label">신청일</span>
+              <span class="adm-review-value">{{ fmtTime(review.applicant.createdAt) }}</span>
+            </div>
+          </div>
+
+          <!-- 업소 정보 폼 (11 필드, 수정 가능) -->
+          <h4 class="adm-modal-section-title">업소 정보 (수정 가능)</h4>
+          <div class="adm-form-grid-2">
+            <label class="adm-field">
+              <span>가게명 *</span>
+              <input v-model.trim="review.form.name" type="text" placeholder="가게 이름" />
+            </label>
+            <label class="adm-field">
+              <span>매장 전화</span>
+              <input v-model.trim="review.form.phone" type="tel" placeholder="010-0000-0000" />
+            </label>
+          </div>
+
+          <div class="adm-field">
+            <span>카테고리</span>
+            <div class="adm-chip-grid">
+              <button
+                v-for="c in storeCategoryOptions"
+                :key="c.key"
+                type="button"
+                class="adm-chip"
+                :class="{ on: review.form.category === c.key }"
+                @click="review.form.category = c.key"
+              >{{ c.label }}</button>
+            </div>
+          </div>
+
+          <div class="adm-field">
+            <span>지역</span>
+            <div class="adm-chip-grid">
+              <button
+                v-for="r in storeRegionOptions"
+                :key="r"
+                type="button"
+                class="adm-chip"
+                :class="{ on: review.form.region === r }"
+                @click="review.form.region = r"
+              >{{ r }}</button>
+            </div>
+          </div>
+
+          <label class="adm-field">
+            <span>한 줄 소개</span>
+            <input v-model.trim="review.form.desc" type="text" maxlength="40" placeholder="가게 한 줄 소개 (16자 내외)" />
+          </label>
+          <label class="adm-field">
+            <span>상세 설명</span>
+            <textarea v-model.trim="review.form.detailDesc" rows="3" placeholder="가게 상세 설명"></textarea>
+          </label>
+
+          <label class="adm-field">
+            <span>주소</span>
+            <input v-model.trim="review.form.address" type="text" placeholder="가게 주소" />
+          </label>
+
+          <div class="adm-form-grid-2">
+            <label class="adm-field">
+              <span>영업시간</span>
+              <input v-model.trim="review.form.hours" type="text" placeholder="예: 18:00 - 02:00" />
+            </label>
+            <label class="adm-field">
+              <span>휴무일</span>
+              <input v-model.trim="review.form.closed" type="text" placeholder="예: 매주 일요일" />
+            </label>
+          </div>
+
+          <div class="adm-field">
+            <span>시급 / 일급 / 월급</span>
+            <div class="adm-chip-grid">
+              <button
+                v-for="w in storeWageTypeOptions"
+                :key="w.key"
+                type="button"
+                class="adm-chip"
+                :class="{ on: review.form.wageType === w.key }"
+                @click="review.form.wageType = w.key"
+              >{{ w.label }}</button>
+            </div>
+          </div>
+          <label class="adm-field">
+            <span>금액 (원)</span>
+            <input
+              :value="reviewWageDisplay"
+              @input="onReviewWageInput"
+              type="text"
+              inputmode="numeric"
+              placeholder="예: 15000"
+            />
+          </label>
+
+          <!-- 이미지 정책 안내 (폼에서 제외) -->
+          <p class="adm-review-image-note">
+            📷 대표 이미지는 승인 후 업체가 직접 업로드합니다 (BizMyStore).
+            관리자 검토 단계에서는 이미지를 수정하지 않습니다.
+          </p>
+
+          <!-- 거절 사유 (거절 시 사용, 선택) -->
+          <h4 class="adm-modal-section-title">거절 사유 (거절 시 사용)</h4>
+          <label class="adm-field">
+            <textarea
+              v-model.trim="review.rejectReason"
+              rows="2"
+              placeholder="거절 사유를 입력하세요 (선택). 거절 버튼 클릭 시 함께 저장됩니다."
+            ></textarea>
+          </label>
+
+          <!-- 저장/처리 결과 -->
+          <p v-if="review.errorMsg" class="adm-result-error">{{ review.errorMsg }}</p>
+          <p v-if="review.successMsg" class="adm-result-success">{{ review.successMsg }}</p>
+        </div>
+
+        <footer class="adm-modal-foot adm-review-foot">
+          <button
+            class="adm-btn ghost"
+            type="button"
+            @click="closeReview"
+            :disabled="review.busy"
+          >취소</button>
+          <button
+            class="adm-btn danger"
+            type="button"
+            @click="onReviewReject"
+            :disabled="review.busy"
+          >{{ review.busy ? '처리 중…' : '거절' }}</button>
+          <button
+            class="adm-btn"
+            type="button"
+            @click="onReviewSaveOnly"
+            :disabled="review.busy"
+          >{{ review.busy ? '처리 중…' : '저장만 (pending 유지)' }}</button>
+          <button
+            class="adm-btn primary"
+            type="button"
+            @click="onReviewSaveAndApprove"
+            :disabled="review.busy"
+          >{{ review.busy ? '처리 중…' : '저장 + 승인' }}</button>
+        </footer>
+      </div>
+    </div>
 
     <!-- ===== 새 업소 등록 모달 (관리자 직접 등록 + 계정 생성/연결 통합) ===== -->
     <div v-if="createStore.open" class="adm-modal-mask" @click.self="closeCreateStore">
@@ -832,6 +1003,180 @@ async function rejectStore(s){
   }
 }
 
+/* =========================================================
+ * 탭 3 — 검토 모달 (PR d / 2026-06-22)
+ *   진단: docs/audit/2026-06-22-관리자-승인화면-수정승인-진단.md
+ *   업체가 /biz-signup 으로 제출한 11 필드 표시 + 수정 + 승인/거절.
+ *   approveStore / rejectStore 의 핵심 update 와 정합 (재호출 안 함 — form 통합 차이).
+ *   firestore.rules / Cloud Functions / partners / 이미지 정책 변경 0.
+ * ========================================================= */
+const review = reactive({
+  open: false,
+  busy: false,
+  storeId: '',
+  applicant: { email: '', phone: '', createdAt: null },
+  form: {
+    name: '', phone: '', category: 'hopper', region: '강남',
+    desc: '', detailDesc: '', address: '', hours: '', closed: '',
+    wage: 0, wageType: 'hourly',
+  },
+  rejectReason: '',
+  errorMsg: '',
+  successMsg: '',
+})
+
+const reviewWageDisplay = computed(() => {
+  const n = Number(review.form.wage || 0)
+  return n ? String(n) : ''
+})
+function onReviewWageInput(e) {
+  const digits = String(e.target.value || '').replace(/[^\d]/g, '')
+  review.form.wage = digits ? Number(digits) : 0
+}
+
+async function openReview(s) {
+  if (!s?.id) return
+  // 폼 11 필드 채우기 (얕은 복사 — 도중에 onSnapshot 갱신돼도 폼 보존)
+  review.storeId = s.id
+  review.form.name       = s.name       || ''
+  review.form.phone      = s.phone      || ''
+  review.form.category   = s.category   || 'hopper'
+  review.form.region     = s.region     || '강남'
+  review.form.desc       = s.desc       || ''
+  review.form.detailDesc = s.detailDesc || ''
+  review.form.address    = s.address    || ''
+  review.form.hours      = s.hours      || ''
+  review.form.closed     = s.closed     || ''
+  review.form.wage       = Number(s.wage || 0)
+  review.form.wageType   = s.wageType   || 'hourly'
+  // 신청자 정보 (stores) — 기본
+  review.applicant.email     = s.ownerEmail || ''
+  review.applicant.phone     = ''
+  review.applicant.createdAt = s.createdAt || null
+  // users(type=company) 추가 조회 — profile.phone (SMS 인증 휴대폰)
+  // 실패해도 모달 자체는 열림 (이메일/생성일은 stores 측에 이미 있음)
+  if (s.ownerId) {
+    try {
+      const usnap = await getDoc(doc(fbDb, 'users', s.ownerId))
+      if (usnap.exists()) {
+        const u = usnap.data() || {}
+        review.applicant.phone = u?.profile?.phone || ''
+        // 이메일 보강 (stores.ownerEmail 비어 있는 경우 대비)
+        if (!review.applicant.email) {
+          review.applicant.email = u?.profile?.email || ''
+        }
+      }
+    } catch (e) {
+      console.warn('[openReview] users getDoc fail:', e?.code || e?.message)
+    }
+  }
+  review.rejectReason = ''
+  review.errorMsg = ''
+  review.successMsg = ''
+  review.busy = false
+  review.open = true
+}
+
+function closeReview() {
+  if (review.busy) return
+  review.open = false
+  review.storeId = ''
+  review.errorMsg = ''
+  review.successMsg = ''
+}
+
+// 폼 11 필드만 추출 (소유자/상태/노출 필드 제외 — 이중 안전).
+// updateDoc 의 payload 베이스.
+function buildReviewFormPayload() {
+  return {
+    name:       review.form.name,
+    phone:      review.form.phone,
+    category:   review.form.category,
+    region:     review.form.region,
+    desc:       review.form.desc,
+    detailDesc: review.form.detailDesc,
+    address:    review.form.address,
+    hours:      review.form.hours,
+    closed:     review.form.closed,
+    wage:       Number(review.form.wage || 0),
+    wageType:   review.form.wageType,
+  }
+}
+
+async function onReviewSaveOnly() {
+  if (review.busy || !review.storeId) return
+  if (!review.form.name) { review.errorMsg = '가게명을 입력해 주세요.'; return }
+  review.busy = true
+  review.errorMsg = ''
+  review.successMsg = ''
+  try {
+    await updateDoc(doc(fbDb, 'stores', review.storeId), {
+      ...buildReviewFormPayload(),
+      updatedAt: serverTimestamp(),
+    })
+    review.successMsg = '저장되었습니다 (승인 대기 유지).'
+  } catch (e) {
+    review.errorMsg = '저장 실패: ' + (e?.message || e?.code || e)
+  } finally {
+    review.busy = false
+  }
+}
+
+async function onReviewSaveAndApprove() {
+  if (review.busy || !review.storeId) return
+  if (!review.form.name) { review.errorMsg = '가게명을 입력해 주세요.'; return }
+  if (!confirm(`'${review.form.name}' 을(를) 저장 후 즉시 승인하시겠습니까?`)) return
+  review.busy = true
+  review.errorMsg = ''
+  review.successMsg = ''
+  try {
+    await updateDoc(doc(fbDb, 'stores', review.storeId), {
+      ...buildReviewFormPayload(),
+      approved: true,
+      applyStatus: 'approved',
+      'exposure.gangtalk': true,
+      approvedAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    })
+    review.successMsg = '승인되었습니다. 현황판에 노출됩니다.'
+    // pending 에서 사라지므로 잠시 후 모달 닫기 (UX)
+    setTimeout(() => { if (review.open) closeReview() }, 800)
+  } catch (e) {
+    review.errorMsg = '승인 실패: ' + (e?.message || e?.code || e)
+  } finally {
+    review.busy = false
+  }
+}
+
+async function onReviewReject() {
+  if (review.busy || !review.storeId) return
+  const reason = String(review.rejectReason || '').trim()
+  const confirmMsg = reason
+    ? `'${review.form.name || review.storeId}' 신청을 거절하시겠습니까?\n\n사유: ${reason}`
+    : `'${review.form.name || review.storeId}' 신청을 거절하시겠습니까?\n(사유 미입력)`
+  if (!confirm(confirmMsg)) return
+  review.busy = true
+  review.errorMsg = ''
+  review.successMsg = ''
+  try {
+    // 폼 변경사항도 함께 저장 (재신청 시 도움) + reject 상태 + 사유
+    await updateDoc(doc(fbDb, 'stores', review.storeId), {
+      ...buildReviewFormPayload(),
+      approved: false,
+      applyStatus: 'rejected',
+      rejectedReason: reason,
+      rejectedAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    })
+    review.successMsg = '거절 처리되었습니다.'
+    setTimeout(() => { if (review.open) closeReview() }, 800)
+  } catch (e) {
+    review.errorMsg = '거절 처리 실패: ' + (e?.message || e?.code || e)
+  } finally {
+    review.busy = false
+  }
+}
+
 /* ===== 출근업소 완전 삭제 (Cloud Function deleteStoreFull) =====
  * 2중 confirm + 중복 클릭 방지. 백엔드가 5종 연관 데이터 정리.
  * partners(제휴처) 는 백엔드 함수가 절대 건드리지 않음 (PR #90).
@@ -1443,6 +1788,72 @@ onBeforeUnmount(() => {
 .adm-modal-foot{
   display:flex; gap:8px; justify-content:flex-end;
   padding:12px 18px; border-top:1px solid #eee;
+}
+
+/* ===== 검토 모달 (PR d) ===== */
+.adm-review-applicant{
+  padding:10px 12px;
+  background:#fafafa; border:1px solid #eee; border-radius:8px;
+  display:flex; flex-direction:column; gap:6px;
+}
+.adm-review-row{
+  display:flex; gap:10px; align-items:center;
+  font-size:13px;
+}
+.adm-review-label{
+  min-width:110px;
+  color:#888; font-weight:600;
+}
+.adm-review-value{
+  flex:1;
+  color:#222; font-weight:600;
+  word-break:break-all;
+}
+.adm-review-image-note{
+  margin:6px 0; padding:10px 12px;
+  background:#fff5f8; border:1px dashed #ffd6e4; border-radius:8px;
+  font-size:12px; color:#666; line-height:1.5;
+}
+.adm-review-foot{
+  flex-wrap:wrap;
+  justify-content:flex-end;
+}
+.adm-result-error{
+  margin:6px 0 0; padding:8px 10px;
+  background:#fff5f5; border:1px solid #fecaca; border-radius:6px;
+  color:#c0392b; font-size:13px;
+}
+.adm-result-success{
+  margin:6px 0 0; padding:8px 10px;
+  background:#f0fdf4; border:1px solid #bbf7d0; border-radius:6px;
+  color:#2e8b57; font-size:13px;
+}
+@media (max-width:560px){
+  .adm-review-row{ flex-direction:column; align-items:flex-start; gap:2px; }
+  .adm-review-label{ min-width:0; font-size:11px; }
+  .adm-review-foot .adm-btn{ flex:1; min-width:0; }
+}
+
+/* 다크모드 보정 */
+:root[data-theme="dark"] .adm-review-applicant,
+:root[data-theme="black"] .adm-review-applicant{
+  background:#1c1c1c; border-color:#2a2a2a;
+}
+:root[data-theme="dark"] .adm-review-label,
+:root[data-theme="black"] .adm-review-label{ color:#999; }
+:root[data-theme="dark"] .adm-review-value,
+:root[data-theme="black"] .adm-review-value{ color:#eee; }
+:root[data-theme="dark"] .adm-review-image-note,
+:root[data-theme="black"] .adm-review-image-note{
+  background:#2a1620; border-color:#3a2030; color:#ccc;
+}
+:root[data-theme="dark"] .adm-result-error,
+:root[data-theme="black"] .adm-result-error{
+  background:#2a1010; border-color:#5a2020; color:#ff8080;
+}
+:root[data-theme="dark"] .adm-result-success,
+:root[data-theme="black"] .adm-result-success{
+  background:#0a2010; border-color:#205a30; color:#80ff80;
 }
 .adm-modal-section-title{
   margin:8px 0 4px;
