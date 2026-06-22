@@ -134,6 +134,77 @@ firebase deploy --only hosting:admin
 
 ## 작업 로그
 
+### 2026-06-22: 관리자 리셋 시각 조정 (현황판) — dailyResetHourly + 즉시 리셋 (`feat/admin-reset-hour-setting`)
+- **목적**: 진단(`docs/audit/2026-06-19-리셋시간-관리자조정-진단.md` 방법 B) — 현황판 리셋 시각(현재 매일 07:00 KST 고정)을 관리자가 0~23시 중 자유롭게 변경 가능하게. 주말 스킵/켜고끄기는 범위 외 (시각만)
+- **⚠️ 배포 주의 — functions 포함 배포 + 옛 함수 수동 삭제 필수**:
+  - 본 PR 은 **functions + hosting:admin 둘 다 배포** 필요
+  - 함수명 변경: `dailyReset0700` → `dailyResetHourly` (스케줄도 매일 07:00 → 매시 정각)
+  - 배포 후 옛 함수 수동 삭제: `firebase functions:delete dailyReset0700`
+  - **안 지우면 옛 7시 리셋 + 새 함수가 동시 동작 → 이중 리셋 위험**
+- **Cloud Functions — `functions/index.js`**:
+  - **신규 헬퍼**:
+    - `_runResetCore(reason)` — rooms_biz 전체 `needRooms/needPeople/matched=0, lastResetDate=오늘` set. 기존 본체 그대로 보존 (필드 변경 0)
+    - `_markResetDone(resetHour, by)` — `config/settings` 에 `lastResetDate, lastResetAt, lastResetHour, lastResetBy` cursor 갱신
+  - **`exports.dailyReset0700` 제거** — 옛 cron `0 7 * * *`
+  - **`exports.dailyResetHourly` 신규** — cron `0 * * * *` (매시 정각, Asia/Seoul):
+    1. `config/settings.resetHour` (0~23, 기본 7) read. 폴백 시 7
+    2. 현재 KST hour 계산 (`toLocaleString hour: numeric hour12:false`)
+    3. `nowHour !== resetHour` → skip (로그)
+    4. `config/settings.lastResetDate === 오늘(KST)` → skip (중복 방지)
+    5. 통과 시 `_runResetCore` + `_markResetDone(resetHour, 'scheduler')`
+  - **`exports.triggerResetNow` 신규** — 관리자 즉시 리셋 onCall:
+    - `assertCallerIsAdmin(req)` + `ADMIN_CORS`
+    - 위치: 파일 하단 (deleteBizAccount 직후) — `ADMIN_CORS / assertCallerIsAdmin` 정의 후에 export (TDZ 회피)
+    - `_runResetCore('manual@email')` + `_markResetDone(resetHour, 'manual:email')`
+    - 결과 `{ ok, count, today }` 반환
+- **firestore.rules 변경 없음**:
+  - `match /config/{docId}` 가 이미 `allow write: if isAdmin()` — `config/settings` 자동 통과
+  - 룰 추가/수정 없음
+- **신규 페이지 — `src/pages/admin/SettingsPage.vue`** (~270 lines):
+  - **3 섹션**:
+    1. **현황판 리셋 시각** — select (0~23시) + 저장 버튼 (dirty 시만 활성)
+    2. **최근 리셋 정보** — `lastResetDate / lastResetAt / lastResetHour / 현재 resetHour` 4 행 표시
+    3. **🔄 지금 즉시 리셋** — danger 버튼 + 2중 confirm + `triggerResetNow` 호출
+  - `onSnapshot(config/settings)` 구독 — 실시간 동기. dirty 중에는 외부 변경 덮어쓰지 않음
+  - 저장: `setDoc(config/settings, { resetHour, updatedAt }, { merge: true })`
+  - 입력 검증: 0~23 범위 (클라이언트 + 함수 양쪽)
+  - 에러/성공 메시지 표시 (`adm-settings-msg.is-ok / .is-error`)
+  - `fmtTime` 헬퍼 — KST `toLocaleString` 으로 한국어 형식 표시
+  - 모바일 반응형 + 다크모드 보정
+- **라우터 — `src/router/admin.js`**:
+  - `SettingsPage` lazy import 추가
+  - `{ path: 'settings', name: 'adminSettings', component: SettingsPage }` 라우트 추가 (`/admin/settings`)
+  - `requiresAdmin` 메타 자동 (부모 `/admin` 레이아웃)
+- **사이드바 — `src/layouts/AdminLayout.vue`**:
+  - `platformMenus` 에 `{ to: '/admin/settings', emoji: '⚙️', label: '설정' }` 추가 (업체 계정 관리 바로 아래)
+- **건드리지 않음**:
+  - 리셋 동작 본체 (어떤 필드 0으로) — `_runResetCore` 내부는 `dailyReset0700` 원본과 100% 동일 (`needRooms/needPeople/matched=0, lastResetDate, updatedAt`)
+  - 주말 스킵 / 켜고끄기 (범위 외 — 의도)
+  - 회원 빌드 / partners / 여성회원 / 룰
+  - 다른 Cloud Functions (createBizAccount / cleanupOldVendorDigests 등)
+- **흐름 (수정 후)**:
+  - 관리자: `/admin/settings` → resetHour 변경 (예: 7 → 9) → 저장 → `config/settings.resetHour=9`
+  - 다음 매시 정각 (09:00 KST): `dailyResetHourly` 진입 → `nowHour=9 === resetHour=9` + `lastResetDate !== 오늘` → 리셋 실행 → `lastResetDate=오늘` cursor 갱신
+  - 같은 날 10:00 매시 트리거: `nowHour=10 !== resetHour=9` → skip
+  - 다음날 09:00: `lastResetDate !== 오늘` 통과 → 다시 리셋
+  - **즉시 리셋**: 관리자가 "🔄 지금 즉시 리셋" → `triggerResetNow` → 즉시 `_runResetCore` + `lastResetDate=오늘` set → 그 날 매시 스케줄러는 중복 실행 안 함
+- **검증 사항 (사용자 수동)**:
+  - [ ] `/admin/settings` 진입 → 현재 resetHour 표시 (기본 7시)
+  - [ ] resetHour 변경 (예: 9시) 저장 → Firestore Console 에서 `config/settings.resetHour=9` 확인
+  - [ ] "🔄 지금 즉시 리셋" 2중 confirm → `rooms_biz` 전체 0 리셋 + `lastResetDate` 오늘로 갱신 확인
+  - [ ] 같은 날 매시 정각 트리거 발생 시 중복 리셋 안 됨 (Cloud Functions 로그 `skip — already reset today`)
+  - [ ] 0~23 범위 외 값 입력 시도 — select 라 불가능 (클라 검증), 함수 측도 0~23 외면 폴백 7 적용
+  - [ ] Asia/Seoul 시간대 일관성 (cron + `nowKstHour` + `today` 모두 KST)
+- **빌드 검증**: `npm run build:admin` ✓ (SettingsPage chunk 신규) / functions 모듈 로드 ✓ (`node -e "require('./index.js')"` 통과, `triggerResetNow / dailyResetHourly` function, `dailyReset0700` undefined)
+- **배포 명령 (사용자 수동)**:
+  ```bash
+  # 1) Functions + hosting 동시 배포
+  firebase deploy --only functions,hosting:admin
+
+  # 2) 옛 함수 수동 삭제 (필수 — 이중 리셋 방지)
+  firebase functions:delete dailyReset0700 --region asia-northeast3
+  ```
+
 ### 2026-06-22: (A)(B) 기존 업소 등록 경로 제거 — C 일원화 완료 (`refactor/remove-legacy-store-register`)
 - **목적**: 진단(`docs/audit/2026-06-22-C통일-제거및구현-진단.md` PR e) — C 흐름(`/biz-signup` 자가가입 → PR #115 검토 → 승인 → 현황판) 전체 검증 완료. 기존 (A) BizMyStorePage 자가등록 + (B) StoresManagePage PR #111 직접 등록 모달 통째 제거. 룰/Cloud Functions/PR #115 검토 모달/BizAccountsPage 모두 보존
 - **(A) 제거 — `src/pages/admin/BizMyStorePage.vue`**:

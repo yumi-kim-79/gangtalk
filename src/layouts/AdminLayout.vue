@@ -121,6 +121,7 @@ const platformMenus = [
   { to: '/admin/news',          emoji: '📰', label: '뉴스/한줄' },
   { to: '/admin/inbox',         emoji: '📬', label: '메시지함' },
   { to: '/admin/biz-accounts',  emoji: '👥', label: '업체 계정 관리' },
+  { to: '/admin/settings',      emoji: '⚙️', label: '설정' },
 ]
 const bizMenus = [
   { to: '/biz/dashboard', emoji: '🏠', label: '대시보드' },
