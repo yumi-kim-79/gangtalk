@@ -134,6 +134,59 @@ firebase deploy --only hosting:admin
 
 ## 작업 로그
 
+### 2026-06-22: 모바일 컴팩트 2 — Top5/인기업소 카드 비율 유지 축소 + name-row 가로 (`feat/mobile-compact-2-cards`)
+- **목적**: 진단(`docs/audit/2026-06-22-모바일-비율유지-축소-진단.md` §4) — Top5 카드(sf-tops/pp-top-sec) thumb 의 `height:140 !important` + `padding-top:0 !important` 강제로 비율 무력화 → aspect-ratio 로 비율 유지(잘림 0) + 카드 폭 축소. 현황판 mp-store 썸네일 80 정사각. 가게찾기 Top5 의 "강남·하퍼" 가로 배치
+- **수정 — `src/App.vue` 토큰 5종 신규**:
+  - `--card-thumb-aspect: 16 / 9` — Top5 카드 thumb 비율 (sf-tops/pp-top-sec 공용)
+  - `--card-min-width: 180px` — Top5 카드 최소 폭 (200 → 180)
+  - `--card-meta-padding: 10px` — Top5 카드 meta 패딩 (12 → 10)
+  - `--store-thumb-size: 80px` — 현황판 인기업소 정사각 (96 → 80)
+  - `--store-card-pad: 10px 4px` — mp-store 패딩 (14/4 → 10/4)
+- **수정 — `src/views/StoreFinder.vue` (Top5 카드)**:
+  - `.sf-tops :deep(.mini)`: `min-width: 200 → var(--card-min-width, 180px)`
+  - `.sf-tops :deep(.m-thumb)`: **`height:140 !important` 제거** → `aspect-ratio: var(--card-thumb-aspect, 16/9)` + `height:auto !important; width:100%`
+    - 폭 따라 자동 높이 (180 폭 → 101px 높이, 16:9 비율 이미지 잘림 0)
+  - `.sf-tops :deep(.m-meta)`: padding 12 → `var(--card-meta-padding, 10px)`
+  - **`.sf-tops :deep(.m-name)`**: 기존 16/800 유지 + **`flex:0 1 auto; max-width:65%; ellipsis`** 추가 (name-row flex 안에서 sub 자리 확보)
+  - **`.sf-tops :deep(.name-row)` 신규**: `display:flex; align-items:baseline; gap:6px; min-width:0`
+  - **`.sf-tops :deep(.m-sub)` 신규**: `flex:1; min-width:0; font:12; color:#888; ellipsis`
+  - → 마크업 (`StoreFinder.vue:238-242`) 은 이미 `<div class="name-row"><m-name><m-sub>` 가로 의도. CSS 누락으로 block 스택됐던 것 보완 → **"도파민 ㅣ 강남·텐카페" 한 줄 표시**
+- **수정 — `src/pages/PartnersPage.vue` (Top5 카드)**:
+  - `.pp-top-sec .rs-card min-width: 200 → var(--card-min-width, 180px)`
+  - `.pp-top-sec .rs-thumb`: **`height:140 !important` 제거** → `aspect-ratio: var(--card-thumb-aspect, 16/9)` + `height:auto !important; width:100%`
+    - 베이스 `.rs-thumb background-size: contain` (`:1801`) 유지 → 이미지 안 잘림 + 비율 외는 배경색
+  - `.pp-top-sec .rs-info padding: 12 → var(--card-meta-padding, 10px)`
+- **수정 — `src/pages/MainPage.vue` (현황판 인기업소)**:
+  - `.mp-store padding: 14/4 → var(--store-card-pad, 10/4)`
+  - `.mp-store-img width/height: 96 → var(--store-thumb-size, 80px)` (정사각 1:1 자동 유지)
+  - 카드 1개 높이 약 124px → **104px** (-20)
+- **효과 (모바일 412px)**:
+  - **Top5 카드 thumb**: 140 → 101px (-39, 16:9 비율 자동 / 잘림 0)
+  - **Top5 카드 폭**: 200 → 180px (-10%, 가로 스크롤 1.5개 → 1.7개 보임)
+  - **Top5 meta padding**: 12 → 10 (-2)
+  - **현황판 카드 1개**: 124 → 104px (-20) × 5장 = **-100px** (리스트 가시성 크게 향상)
+  - **"강남·하퍼" 가로 배치**: 두 줄 → 한 줄 (-16~20px 카드당)
+- **건드리지 않음**:
+  - 배너/슬라이더 (PR #118 그대로 — aspect-ratio 12/5 유지)
+  - 헤더/검색/핫이슈/카테고리 (PR #119 그대로)
+  - 커뮤니티 박스 (강톡 gc-card) — PR 3 별도
+  - **마크업 변경 0** — `.name-row / .m-sub / .m-name` 모두 기존 HTML 그대로, CSS만 추가/조정
+  - 기능 / 라우터 / 룰 / Functions / admin 빌드 / 회원 가입
+- **비율 유지 메커니즘**:
+  - sf-tops/pp-top-sec thumb 가 폭에 비례해 자동 높이 계산 (16:9)
+  - 16:9 비율 이미지: 정확히 채움 (cover 정상)
+  - 비율 다른 이미지: 미세 cover 잘림 (sf) 또는 contain 빈 공간 (pp). 16/9 마케팅 표준 권장
+- **빌드 검증**: `npm run build` ✓ (회원 index 228KB 유지, CSS only)
+- **배포 범위**: `firebase deploy --only hosting:prod` (회원 빌드만)
+- **검증 시나리오 (사용자 수동)**:
+  - [ ] 가게찾기 Top5 — 카드 폭 축소, 썸네일 잘림 0
+  - [ ] **"도파민 ㅣ 강남·텐카페"** 한 줄 가로 배치 (사진 2번 의도 살림)
+  - [ ] 긴 업체명 (예: "강남톡방프리미엄") → ellipsis + sub 옆 자동 줄임
+  - [ ] 제휴관 Top5 — sf-tops 와 동일 크기, 안 잘림
+  - [ ] 현황판 인기업소 — 썸네일 80 정사각, 카드 더 컴팩트 → 5장 더 잘 보임
+  - [ ] PR #118 (배너 aspect-ratio) / PR #119 (헤더/카테고리) 회귀 없음
+  - [ ] 다크모드 정상
+
 ### 2026-06-22: 모바일 컴팩트 1b — 검색창/핫이슈/카테고리 추가 압축 (`feat/mobile-compact-1b-tighter`)
 - **목적**: 진단(`docs/audit/2026-06-22-모바일-비율유지-축소-진단.md`) PR 1 (#118) 후속 — 위쪽 영역 더 압축해 인기업소 리스트가 더 위로. 배너 비율 (PR #118) 은 그대로 보존
 - **수정 — `src/App.vue` 전역 토큰 추가/조정 (7종)**:

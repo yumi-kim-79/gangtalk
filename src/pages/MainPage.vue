@@ -2644,7 +2644,8 @@ onUnmounted(() => {
 .mp-store{
   display:flex;
   gap:12px;
-  padding:14px 4px;
+  /* PR 2 (2026-06-22): padding 14/4 → 10/4 (토큰), 리스트 더 보임 */
+  padding: var(--store-card-pad, 10px 4px);
   border-bottom:1px solid var(--line, #f0f0f0);
   cursor:pointer;
   align-items:stretch;
@@ -2654,7 +2655,9 @@ onUnmounted(() => {
 
 .mp-store-img{
   flex:none;
-  width:96px; height:96px;
+  /* PR 2 (2026-06-22): 96×96 → 80×80 정사각 (토큰). 1:1 비율 자동 유지 */
+  width: var(--store-thumb-size, 80px);
+  height: var(--store-thumb-size, 80px);
   border-radius:12px;
   background-color:#f0f0f0;
   background-size:cover;
