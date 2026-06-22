@@ -257,6 +257,15 @@
           {{ pendingSignup ? '가입 처리 중…' : '회원가입' }}
         </button>
       </form>
+
+      <!-- 업체 회원가입 진입 — 같은 회원 빌드의 /biz-signup (PR #113) 으로 이동.
+           여성회원 가입(위) 과 명확히 구분. 진단: docs/audit/2026-06-22-C통일-제거및구현-진단.md (PR c) -->
+      <div class="biz-entry">
+        <p class="biz-entry-line">업소를 운영하시나요?</p>
+        <router-link :to="{ name: 'bizSignup' }" class="biz-entry-link">
+          업체 회원가입 →
+        </router-link>
+      </div>
     </section>
   </main>
 </template>
@@ -738,6 +747,36 @@ label {
   gap: 6px;
   align-items: center;
 }
+
+/* 업체 회원가입 진입 — 여성회원 가입과 시각적으로 구분 */
+.biz-entry {
+  margin-top: 22px;
+  padding: 14px 16px;
+  border-top: 1px dashed #ffd6e4;
+  text-align: center;
+}
+.biz-entry-line {
+  margin: 0 0 6px;
+  font-size: 13px;
+  color: #666;
+}
+.biz-entry-link {
+  display: inline-block;
+  padding: 8px 16px;
+  border-radius: 999px;
+  background: #fff5f8;
+  border: 1.5px solid #ffd6e4;
+  color: #ff2e7e;
+  font-weight: 700;
+  font-size: 14px;
+  text-decoration: none;
+  transition: background .12s, border-color .12s;
+}
+.biz-entry-link:hover {
+  background: #ff2e7e;
+  border-color: #ff2e7e;
+  color: #fff;
+}
 </style>
 
 <!-- ===== 전역 오버라이드 스타일 ===== -->
@@ -852,5 +891,26 @@ html[data-theme='white'] .auth-page .tabs .tab:not(.active) {
   color: #ff2c8a !important;
   border: 1.5px solid #ffc0d8 !important;
   background: #ffffff !important;
+}
+
+/* ── 업체 회원가입 진입 다크모드 보정 */
+html[data-theme='black'] .auth-page .biz-entry,
+html[data-theme='dark']  .auth-page .biz-entry {
+  border-top-color: #3a2030 !important;
+}
+html[data-theme='black'] .auth-page .biz-entry-line,
+html[data-theme='dark']  .auth-page .biz-entry-line {
+  color: #aaa !important;
+}
+html[data-theme='black'] .auth-page .biz-entry-link,
+html[data-theme='dark']  .auth-page .biz-entry-link {
+  background: #2a1620 !important;
+  border-color: #ff4da3 !important;
+  color: #ff86b9 !important;
+}
+html[data-theme='black'] .auth-page .biz-entry-link:hover,
+html[data-theme='dark']  .auth-page .biz-entry-link:hover {
+  background: #ff2c8a !important;
+  color: #fff !important;
 }
 </style>
