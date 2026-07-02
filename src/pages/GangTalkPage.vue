@@ -2565,18 +2565,9 @@ const FALLBACK_BIZ_IMG = 'https://images.unsplash.com/photo-1517248135467-4c7edc
      폭 따라 자동 높이 → 잘림 0. 배너와 동일 12/5 비율. */
   width: 100%;
   aspect-ratio: var(--gt-slider-aspect, 12 / 5);
-  /* fix (2026-07-02): 진단 docs/audit/2026-07-02-배너슬라이드-가로스크롤-진단.md §4-1.
-     아래 자식(.gt-slider-track/.gt-slide) 이 percentage(height:100%) 상속에
-     실패해 슬라이드가 안 보이는 브라우저 대비 min-height 폴백. */
-  min-height: 140px;
   background: #f0f0f0;
 }
 .gt-slider-track{
-  /* fix (2026-07-02 재진단): PR #127 의 position:absolute + inset:0 는 flex
-     slider 의 자식 가로 나열(3 슬라이드 각 100%)을 부모 폭 100% 안으로
-     auto-shrink 하게 만들어 translateX 이동이 무효화됨.
-     원상 복구 (width:100% + height:100%). 부모(.gt-slider-bar) 의
-     min-height:140px 폴백만으로도 자식 percentage 상속 정상 (검증됨). */
   display: flex;
   width: 100%;
   height: 100%;
