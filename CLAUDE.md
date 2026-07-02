@@ -134,6 +134,58 @@ firebase deploy --only hosting:admin
 
 ## 작업 로그
 
+### 2026-07-02: 배너 슬라이드 가로 이동 + Top5 가로 스크롤 복구 (`fix/top5-banner-horizontal-scroll`)
+- **목적**: 진단(`docs/audit/2026-07-02-가로이동-배너Top5-재진단.md`) — PR #127 배포 후에도 여전한 두 증상 해결:
+  1. **배너 슬라이드**: PR #127 의 `.gt-slider-track { position: absolute; inset: 0 }` 가 flex slider 자식 가로 나열 (3 슬라이드 × 100%) 을 부모 폭 100% 안으로 auto-shrink → translateX 이동 무효 (진단 §1-4)
+  2. **Top5**: 상위/전역 grid CSS 가 `.top-row / .rs-scroller` 를 오버라이드 가능성 + 명시적 flex-nowrap/overflow-x 로 강제 필요
+- **⚠️ PR #127 부분 롤백**: `.gt-slider-bar { min-height: 140px }` 폴백만 유지, `.gt-slider-track` 은 원상 복구
+- **수정 3 곳 — CSS 만, aspect-ratio 값 변경 0**:
+  - **`src/pages/GangTalkPage.vue` 강톡 슬라이더**:
+    - `.gt-slider-track`: `position: absolute; inset: 0` **제거** → `display: flex; width: 100%; height: 100%` 원상 복구
+    - `.gt-slide`: `width: 100%` 추가 (명시)
+    - **`.gt-slider-bar { aspect-ratio; min-height: 140px; overflow: hidden }` 그대로 유지** — 이미지 잘림 0 (PR #118) + 자식 percentage 상속 폴백 (min-height) 유지
+  - **`src/views/StoreFinder.vue` Top5 (`.sf-tops :deep(.top-row)`)**:
+    - `display: flex !important; flex-wrap: nowrap !important; overflow-x: auto !important` 명시 강제
+    - `overflow-y: hidden` (세로 스크롤 차단)
+    - `-webkit-overflow-scrolling: touch` (iOS Safari 옛 버전 스크롤 최적화)
+    - `touch-action: pan-x` (가로 팬 명시 — 세로 스크롤과 충돌 방지)
+  - **`src/pages/PartnersPage.vue` Top5 (`.pp-top-sec .rs-scroller`)**: 동일 패턴 (flex-nowrap + overflow-x:auto + touch-action)
+- **왜 !important 로 강제하나**:
+  - 진단 결과 `.top-row / .rs-scroller` 는 카테고리 grid 클래스 (`mp/sf/pp-cat-scroll`, PR #101/#102) 와 **별개 클래스**
+  - 그러나 상위/전역 CSS 가 tag 셀렉터 등으로 오버라이드할 가능성 대비 명시적 강제
+  - 카테고리 grid CSS 는 별도 클래스라 이 변경으로 **카테고리 5×2 회귀 0**
+- **핵심 메커니즘**:
+  - **배너 (수정 전)**: `position: absolute + inset: 0` → track width 부모 폭 100% 확정 → 자식 3 개 flex-basis:100% × 3 요구 → 브라우저 (iOS 등) 가 자식들을 컨테이너 안으로 auto-shrink → 겹침 → translateX 무효
+  - **배너 (수정 후)**: `width: 100%` static layout + flex nowrap → 자식이 부모 폭 밖으로 자연 나열 → `.gt-slider-bar { overflow: hidden }` 로 뷰포트 밖 숨김 → translateX 로 다음 슬라이드 노출 정상
+  - **Top5**: flex-nowrap + overflow-x:auto 명시 → 카드 5 × 180 + gap = 940 > 화면 380 → 가로 스크롤 활성화. touch-action: pan-x 로 iOS Safari 에서 가로 스와이프 우선권 보장
+- **건드리지 않음 (사용자 명시)**:
+  - **카테고리 grid 5×2** (`mp-cat-scroll / sf-cat-scroll / pp-cat-scroll`, PR #101/#102) 그대로 — 별개 클래스라 영향 0
+  - **aspect-ratio** (`--banner-aspect: 12/5`, `--gt-slider-aspect: 12/5`, `--card-thumb-aspect: 16/9`) — 이미지 잘림 0 유지
+  - **PR #118 배너 aspect-ratio** — 컨테이너 자체 유지
+  - **PR #119 헤더/검색/카테고리 컴팩트** / **PR #120 카드 축소** / **PR #121 커뮤니티 박스** — 변경 0
+  - **PR #124/#125/#126 노출 필드 분리** — 로직 무관
+  - **PR #127 의 min-height 폴백** — 유지 (배너 컨테이너 부모 명시적 height 확보)
+  - **PR #127 의 `.m-thumb / .rs-thumb min-height: 100px !important`** — 카드 붕괴 방지 유지 (폭 계산 무관)
+  - 강톡 JS 로직 (`sliderIdx / startSlider / sliderItems`) 그대로
+  - MainPage 는 배너 없음 (mp-hot 카드만) — 무관
+- **효과**:
+  - 강톡 배너 자동 넘김 (4초) + 좌우 스와이프 정상 (iOS/Android/데스크탑 모두)
+  - Top5 가로 스크롤/스와이프 정상 (5+ 카드 옆으로 스크롤해서 3·4·5위까지 표시)
+  - 배너 이미지 잘림 0 (PR #118 효과)
+  - 카드 썸네일 잘림 0 (PR #120 aspect-ratio + PR #127 min-height 유지)
+- **빌드 검증**: `npm run build` ✓ (회원 index 228KB 유지, CSS only)
+- **배포 범위**: `firebase deploy --only hosting:prod` (회원 빌드만)
+- **검증 시나리오 (사용자 수동)**:
+  - [ ] 강톡: 배너 자동 넘김 (4초 주기) + 좌우 스와이프 정상
+  - [ ] 점 인디케이터 슬라이드 동기
+  - [ ] 배너 이미지 잘림 0
+  - [ ] 가게찾기 Top5: 카드 가로 나열, 옆으로 스크롤/스와이프해서 3·4·5위 표시
+  - [ ] 제휴관 Top5: 동일
+  - [ ] Top5 카드 썸네일 안 잘림
+  - [ ] 카테고리 5×2 그리드 그대로 (PR #101/#102 보존)
+  - [ ] PR #118/#119/#120/#121 회귀 없음
+  - [ ] PR #124/#125/#126 노출 구조 정상
+
 ### 2026-07-02: 배너 슬라이드/가로 스크롤 높이 복구 (`fix/banner-slide-scroll-height`)
 - **목적**: 진단(`docs/audit/2026-07-02-배너슬라이드-가로스크롤-진단.md`) — PR #118 이 배너 컨테이너를 `height:180px → aspect-ratio: 12/5` 로 전환한 후, 부모 aspect-ratio + 자식 `height:100%` 이중 percentage 상속 실패로 특정 브라우저에서 컨테이너 height 붕괴 → 슬라이드/스크롤 시각 실패. **aspect-ratio 유지 (이미지 잘림 0 = PR #118 효과 보존) + 자식 구조 재설계 + fallback min-height** 로 복구
 - **수정 5 곳 — CSS 만, aspect-ratio 값 변경 0**:

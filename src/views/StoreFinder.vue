@@ -1992,6 +1992,16 @@ function toggleSort(){ ui.value.sortOpen = !ui.value.sortOpen; if(ui.value.sortO
 }
 /* Top5 카드 업그레이드 */
 .sf-tops :deep(.top-row){
+  /* fix (2026-07-02 재진단): 상위/전역 CSS 가 grid 로 오버라이드하지 못하게
+     flex-nowrap + overflow-x:auto 명시. 카테고리 grid (mp/sf/pp-cat-scroll,
+     PR #101/#102) 와는 별개 클래스(.top-row) 라 카테고리 영향 0.
+     Top5 카드 5+ 개를 가로 나열하고 옆으로 스크롤 가능하게 강제. */
+  display: flex !important;
+  flex-wrap: nowrap !important;
+  overflow-x: auto !important;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-x;
   gap:12px;
   padding-bottom:6px;
 }
