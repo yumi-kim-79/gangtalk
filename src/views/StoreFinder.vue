@@ -1876,6 +1876,8 @@ function toggleSort(){ ui.value.sortOpen = !ui.value.sortOpen; if(ui.value.sortO
   width:100%;
   height:auto;
   aspect-ratio: var(--banner-aspect, 12 / 5);
+  /* fix (2026-07-02): aspect-ratio 미지원/오계산 브라우저 대비 min-height 폴백. */
+  min-height: 140px;
   object-fit:cover;
   display:block;
 }
@@ -1884,6 +1886,8 @@ function toggleSort(){ ui.value.sortOpen = !ui.value.sortOpen; if(ui.value.sortO
 .sf-banner-skeleton{
   width:100%;
   aspect-ratio: var(--banner-aspect, 12 / 5);
+  /* fix (2026-07-02): aspect-ratio 폴백 */
+  min-height: 140px;
   border-radius:16px;
   background:linear-gradient(135deg, #ffe4ef, #fff0f6);
 }
@@ -2005,6 +2009,11 @@ function toggleSort(){ ui.value.sortOpen = !ui.value.sortOpen; if(ui.value.sortO
   height:auto !important;
   aspect-ratio: var(--card-thumb-aspect, 16 / 9);
   width:100%;
+  /* fix (2026-07-02): 진단 §4-3 D — flex 아이템 안의 aspect-ratio 자식이
+     height 를 부모(top-row)로 stretch 못하는 브라우저 대비 min-height 폴백.
+     이 fallback 이 없으면 .m-thumb height=0 → .mini height 붕괴 → .top-row
+     가로 스크롤 컨테이너가 시각적으로 안 보임 (스크롤 대상 감지 실패). */
+  min-height: 100px !important;
 }
 .sf-tops :deep(.rank){
   left:10px; top:10px;

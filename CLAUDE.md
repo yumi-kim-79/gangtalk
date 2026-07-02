@@ -134,6 +134,58 @@ firebase deploy --only hosting:admin
 
 ## 작업 로그
 
+### 2026-07-02: 배너 슬라이드/가로 스크롤 높이 복구 (`fix/banner-slide-scroll-height`)
+- **목적**: 진단(`docs/audit/2026-07-02-배너슬라이드-가로스크롤-진단.md`) — PR #118 이 배너 컨테이너를 `height:180px → aspect-ratio: 12/5` 로 전환한 후, 부모 aspect-ratio + 자식 `height:100%` 이중 percentage 상속 실패로 특정 브라우저에서 컨테이너 height 붕괴 → 슬라이드/스크롤 시각 실패. **aspect-ratio 유지 (이미지 잘림 0 = PR #118 효과 보존) + 자식 구조 재설계 + fallback min-height** 로 복구
+- **수정 5 곳 — CSS 만, aspect-ratio 값 변경 0**:
+  - **`GangTalkPage.vue` 강톡 슬라이더 (`:2557-2588`)** — 실제 슬라이드 로직 있는 유일한 페이지:
+    - `.gt-slider-bar`: `aspect-ratio: 12/5` 유지 + **`min-height: 140px` fallback 추가** (진단 §4-1 옵션 A)
+    - `.gt-slider-track`: `width:100%; height:100%` 제거 → **`position:absolute; inset:0`** 로 부모 채움 (진단 §4-1 옵션 B — percentage 상속 이슈 회피)
+    - `.gt-slide`: `height:100%` 유지 — 부모 track 이 이제 `inset:0` 로 명시적 height 가짐, 정상 상속
+  - **`StoreFinder.vue .sf-banners :deep(.banner-img)` (`:1875+`)**:
+    - `aspect-ratio: 12/5` 유지 + **`min-height: 140px` fallback**
+  - **`StoreFinder.vue .sf-banner-skeleton`**:
+    - 동일 fallback 추가 (점프 방지 스켈레톤 높이 유지)
+  - **`StoreFinder.vue .sf-tops :deep(.m-thumb)` (Top5 카드 썸네일)**:
+    - `aspect-ratio: 16/9` 유지 + **`min-height: 100px !important` fallback**
+    - flex 아이템 (`.mini`) 안의 aspect-ratio 자식이 부모 height 를 stretch 못하는 브라우저 대비. 이 fallback 없으면 `.m-thumb` height=0 → `.mini` 붕괴 → `.top-row` 가로 스크롤 컨테이너 시각 실패
+  - **`PartnersPage.vue .pp-banners .banner-img`**:
+    - `aspect-ratio: 12/5` 유지 + **`min-height: 140px` fallback**
+  - **`PartnersPage.vue .pp-top-sec .rs-thumb`**:
+    - `aspect-ratio: 16/9` 유지 + **`min-height: 100px !important` fallback**
+- **핵심 메커니즘 (강톡 슬라이더)**:
+  - 이전: 부모 `aspect-ratio` (auto height) + 자식 `height:100%` (percentage) → 일부 브라우저 (iOS Safari 15 미만 등) 에서 이중 상속 실패 → 자식 height=0 → 슬라이드 안 보임
+  - 이후: 부모 `aspect-ratio` (auto height) + 자식 `position:absolute; inset:0` → 브라우저 무관 정상 채움. `transform: translateX(-${sliderIdx * 100}%)` 로 좌우 이동 정상
+- **효과**:
+  - **강톡 슬라이더** 자동 넘김 (4초) + 좌우 스와이프 정상 (모든 브라우저)
+  - **배너 컨테이너** 높이 최소 140px 보장 → aspect-ratio 미지원 브라우저에서도 안 안 보이는 이슈 방어
+  - **Top5 카드 썸네일** 최소 100px 높이 보장 → `.top-row / .rs-scroller` 가로 스크롤 컨테이너의 시각 확보 → 스크롤/스와이프 정상
+  - **이미지 잘림 0** 유지 (PR #118 aspect-ratio 효과 보존)
+  - 인디케이터 (강톡 dots) 는 `sliderIdx` 반응성 그대로 → 슬라이드와 일치
+- **건드리지 않음**:
+  - **aspect-ratio 값** (`--banner-aspect: 12/5`, `--gt-slider-aspect: 12/5`, `--card-thumb-aspect: 16/9`) — 이미지 잘림 0 정책 유지
+  - **PR #119** (헤더/카테고리 컴팩트) / **PR #120** (카드 min-width 축소) / **PR #121** (커뮤니티 박스) — CSS 값 무영향
+  - **PR #124/#125/#126** (노출 필드 분리) — 로직 변경 0
+  - `sliderIdx` / `startSlider()` / `sliderItems` 자바스크립트 로직 그대로
+  - 카테고리 grid 5×2 — PR #101/#102 그대로 (원래 스크롤 아님)
+  - MainPage 는 배너 없음 (mp-hot 카드만) — 무관
+- **폴백값 산정 근거**:
+  - 배너 min-height 140 = 폭 336px (모바일 360-24 padding) × 5/12 = 140px (aspect-ratio 계산값)
+  - 카드 thumb min-height 100 = 폭 180 (`--card-min-width`) × 9/16 = 101px
+  - 정상 브라우저에서는 aspect-ratio 계산값이 min-height 보다 크거나 같아 무영향
+  - 이슈 브라우저에서만 min-height 발동
+- **빌드 검증**: `npm run build` ✓ (회원 index 228KB 유지)
+- **배포 범위**: `firebase deploy --only hosting:prod` (회원 빌드만)
+- **검증 시나리오 (사용자 수동)**:
+  - [ ] 강톡: 배너 이미지 3장 자동 넘김 (4초 주기), 좌우 스와이프 정상, 점 인디케이터 동기
+  - [ ] 배너 이미지 잘림 0 (PR #118 효과)
+  - [ ] 가게찾기 Top5: 카드가 화면 폭 초과 → 좌우 스크롤/스와이프 정상
+  - [ ] 제휴관 Top5: 동일
+  - [ ] Top5 카드 썸네일 안 잘림
+  - [ ] iOS Safari / Android Chrome / 데스크탑 브라우저 모두 정상
+  - [ ] PR #119/#120/#121 회귀 없음
+  - [ ] 카테고리 grid 5×2 그대로 (스크롤 아님)
+  - [ ] PR #124/#125/#126 노출 구조 정상
+
 ### 2026-07-02: 노출 필드 분리 PR 3 (완결) — 승인·자가가입 로직 정합 (`feat/approve-gangtalk-only-not-dashboard`)
 - **목적**: 진단(`docs/audit/2026-07-02-현황판-가게찾기-노출구조-진단.md` PR 3) — PR #124(필드+토글) + PR #125(MainPage 전환) 이후 마무리. 승인·자가가입 시 `exposure.dashboard` 를 명시적으로 false 로 set → **신규 승인 = 가게찾기만 자동 노출, 현황판은 관리자가 Tab 1 에서 별도 지정** (사용자 목표 완결)
 - **수정 3 곳**:

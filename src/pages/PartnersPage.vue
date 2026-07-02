@@ -1339,6 +1339,8 @@ function refresh(){ loadPartners() }
   width:100%;
   height:auto;
   aspect-ratio: var(--banner-aspect, 12 / 5);
+  /* fix (2026-07-02): aspect-ratio 미지원/오계산 브라우저 대비 min-height 폴백. */
+  min-height: 140px;
   object-fit:cover;
   display:block;
 }
@@ -1474,6 +1476,9 @@ function refresh(){ loadPartners() }
   width:100%;
   aspect-ratio: var(--card-thumb-aspect, 16 / 9);
   /* contain 베이스 (rs-thumb :1801) 유지 — 잘림 0 + 빈 공간은 배경색 */
+  /* fix (2026-07-02): 진단 §4-3 D — flex 아이템 안의 aspect-ratio 자식이
+     height 를 부모(rs-scroller)로 stretch 못하는 브라우저 대비 min-height 폴백. */
+  min-height: 100px !important;
 }
 .pp-top-sec .rs-badge{
   left:10px; top:10px;
