@@ -2565,17 +2565,23 @@ const FALLBACK_BIZ_IMG = 'https://images.unsplash.com/photo-1517248135467-4c7edc
      폭 따라 자동 높이 → 잘림 0. 배너와 동일 12/5 비율. */
   width: 100%;
   aspect-ratio: var(--gt-slider-aspect, 12 / 5);
+  /* fix (2026-07-02): 진단 docs/audit/2026-07-02-배너슬라이드-가로스크롤-진단.md §4-1.
+     아래 자식(.gt-slider-track/.gt-slide) 이 percentage(height:100%) 상속에
+     실패해 슬라이드가 안 보이는 브라우저 대비 min-height 폴백. */
+  min-height: 140px;
   background: #f0f0f0;
 }
 .gt-slider-track{
+  /* fix (2026-07-02): height:100% 이중 percentage 상속 이슈 회피 —
+     position:absolute + inset:0 로 부모(aspect-ratio 계산 높이) 그대로 채움. */
+  position: absolute;
+  inset: 0;
   display: flex;
-  width: 100%;
-  height: 100%;
   transition: transform 0.5s ease;
 }
 .gt-slide{
   flex: 0 0 100%;
-  width: 100%;
+  /* 부모 track 이 명시적 height (inset:0) 을 가지므로 percentage 정상 */
   height: 100%;
   position: relative;
   overflow: hidden;
