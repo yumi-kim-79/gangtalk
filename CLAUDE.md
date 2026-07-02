@@ -134,6 +134,62 @@ firebase deploy --only hosting:admin
 
 ## 작업 로그
 
+### 2026-07-02: 노출 필드 분리 PR 2 — MainPage 가 exposure.dashboard 참조 (`feat/mainpage-read-dashboard-exposure`)
+- **목적**: 진단(`docs/audit/2026-07-02-현황판-가게찾기-노출구조-진단.md` PR 2) — PR 1 (#124) 로 신설된 `exposure.dashboard` 필드를 MainPage 가 실제로 참조하도록 전환. 현황판 = 관리자가 명시 지정한 가게만 노출
+- **⚠️ 배포 전제 (사용자 확인 완료)**: PR #124 배포 + 관리자가 기존 현황판 가게 (레이블/달토/유앤미 등) 에 `exposure.dashboard:true` 지정 완료 — 그래야 본 PR 배포 후 현황판 안 비움
+- **수정 — `src/pages/MainPage.vue` 단일 파일 (2 곳)**:
+  - **1) `EXPOSURE_KEY` 상수 (`:638`)**:
+    - 이전: `const EXPOSURE_KEY = 'gangtalk'` (StoreFinder 와 동일 필드 — 가게찾기 = 현황판 동시 결정)
+    - 이후: `const EXPOSURE_KEY = 'dashboard'` (현황판 전용 필드 참조)
+    - 상단에 진단 근거 + PR 관계 + StoreFinder 는 계속 'gangtalk' 유지 명시
+  - **2) `exposedHere` 정책 (`:1876-1881`)** — undefined 처리 반전:
+    ```js
+    // 이전 (gangtalk 시절): 기본 노출
+    if (exp == null || typeof exp !== 'object') return true
+    if (exp[EXPOSURE_KEY] === undefined) return true
+    return !!exp[EXPOSURE_KEY]
+
+    // 이후 (dashboard 시절): 관리자 지정 명시 필요
+    if (exp == null || typeof exp !== 'object') return false     // ← 반전
+    if (exp[EXPOSURE_KEY] === undefined) return false            // ← 반전
+    return !!exp[EXPOSURE_KEY]
+    ```
+    - 정책 근거: 진단 §7-2 — 새 필드는 관리자가 명시 지정한 것만 노출 (undefined = 관리자 미지정 = 미노출)
+- **건드리지 않음 (사용자 명시)**:
+  - **StoreFinder.vue** — `EXPOSURE_KEY = 'gangtalk'` 그대로. **핵심 검증 포인트**: 현황판 OFF 여도 가게찾기 ON 이면 가게찾기엔 계속 나옴 (현황판 ⊂ 가게찾기 정책)
+  - **BizSignupPage** — 자가가입 payload 그대로 (`exposure.gangtalk:false`, dashboard 필드 미설정)
+  - **`approveStore` / `onReviewSaveAndApprove`** — `exposure.gangtalk:true` 만 set 그대로 (PR 3 에서 정합)
+  - **rooms_biz 지표 로직** — `applyRoomsBiz` / `subscribeRoomsBiz` / 맞출방/필요인원/혼잡도 계산 전부 그대로. 노출 대상 필터 (`exposedHere`) 만 변경
+  - **`isApproved` / `isActiveAd`** — 승인/광고 기간 판정 로직 그대로
+  - `baseFiltered` (`:1884-1899`) — 필터 조합 그대로 (`okExpose && okApproved && okPeriod && okT && okM && okQ && okNear`), `exposedHere` 내부 만 변경
+  - firestore.rules / Cloud Functions / admin 빌드 / 회원 가입 / partners
+- **효과 (배포 후)**:
+  - 현황판 (`gangtox.com/`) 에는 `exposure.dashboard === true` 인 가게만 노출
+  - 관리자가 지정 안 한 가게 (미지정 = undefined) 는 현황판 미노출
+  - StoreFinder 가게찾기는 그대로 (`exposure.gangtalk` 참조 유지)
+  - 관리자 Tab 1 에서 "현황판 OFF" 저장 → 사용자 화면에서 그 가게 사라짐
+  - 다시 "현황판 ON" 저장 → 사용자 화면에 복귀
+- **현황판 지표 정상 작동**:
+  - rooms_biz 구독 / 매핑 / applyRoomsBiz 그대로
+  - 맞출방/필요인원/혼잡도 계산 그대로
+  - `computeStatus` / `wifiColor` / `wifiText` 그대로
+  - 순서 (`homeOrder`) 그대로
+  - 노출 필터가 좁아졌을 뿐, 표시된 가게의 지표는 정상
+- **빌드 검증**: `npm run build` ✓ (회원 index 228KB 유지, 상수 1글자 + 정책 2줄 변경만)
+- **배포 범위**: `firebase deploy --only hosting:prod` (회원 빌드만)
+- **검증 시나리오 (사용자 수동)**:
+  - [ ] `gangtox.com` 현황판 → 관리자가 ON 지정한 가게만 표시 (레이블/달토/유앤미 등)
+  - [ ] 지정 안 한 승인 가게는 현황판에서 사라짐
+  - [ ] 관리자 Tab 1 "현황판 OFF" 저장 → 그 가게 현황판에서 사라짐
+  - [ ] 다시 "현황판 ON" 저장 → 그 가게 현황판 복귀
+  - [ ] **가게찾기 그대로**: 현황판 OFF 여도 가게찾기 ON 이면 가게찾기에 계속 노출 (핵심 검증)
+  - [ ] 현황판 지표 (맞출방/필요인원/혼잡도) 정상 표시
+  - [ ] 순서/드래그 정상
+  - [ ] 자가가입 / 승인 흐름 정상 (PR 3 대기 — 승인 후 관리자가 별도로 현황판 ON 지정 필요)
+- **다음 단계 (PR 3)**:
+  - `approveStore` / `onReviewSaveAndApprove` / `BizSignupPage` 에 `exposure.dashboard:false` 명시 set
+  - 목적: 신규 자가가입 승인 시 자동으로 가게찾기만 노출, 현황판은 관리자 별도 지정 필요 (사용자 목표 완결)
+
 ### 2026-07-02: 노출 필드 분리 PR 1 — exposure.dashboard 필드 신설 + 관리자 토글 (`feat/dashboard-exposure-toggle`)
 - **목적**: 진단(`docs/audit/2026-07-02-현황판-가게찾기-노출구조-진단.md` PR 1, 옵션 A) — 현재 `exposure.gangtalk` 단일 필드가 가게찾기 + 현황판 노출을 동시 결정. 목표 구조: 승인=가게찾기 자동 / 현황판=관리자 별도 지정. 본 PR 은 **필드 + 관리자 UI 신설만**. MainPage/StoreFinder/승인 로직/BizSignupPage 변경 0 → **기존 현황판 노출 그대로 유지** (레이블/달토/유앤미 등)
 - **⚠️ 중요 — 4 단계 배포 순서**:
