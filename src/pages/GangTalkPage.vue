@@ -2572,16 +2572,19 @@ const FALLBACK_BIZ_IMG = 'https://images.unsplash.com/photo-1517248135467-4c7edc
   background: #f0f0f0;
 }
 .gt-slider-track{
-  /* fix (2026-07-02): height:100% 이중 percentage 상속 이슈 회피 —
-     position:absolute + inset:0 로 부모(aspect-ratio 계산 높이) 그대로 채움. */
-  position: absolute;
-  inset: 0;
+  /* fix (2026-07-02 재진단): PR #127 의 position:absolute + inset:0 는 flex
+     slider 의 자식 가로 나열(3 슬라이드 각 100%)을 부모 폭 100% 안으로
+     auto-shrink 하게 만들어 translateX 이동이 무효화됨.
+     원상 복구 (width:100% + height:100%). 부모(.gt-slider-bar) 의
+     min-height:140px 폴백만으로도 자식 percentage 상속 정상 (검증됨). */
   display: flex;
+  width: 100%;
+  height: 100%;
   transition: transform 0.5s ease;
 }
 .gt-slide{
   flex: 0 0 100%;
-  /* 부모 track 이 명시적 height (inset:0) 을 가지므로 percentage 정상 */
+  width: 100%;
   height: 100%;
   position: relative;
   overflow: hidden;

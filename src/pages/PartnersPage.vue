@@ -1457,6 +1457,16 @@ function refresh(){ loadPartners() }
 .pp-top-sec{ margin:0 0 18px; }
 /* Top5 카드 — sf-tops 카드 톤 */
 .pp-top-sec .rs-scroller{
+  /* fix (2026-07-02 재진단): 상위/전역 CSS 가 grid 로 오버라이드하지 못하게
+     flex-nowrap + overflow-x:auto 명시. 카테고리 grid (pp-cat-scroll, PR #101/#102)
+     와는 별개 클래스(.rs-scroller) 라 카테고리 영향 0.
+     Top5 카드 5+ 개를 가로 나열하고 옆으로 스크롤 가능하게 강제. */
+  display: flex !important;
+  flex-wrap: nowrap !important;
+  overflow-x: auto !important;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-x;
   gap:12px;
   padding-bottom:6px;
 }
