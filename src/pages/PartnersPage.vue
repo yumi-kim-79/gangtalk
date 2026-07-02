@@ -38,6 +38,10 @@
          allBanners 로 전부 렌더 + track 이 translateX 로 이동 + 자동 타이머 + 스와이프.
          CSS 는 건드리지 않고 inline style 로 flex slider 구현. -->
     <section class="banners pp-banners" v-if="bannersReady && allBanners.length">
+      <!-- 뷰포트 wrapper — overflow:hidden 담당 (진단 §4-3 옵션 C).
+           track 자체에 overflow:hidden 을 걸면 track 이 transform 이동하며 clip
+           box 도 함께 이동해 슬라이드가 안 보이는 브라우저 이슈 회피. -->
+      <div :style="{ overflow: 'hidden', width: '100%' }">
       <div
         :style="{
           display: 'flex',
@@ -64,6 +68,7 @@
           >{{ t }}</span>
         </article>
       </div>
+      </div><!-- /뷰포트 wrapper -->
       <!-- 핑크 인디케이터 — 슬라이드 개수와 동기 -->
       <div class="pp-banner-dots" aria-hidden="true" v-if="allBanners.length > 1">
         <span
