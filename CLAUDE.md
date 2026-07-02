@@ -134,6 +134,80 @@ firebase deploy --only hosting:admin
 
 ## 작업 로그
 
+### 2026-07-02: 노출 필드 분리 PR 1 — exposure.dashboard 필드 신설 + 관리자 토글 (`feat/dashboard-exposure-toggle`)
+- **목적**: 진단(`docs/audit/2026-07-02-현황판-가게찾기-노출구조-진단.md` PR 1, 옵션 A) — 현재 `exposure.gangtalk` 단일 필드가 가게찾기 + 현황판 노출을 동시 결정. 목표 구조: 승인=가게찾기 자동 / 현황판=관리자 별도 지정. 본 PR 은 **필드 + 관리자 UI 신설만**. MainPage/StoreFinder/승인 로직/BizSignupPage 변경 0 → **기존 현황판 노출 그대로 유지** (레이블/달토/유앤미 등)
+- **⚠️ 중요 — 4 단계 배포 순서**:
+  1. **PR 1 (본 PR)**: 관리자 UI + `exposure.dashboard` 필드 신설. MainPage 변경 0. **회귀 0**
+  2. 관리자가 UI 로 현재 현황판 표시 가게들에 `exposure.dashboard:true` 지정
+  3. PR 2: MainPage `EXPOSURE_KEY 'gangtalk' → 'dashboard'` 전환
+  4. PR 3: 승인 로직 정합 (`exposure.dashboard:false` 명시)
+- **수정 — `src/pages/admin/StoresManagePage.vue` 단일 파일**:
+  - **마크업 — Tab 1 각 카드에 "현황판 노출" 토글 추가**:
+    - 기존 `.adm-toggle` (가게찾기) 라벨: "노출/숨김" → "가게찾기 ON/OFF" 로 명확화
+    - **신규 `.adm-toggle.adm-toggle-dashboard`** (현황판, 파랑 톤 시각 구분):
+      ```html
+      <label class="adm-toggle adm-toggle-dashboard" title="현황판 노출 (신규 — 관리자 지정)">
+        <input type="checkbox" :checked="effDashboardExposed(s)"
+               @change="toggleDashboardExposed(s, $event.target.checked)" />
+        <span class="adm-toggle-track"><span class="adm-toggle-thumb"></span></span>
+        <span class="adm-toggle-label">현황판 {{ effDashboardExposed(s) ? 'ON' : 'OFF' }}</span>
+      </label>
+      ```
+    - 섹션 hint 2줄 신설: 두 토글 의미 안내 + "현황판 ⊂ 가게찾기" 승격 정책 안내
+  - **스크립트**:
+    - **`isDashboardExposed(s)` 헬퍼 신규**: `exp.dashboard === undefined ? false : !!exp.dashboard`
+      - undefined = 미노출 (진단 §7-2 정책 — 관리자 지정 명시 필요)
+    - **`dashboardEdits = ref({})`** 신규 (edits 별개 관리)
+    - **`toggleDashboardExposed(s, next)`** — **승격 정책**: 현황판 ON 하면 `exposureEdits[id] = true` 자동 (가게찾기 승격)
+    - **`toggleExposed` 확장** — **역방향 정책**: 가게찾기 OFF 하면 `dashboardEdits[id] = false` 자동 (현황판 강제 OFF)
+    - **`effDashboardExposed(s)`** — edits 우선, 없으면 stores 값
+    - **`saveExposeAndOrder` 통합**: 두 edits 를 스토어별로 병합 → 한 번의 `updateDoc` 로 필드 병합 저장 (dot 경로 자동 merge)
+      ```js
+      const payload = {}
+      if (exposureEdits[id] 변경) payload['exposure.gangtalk'] = val
+      if (dashboardEdits[id] 변경) payload['exposure.dashboard'] = val
+      if (payload keys 0) skip
+      payload.updatedAt = serverTimestamp()
+      updateDoc(stores/{id}, payload)
+      ```
+    - 성공 후 `exposureEdits.value = {}` + `dashboardEdits.value = {}` 함께 초기화
+  - **CSS 신규**:
+    - `.adm-toggle-label min-width: 32 → 56px` (라벨 텍스트 "가게찾기 ON" 길이 대응)
+    - `.adm-toggle.adm-toggle-dashboard input:checked + .adm-toggle-track { background:#3b82f6 }` (파랑 톤)
+    - `.adm-toggle.adm-toggle-dashboard .adm-toggle-label { color:#3b82f6 }` (활성 파랑 텍스트)
+- **승격 정책 (현황판 ⊂ 가게찾기)**:
+  - **현황판 ON** → 가게찾기도 자동 ON (`toggleDashboardExposed` 에서 `exposureEdits[id]=true` set)
+  - **가게찾기 OFF** → 현황판도 자동 OFF (`toggleExposed` 에서 `dashboardEdits[id]=false` set)
+  - **현황판 OFF** → 가게찾기는 그대로 (관계 안 어긋남)
+  - **가게찾기 ON** → 현황판은 그대로 (별도 지정 필요 — 사용자 목표)
+- **건드리지 않음 (사용자 명시)**:
+  - **MainPage.vue** — `EXPOSURE_KEY = 'gangtalk'` / `exposedHere` 정책 그대로 (PR 2 에서 변경 예정)
+  - **StoreFinder.vue** — `EXPOSURE_KEY = 'gangtalk'` 그대로
+  - **BizSignupPage.vue** — payload `exposure.gangtalk:false` 그대로 (PR 3 에서 `exposure.dashboard:false` 추가 예정)
+  - **`approveStore` / `onReviewSaveAndApprove`** — `exposure.gangtalk:true` 만 set 그대로 (PR 3 에서 정합)
+  - **firestore.rules** — `stores/*.exposure.*` write 는 이미 admin/owner 통과 (변경 0)
+  - Cloud Functions / partners / 회원 빌드 / 자가가입 / 승인 흐름
+- **효과**:
+  - 관리자가 Tab 1 에서 스토어별 "현황판 노출" ON/OFF 지정 가능
+  - Firestore `stores/{id}.exposure.dashboard` 필드 저장
+  - **MainPage 는 이 필드를 아직 안 읽음** → 사용자 화면 회귀 0 (현재 현황판 그대로)
+  - PR 2 배포 전 관리자가 사전 지정 완료 → PR 2 배포 시 지정한 가게만 현황판 노출
+- **다음 단계 (사용자 액션)**:
+  1. **본 PR 배포**: `firebase deploy --only hosting:admin`
+  2. **관리자 지정 작업**: `/admin/stores` Tab 1 → 현재 현황판 표시 중인 가게 (레이블/달토/유앤미 등) 마다 "현황판 ON" 토글 → 저장
+  3. PR 2 (다음 PR) 로 MainPage 조건 변경
+- **빌드 검증**: `npm run build:admin` ✓ (admin 빌드만, 회원 무영향)
+- **배포 범위**: `firebase deploy --only hosting:admin`
+- **검증 시나리오 (사용자 수동)**:
+  - [ ] `/admin/stores` Tab 1 각 카드에 "가게찾기" / "현황판" 두 토글 노출
+  - [ ] "현황판 ON" 클릭 → 가게찾기도 자동 ON 됨 (승격 정책)
+  - [ ] "가게찾기 OFF" 클릭 → 현황판도 자동 OFF 됨 (역방향)
+  - [ ] "저장" 클릭 → Firestore Console 에서 `stores/{id}.exposure.dashboard` 값 저장 확인
+  - [ ] `exposure.gangtalk` 값도 보존 (merge 확인)
+  - [ ] **MainPage 현황판 그대로** — 레이블/달토/유앤미 등 기존 노출 가게 회귀 0
+  - [ ] StoreFinder 가게찾기 그대로
+  - [ ] BizSignupPage 자가가입 정상, 승인 흐름 정상
+
 ### 2026-06-22: 제휴관 카테고리 PNG 아이콘 잘림 해결 (`fix/partners-cat-icon-crop`)
 - **목적**: 진단(`docs/audit/2026-06-22-제휴관-카테고리-라벨잘림-진단.md`) — 사용자가 "라벨 잘림" 으로 본 진짜 원인은 라벨이 아니라 PNG 아이콘. `.cat-icon` 컨테이너 32px 안에서 `background-size: 50/40/35px` 오버라이드 강제로 PNG 가 좌우/상하 잘림 → 시각적 답답함 → "라벨 잘림" 인상. 라벨 자체는 412/360px 모두 잘림 0
 - **수정 — `src/pages/PartnersPage.vue` 단일 파일**:

@@ -38,7 +38,12 @@
           </button>
         </div>
       </header>
-      <p class="adm-hint">드래그(☰) 또는 위/아래 버튼으로 순서 변경 · 토글로 노출/숨김 · 15/30/60/90일 버튼으로 노출 기간 설정 (즉시 저장)</p>
+      <p class="adm-hint">
+        드래그(☰) 로 순서 변경 · <strong>가게찾기</strong> 토글 = 가게찾기 노출 · <strong>현황판</strong> 토글 = 현황판 노출 (별도 지정) · 15/30/60/90일 = 노출 기간
+      </p>
+      <p class="adm-hint">
+        💡 현황판 ⊂ 가게찾기 정책 — 현황판을 ON 하면 가게찾기도 자동 ON 됩니다. 가게찾기를 OFF 하면 현황판도 자동 OFF.
+      </p>
 
       <ul ref="storeListRef" class="adm-store-list" v-if="approvedStores.length">
         <li
@@ -54,10 +59,25 @@
               <strong>{{ s.name || '(이름 없음)' }}</strong>
               <span class="adm-store-sub">{{ s.region || '-' }} · {{ s.category || '-' }}</span>
             </div>
-            <label class="adm-toggle">
+            <!-- PR 1 (2026-07-02): 노출 필드 분리 진단 (docs/audit/2026-07-02-현황판-가게찾기-노출구조-진단.md)
+                 - 가게찾기 노출 = exposure.gangtalk (기존, 승인 시 자동 ON)
+                 - 현황판 노출 = exposure.dashboard (신규, 관리자가 별도 지정)
+                 - 정책: 현황판 ⊂ 가게찾기 (dashboard=ON 시 gangtalk도 자동 ON 승격)
+                 - MainPage 는 이 PR 에서 변경 0 — 여전히 exposure.gangtalk 참조 (기존 노출 보존)
+                 - PR 2 에서 MainPage 를 exposure.dashboard 로 전환 예정 -->
+            <label class="adm-toggle" title="가게찾기 노출 (기존)">
               <input type="checkbox" :checked="effExposed(s)" @change="toggleExposed(s, $event.target.checked)" />
               <span class="adm-toggle-track"><span class="adm-toggle-thumb"></span></span>
-              <span class="adm-toggle-label">{{ effExposed(s) ? '노출' : '숨김' }}</span>
+              <span class="adm-toggle-label">가게찾기 {{ effExposed(s) ? 'ON' : 'OFF' }}</span>
+            </label>
+            <label class="adm-toggle adm-toggle-dashboard" title="현황판 노출 (신규 — 관리자 지정)">
+              <input
+                type="checkbox"
+                :checked="effDashboardExposed(s)"
+                @change="toggleDashboardExposed(s, $event.target.checked)"
+              />
+              <span class="adm-toggle-track"><span class="adm-toggle-thumb"></span></span>
+              <span class="adm-toggle-label">현황판 {{ effDashboardExposed(s) ? 'ON' : 'OFF' }}</span>
             </label>
             <button
               type="button"
@@ -417,6 +437,11 @@ const isExposed = (s) => {
   const exp = s?.exposure || {}
   return exp.gangtalk === undefined ? true : !!exp.gangtalk
 }
+/* PR 1 (2026-07-02): 현황판 노출 별도 필드 — undefined 는 미노출 (관리자 지정 필요) */
+const isDashboardExposed = (s) => {
+  const exp = s?.exposure || {}
+  return exp.dashboard === undefined ? false : !!exp.dashboard
+}
 
 const approvedStores = computed(() => stores.value.filter(isApproved))
 const exposedStores = computed(() => approvedStores.value.filter(isExposed))
@@ -440,11 +465,19 @@ const tabs = computed(() => [
 ])
 
 /* ===== 탭 1: 노출 토글 + 순서 ===== */
-const exposureEdits = ref({})    // { storeId: bool }
+const exposureEdits = ref({})            // { storeId: bool } — 가게찾기 노출 edits
+const dashboardEdits = ref({})           // { storeId: bool } — 현황판 노출 edits (PR 1)
 const savingExpose = ref(false)
 
+/* 가게찾기 토글 — 현황판 ⊂ 가게찾기 정책:
+ * 가게찾기 OFF 로 하면 현황판도 자동 OFF (승격 역방향). */
 function toggleExposed(s, next){
-  exposureEdits.value[s.id] = !!next
+  const val = !!next
+  exposureEdits.value[s.id] = val
+  if (!val) {
+    // 가게찾기 OFF → 현황판도 자동 OFF
+    dashboardEdits.value[s.id] = false
+  }
 }
 
 function effExposed(s){
@@ -452,6 +485,24 @@ function effExposed(s){
     return exposureEdits.value[s.id]
   }
   return isExposed(s)
+}
+
+/* PR 1 (2026-07-02): 현황판 토글 — 현황판 ⊂ 가게찾기 정책:
+ * 현황판 ON 하면 가게찾기도 자동 ON (승격). */
+function toggleDashboardExposed(s, next){
+  const val = !!next
+  dashboardEdits.value[s.id] = val
+  if (val) {
+    // 현황판 ON → 가게찾기도 자동 ON
+    exposureEdits.value[s.id] = true
+  }
+}
+
+function effDashboardExposed(s){
+  if (Object.prototype.hasOwnProperty.call(dashboardEdits.value, s.id)) {
+    return dashboardEdits.value[s.id]
+  }
+  return isDashboardExposed(s)
 }
 
 function reorderApproved(fromIdx, toIdx){
@@ -566,17 +617,41 @@ async function saveExposeAndOrder(){
   if (savingExpose.value) return
   savingExpose.value = true
   try {
-    // 1) 노출 토글된 업소 → stores/{id} exposure.gangtalk 업데이트
-    const edits = Object.entries(exposureEdits.value)
-    for (const [id, val] of edits) {
+    /* PR 1 (2026-07-02): 가게찾기(exposure.gangtalk) + 현황판(exposure.dashboard) 를
+     * 스토어별 한 번의 updateDoc 으로 병합 저장 (merge 자동 — dot 경로는 필드별 병합).
+     * 승격 정책은 toggleExposed / toggleDashboardExposed 에서 edits 에 이미 반영됨. */
+    const ids = new Set([
+      ...Object.keys(exposureEdits.value),
+      ...Object.keys(dashboardEdits.value),
+    ])
+
+    for (const id of ids) {
       const cur = stores.value.find(s => s.id === id)
       if (!cur) continue
-      if (isExposed(cur) === val) continue
+
+      const payload = {}
+
+      // 가게찾기 노출 (exposure.gangtalk)
+      if (Object.prototype.hasOwnProperty.call(exposureEdits.value, id)) {
+        const val = !!exposureEdits.value[id]
+        if (isExposed(cur) !== val) {
+          payload[`exposure.gangtalk`] = val
+        }
+      }
+
+      // 현황판 노출 (exposure.dashboard) — PR 1 신규
+      if (Object.prototype.hasOwnProperty.call(dashboardEdits.value, id)) {
+        const val = !!dashboardEdits.value[id]
+        if (isDashboardExposed(cur) !== val) {
+          payload[`exposure.dashboard`] = val
+        }
+      }
+
+      if (Object.keys(payload).length === 0) continue
+      payload.updatedAt = serverTimestamp()
+
       try {
-        await updateDoc(doc(fbDb, 'stores', id), {
-          [`exposure.gangtalk`]: !!val,
-          updatedAt: serverTimestamp(),
-        })
+        await updateDoc(doc(fbDb, 'stores', id), payload)
       } catch (e) { console.warn('exposure update fail', id, e) }
     }
 
@@ -587,6 +662,7 @@ async function saveExposeAndOrder(){
     }, { merge: true })
 
     exposureEdits.value = {}
+    dashboardEdits.value = {}
     alert('저장되었습니다.')
   } catch (e) {
     console.error(e)
@@ -1162,7 +1238,12 @@ function fmtTime(v){
 }
 .adm-toggle input:checked + .adm-toggle-track{ background:#ff2e7e; }
 .adm-toggle input:checked + .adm-toggle-track .adm-toggle-thumb{ left:18px; }
-.adm-toggle-label{ font-size:12px; color:#666; font-weight:700; min-width:32px; }
+.adm-toggle-label{ font-size:12px; color:#666; font-weight:700; min-width:56px; }
+
+/* PR 1 (2026-07-02): 현황판 노출 토글 — 시각적 구분 (핑크 → 파랑 톤) */
+.adm-toggle.adm-toggle-dashboard input:checked + .adm-toggle-track{ background:#3b82f6; }
+.adm-toggle.adm-toggle-dashboard .adm-toggle-label{ color:#3b82f6; }
+.adm-toggle.adm-toggle-dashboard input:not(:checked) ~ .adm-toggle-label{ color:#999; }
 
 .adm-table{
   width:100%; border-collapse:collapse;
