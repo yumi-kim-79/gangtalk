@@ -134,6 +134,85 @@ firebase deploy --only hosting:admin
 
 ## 작업 로그
 
+### 2026-07-02: 배너 자동 넘김 + Top5 폴백 강화 — JS 로직 (`fix/banner-timer-top5-slice`)
+- **목적**: 진단(`docs/audit/2026-07-02-배너Top5-렌더링개수-진단.md`) — 원인은 CSS 아닌 JS 로직
+  - **StoreFinder/PartnersPage 배너**: `slice(-1) / slice(0,1)` 로 1장만 렌더 + 슬라이드 로직 자체 없음 → 자동 넘김 안 됨
+  - **가게찾기 Top5**: `topFromRanks` 필터 통과된 유효 store 2개 + 폴백 조건 (`ranked.length ? ranked : fallback`) 이 부족해도 자동 채움 안 함 → 2개만 렌더
+- **⚠️ CSS 는 건드리지 않음** — 슬라이더 wrapper 는 inline `:style` 로 처리, 새 CSS 룰 0
+- **수정 3 파일**:
+  - **`src/views/StoreFinder.vue`** — 배너 슬라이더 신설 + Top5 폴백 강화:
+    - **`oneBanner` (slice(-1)) → `allBanners` (필터만, slice 없음)** — 이미지 있는 배너 전부
+    - 하위 호환: `oneBanner = allBanners` (preload head link 등 참조 유지)
+    - **`slideIdx` ref + `sliderTimer` + `startSlider/stopSlider`**:
+      - 2장 이상일 때만 setInterval 4초 작동 (진단 지정)
+      - `allBanners` watch — 배열 변화 시 idx 리셋 + 타이머 재시작
+    - **수동 스와이프** (`onSliderTouchStart/onSliderTouchEnd`):
+      - `|dx| > 40` + 가로 우세 (`|dx| > |dy|`) 시 좌/우 이동
+      - 터치 시작 시 stopSlider, 종료 시 startSlider (재시작)
+    - **onMounted → startSlider() / onUnmounted → stopSlider()**
+    - **마크업**:
+      - `.sf-banners` 안에 wrapper `<div>` 신설 — inline style `display:flex; width:100%; transform: translateX(-${slideIdx * 100}%); transition: transform 0.5s ease`
+      - `@touchstart.passive / @touchend.passive` 붙임
+      - `v-for="(b, i) in allBanners"` → 여러 배너 렌더
+      - 각 `<article class="banner">` 에 inline `:style="{ flex: '0 0 100%', minWidth: '0' }"` (flex-shrink 0 로 겹침 방지)
+      - **인디케이터 동적화**: `v-for="(_, i) in allBanners"` + `v-if="allBanners.length > 1"` (1장 이하면 숨김)
+    - **Top5 폴백 강화** (진단 옵션 A, `:1410`):
+      ```diff
+      - const list = ranked.length ? ranked : topByCat(c.key)
+      + const list = ranked.slice()
+      + if (list.length < 5) {
+      +   const fallback = topByCat(c.key)
+      +   const seen = new Set(list.map(s => String(s.id)))
+      +   for (const s of fallback) {
+      +     if (list.length >= 5) break
+      +     if (!seen.has(String(s.id))) list.push(s)
+      +   }
+      + }
+      ```
+      - 관리자 지정 통과 항목 부족 시 자동 score 정렬 폴백으로 5개 채움
+      - 제휴관과 동일 결과
+  - **`src/pages/PartnersPage.vue`** — 동일 패턴 이식:
+    - `bannersToShow` (slice(0,1)) → `allBanners` (필터만)
+    - 하위 호환: `bannersToShow = allBanners`
+    - 동일 `slideIdx / sliderTimer / startSlider / stopSlider / watch / touch` 로직
+    - `onMounted → startSlider()` + `onUnmounted → stopSlider()`
+    - 마크업 동일 패턴 (inline flex track + inline flex 아이템)
+    - 인디케이터 동적화
+  - **`src/pages/GangTalkPage.vue`** — 기존 슬라이더에 수동 스와이프 추가:
+    - 자동 넘김 (`sliderIdx / sliderItems / startSlider setInterval`) 그대로
+    - `.gt-slider-bar` `<section>` 에 `@touchstart.passive / @touchend.passive` 추가
+    - `onSliderTouchStart / onSliderTouchEnd` 함수 신설 (동일 좌/우 40px 판별 로직)
+- **CSS 변경 0**:
+  - `.sf-banners / .pp-banners / .banner / .banner-img` — 그대로
+  - `.gt-slider-bar / .gt-slider-track / .gt-slide` — 그대로 (PR #118 aspect-ratio 유지)
+  - `.sf-banner-dots / .pp-banner-dots / .dot.active` — 그대로
+  - 카테고리 grid 5×2 (`mp/sf/pp-cat-scroll`, PR #101/#102) — 무관
+  - `.top-row / .rs-scroller / .mini / .rs-card` — 그대로 (CSS 문제 아님)
+- **건드리지 않음**:
+  - **PR #118** 배너/카드 aspect-ratio (이미지 잘림 0 유지)
+  - **PR #119/120/121** 컴팩트 그대로
+  - **PR #124/125/126** 노출 필드 분리 그대로
+  - MainPage 는 배너 자체 없음 (mp-hot 카드만) — 대상 아님
+  - `topByCat` / `topFromRanks` 필터 로직 그대로 (폴백 조건만 변경)
+- **효과**:
+  - **StoreFinder/PartnersPage 배너**: 여러 장 자동 넘김 (4초 주기) + 좌우 스와이프. 배너 1장 이하면 정적 (인디케이터 숨김)
+  - **강톡 슬라이더**: 자동 넘김 그대로 + 수동 스와이프 추가
+  - **가게찾기 Top5**: 하퍼 등에서 관리자 지정 통과 항목 부족해도 자동 폴백으로 5개 채워짐
+  - **점 인디케이터 개수 = 실제 슬라이드 수** (동적 v-for)
+- **빌드 검증**: `npm run build` ✓ (회원 index 228.08→228.62KB, +0.54KB JS 로직)
+- **배포 범위**: `firebase deploy --only hosting:prod` (회원 빌드만)
+- **검증 시나리오 (사용자 수동)**:
+  - [ ] 가게찾기 배너 2장 이상 → 4초마다 자동 넘김
+  - [ ] 제휴관 배너 동일
+  - [ ] 손가락으로 좌/우 스와이프 → 슬라이드 이동
+  - [ ] 강톡 슬라이더 자동 넘김 + 스와이프 정상
+  - [ ] 점 인디케이터 개수 = 실제 슬라이드 개수
+  - [ ] 배너 1장이면 슬라이더 정지 + 인디케이터 숨김
+  - [ ] 배너 이미지 잘림 0 (PR #118 aspect-ratio 유지)
+  - [ ] **가게찾기 Top5 하퍼 5개 렌더** (관리자 지정 부족해도 자동 폴백)
+  - [ ] 제휴관 Top5 회귀 없음
+  - [ ] 카테고리 5×2 그대로
+
 ### 2026-07-02: PR #127/#128 revert — 배너 슬라이드/스크롤 fix 롤백 (`revert/banner-scroll-127-128`)
 - **목적**: PR #127/#128 로 배너 슬라이드/Top5 가로 스크롤을 고치려던 시도가 실패했고, **원래 잘 작동하던 제휴관 배너 자동 넘김까지 회귀 손상**. CSS 를 덧대며 악화 중이므로 안정 상태 (PR #118 상태) 로 롤백
 - **롤백 대상**: PR #127 (`fix/banner-slide-scroll-height`) + PR #128 (`fix/top5-banner-horizontal-scroll`)

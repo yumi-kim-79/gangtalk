@@ -34,26 +34,44 @@
     </section>
 
     <!-- 프로모션 배너 — 가게찾기 sf-banners 톤 -->
-    <section class="banners pp-banners" v-if="bannersReady && bannersToShow.length">
-      <article
-        v-for="b in bannersToShow"
-        :key="b.id"
-        class="banner"
-        @click="onBannerClick"
+    <!-- fix (2026-07-02): 이전에는 bannersToShow=slice(0,1) 로 1장만 렌더 → 자동 넘김 없음.
+         allBanners 로 전부 렌더 + track 이 translateX 로 이동 + 자동 타이머 + 스와이프.
+         CSS 는 건드리지 않고 inline style 로 flex slider 구현. -->
+    <section class="banners pp-banners" v-if="bannersReady && allBanners.length">
+      <div
+        :style="{
+          display: 'flex',
+          width: '100%',
+          transform: `translateX(-${slideIdx * 100}%)`,
+          transition: 'transform 0.5s ease',
+        }"
+        @touchstart.passive="onSliderTouchStart"
+        @touchend.passive="onSliderTouchEnd"
       >
-        <img v-if="bannerImage(b)" :src="bannerImage(b)" alt="" class="banner-img" loading="lazy" />
+        <article
+          v-for="(b, i) in allBanners"
+          :key="b.id || i"
+          class="banner"
+          :style="{ flex: '0 0 100%', minWidth: '0' }"
+          @click="onBannerClick"
+        >
+          <img v-if="bannerImage(b)" :src="bannerImage(b)" alt="" class="banner-img" loading="lazy" />
+          <span
+            v-for="(t, tIdx) in (b.tags||[])"
+            :key="t + '_' + tIdx"
+            class="chip tag-abs"
+            :style="tagPosStyle(b, tIdx)"
+          >{{ t }}</span>
+        </article>
+      </div>
+      <!-- 핑크 인디케이터 — 슬라이드 개수와 동기 -->
+      <div class="pp-banner-dots" aria-hidden="true" v-if="allBanners.length > 1">
         <span
-          v-for="(t, tIdx) in (b.tags||[])"
-          :key="t + '_' + tIdx"
-          class="chip tag-abs"
-          :style="tagPosStyle(b, tIdx)"
-        >{{ t }}</span>
-      </article>
-      <!-- 핑크 인디케이터 -->
-      <div class="pp-banner-dots" aria-hidden="true">
-        <span class="dot active"></span>
-        <span class="dot"></span>
-        <span class="dot"></span>
+          v-for="(_, i) in allBanners"
+          :key="i"
+          class="dot"
+          :class="{ active: slideIdx === i }"
+        ></span>
       </div>
     </section>
 
@@ -732,16 +750,64 @@ function buildNearbyStores(center){
 
 /* ---------- 배너: 공통 훅 사용(제휴관 'P') ---------- */
 const { items: bannersP, ready: bannersReady } = useMarketingBanners('P')
-const bannersToShow = computed(() => {
+/* fix (2026-07-02): 이전 bannersToShow=slice(0,1) 은 1장만 → 자동 넘김 불가.
+   allBanners 로 이미지 있는 배너 전부 반환. 아래 slideIdx/타이머로 슬라이드. */
+const allBanners = computed(() => {
   const arr = Array.isArray(bannersP.value) ? bannersP.value : []
-  const withImage = arr.filter(b => !!bannerImage(b))
-  return withImage.slice(0, 1)
+  return arr.filter(b => !!bannerImage(b))
 })
+// 하위 호환
+const bannersToShow = allBanners
 const firstBannerUrl = computed(() => {
-  const b = bannersToShow.value && bannersToShow.value[0]
+  const b = allBanners.value && allBanners.value[0]
   return b ? bannerImage(b) : ''
 })
 function onBannerClick(){ scrollToList() }
+
+/* 자동 슬라이드 (2장 이상일 때만 타이머 작동) */
+const slideIdx = ref(0)
+let sliderTimer = null
+function startSlider() {
+  stopSlider()
+  const n = allBanners.value.length
+  if (n < 2) return
+  sliderTimer = setInterval(() => {
+    const n2 = allBanners.value.length
+    if (n2 < 2) return
+    slideIdx.value = (slideIdx.value + 1) % n2
+  }, 4000)
+}
+function stopSlider() {
+  if (sliderTimer) { clearInterval(sliderTimer); sliderTimer = null }
+}
+watch(allBanners, (arr) => {
+  if (!Array.isArray(arr)) return
+  if (slideIdx.value >= arr.length) slideIdx.value = 0
+  startSlider()
+})
+
+/* 수동 스와이프 */
+const _sliderTouch = { startX: 0, startY: 0 }
+function onSliderTouchStart(e) {
+  const t = e.touches?.[0]
+  if (!t) return
+  _sliderTouch.startX = t.clientX
+  _sliderTouch.startY = t.clientY
+  stopSlider()
+}
+function onSliderTouchEnd(e) {
+  const t = e.changedTouches?.[0]
+  const n = allBanners.value.length
+  if (t && n > 1) {
+    const dx = t.clientX - _sliderTouch.startX
+    const dy = t.clientY - _sliderTouch.startY
+    if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy)) {
+      if (dx < 0) slideIdx.value = (slideIdx.value + 1) % n
+      else slideIdx.value = (slideIdx.value - 1 + n) % n
+    }
+  }
+  startSlider()
+}
 
 /* ---------- 파트너 데이터 ---------- */
 const partners = ref([])
@@ -879,9 +945,11 @@ function bindRatingEvents(add=true){
 // 별점/찜 이벤트 리스너는 첫 페인트 이후에 등록 (idle 지연)
 const _ric = window.requestIdleCallback || ((cb) => setTimeout(cb, 1))
 onMounted(() => _ric(() => bindRatingEvents(true)))
+onMounted(() => startSlider())   // fix (2026-07-02): 배너 자동 슬라이드 시작 (2장 이상)
 onUnmounted(() => {
   bindRatingEvents(false)
   if (flashTimer) clearTimeout(flashTimer)
+  stopSlider()  // fix (2026-07-02): 배너 타이머 정리
 })
 
 /* ---------- 점수/정렬 ---------- */
