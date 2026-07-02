@@ -859,12 +859,17 @@ async function saveAllMetrics(){
 
 /* ===== 탭 3: 승인/거절 ===== */
 async function approveStore(s){
-  if (!confirm(`'${s.name || s.id}' 을(를) 승인하시겠습니까?`)) return
+  if (!confirm(`'${s.name || s.id}' 을(를) 승인하시겠습니까?\n\n승인 시 가게찾기에 자동 노출됩니다.\n현황판 노출은 Tab 1 에서 별도 지정해야 합니다.`)) return
   try {
+    /* PR 3 (2026-07-02): 노출 필드 분리 완결.
+     * 진단: docs/audit/2026-07-02-현황판-가게찾기-노출구조-진단.md
+     * 승인 = 가게찾기(exposure.gangtalk) 만 자동 ON.
+     * 현황판(exposure.dashboard) 은 명시적으로 false 로 (관리자가 Tab 1 별도 지정). */
     await updateDoc(doc(fbDb, 'stores', s.id), {
       approved: true,
       applyStatus: 'approved',
       [`exposure.gangtalk`]: true,
+      [`exposure.dashboard`]: false,
       approvedAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     })
@@ -1008,20 +1013,28 @@ async function onReviewSaveOnly() {
 async function onReviewSaveAndApprove() {
   if (review.busy || !review.storeId) return
   if (!review.form.name) { review.errorMsg = '가게명을 입력해 주세요.'; return }
-  if (!confirm(`'${review.form.name}' 을(를) 저장 후 즉시 승인하시겠습니까?`)) return
+  if (!confirm(
+    `'${review.form.name}' 을(를) 저장 후 즉시 승인하시겠습니까?\n\n` +
+    `승인 시 가게찾기에 자동 노출됩니다.\n` +
+    `현황판 노출은 Tab 1 에서 별도 지정해야 합니다.`,
+  )) return
   review.busy = true
   review.errorMsg = ''
   review.successMsg = ''
   try {
+    /* PR 3 (2026-07-02): 노출 필드 분리 완결.
+     * 승인 = 가게찾기(exposure.gangtalk) 만 자동 ON.
+     * 현황판(exposure.dashboard) 은 명시적으로 false — 관리자가 Tab 1 별도 지정 */
     await updateDoc(doc(fbDb, 'stores', review.storeId), {
       ...buildReviewFormPayload(),
       approved: true,
       applyStatus: 'approved',
       'exposure.gangtalk': true,
+      'exposure.dashboard': false,
       approvedAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     })
-    review.successMsg = '승인되었습니다. 현황판에 노출됩니다.'
+    review.successMsg = '승인되었습니다. 가게찾기에 노출됩니다. (현황판 노출은 Tab 1 에서 별도 지정)'
     // pending 에서 사라지므로 잠시 후 모달 닫기 (UX)
     setTimeout(() => { if (review.open) closeReview() }, 800)
   } catch (e) {

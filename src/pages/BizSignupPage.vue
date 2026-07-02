@@ -535,7 +535,12 @@ async function runCreateStore(uid, email) {
       // 승인 대기 상태 — MainPage.isApproved 자동 미노출
       applyStatus: 'pending',
       approved:    false,
+      // PR 3 (2026-07-02): 노출 필드 분리 완결 —
+      //   진단: docs/audit/2026-07-02-현황판-가게찾기-노출구조-진단.md
+      //   가게찾기(gangtalk) 는 승인 시 관리자가 true 로. 자가가입 시점은 false.
+      //   현황판(dashboard) 는 승인 후에도 자동 안 켬 — 관리자가 Tab 1 에서 별도 지정.
       'exposure.gangtalk': false,
+      'exposure.dashboard': false,
       thumbVer:   Date.now(),
       createdAt:  serverTimestamp(),
       updatedAt:  serverTimestamp(),
