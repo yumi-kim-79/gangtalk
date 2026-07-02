@@ -1876,8 +1876,6 @@ function toggleSort(){ ui.value.sortOpen = !ui.value.sortOpen; if(ui.value.sortO
   width:100%;
   height:auto;
   aspect-ratio: var(--banner-aspect, 12 / 5);
-  /* fix (2026-07-02): aspect-ratio 미지원/오계산 브라우저 대비 min-height 폴백. */
-  min-height: 140px;
   object-fit:cover;
   display:block;
 }
@@ -1886,8 +1884,6 @@ function toggleSort(){ ui.value.sortOpen = !ui.value.sortOpen; if(ui.value.sortO
 .sf-banner-skeleton{
   width:100%;
   aspect-ratio: var(--banner-aspect, 12 / 5);
-  /* fix (2026-07-02): aspect-ratio 폴백 */
-  min-height: 140px;
   border-radius:16px;
   background:linear-gradient(135deg, #ffe4ef, #fff0f6);
 }
@@ -1992,16 +1988,6 @@ function toggleSort(){ ui.value.sortOpen = !ui.value.sortOpen; if(ui.value.sortO
 }
 /* Top5 카드 업그레이드 */
 .sf-tops :deep(.top-row){
-  /* fix (2026-07-02 재진단): 상위/전역 CSS 가 grid 로 오버라이드하지 못하게
-     flex-nowrap + overflow-x:auto 명시. 카테고리 grid (mp/sf/pp-cat-scroll,
-     PR #101/#102) 와는 별개 클래스(.top-row) 라 카테고리 영향 0.
-     Top5 카드 5+ 개를 가로 나열하고 옆으로 스크롤 가능하게 강제. */
-  display: flex !important;
-  flex-wrap: nowrap !important;
-  overflow-x: auto !important;
-  overflow-y: hidden;
-  -webkit-overflow-scrolling: touch;
-  touch-action: pan-x;
   gap:12px;
   padding-bottom:6px;
 }
@@ -2019,11 +2005,6 @@ function toggleSort(){ ui.value.sortOpen = !ui.value.sortOpen; if(ui.value.sortO
   height:auto !important;
   aspect-ratio: var(--card-thumb-aspect, 16 / 9);
   width:100%;
-  /* fix (2026-07-02): 진단 §4-3 D — flex 아이템 안의 aspect-ratio 자식이
-     height 를 부모(top-row)로 stretch 못하는 브라우저 대비 min-height 폴백.
-     이 fallback 이 없으면 .m-thumb height=0 → .mini height 붕괴 → .top-row
-     가로 스크롤 컨테이너가 시각적으로 안 보임 (스크롤 대상 감지 실패). */
-  min-height: 100px !important;
 }
 .sf-tops :deep(.rank){
   left:10px; top:10px;

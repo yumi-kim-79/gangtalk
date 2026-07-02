@@ -134,6 +134,53 @@ firebase deploy --only hosting:admin
 
 ## 작업 로그
 
+### 2026-07-02: PR #127/#128 revert — 배너 슬라이드/스크롤 fix 롤백 (`revert/banner-scroll-127-128`)
+- **목적**: PR #127/#128 로 배너 슬라이드/Top5 가로 스크롤을 고치려던 시도가 실패했고, **원래 잘 작동하던 제휴관 배너 자동 넘김까지 회귀 손상**. CSS 를 덧대며 악화 중이므로 안정 상태 (PR #118 상태) 로 롤백
+- **롤백 대상**: PR #127 (`fix/banner-slide-scroll-height`) + PR #128 (`fix/top5-banner-horizontal-scroll`)
+- **보존**: PR #118 (배너 aspect-ratio) — 이미지 잘림 방지 정책 유지
+- **수정 3 파일**:
+  - **`src/pages/GangTalkPage.vue` 강톡 슬라이더**:
+    - `.gt-slider-bar { min-height: 140px }` **제거** (PR #127 잔존)
+    - `.gt-slider-track` PR #128 상태 그대로 (원래도 `width:100%; height:100%; display:flex` 였음 — PR #118 상태와 동일)
+    - `.gt-slide` PR #118 상태 그대로
+  - **`src/views/StoreFinder.vue`**:
+    - `.sf-banners :deep(.banner-img)` `min-height: 140px` 제거 (PR #127)
+    - `.sf-banner-skeleton` `min-height: 140px` 제거 (PR #127)
+    - `.sf-tops :deep(.top-row)` PR #128 강제 룰 (`display:flex !important` / `flex-wrap:nowrap !important` / `overflow-x:auto !important` / `overflow-y:hidden` / `-webkit-overflow-scrolling` / `touch-action:pan-x`) 전부 제거 → `gap:12px; padding-bottom:6px` 만
+    - `.sf-tops :deep(.m-thumb)` `min-height: 100px !important` 제거 (PR #127)
+  - **`src/pages/PartnersPage.vue`**:
+    - `.pp-banners .banner-img` `min-height: 140px` 제거 (PR #127)
+    - `.pp-top-sec .rs-scroller` PR #128 강제 룰 전부 제거 → `gap:12px; padding-bottom:6px` 만
+    - `.pp-top-sec .rs-thumb` `min-height: 100px !important` 제거 (PR #127)
+- **결과 = PR #118 배포 직후 상태**:
+  - `.gt-slider-bar { aspect-ratio: 12/5 }` — 이미지 잘림 0 (PR #118 효과 유지)
+  - `.sf-banners :deep(.banner-img)` / `.pp-banners .banner-img` aspect-ratio 12/5 유지
+  - `.sf-tops :deep(.m-thumb)` / `.pp-top-sec .rs-thumb` aspect-ratio 16/9 유지
+  - `.sf-tops :deep(.top-row)` / `.pp-top-sec .rs-scroller` 스코프 오버라이드 제거 → 베이스 `.top-row / .rs-scroller` 룰 (`display:flex; overflow:auto`) 그대로 작동
+- **보존 (건드리지 않음)**:
+  - **PR #118** 배너/카드 aspect-ratio — 이미지 잘림 방지 유지
+  - **PR #119** 헤더/검색/카테고리 컴팩트
+  - **PR #120** 카드 min-width 축소 + name-row 가로 배치
+  - **PR #121/#3b** 강톡 커뮤니티 컴팩트
+  - **PR #101/#102** 카테고리 grid 5×2
+  - **PR #124/#125/#126** 노출 필드 분리 (`exposure.dashboard`)
+  - 강톡 JS 로직 (`sliderIdx / startSlider / sliderItems`) 그대로
+  - 카테고리 grid 5×2 (`mp/sf/pp-cat-scroll`) 그대로
+- **다음 조사 방향 (별도 브랜치, 별도 진단)**:
+  - 배너 슬라이드가 안 넘어가는 진짜 원인은 다른 곳일 가능성 (진단 중)
+  - Top5 "2개만 노출" 도 별도 조사 — 급하게 fix 덧대지 말고 실 브라우저 DevTools 확인
+  - `@touchmove.passive` / `touch-action` / 상위 컨테이너 max-width 등 별도 검토
+- **빌드 검증**: `npm run build` ✓ (회원 index 228KB 유지)
+- **배포 범위**: `firebase deploy --only hosting:prod` (회원 빌드만)
+- **검증 시나리오 (사용자 수동)**:
+  - [ ] 제휴관 배너 자동 넘김 (PR #127 이전처럼 정상 작동 — 회귀 복구 핵심)
+  - [ ] 가게찾기 배너 정상 (원래 slice(-1) 로 1장 표시)
+  - [ ] 강톡 슬라이더 상태 (PR #127 이전과 동일)
+  - [ ] 배너 이미지 잘림 0 (PR #118 aspect-ratio 유지)
+  - [ ] 카드 썸네일 잘림 0 (PR #120 aspect-ratio 유지)
+  - [ ] 카테고리 5×2 그리드 그대로
+  - [ ] PR #124~#126 노출 구조 정상
+
 ### 2026-07-02: 배너 슬라이드 가로 이동 + Top5 가로 스크롤 복구 (`fix/top5-banner-horizontal-scroll`)
 - **목적**: 진단(`docs/audit/2026-07-02-가로이동-배너Top5-재진단.md`) — PR #127 배포 후에도 여전한 두 증상 해결:
   1. **배너 슬라이드**: PR #127 의 `.gt-slider-track { position: absolute; inset: 0 }` 가 flex slider 자식 가로 나열 (3 슬라이드 × 100%) 을 부모 폭 100% 안으로 auto-shrink → translateX 이동 무효 (진단 §1-4)
