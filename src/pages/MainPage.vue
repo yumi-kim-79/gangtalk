@@ -635,7 +635,12 @@ function scrollIntoViewWithOffset(el, offset = TABBAR_H + 8, smooth = true){
 const storage = getStorage()
 const auth    = getAuth()
 
-const EXPOSURE_KEY = 'gangtalk'
+/* PR 2 (2026-07-02): 현황판/가게찾기 노출 분리 —
+ *   진단: docs/audit/2026-07-02-현황판-가게찾기-노출구조-진단.md
+ *   PR 1 (#124) 에서 exposure.dashboard 필드 + 관리자 토글 신설.
+ *   본 PR 에서 MainPage 가 'gangtalk' → 'dashboard' 로 전환.
+ *   StoreFinder 는 계속 'gangtalk' 참조 → 가게찾기 노출 그대로 유지. */
+const EXPOSURE_KEY = 'dashboard'
 
 const q = ref('')
 const doSearch = ()=>{}
@@ -1873,10 +1878,14 @@ const isActiveAd = (s)=> {
   return true
 }
 
+/* PR 2 (2026-07-02): 정책 변경 — undefined = false (미노출).
+ * 이전 (gangtalk 필드 시절): undefined ? true (기본 노출)
+ * 이후 (dashboard 필드): 관리자가 명시 지정한 가게만 노출 (진단 §7-2 정책).
+ * 배포 전제: PR #124 로 관리자가 기존 현황판 가게들에 exposure.dashboard:true 지정 완료. */
 const exposedHere = (s)=> {
   const exp = s?.exposure || {}
-  if (exp == null || typeof exp !== 'object') return true
-  if (exp[EXPOSURE_KEY] === undefined) return true
+  if (exp == null || typeof exp !== 'object') return false
+  if (exp[EXPOSURE_KEY] === undefined) return false
   return !!exp[EXPOSURE_KEY]
 }
 
