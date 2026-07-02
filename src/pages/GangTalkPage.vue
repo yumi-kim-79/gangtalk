@@ -4,7 +4,11 @@
     <AppHeader :show-search="false" />
 
     <!-- ✅ 상단 배너 슬라이더 (실사 이미지) -->
-    <section class="gt-slider-bar">
+    <section
+      class="gt-slider-bar"
+      @touchstart.passive="onSliderTouchStart"
+      @touchend.passive="onSliderTouchEnd"
+    >
       <div class="gt-slider-track" :style="{ transform: `translateX(-${sliderIdx * 100}%)` }">
         <div
           v-for="(slide, i) in sliderItems"
@@ -617,6 +621,29 @@ function startSlider() {
 }
 function stopSlider() {
   if (sliderTimer) { clearInterval(sliderTimer); sliderTimer = null }
+}
+
+/* fix (2026-07-02): 수동 스와이프 — 좌/우 40px 이상 + 가로 우세 시 인덱스 이동. */
+const _sliderTouch = { startX: 0, startY: 0 }
+function onSliderTouchStart(e) {
+  const t = e.touches?.[0]
+  if (!t) return
+  _sliderTouch.startX = t.clientX
+  _sliderTouch.startY = t.clientY
+  stopSlider()
+}
+function onSliderTouchEnd(e) {
+  const t = e.changedTouches?.[0]
+  const n = sliderItems.value.length
+  if (t && n > 1) {
+    const dx = t.clientX - _sliderTouch.startX
+    const dy = t.clientY - _sliderTouch.startY
+    if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy)) {
+      if (dx < 0) sliderIdx.value = (sliderIdx.value + 1) % n
+      else sliderIdx.value = (sliderIdx.value - 1 + n) % n
+    }
+  }
+  startSlider()
 }
 
 // ✅ (레거시) 상단 한 줄 광고 텍스트

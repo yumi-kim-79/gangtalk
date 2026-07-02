@@ -75,41 +75,59 @@
       </div>
     </section>
 
-    <!-- =================== 배너(실사) =================== -->
-    <section class="banners sf-banners" v-if="oneBanner.length">
-      <article
-        v-for="b in oneBanner"
-        :key="b.id || b._key || b.title"
-        class="banner"
-        @click="onBannerClick"
+    <!-- =================== 배너(실사) — 자동 슬라이더 (2장 이상) ===================
+         fix (2026-07-02): 이전에는 oneBanner=slice(-1) 로 1장만 렌더 → 자동 넘김 없음.
+         allBanners 로 전부 렌더 + track 이 translateX 로 이동 + 자동 타이머 + 스와이프.
+         CSS 는 건드리지 않고 inline style 로 flex slider 구현. -->
+    <section class="banners sf-banners" v-if="allBanners.length">
+      <div
+        :style="{
+          display: 'flex',
+          width: '100%',
+          transform: `translateX(-${slideIdx * 100}%)`,
+          transition: 'transform 0.5s ease',
+        }"
+        @touchstart.passive="onSliderTouchStart"
+        @touchend.passive="onSliderTouchEnd"
       >
-        <!-- img → images[_imgIndex] → images[0] 순서로 안전하게 표시 -->
-        <img
-          v-if="bannerImage(b)"
-          class="banner-img"
-          :src="bannerImage(b)"
-          alt=""
-          loading="lazy"
-          decoding="async"
-        />
-        <div class="banner-left" v-if="b.title || b.desc">
-          <h3 v-if="b.title">{{ b.title }}</h3>
-          <p v-if="b.desc" class="muted">{{ b.desc }}</p>
-        </div>
-        <span
-          v-for="(t, tIdx) in (b.tags || [])"
-          :key="t + '_' + tIdx"
-          class="chip pill tag-abs"
-          :style="tagPosStyle(b, tIdx)"
+        <article
+          v-for="(b, i) in allBanners"
+          :key="b.id || b._key || b.title || i"
+          class="banner"
+          :style="{ flex: '0 0 100%', minWidth: '0' }"
+          @click="onBannerClick"
         >
-          {{ t }}
-        </span>
-      </article>
-      <!-- 핑크 인디케이터 (배너가 1장이지만 점 3개 시각 디자인 통일용) -->
-      <div class="sf-banner-dots" aria-hidden="true">
-        <span class="dot active"></span>
-        <span class="dot"></span>
-        <span class="dot"></span>
+          <!-- img → images[_imgIndex] → images[0] 순서로 안전하게 표시 -->
+          <img
+            v-if="bannerImage(b)"
+            class="banner-img"
+            :src="bannerImage(b)"
+            alt=""
+            loading="lazy"
+            decoding="async"
+          />
+          <div class="banner-left" v-if="b.title || b.desc">
+            <h3 v-if="b.title">{{ b.title }}</h3>
+            <p v-if="b.desc" class="muted">{{ b.desc }}</p>
+          </div>
+          <span
+            v-for="(t, tIdx) in (b.tags || [])"
+            :key="t + '_' + tIdx"
+            class="chip pill tag-abs"
+            :style="tagPosStyle(b, tIdx)"
+          >
+            {{ t }}
+          </span>
+        </article>
+      </div>
+      <!-- 핑크 인디케이터 — 슬라이드 개수와 동기 -->
+      <div class="sf-banner-dots" aria-hidden="true" v-if="allBanners.length > 1">
+        <span
+          v-for="(_, i) in allBanners"
+          :key="i"
+          class="dot"
+          :class="{ active: slideIdx === i }"
+        ></span>
       </div>
     </section>
 
@@ -683,16 +701,64 @@ function bannerImage(b){
 }
 
 const { items: bannersF } = useMarketingBanners('F')  // 가게찾기용 실시간 구독
-const oneBanner = computed(() => {
+/* fix (2026-07-02): 이전 oneBanner=slice(-1) 은 1장만 → 자동 넘김 불가.
+   allBanners 로 이미지 있는 배너 전부 반환. 아래 slideIdx/타이머로 슬라이드. */
+const allBanners = computed(() => {
   const arr = Array.isArray(bannersF.value) ? bannersF.value : []
-  // 실제 이미지가 있는 배너만 걸러서 최신 1장만
-  const withImg = arr.filter(b => !!bannerImage(b))
-  return withImg.slice(-1)
+  return arr.filter(b => !!bannerImage(b))
 })
+// 하위 호환 (preload head <link rel="preload"> 등이 참조 가능)
+const oneBanner = allBanners
 const firstBannerUrl = computed(() => {
-  const b = oneBanner.value && oneBanner.value[0]
+  const b = allBanners.value && allBanners.value[0]
   return b ? bannerImage(b) : ''
 })
+
+/* 자동 슬라이드 (2장 이상일 때만 타이머 작동) */
+const slideIdx = ref(0)
+let sliderTimer = null
+function startSlider() {
+  stopSlider()
+  const n = allBanners.value.length
+  if (n < 2) return
+  sliderTimer = setInterval(() => {
+    const n2 = allBanners.value.length
+    if (n2 < 2) return
+    slideIdx.value = (slideIdx.value + 1) % n2
+  }, 4000)
+}
+function stopSlider() {
+  if (sliderTimer) { clearInterval(sliderTimer); sliderTimer = null }
+}
+// allBanners 변화 시 인덱스/타이머 재설정
+watch(allBanners, (arr) => {
+  if (!Array.isArray(arr)) return
+  if (slideIdx.value >= arr.length) slideIdx.value = 0
+  startSlider()
+})
+
+/* 수동 스와이프 — |dx| > 40 + 가로 우세 시 좌/우 이동 */
+const _sliderTouch = { startX: 0, startY: 0 }
+function onSliderTouchStart(e) {
+  const t = e.touches?.[0]
+  if (!t) return
+  _sliderTouch.startX = t.clientX
+  _sliderTouch.startY = t.clientY
+  stopSlider()
+}
+function onSliderTouchEnd(e) {
+  const t = e.changedTouches?.[0]
+  const n = allBanners.value.length
+  if (t && n > 1) {
+    const dx = t.clientX - _sliderTouch.startX
+    const dy = t.clientY - _sliderTouch.startY
+    if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy)) {
+      if (dx < 0) slideIdx.value = (slideIdx.value + 1) % n
+      else slideIdx.value = (slideIdx.value - 1 + n) % n
+    }
+  }
+  startSlider()
+}
 
 function onBannerClick(){ scrollToList() }
 
@@ -1059,6 +1125,7 @@ function rebuildStores(){
 // Firestore 구독
 onMounted(() => {
   applyThemeToDom(getTheme())
+  startSlider()   // fix (2026-07-02): 배너 자동 슬라이드 시작 (2장 이상일 때)
   // 1) stores 컬렉션 (limit 100 — 초기 진입 부담 ↓)
   try{
     const qRef = query(collection(db, 'stores'), orderBy('updatedAt','desc'), limit(100))
@@ -1110,6 +1177,7 @@ onMounted(() => {
 onUnmounted(() => {
   if (typeof unsubsStores   === 'function') unsubsStores()
   if (typeof unsubsRoomsBiz === 'function') unsubsRoomsBiz()
+  stopSlider()  // fix (2026-07-02): 배너 타이머 정리
 })
 
 /* ───────────────────────── 새로고침(샘플 변동) ───────────────────────── */
@@ -1406,8 +1474,19 @@ const topLists = computed(()=>{
   return allCats
     .filter(c => targetKeys.includes(c.key))
     .map(c => {
+      /* fix (2026-07-02): 관리자 지정으로 통과된 항목이 5개 미만이면 자동 폴백으로
+         나머지 채움. 이전에는 ranked.length !== 0 이면 그대로라 하퍼 등에서 유효
+         store 2개만 통과 시 2개만 렌더링됐음. 제휴관과 동일 결과 (5개 채움). */
       const ranked = topFromRanks(c.key)
-      const list = ranked.length ? ranked : topByCat(c.key)
+      const list = ranked.slice()
+      if (list.length < 5) {
+        const fallback = topByCat(c.key)
+        const seen = new Set(list.map(s => String(s.id)))
+        for (const s of fallback) {
+          if (list.length >= 5) break
+          if (!seen.has(String(s.id))) list.push(s)
+        }
+      }
       return { key:c.key, label:c.label || c.key, list }
     })
     .filter(sec => sec.list.length > 0)
