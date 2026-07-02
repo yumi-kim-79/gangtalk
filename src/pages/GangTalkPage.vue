@@ -236,7 +236,6 @@
             <thead>
               <tr>
                 <th class="col-num">번호</th>
-                <th class="col-cat">분류</th>
                 <th class="col-title">제목</th>
                 <th class="col-author">작성자</th>
                 <th class="col-date">날짜</th>
@@ -253,7 +252,6 @@
                 @click="openDetail(n)"
               >
                 <td class="col-num" data-label="번호"><span class="notice-badge">공지</span></td>
-                <td class="col-cat" data-label="분류">-</td>
                 <td class="col-title" data-label="제목">
                   <!-- 모바일 압축 모드에서 col-num 이 숨겨질 때 대비한 in-title 공지 뱃지 -->
                   <span class="notice-badge mobile-notice">공지</span>
@@ -275,12 +273,7 @@
                 @click="openDetail(p)"
               >
                 <td class="col-num" data-label="번호">{{ totalCount - ((currentPage-1)*BOARD_PAGE_SIZE + i) }}</td>
-                <td class="col-cat" data-label="분류">
-                  <span :class="['cat-tag', 'cat-' + (p.category || 'default')]">{{ catLabelFor(p.category) }}</span>
-                </td>
                 <td class="col-title" data-label="제목">
-                  <!-- 모바일 압축 테이블: 분류 컬럼 숨김 → 타이틀 안에 inline 표시 -->
-                  <span :class="['cat-tag','mobile-cat','cat-' + (p.category || 'default')]">{{ catLabelFor(p.category) }}</span>
                   <span class="post-title">{{ p.title }}</span>
                   <span v-if="p.images && p.images.length" class="img-icon" aria-label="이미지 첨부">📷</span>
                   <span v-if="isNewPost(p)" class="new-badge">N</span>
@@ -293,7 +286,7 @@
               </tr>
 
               <tr v-if="!pagedPosts.length && !noticePosts.length" class="empty-row-wrap">
-                <td colspan="7" class="empty-row">아직 등록된 글이 없습니다.</td>
+                <td colspan="6" class="empty-row">아직 등록된 글이 없습니다.</td>
               </tr>
             </tbody>
           </table>

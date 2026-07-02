@@ -134,6 +134,41 @@ firebase deploy --only hosting:admin
 
 ## 작업 로그
 
+### 2026-07-02: 강톡 게시판 목록 카테고리 라벨 제거 (`fix/board-remove-category-labels`)
+- **목적**: 진단(`docs/audit/2026-07-02-강톡게시판-라벨제거-진단.md`) 지정 대로 게시판 목록에서 앞쪽 카테고리 라벨(기타/건의/뉴스게시판 등) 완전 제거. 카테고리 개념 자체는 유지
+- **수정 — `src/pages/GangTalkPage.vue` 단일 파일 (5줄 편집)**:
+  1. `<th class="col-cat">분류</th>` (line 239) 제거 — 테이블 헤더의 분류 컬럼
+  2. 공지 행 `<td class="col-cat" data-label="분류">-</td>` (line 256) 제거
+  3. 일반 행 데스크탑 `<td class="col-cat">...<span cat-tag>{{ catLabelFor }}</span></td>` 통째 (line 278-280) 제거
+  4. 일반 행 모바일 in-title pill `<span cat-tag mobile-cat>{{ catLabelFor }}</span>` (line 283) + 위 주석 함께 제거
+  5. `<td colspan="7">` → `<td colspan="6">` (line 296, 컬럼 수 7→6 반영)
+- **유지 (사용자 명시 + 진단 §4 준수)**:
+  - **카테고리 필터 pill 탭** (`v2-cat-tabs`, line 210) — 상단 필터 UI 그대로
+  - **글쓰기 모달 카테고리 선택** (`composeCat` + `composeCats`, line 423-428) — 사용자가 글 쓸 때 카테고리 지정 유지
+  - **글 상세 뱃지** (`v2-cat-badge`, line 489) — 상세 페이지 카테고리 표시 그대로
+  - **힐링톡 목록 뱃지** (`v2-cat-badge`, line 362) — 별도 클래스 + 다른 페이지 스코프. 강톡 게시판 대상 아님
+  - **카테고리 데이터** — `p.category` 필드 저장/읽기 그대로, `yaCats` / `composeCats` / `catLabelFor` / `catIcon` / `normalizeCategory` 함수 그대로
+  - **CSS 룰** (`.col-cat` / `.cat-tag` / `.mobile-cat`) — 진단 §5-2 옵션 A 채택 (unused 룰 유지, 무해). CSS 파일 변경 0
+- **레이아웃 자연스러움 (진단 §6 확인)**:
+  - 데스크탑: 7 컬럼 (번호/**분류**/제목/작성자/날짜/추천/조회) → 6 컬럼 (번호/제목/작성자/날짜/추천/조회). `.col-title { width: auto }` 라 남은 폭 자동 흡수 → 제목이 왼쪽으로 자연스럽게 붙음. 빈 공간 없음
+  - 모바일: `[pill 카테고리] [제목] [📷] [N] [댓글수]` → `[제목] [📷] [N] [댓글수]`. 제목 앞 공백 없음
+  - `.mobile-notice` (공지 뱃지) 는 별건, 유지
+- **건드리지 않음**:
+  - `firestore.rules` / `storage.rules` / Cloud Functions / admin 빌드
+  - 회원 빌드 다른 페이지 / 다른 게시판 (힐링톡 별도 구조)
+  - `.cat-tag` 클래스는 `GangTalkPage.vue` 안에서만 사용 (진단 §3-4 grep 검증). 다른 파일 영향 0
+- **빌드 검증**: `npm run build` ✓ (index 228.06→228.28KB, +0.22KB — HTML 축약분. CSS/JS 로직 변경 0)
+- **배포 범위**: `firebase deploy --only hosting:prod` (회원 빌드만)
+- **검증 시나리오 (사용자 수동)**:
+  - [ ] 강톡 게시판 목록 진입 → 각 글 앞에 카테고리 라벨 (기타/건의/뉴스게시판 등) 안 보임
+  - [ ] 데스크탑: 번호/제목/작성자/날짜/추천/조회 6 컬럼 정렬 정상, 제목 왼쪽으로 자연스럽게 붙음
+  - [ ] 모바일: 제목 앞 pill 없음, 공백 없음
+  - [ ] 상단 카테고리 필터 pill 탭 (전체/뉴스게시판/건의/...) 그대로 노출 + 클릭 필터링 정상
+  - [ ] 글쓰기 모달 → 카테고리 선택 UI 그대로 (`composeCats` 9개 + 관리자 시 공지)
+  - [ ] 글 상세 진입 → 상단 카테고리 뱃지 (`v2-cat-badge`) 그대로 표시
+  - [ ] 공지 행 상단 고정 + 핑크 배경 그대로
+  - [ ] 힐링톡 게시판 (별도 구조) 회귀 없음
+
 ### 2026-07-02: 배너 옆 슬라이드 peek 제거 — 뷰포트 wrapper (`fix/banner-peek-padding`)
 - **목적**: 진단(`docs/audit/2026-07-02-배너-옆노출-peek-진단.md`) — PR #130 이 track/article/translateX 계산은 정확하나 **부모 배너 컨테이너 (`.sf-banners / .pp-banners`) 에 `overflow: hidden` 이 없어서** flex 자식 (article 3+개) 이 밖으로 나간 게 그대로 표시 → 옆 배너가 좌우로 미리 보임 (peek)
 - **왜 진단 옵션 A (track 자체에 overflow:hidden) 가 아닌 옵션 C (뷰포트 wrapper) 채택**:
