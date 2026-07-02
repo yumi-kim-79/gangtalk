@@ -134,6 +134,76 @@ firebase deploy --only hosting:admin
 
 ## 작업 로그
 
+### 2026-07-02: 노출 필드 분리 PR 3 (완결) — 승인·자가가입 로직 정합 (`feat/approve-gangtalk-only-not-dashboard`)
+- **목적**: 진단(`docs/audit/2026-07-02-현황판-가게찾기-노출구조-진단.md` PR 3) — PR #124(필드+토글) + PR #125(MainPage 전환) 이후 마무리. 승인·자가가입 시 `exposure.dashboard` 를 명시적으로 false 로 set → **신규 승인 = 가게찾기만 자동 노출, 현황판은 관리자가 Tab 1 에서 별도 지정** (사용자 목표 완결)
+- **수정 3 곳**:
+  - **`src/pages/BizSignupPage.vue` (`:538`)** — 자가가입 payload:
+    - 기존: `'exposure.gangtalk': false`
+    - 추가: **`'exposure.dashboard': false`** 명시
+    - 이유: PR #125 `exposedHere` 가 `undefined ? false` 라 미설정 = 미노출로도 동작하지만, 명시 저장으로 필드 존재 보장 (관리자 UI 에서 명확히 인식)
+  - **`src/pages/admin/StoresManagePage.vue::approveStore` (`:861`)** — Tab 3 승인 버튼:
+    - 기존: `exposure.gangtalk:true` 만
+    - 추가: **`exposure.dashboard:false`** 명시
+    - confirm 문구 확장: `"승인 시 가게찾기에 자동 노출됩니다. 현황판 노출은 Tab 1 에서 별도 지정해야 합니다."`
+  - **`src/pages/admin/StoresManagePage.vue::onReviewSaveAndApprove` (`:1008`)** — 검토 모달 "저장+승인":
+    - 기존: `exposure.gangtalk:true` 만
+    - 추가: **`exposure.dashboard:false`** 명시
+    - confirm 문구 확장 (동일 안내)
+    - 성공 메시지 정정: `"승인되었습니다. 현황판에 노출됩니다."` → `"승인되었습니다. 가게찾기에 노출됩니다. (현황판 노출은 Tab 1 에서 별도 지정)"`
+- **건드리지 않음**:
+  - **MainPage** (PR #125 `EXPOSURE_KEY = 'dashboard'` + undefined ? false 정책) 그대로
+  - **StoreFinder** (`EXPOSURE_KEY = 'gangtalk'`) 그대로
+  - **rooms_biz** 지표 계산 로직 (`applyRoomsBiz`, `subscribeRoomsBiz`, 맞출방/필요인원/혼잡도) 그대로
+  - **Tab 1 토글** (PR #124 `toggleExposed / toggleDashboardExposed / saveExposeAndOrder`) 그대로
+  - **`rejectStore`** — 거절은 기존대로 (`applyStatus:'rejected'` 만, 노출 필드 미변경 — 어차피 approved:false 라 미노출)
+  - **`isApproved` / `isActiveAd` / `baseFiltered`** 조합 그대로
+  - firestore.rules / Cloud Functions / partners / 회원 가입/로그인
+- **최종 파이프라인 (3 PR 완결 후)**:
+  ```
+  자가가입 (BizSignupPage)
+    → stores/{id}: {approved:false, applyStatus:'pending',
+                     exposure.gangtalk:false, exposure.dashboard:false}
+    → 가게찾기 미노출 ✓
+    → 현황판 미노출 ✓
+    ↓
+  관리자 검토 → 저장+승인 (또는 Tab 3 승인 버튼)
+    → stores/{id}: {approved:true, applyStatus:'approved',
+                     exposure.gangtalk:true, exposure.dashboard:false}
+    → 가게찾기 자동 노출 ✓ (승인 = 가게찾기)
+    → 현황판 여전히 미노출 (관리자 별도 지정 필요) ✓
+    ↓
+  관리자 Tab 1 "현황판 ON" 토글 → 저장
+    → stores/{id}: {exposure.dashboard: true, ...}
+    → 현황판 노출 ✓
+    → 가게찾기도 이미 노출 유지 (승격 정책 자동)
+  ```
+- **관리자 UX 강화**:
+  - confirm 창에 "가게찾기 자동 / 현황판 별도" 안내 명시 → 관리자가 승인 시 두 노출 개념 혼동 안 함
+  - 성공 메시지도 정확히 반영
+- **효과 검증**:
+  - 신규 자가가입 → 승인 → 가게찾기만 노출 (현황판 미노출)
+  - 관리자가 Tab 1 "현황판 ON" → 저장 → 현황판 노출 시작
+  - 기존 dashboard 지정된 가게 영향 없음 (변경 없이 그대로)
+- **정책 완결 정리**:
+  - **`exposure.gangtalk`** = 가게찾기 노출 (승인 시 자동 true, 관리자 Tab 1 에서 조정)
+  - **`exposure.dashboard`** = 현황판 노출 (승인 시 false 유지, **관리자 Tab 1 에서 별도 지정만**)
+  - **정책 (현황판 ⊂ 가게찾기)**: Tab 1 승격 로직으로 자동 유지 (PR #124)
+- **빌드 검증**:
+  - `npm run build` ✓ (회원 index 228KB)
+  - `npm run build:admin` ✓ (admin)
+- **배포 범위**: `firebase deploy --only hosting:prod,hosting:admin` (양쪽 배포)
+- **검증 시나리오 (사용자 수동)**:
+  - [ ] 새 계정 자가가입 → Firestore Console 에서 `exposure.gangtalk:false` + `exposure.dashboard:false` 확인
+  - [ ] 관리자 Tab 3 검토 모달에서 "저장+승인" → confirm 창에 "가게찾기 자동 / 현황판 별도" 안내 표시
+  - [ ] 승인 후 → Firestore 에서 `exposure.gangtalk:true` + `exposure.dashboard:false` 확인
+  - [ ] `gangtox.com` 가게찾기 → 그 가게 노출 ✓
+  - [ ] `gangtox.com` 현황판 → 그 가게 **미노출** ✓
+  - [ ] 관리자 Tab 1 → 그 가게 "현황판 ON" → 저장 → 현황판 노출 ✓
+  - [ ] 기존 dashboard 지정 가게 영향 없음 (레이블/달토/유앤미)
+  - [ ] Tab 3 승인 버튼 (검토 모달 외) 도 동일 동작
+  - [ ] rooms_biz 지표 정상
+  - [ ] 자가가입 SMS 인증 / 승인 흐름 정상
+
 ### 2026-07-02: 노출 필드 분리 PR 2 — MainPage 가 exposure.dashboard 참조 (`feat/mainpage-read-dashboard-exposure`)
 - **목적**: 진단(`docs/audit/2026-07-02-현황판-가게찾기-노출구조-진단.md` PR 2) — PR 1 (#124) 로 신설된 `exposure.dashboard` 필드를 MainPage 가 실제로 참조하도록 전환. 현황판 = 관리자가 명시 지정한 가게만 노출
 - **⚠️ 배포 전제 (사용자 확인 완료)**: PR #124 배포 + 관리자가 기존 현황판 가게 (레이블/달토/유앤미 등) 에 `exposure.dashboard:true` 지정 완료 — 그래야 본 PR 배포 후 현황판 안 비움
