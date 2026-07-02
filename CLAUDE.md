@@ -134,6 +134,68 @@ firebase deploy --only hosting:admin
 
 ## 작업 로그
 
+### 2026-07-02: 배너 옆 슬라이드 peek 제거 — 뷰포트 wrapper (`fix/banner-peek-padding`)
+- **목적**: 진단(`docs/audit/2026-07-02-배너-옆노출-peek-진단.md`) — PR #130 이 track/article/translateX 계산은 정확하나 **부모 배너 컨테이너 (`.sf-banners / .pp-banners`) 에 `overflow: hidden` 이 없어서** flex 자식 (article 3+개) 이 밖으로 나간 게 그대로 표시 → 옆 배너가 좌우로 미리 보임 (peek)
+- **왜 진단 옵션 A (track 자체에 overflow:hidden) 가 아닌 옵션 C (뷰포트 wrapper) 채택**:
+  - 옵션 A 는 track 이 이동하는 요소 → clip box 도 함께 이동하는 브라우저에서 self-clip 이슈 가능 (진단 §4-1 주의점 명시)
+  - 옵션 C 는 뷰포트 wrapper 가 **이동 안 함** → clip box 고정 → transform 된 자식 painting 이 clip 안이면 안정적으로 보임
+- **수정 2 파일 — 마크업만, CSS 파일 무변경**:
+  - **`src/views/StoreFinder.vue`** — 기존 track wrapper 를 새 **뷰포트 wrapper** `<div :style="{ overflow: 'hidden', width: '100%' }">` 로 감싼:
+    ```html
+    <section class="banners sf-banners" v-if="allBanners.length">
+      <!-- 신규 뷰포트 wrapper (이동 안 함) -->
+      <div :style="{ overflow: 'hidden', width: '100%' }">
+        <!-- 기존 track wrapper (transform 이동) - 변경 0 -->
+        <div :style="{ display: 'flex', width: '100%', transform: ..., transition: ... }"
+             @touchstart.passive="..." @touchend.passive="...">
+          <article v-for="..." :style="{ flex: '0 0 100%', minWidth: '0' }">...</article>
+        </div>
+      </div>
+      <div class="sf-banner-dots" ...>...</div>
+    </section>
+    ```
+  - **`src/pages/PartnersPage.vue`** — 동일 패턴
+- **왜 마크업 계층 추가만 하는지 (진단 §4-3)**:
+  - 진단 §4-1 옵션 A (track inline `overflow:hidden` 1줄) 는 이론상 최소 변경이지만 self-clip 이슈 가능 (진단 §4-1 주의점 명시)
+  - 진단 §4-3 옵션 C 는 새 wrapper 하나 추가로 확실히 동작. clip 담당(뷰포트) 과 이동 담당(track) 분리
+  - 두 옵션 모두 CSS 파일 무변경 조건 만족 → 안정성 우선으로 옵션 C 선택
+- **강톡 슬라이더는 수정 안 함**:
+  - `.gt-slider-bar` 는 CSS 에 이미 `overflow: hidden` 있음 (PR #118 유지) → peek 발생 안 함
+  - 확인: `GangTalkPage.vue:2586 overflow: hidden` 존재
+- **건드리지 않음 (사용자 명시)**:
+  - **PR #118** 배너 aspect-ratio (12/5) — 이미지 잘림 0 유지
+  - **PR #130** 넘김 타이머 / 스와이프 로직 (`slideIdx / sliderTimer / startSlider / stopSlider / onSliderTouch*` 전부 그대로)
+  - **CSS 파일** — `.sf-banners / .pp-banners / .banner / .banner-img / .sf-banner-dots / .pp-banner-dots` 및 관련 룰 모두 변경 0
+  - 각 배너 article inline `:style="{ flex: '0 0 100%', minWidth: '0' }"` 그대로
+  - 인디케이터 동적 v-for + `v-if="length > 1"` 그대로
+  - 카테고리 grid 5×2 (`mp/sf/pp-cat-scroll`) 무영향
+  - Top5 (`.top-row / .rs-scroller / .mini / .rs-card / .m-thumb / .rs-thumb`) 무영향
+  - 컴팩트 (PR #119/120/121), 노출 필드 분리 (PR #124/125/126) 무영향
+- **효과 (모바일 412px, allBanners.length=3 기준)**:
+  - 뷰포트 wrapper: layout 0~380 (부모 폭), overflow:hidden, 이동 안 함
+  - track: 뷰포트 안 layout 0~380, transform: translateX(-N%)
+  - article 1: track 안 layout 0~380 → transform 후 painting 위치는 -380*idx ~ (380-380*idx)
+  - 뷰포트 clip box 0~380 고정 → transform 자식 painting 이 clip 안이면 보임
+  - **정확히 1장만 화면 표시**, 옆 슬라이드 peek 사라짐
+  - 자동 넘김 (4초) + 스와이프 정상 (track 이동 로직 무변경)
+- **주변 레이아웃 영향 0**:
+  - 새 wrapper 는 `.sf-banners / .pp-banners` 안 첫 자식으로만 추가 → 검색창/카테고리/Top5 위치 불변
+  - `.sf-banners / .pp-banners` margin/padding 그대로
+  - 인디케이터 위치 그대로 (뷰포트 wrapper 밖, section 안)
+- **빌드 검증**: `npm run build` ✓ (회원 index 228.62KB 유지 — 마크업만 변경)
+- **배포 범위**: `firebase deploy --only hosting:prod` (회원 빌드만)
+- **검증 시나리오 (사용자 수동)**:
+  - [ ] 가게찾기 배너 한 화면에 **정확히 1장만** 표시 (옆 배너 안 비침)
+  - [ ] 제휴관 배너 동일
+  - [ ] 자동 넘김 (4초) 정상 (PR #130 유지)
+  - [ ] 수동 좌우 스와이프 정상
+  - [ ] 배너 이미지 잘림 0 (PR #118 aspect-ratio 유지)
+  - [ ] 점 인디케이터 정상 (개수 = 슬라이드 수, active 동기)
+  - [ ] 배너 위 검색창 / 아래 카테고리 위치 변화 없음
+  - [ ] Top5 (PR #130 폴백 5개 채움) 회귀 없음
+  - [ ] 카테고리 5×2 그대로
+  - [ ] 강톡 슬라이더 정상 (수정 대상 아님)
+
 ### 2026-07-02: 배너 자동 넘김 + Top5 폴백 강화 — JS 로직 (`fix/banner-timer-top5-slice`)
 - **목적**: 진단(`docs/audit/2026-07-02-배너Top5-렌더링개수-진단.md`) — 원인은 CSS 아닌 JS 로직
   - **StoreFinder/PartnersPage 배너**: `slice(-1) / slice(0,1)` 로 1장만 렌더 + 슬라이드 로직 자체 없음 → 자동 넘김 안 됨
