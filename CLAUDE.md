@@ -202,6 +202,25 @@ npm run build:all
 
 ## 작업 로그
 
+### 2026-09-01: 안드로이드 빌드 실패 — 카카오 SDK 저장소 누락 (`feature/rn-app`)
+
+```
+Could not find com.kakao.sdk:v2-common:2.20.1
+Could not find com.kakao.sdk:v2-user:2.20.1
+  Searched: mavenCentral / dl.google.com / jitpack
+```
+
+카카오 안드로이드 SDK 는 **Maven Central·Google·JitPack 어디에도 없다.**
+카카오가 직접 운영하는 저장소에만 올라와 있다:
+`https://devrepo.kakao.com/nexus/content/groups/public/`
+
+`android/build.gradle` 에 `allprojects { repositories { … } }` 로 등록.
+
+소셜 로그인은 `SOCIAL_LOGIN_ENABLED = false` 로 **노출만** 막은 상태이고
+네이티브 모듈(`@react-native-kakao/*`)은 링크돼 있어 **빌드 시점에는 의존성이 필요하다.**
+iOS 는 CocoaPods 라 이 문제가 없어 지금까지 드러나지 않았다.
+
+
 ### 2026-09-01: 신고·차단 구현 + 앱 아이콘/아이덴티티 (`feature/rn-app`)
 
 Apple 심사지침 1.2(사용자 생성 콘텐츠) 필수 요건과 제출 차단 항목을 함께 처리.

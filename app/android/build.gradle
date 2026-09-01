@@ -20,4 +20,20 @@ buildscript {
     }
 }
 
+/**
+ * fix (2026-09-01): 카카오 SDK 는 Maven Central / Google / JitPack 어디에도 없다.
+ * 카카오가 직접 운영하는 저장소에만 올라와 있어 등록하지 않으면
+ *   Could not find com.kakao.sdk:v2-common / v2-user
+ * 로 안드로이드 빌드가 통째로 실패한다.
+ * (소셜 로그인은 SOCIAL_LOGIN_ENABLED=false 로 노출만 막았을 뿐
+ *  네이티브 모듈은 링크돼 있어 빌드 시점에는 의존성이 필요하다)
+ */
+allprojects {
+    repositories {
+        google()
+        mavenCentral()
+        maven { url "https://devrepo.kakao.com/nexus/content/groups/public/" }
+    }
+}
+
 apply plugin: "com.facebook.react.rootproject"
