@@ -3,7 +3,7 @@
   <header class="mypage-header">
     <span class="member-pill" :data-type="type">{{ title }}</span>
 
-    <div class="mh-actions">
+    <div v-if="showActions" class="mh-actions">
       <button
         class="mh-icon-btn"
         type="button"
@@ -27,6 +27,8 @@ import { computed } from 'vue'
 const props = defineProps({
   /** 'user' | 'company' */
   type: { type: String, default: 'user' },
+  /** 개인회원 화면은 수정/로그아웃을 UserSection 메뉴에서 처리한다 */
+  showActions: { type: Boolean, default: true },
 })
 defineEmits(['edit', 'logout'])
 

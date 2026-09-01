@@ -9,11 +9,16 @@
 
     <!-- 로그인 상태(정식 회원만) -->
     <template v-else>
-      <HeaderBar :type="uiType" @edit="goProfileEdit" @logout="onLogout" />
+      <!-- 2026-09-01: 수정/로그아웃은 UserSection 안으로 옮겼다 (앱 구조와 동일).
+           HeaderBar 는 회원유형 배지만 남긴다. -->
+      <HeaderBar :type="uiType" :show-actions="false"
+                 @edit="goProfileEdit" @logout="onLogout" />
 
       <!-- 개인 회원 -->
       <UserSection
         v-if="uiType === 'user'"
+        @edit="goProfileEdit"
+        @logout="onLogout"
         :state="state"
         :displayNick="displayNick"
         :myCode="myCode"
@@ -48,6 +53,8 @@
 
         <!-- 기업/관리자용 포인트·리워드·등급·추천코드 카드 -->
         <UserSection
+          @edit="goProfileEdit"
+          @logout="onLogout"
           :state="state"
           :displayNick="displayNick"
           :myCode="myCode"

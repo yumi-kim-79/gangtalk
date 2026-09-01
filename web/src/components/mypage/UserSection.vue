@@ -1,110 +1,81 @@
 <template>
   <section class="section user-section">
-    <!-- 프로필 카드 -->
-    <div class="card shadow profile-card">
-      <div class="profile">
-        <div class="avatar" :style="avatarStyle">
-          <!-- ✅ 배경 이미지가 "실제 url"일 때만 글자 숨김 -->
-          <span v-if="!hasBg">{{ safeInitials }}</span>
-        </div>
-        <div class="info">
-          <div class="nick">{{ displayNick || '회원' }}</div>
-          <div class="email">{{ state?.profile?.email || state?.email || '-' }}</div>
-        </div>
+    <!-- ═══════════ 2026-09-01: 앱 마이페이지와 같은 구조로 재편 ═══════════
+         프로필 카드 → 지표 2칸 → 등급 → 추천코드 → 리워드 배너 → 메뉴 리스트.
+         앱 `screens/ProfileScreen.tsx` 와 순서·구획이 1:1로 대응한다. -->
+
+    <!-- 프로필 -->
+    <div class="us-profile">
+      <div class="avatar" :style="avatarStyle">
+        <span v-if="!hasBg">{{ safeInitials }}</span>
       </div>
-
-      <ul class="rows">
-        <!-- 보유 포인트 -->
-        <li class="row">
-          <span class="key">보유 포인트</span>
-          <span class="val strong">
-            {{ points.toLocaleString('ko-KR') }}P
-            <!-- ✅ 포인트표 보기 버튼 -->
-            <button
-              v-if="onPointTableClick"
-              class="btn xs ghost"
-              type="button"
-              @click="handlePointTableClick"
-            >
-              포인트표 보기
-            </button>
-          </span>
-        </li>
-
-        <!-- 리워드 금액 -->
-        <li class="row">
-          <span class="key">리워드</span>
-          <span class="val strong">
-            {{ rewardText }}
-          </span>
-        </li>
-
-        <!-- 회원 등급 (브랜드 배지 이미지) : 클릭 시 등급표 페이지 -->
-        <li
-          class="row row-clickable"
-          role="button"
-          tabindex="0"
-          :title="'등급표 열기'"
-          @click="handleTierClick"
-          @keydown.enter.prevent="handleTierClick"
-          @keydown.space.prevent="handleTierClick"
-        >
-          <span class="key">회원 등급</span>
-          <span class="val gap">
-            <span class="tier-badge" :data-tier="tier.key">
-              <img class="tier-badge-img" :src="tierBadgeSrc" :alt="tier.label" />
-              {{ tier.label }}
-            </span>
-          </span>
-        </li>
-
-        <!-- 진행 바 : 🔒 클릭/포커스 비활성 -->
-        <li class="row tier-progress-wrap" aria-disabled="true">
-          <div class="tier-progress">
-            <div class="bar" aria-hidden="true">
-              <div class="fill" :style="{ width: progressPct + '%' }"></div>
-            </div>
-            <div class="legend" aria-label="등급 진행 상황">
-              <span class="cur">{{ tier.label }}</span>
-              <span class="next" v-if="nextTier">
-                {{ `다음: ${nextTier.label} (${fmtWon(pointToNext)} 남음)` }}
-              </span>
-              <span class="next" v-else>최고 등급 달성 🎉</span>
-            </div>
-          </div>
-        </li>
-
-        <!-- 추천코드 — 세로 3행 레이아웃: 레이블 / 코드+복사 / 추천인 보기 링크 -->
-        <li class="row row-stack ref-row">
-          <span class="key">내 추천코드</span>
-          <div class="ref-code-row">
-            <code class="ref-code-box">{{ myCode || '-' }}</code>
-            <button class="ref-copy-btn" type="button" @click="onCopyCode" aria-label="추천코드 복사" title="복사">
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="9" y="9" width="13" height="13" rx="2"/>
-                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
-              </svg>
-            </button>
-          </div>
-          <button
-            v-if="onShowReferralList"
-            class="ref-show-link"
-            type="button"
-            @click="handleShowReferralList"
-          >내 추천인 보기 ›</button>
-        </li>
-      </ul>
+      <div class="info">
+        <div class="nick">{{ displayNick || '회원' }}</div>
+        <div class="email">{{ state?.profile?.email || state?.email || '-' }}</div>
+      </div>
+      <button class="us-edit-btn" type="button" @click="$emit('edit')">수정</button>
     </div>
 
-    <!-- 프로모션 -->
-    <div class="promo card shadow">
-      <div class="text">
-        <b>추천 리워드</b> — 친구가 회원가입 시 서로 <u>20,000P</u>!
+    <!-- 포인트 · 리워드 -->
+    <div class="us-stats">
+      <div class="us-stat">
+        <b>{{ points.toLocaleString('ko-KR') }}P</b>
+        <span>보유 포인트</span>
       </div>
-      <button class="btn primary sm" type="button" @click="onShareCode">
-        내 코드 공유하기
-      </button>
+      <div class="us-stat">
+        <b>{{ rewardText }}</b>
+        <span>리워드</span>
+      </div>
     </div>
+
+    <!-- 회원 등급 -->
+    <div class="us-box us-tier" role="button" tabindex="0"
+         @click="handleTierClick" @keydown.enter.prevent="handleTierClick">
+      <div class="us-tier-head">
+        <span class="us-box-label">회원 등급</span>
+        <span class="tier-badge" :data-tier="tier.key">
+          <img class="tier-badge-img" :src="tierBadgeSrc" :alt="tier.label" />
+          {{ tier.label }}
+        </span>
+      </div>
+      <div class="us-bar" aria-hidden="true">
+        <div class="us-bar-fill" :style="{ width: progressPct + '%' }"></div>
+      </div>
+      <div class="us-tier-next">
+        <template v-if="nextTier">다음: {{ nextTier.label }} ({{ fmtWon(pointToNext) }} 남음)</template>
+        <template v-else>최고 등급 달성 🎉</template>
+      </div>
+    </div>
+
+    <!-- 내 추천코드 -->
+    <div class="us-box">
+      <span class="us-box-label">내 추천코드</span>
+      <div class="us-ref-row">
+        <code class="us-ref-code">{{ myCode || '-' }}</code>
+        <button class="us-ref-copy" type="button" @click="onCopyCode">복사</button>
+      </div>
+    </div>
+
+    <!-- 추천 리워드 -->
+    <div class="us-invite">
+      <div class="us-invite-text">
+        추천 리워드 — 친구가 회원가입 시 서로 <b>20,000P</b>!
+      </div>
+      <button class="us-invite-btn" type="button" @click="onShareCode">내 코드 공유하기</button>
+    </div>
+
+    <!-- ───────── 내 활동 ───────── -->
+    <h3 class="us-sec">내 활동</h3>
+    <button class="us-row" type="button" @click="go({ name: 'favorites' })">
+      <span>찜한 업체</span><i class="us-arrow"></i>
+    </button>
+    <button class="us-row" type="button" @click="toggleMyPanel">
+      <span>내 글/댓글 관리</span>
+      <i class="us-arrow" :class="{ open: panel.open }"></i>
+    </button>
+    <button v-if="onShowReferralList" class="us-row" type="button" @click="handleShowReferralList">
+      <span>내 추천인 보기</span><i class="us-arrow"></i>
+    </button>
 
     <!-- ===== 내 글/댓글/대댓글 관리 패널 ===== -->
     <section class="mypanel card shadow" v-if="panel.open">
@@ -206,47 +177,43 @@
       </div>
     </section>
 
-    <!-- 관리 메뉴 (심플한 아이콘+텍스트+화살표 행) -->
-    <div class="us-menu-card">
-      <button class="us-menu-item" type="button" @click="toggleMyPanel">
-        <span class="us-menu-ico" aria-hidden="true">📝</span>
-        <span class="us-menu-text">
-          <span class="us-menu-title">내 글/댓글 관리</span>
-          <span class="us-menu-hint">{{ panel.open ? '접기' : '활동 기록 보기' }}</span>
-        </span>
-        <svg class="us-menu-arrow" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" :style="panel.open ? 'transform:rotate(90deg)' : ''">
-          <path d="M9 6l6 6-6 6"/>
-        </svg>
-      </button>
 
-      <!-- 다크 / 라이트 모드 토글 — store/theme.js 공유 -->
-      <button
-        class="us-menu-item"
-        type="button"
-        role="switch"
-        :aria-checked="isDark ? 'true' : 'false'"
-        @click="onToggleTheme"
-      >
-        <span class="us-menu-ico" aria-hidden="true">
-          <!-- 햇님 (라이트) -->
-          <svg v-if="!isDark" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="4"/>
-            <path d="M12 2v2M12 20v2M4 12H2M22 12h-2M5 5l-1.5-1.5M20.5 20.5L19 19M5 19l-1.5 1.5M20.5 3.5L19 5"/>
-          </svg>
-          <!-- 달 (다크) -->
-          <svg v-else viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M21 12.79A9 9 0 1 1 11.21 3a7 7 0 0 0 9.79 9.79z"/>
-          </svg>
-        </span>
-        <span class="us-menu-text">
-          <span class="us-menu-title">{{ isDark ? '야간 모드' : '주간 모드' }}</span>
-          <span class="us-menu-hint">{{ isDark ? '탭해서 주간 모드로' : '탭해서 야간 모드로' }}</span>
-        </span>
-        <span class="us-theme-switch" :class="{ on: isDark }" aria-hidden="true">
-          <span class="us-theme-knob"></span>
-        </span>
-      </button>
-    </div>
+    <!-- ───────── 혜택 ───────── -->
+    <h3 class="us-sec">혜택</h3>
+    <button v-if="onPointTableClick" class="us-row" type="button" @click="handlePointTableClick">
+      <span>포인트표 보기</span><i class="us-arrow"></i>
+    </button>
+    <button class="us-row" type="button" @click="handleTierClick">
+      <span>등급표 보기</span><i class="us-arrow"></i>
+    </button>
+
+    <!-- ───────── 고객센터 ───────── -->
+    <h3 class="us-sec">고객센터</h3>
+    <button class="us-row" type="button" @click="go({ name: 'support' })">
+      <span>이용약관</span><i class="us-arrow"></i>
+    </button>
+    <button class="us-row" type="button" @click="go({ name: 'support' })">
+      <span>개인정보처리방침</span><i class="us-arrow"></i>
+    </button>
+    <button class="us-row" type="button" @click="go({ name: 'support' })">
+      <span>문의하기</span><i class="us-arrow"></i>
+    </button>
+
+    <!-- ───────── 설정 ───────── -->
+    <h3 class="us-sec">설정</h3>
+    <button class="us-row" type="button" role="switch"
+            :aria-checked="isDark ? 'true' : 'false'" @click="onToggleTheme">
+      <span>{{ isDark ? '야간 모드' : '주간 모드' }}</span>
+      <span class="us-theme-switch" :class="{ on: isDark }" aria-hidden="true">
+        <span class="us-theme-knob"></span>
+      </span>
+    </button>
+
+    <!-- ───────── 계정 ───────── -->
+    <h3 class="us-sec">계정</h3>
+    <button class="us-row" type="button" @click="$emit('logout')">
+      <span>로그아웃</span><i class="us-arrow"></i>
+    </button>
 
     <!-- ===== 수정 모달(글) ===== -->
     <div v-if="edit.open && edit.mode === 'post'" class="sheet-backdrop" @click.self="closeEdit">
@@ -303,6 +270,8 @@ import {
   serverTimestamp,
   limit,
 } from 'firebase/firestore'
+
+defineEmits(['edit', 'logout'])
 
 /* ===== Props ===== */
 const props = defineProps({
@@ -739,6 +708,89 @@ function ymd(ts) {
 </script>
 
 <style scoped>
+/* ═══════════ 2026-09-01: 앱 마이페이지 구조에 맞춘 레이아웃 ═══════════ */
+.user-section{ padding:0 14px 24px; }
+
+.us-profile{
+  display:flex; align-items:center; gap:12px;
+  padding:14px; margin-top:10px;
+  border:1px solid var(--line, #eee); border-radius:14px;
+  background:var(--card, #fff);
+}
+.us-profile .info{ flex:1; min-width:0; }
+.us-profile .nick{ font-size:16px; font-weight:800; color:var(--fg,#111); }
+.us-profile .email{
+  margin-top:2px; font-size:12px; color:var(--muted,#999);
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.us-edit-btn{
+  flex:none; padding:7px 14px; border-radius:999px;
+  border:1px solid var(--line,#eee); background:var(--card,#fff);
+  font-size:12px; font-weight:700; color:var(--muted,#777); cursor:pointer;
+}
+
+.us-stats{ display:flex; gap:10px; margin-top:10px; }
+.us-stat{
+  flex:1; display:flex; flex-direction:column; align-items:center; gap:2px;
+  padding:14px 8px; border:1px solid var(--line,#eee); border-radius:14px;
+  background:var(--card,#fff);
+}
+.us-stat b{ font-size:19px; font-weight:900; color:#ff2e7e; }
+.us-stat span{ font-size:12px; color:var(--muted,#999); }
+
+.us-box{
+  margin-top:10px; padding:14px;
+  border:1px solid var(--line,#eee); border-radius:14px; background:var(--card,#fff);
+}
+.us-box-label{ font-size:13px; color:var(--muted,#888); }
+.us-tier{ cursor:pointer; }
+.us-tier-head{ display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:10px; }
+.us-bar{ height:6px; border-radius:3px; background:#f1f2f4; overflow:hidden; }
+.us-bar-fill{ height:100%; border-radius:3px; background:#ff2e7e; }
+.us-tier-next{ margin-top:8px; font-size:12px; color:var(--muted,#999); }
+
+.us-ref-row{ display:flex; align-items:center; gap:8px; margin-top:8px; }
+.us-ref-code{
+  flex:1; min-width:0; height:44px; line-height:44px; padding:0 12px;
+  border-radius:10px; background:#ffe9f1;
+  font-size:17px; font-weight:800; letter-spacing:1px; color:#ff2e7e;
+  font-family:inherit;
+}
+.us-ref-copy{
+  flex:none; height:44px; padding:0 18px; border-radius:10px;
+  border:1px solid var(--line,#eee); background:var(--card,#fff);
+  font-size:13px; font-weight:700; color:var(--muted,#777); cursor:pointer;
+}
+
+.us-invite{
+  margin-top:10px; padding:14px; border-radius:14px; background:#ffe9f1;
+  display:flex; flex-direction:column; gap:10px;
+}
+.us-invite-text{ font-size:13px; line-height:1.5; color:#a03465; }
+.us-invite-text b{ color:#ff2e7e; }
+.us-invite-btn{
+  height:44px; border:none; border-radius:999px; background:#ff2e7e;
+  font-size:13px; font-weight:800; color:#fff; cursor:pointer;
+}
+
+.us-sec{
+  margin:22px 0 4px; padding:0 2px;
+  font-size:12px; font-weight:700; color:var(--muted,#aaa);
+}
+.us-row{
+  width:100%; display:flex; align-items:center; justify-content:space-between;
+  gap:10px; padding:15px 2px;
+  border:none; border-bottom:1px solid var(--line,#f0f0f0);
+  background:transparent; font-size:15px; color:var(--fg,#111);
+  text-align:left; cursor:pointer;
+}
+.us-row:active{ background:rgba(0,0,0,.02); }
+.us-arrow{
+  flex:none; width:8px; height:8px; border-right:2px solid #ccc; border-top:2px solid #ccc;
+  transform:rotate(45deg); transition:transform .15s;
+}
+.us-arrow.open{ transform:rotate(135deg); }
+
 .user-section {
   display: flex;
   flex-direction: column;
