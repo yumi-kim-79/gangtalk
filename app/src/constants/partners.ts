@@ -64,5 +64,12 @@ export function normalizePartnerCategory(raw: unknown): string {
 /** Top5 순서를 담는 config/marketing 필드명 (웹과 동일) */
 export const PARTNER_TOP_RANKS_FIELD = 'partnerTopRanks';
 
+/**
+ * 제휴관 전체 목록 순서를 담는 config/marketing 필드명.
+ * 관리자 PartnersManagePage 의 드래그 정렬이 여기에 저장되고,
+ * 웹 PartnersPage.filtered 가 이 순서를 우선 적용한다.
+ */
+export const PARTNER_ORDER_FIELD = 'partnerOrder';
+
 export const PARTNER_FETCH_LIMIT = 200;
 export const TOP_N = 5;

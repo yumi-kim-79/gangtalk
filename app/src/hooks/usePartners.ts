@@ -1,18 +1,28 @@
 import { useEffect, useMemo, useState } from 'react';
-import { subscribePartnerTopRanks, subscribePartners } from '@/services/partners';
+import {
+  EMPTY_PARTNER_CONFIG,
+  applyPartnerOrder,
+  matchesPartnerQuery,
+  subscribePartnerConfig,
+  subscribePartners,
+  type PartnerConfig,
+} from '@/services/partners';
 import type { Partner } from '@/types/partner';
 
-/** 제휴관 목록 + 카테고리별 Top5 순서 */
+/**
+ * 제휴관 목록 + 관리자 설정(전체 순서 / 카테고리별 Top5).
+ * 관리자 웹에서 순서를 저장하면 onSnapshot 으로 즉시 반영된다.
+ */
 export function usePartners(category: string, keyword: string) {
-  const [all, setAll] = useState<Partner[]>([]);
-  const [ranks, setRanks] = useState<Record<string, string[]>>({});
+  const [raw, setRaw] = useState<Partner[]>([]);
+  const [config, setConfig] = useState<PartnerConfig>(EMPTY_PARTNER_CONFIG);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const unsubPartners = subscribePartners(
       rows => {
-        setAll(rows);
+        setRaw(rows);
         setLoading(false);
       },
       () => {
@@ -20,24 +30,28 @@ export function usePartners(category: string, keyword: string) {
         setLoading(false);
       },
     );
-    const unsubRanks = subscribePartnerTopRanks(setRanks);
+    const unsubConfig = subscribePartnerConfig(setConfig);
     return () => {
       unsubPartners();
-      unsubRanks();
+      unsubConfig();
     };
   }, []);
 
-  /** 하단 전체 목록 — 카테고리·검색어 적용 */
-  const filtered = useMemo(() => {
-    const q = keyword.trim().toLowerCase();
-    return all.filter(p => {
-      if (category !== 'all' && p.category !== category) return false;
-      if (!q) return true;
-      return `${p.name} ${p.intro} ${p.benefits} ${p.tags.join(' ')} ${p.region}`
-        .toLowerCase()
-        .includes(q);
-    });
-  }, [all, category, keyword]);
+  /** 관리자 순서를 적용한 전체 목록 — Top5 폴백도 이 순서를 기준으로 본다 */
+  const all = useMemo(
+    () => applyPartnerOrder(raw, config.order),
+    [raw, config.order],
+  );
 
-  return { all, filtered, ranks, loading, error };
+  /** 하단 전체 목록 — 카테고리·검색어 적용 (순서는 유지) */
+  const filtered = useMemo(
+    () =>
+      all.filter(p => {
+        if (category !== 'all' && p.category !== category) return false;
+        return matchesPartnerQuery(p, keyword);
+      }),
+    [all, category, keyword],
+  );
+
+  return { all, filtered, ranks: config.ranks, loading, error };
 }

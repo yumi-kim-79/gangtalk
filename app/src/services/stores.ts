@@ -398,24 +398,56 @@ export async function resolveThumb(raw: string): Promise<string> {
  * 관리자가 config/marketing.topRanks 에 지정한 카테고리별 순서.
  * 제휴관의 partnerTopRanks 와 별개 필드다.
  */
-export function subscribeStoreTopRanks(onData: (ranks: Record<string, string[]>) => void) {
+/** 가게찾기 관련 관리자 설정 (config/marketing 1개 문서) */
+export interface StoreMarketing {
+  /** 카테고리별 Top5 순서 — 관리자 Top5ManagePage */
+  topRanks: Record<string, string[]>;
+  /** 카테고리별 하단 목록 순서 — StoreFinder 편집모드 저장분 */
+  listOrders: Record<string, string[]>;
+}
+
+export const EMPTY_STORE_MARKETING: StoreMarketing = { topRanks: {}, listOrders: {} };
+
+function readIdMap(raw: unknown): Record<string, string[]> {
+  const out: Record<string, string[]> = {};
+  if (!raw || typeof raw !== 'object') return out;
+  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+    if (Array.isArray(v)) out[k] = v.map(String);
+  }
+  return out;
+}
+
+/**
+ * topRanks + listOrders 를 한 번의 onSnapshot 으로 구독한다.
+ * (웹 StoreFinder 도 같은 문서 하나를 구독해 두 필드를 같이 읽는다)
+ */
+export function subscribeStoreMarketing(onData: (cfg: StoreMarketing) => void) {
   return onSnapshot(
     doc(db, COLLECTIONS.config, 'marketing'),
     (snap: FirebaseFirestoreTypes.DocumentSnapshot) => {
-      const data = (snap.data() ?? {}) as { topRanks?: unknown };
-      const raw = data.topRanks;
-      if (!raw || typeof raw !== 'object') {
-        onData({});
-        return;
-      }
-      const out: Record<string, string[]> = {};
-      for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
-        if (Array.isArray(v)) out[k] = v.map(String);
-      }
-      onData(out);
+      const data = (snap.data() ?? {}) as Record<string, unknown>;
+      onData({
+        topRanks: readIdMap(data.topRanks),
+        listOrders: readIdMap(data.listOrders),
+      });
     },
-    () => onData({}),
+    () => onData(EMPTY_STORE_MARKETING),
   );
+}
+
+/**
+ * 관리자 지정 목록 순서 적용 (웹 StoreFinder.filtered 이식).
+ * 지정에 없는 업체는 뒤로 밀되, 그 안에서는 선택된 정렬 기준을 그대로 쓴다.
+ */
+export function applyListOrder(list: Store[], order: string[], sort: SortKey): Store[] {
+  if (!order.length) return list;
+  const pos = new Map(order.map((id, idx) => [String(id), idx]));
+  return list.slice().sort((a, b) => {
+    const ai = pos.get(a.id) ?? Infinity;
+    const bi = pos.get(b.id) ?? Infinity;
+    if (ai !== bi) return ai === bi ? 0 : ai < bi ? -1 : 1;
+    return sortValue(b, sort) - sortValue(a, sort);
+  });
 }
 
 export interface TopSection {
@@ -436,11 +468,16 @@ export function buildTopSections(
   filter: { category: string; region: RegionKey; sort: SortKey },
 ): TopSection[] {
   const byId = new Map(stores.map(s => [s.id, s]));
+  /**
+   * 웹 topFromRanks 와 동일 조건.
+   * 카테고리 탭이 '전체'일 때는 웹이 카테고리 일치를 검사하지 않으므로 여기서도 맞춘다
+   * (관리자가 다른 카테고리 업소를 지정해 둔 경우까지 화면이 동일하게 나오도록).
+   */
   const passes = (s: Store, catKey: string) =>
     exposedHere(s) &&
     isApproved(s) &&
     (filter.region === 'all' || macroOf(s) === filter.region) &&
-    s.category === catKey;
+    (filter.category === 'all' || s.category === catKey);
 
   const targets =
     filter.category === 'all'

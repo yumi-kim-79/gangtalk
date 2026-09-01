@@ -1,13 +1,16 @@
 import { useEffect, useMemo, useState } from 'react';
 import { STORE_CATEGORIES } from '@/constants/stores';
 import {
+  EMPTY_STORE_MARKETING,
+  applyListOrder,
   buildTopSections,
   filterStores,
   mergeRoomsBiz,
   subscribeRoomsBiz,
-  subscribeStoreTopRanks,
+  subscribeStoreMarketing,
   subscribeStores,
   type StoreFilter,
+  type StoreMarketing,
 } from '@/services/stores';
 import type { RoomsBizDoc, Store, StoreDoc } from '@/types/store';
 
@@ -18,12 +21,12 @@ import type { RoomsBizDoc, Store, StoreDoc } from '@/types/store';
 export function useStores(filter: StoreFilter) {
   const [rawStores, setRawStores] = useState<StoreDoc[]>([]);
   const [roomsBiz, setRoomsBiz] = useState<Map<string, RoomsBizDoc>>(new Map());
-  const [ranks, setRanks] = useState<Record<string, string[]>>({});
+  const [marketing, setMarketing] = useState<StoreMarketing>(EMPTY_STORE_MARKETING);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const unsubRanks = subscribeStoreTopRanks(setRanks);
+    const unsubMarketing = subscribeStoreMarketing(setMarketing);
     const unsubStores = subscribeStores(
       rows => {
         setRawStores(rows);
@@ -38,7 +41,7 @@ export function useStores(filter: StoreFilter) {
     return () => {
       unsubStores();
       unsubRooms();
-      unsubRanks();
+      unsubMarketing();
     };
   }, []);
 
@@ -47,19 +50,27 @@ export function useStores(filter: StoreFilter) {
     [rawStores, roomsBiz],
   );
 
-  const stores = useMemo(() => filterStores(merged, filter), [merged, filter]);
+  /**
+   * 필터·정렬 후 관리자 지정 목록 순서(listOrders) 적용.
+   * 검색 중에는 연관순이 우선이라 웹과 동일하게 지정 순서를 쓰지 않는다.
+   */
+  const stores = useMemo(() => {
+    const list = filterStores(merged, filter);
+    if (filter.keyword.trim()) return list;
+    return applyListOrder(list, marketing.listOrders[filter.category] ?? [], filter.sort);
+  }, [merged, filter, marketing.listOrders]);
 
   /** 카테고리별 Top5 — 검색 중에는 목록에 집중하도록 숨긴다 */
   const topSections = useMemo(
     () =>
       filter.keyword.trim()
         ? []
-        : buildTopSections(merged, ranks, STORE_CATEGORIES, {
+        : buildTopSections(merged, marketing.topRanks, STORE_CATEGORIES, {
             category: filter.category,
             region: filter.region,
             sort: filter.sort,
           }),
-    [merged, ranks, filter.keyword, filter.category, filter.region, filter.sort],
+    [merged, marketing.topRanks, filter.keyword, filter.category, filter.region, filter.sort],
   );
 
   return { stores, topSections, total: merged.length, loading, error };

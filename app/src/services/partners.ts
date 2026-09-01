@@ -13,6 +13,7 @@ import {
 import { COLLECTIONS } from '@/constants/app';
 import {
   PARTNER_FETCH_LIMIT,
+  PARTNER_ORDER_FIELD,
   PARTNER_TOP_RANKS_FIELD,
   TOP_N,
   normalizePartnerCategory,
@@ -56,6 +57,27 @@ export function isActiveAdPartner(x: Raw): boolean {
 
 /* ───────────────────────── 정규화 ───────────────────────── */
 
+/**
+ * 썸네일 후보 (웹 pickThumb 이식).
+ * 배열 필드(images/photos/pictures)는 첫 문자열을 쓴다.
+ */
+function pickPartnerThumb(x: Raw): string {
+  const cands: unknown[] = [
+    x.thumb, x.image, x.logo, x.photoUrl, x.cover, x.banner,
+    x.thumbnail, x.thumbUrl, x.pic, x.photo, x.img,
+    x.images, x.photos, x.pictures,
+    (x.tags as Raw | undefined)?.thumb,
+  ];
+  for (const c of cands) {
+    if (typeof c === 'string' && c.trim()) return c.trim();
+    if (Array.isArray(c)) {
+      const first = c.find(v => typeof v === 'string' && v.trim());
+      if (first) return String(first).trim();
+    }
+  }
+  return '';
+}
+
 function normalizePartner(id: string, x: Raw): Partner {
   return {
     id,
@@ -66,7 +88,7 @@ function normalizePartner(id: string, x: Raw): Partner {
     category: normalizePartnerCategory(x.category ?? x.categoryRaw),
     categoryRaw: str(x.category || x.categoryRaw),
     rating: Math.max(0, Number(x.rating ?? 4.5) || 0),
-    thumb: str(x.thumb || x.cover || x.image || x.img || x.logo).trim(),
+    thumb: pickPartnerThumb(x),
     link: str(x.link),
     tags: Array.isArray(x.tags) ? (x.tags as unknown[]).map(t => str(t)) : [],
     intro: str(x.intro || x.desc || x.about || x.bio).trim(),
@@ -100,32 +122,90 @@ export function subscribePartners(
   );
 }
 
-/** 관리자가 지정한 카테고리별 Top5 순서 */
-export function subscribePartnerTopRanks(onData: (ranks: Record<string, string[]>) => void) {
+/** 제휴관 관련 관리자 설정 (config/marketing 1개 문서) */
+export interface PartnerConfig {
+  /** 전체 목록 순서 — 관리자 PartnersManagePage 드래그 결과 */
+  order: string[];
+  /** 카테고리별 Top5 순서 — 관리자 PartnerTop5ManagePage 결과 */
+  ranks: Record<string, string[]>;
+}
+
+export const EMPTY_PARTNER_CONFIG: PartnerConfig = { order: [], ranks: {} };
+
+/**
+ * partnerOrder + partnerTopRanks 를 한 번의 onSnapshot 으로 구독한다.
+ * (웹 PartnersPage.subPartnerOrder 와 동일 — 같은 문서라 구독을 나누면 비용만 2배)
+ */
+export function subscribePartnerConfig(onData: (cfg: PartnerConfig) => void) {
   return onSnapshot(
     doc(db, COLLECTIONS.config, 'marketing'),
     (snap: FirebaseFirestoreTypes.DocumentSnapshot) => {
       const data = (snap.data() ?? {}) as Record<string, unknown>;
-      const raw = data[PARTNER_TOP_RANKS_FIELD];
-      if (!raw || typeof raw !== 'object') {
-        onData({});
-        return;
+
+      const rawOrder = data[PARTNER_ORDER_FIELD];
+      const order = Array.isArray(rawOrder) ? rawOrder.map(String) : [];
+
+      const rawRanks = data[PARTNER_TOP_RANKS_FIELD];
+      const ranks: Record<string, string[]> = {};
+      if (rawRanks && typeof rawRanks === 'object') {
+        for (const [k, v] of Object.entries(rawRanks as Record<string, unknown>)) {
+          if (Array.isArray(v)) ranks[k] = v.map(String);
+        }
       }
-      const out: Record<string, string[]> = {};
-      for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
-        if (Array.isArray(v)) out[k] = v.map(String);
-      }
-      onData(out);
+
+      onData({ order, ranks });
     },
-    () => onData({}),
+    () => onData(EMPTY_PARTNER_CONFIG),
   );
+}
+
+/**
+ * 관리자 지정 순서 적용 (웹 PartnersPage.filtered 이식).
+ * 순서에 없는 업체는 뒤로 밀되 원래 상대 순서를 유지한다.
+ */
+export function applyPartnerOrder(list: Partner[], order: string[]): Partner[] {
+  if (!order.length) return list;
+  const pos = new Map(order.map((id, idx) => [String(id), idx]));
+  return list
+    .map((p, idx) => ({ p, idx }))
+    .sort((a, b) => {
+      const ai = pos.get(a.p.id) ?? Infinity;
+      const bi = pos.get(b.p.id) ?? Infinity;
+      if (ai !== bi) return ai === bi ? 0 : ai < bi ? -1 : 1;
+      return a.idx - b.idx;
+    })
+    .map(x => x.p);
 }
 
 /* ───────────────────────── 정렬 ───────────────────────── */
 
-/** 자동 정렬 점수 — 평점 우선, 찜 수 보조 (웹 score 폴백과 동일 취지) */
+/**
+ * 자동 정렬 점수 — 웹 PartnersPage.score 와 **동일한 공식**이어야 한다.
+ * (웹: rating*100 + tags.length*3, 반올림. favs 는 쓰지 않는다)
+ */
 export function partnerScore(p: Partner): number {
-  return p.rating * 100 + p.favs;
+  return Math.round(p.rating * 100 + p.tags.length * 3);
+}
+
+/* ───────────────────────── 검색 ───────────────────────── */
+
+const norm = (v: unknown): string => String(v ?? '').toLowerCase().trim();
+
+/** 검색 대상 텍스트 (웹 searchTextOf 이식) */
+export function partnerSearchText(p: Partner): string {
+  return [p.name, p.manager, p.intro, p.benefits, p.tags.join(' '), p.address]
+    .map(norm)
+    .filter(Boolean)
+    .join(' ');
+}
+
+/** 공백으로 나눈 토큰이 **모두** 포함돼야 매칭 (웹 matchesQuery 이식) */
+export function matchesPartnerQuery(p: Partner, keyword: string): boolean {
+  const toks = norm(keyword).split(/\s+/).filter(Boolean);
+  if (!toks.length) return true;
+  const text = partnerSearchText(p);
+  if (!text) return false;
+  return toks.every(t => text.includes(t));
 }
 
 /**

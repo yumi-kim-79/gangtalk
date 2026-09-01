@@ -24,10 +24,11 @@ const db = getFirestore(app);
 
 const n = v => (v === undefined || v === null ? '-' : String(v));
 
-const [storesSnap, rbSnap, marketingSnap] = await Promise.all([
+const [storesSnap, rbSnap, marketingSnap, partnersSnap] = await Promise.all([
   getDocs(collection(db, 'stores')),
   getDocs(collection(db, 'rooms_biz')),
   getDoc(doc(db, 'config', 'marketing')),
+  getDocs(collection(db, 'partners')),
 ]);
 
 const marketing = marketingSnap.exists() ? marketingSnap.data() : {};
@@ -146,5 +147,93 @@ if (hidden.length) {
   console.log(`\n현황판에 안 보이는 업소 ${hidden.length}건:`);
   hidden.forEach(h => console.log('   - ' + h));
 }
+
+/* ═══════════════ 제휴관 / Top5 관리자 설정 ═══════════════ */
+
+const partnerOrder = Array.isArray(marketing.partnerOrder) ? marketing.partnerOrder.map(String) : [];
+const partnerTopRanks = (marketing.partnerTopRanks && typeof marketing.partnerTopRanks === 'object')
+  ? marketing.partnerTopRanks : {};
+const topRanks = (marketing.topRanks && typeof marketing.topRanks === 'object') ? marketing.topRanks : {};
+const listOrders = (marketing.listOrders && typeof marketing.listOrders === 'object') ? marketing.listOrders : {};
+
+const partners = new Map();
+partnersSnap.forEach(d => partners.set(d.id, d.data() || {}));
+
+const partnerApproved = (x = {}) => {
+  const apply = String(x.applyStatus || '').trim().toLowerCase();
+  const hasExplicit = typeof x.approved === 'boolean' || typeof x.active === 'boolean' || !!apply;
+  if (!hasExplicit) return true;
+  return x.active !== false && (x.approved === true || ['approved', '승인', '승인완료'].includes(apply));
+};
+const adOk = (x = {}) => {
+  if (!x.adStart && !x.adEnd) return true;
+  const t = Date.now();
+  if (x.adStart && t < Number(x.adStart)) return false;
+  if (x.adEnd && t >= Number(x.adEnd)) return false;
+  return true;
+};
+
+console.log('\n\n═══════════════ 제휴관(partners) ═══════════════');
+console.log(`제휴업체 ${partners.size}건`);
+console.log(`config/marketing.partnerOrder ${partnerOrder.length}건 ${partnerOrder.length ? '' : '⚠️ 비어 있음 — 관리자 순서가 앱/웹에 반영되지 않습니다'}`);
+
+const posP = new Map(partnerOrder.map((id, i) => [id, i + 1]));
+const hiddenP = [];
+console.log('\n순번  업체명                     카테고리   승인  기간');
+console.log('─────────────────────────────────────────────────────────────');
+[...partners.entries()]
+  .sort((a, b) => (posP.get(a[0]) ?? 1e9) - (posP.get(b[0]) ?? 1e9))
+  .forEach(([id, x]) => {
+    const ok = partnerApproved(x);
+    const ad = adOk(x);
+    const period = !x.adStart && !x.adEnd ? '무기한'
+      : `${x.adStart ? new Date(Number(x.adStart)).toISOString().slice(0, 10) : '-'}~${x.adEnd ? new Date(Number(x.adEnd)).toISOString().slice(0, 10) : '-'}`;
+    console.log(
+      String(posP.get(id) ?? '-').padStart(4) + '  ' +
+      String(x.name || id).padEnd(24) + '  ' +
+      String(x.category || '-').padEnd(9) + '  ' +
+      (ok ? '  O ' : '  X ') + '  ' + period
+    );
+    if (!ok || !ad) hiddenP.push(`${x.name || id} (${!ok ? '미승인/비활성' : ''}${!ok && !ad ? ', ' : ''}${!ad ? '기간 ' + period : ''})`);
+  });
+if (hiddenP.length) {
+  console.log(`\n제휴관에 안 보이는 업체 ${hiddenP.length}건:`);
+  hiddenP.forEach(h => console.log('   - ' + h));
+}
+
+console.log('\n제휴관 카테고리별 Top5 (partnerTopRanks):');
+const pKeys = Object.keys(partnerTopRanks);
+if (!pKeys.length) console.log('   (지정 없음 — 전부 자동 점수 정렬)');
+pKeys.forEach(k => {
+  const ids = Array.isArray(partnerTopRanks[k]) ? partnerTopRanks[k] : [];
+  const names = ids.map(id => {
+    const x = partners.get(String(id));
+    if (!x) return `${id}(삭제됨⚠️)`;
+    if (x.category !== k) return `${x.name}(카테고리≠${k}⚠️)`;
+    if (!partnerApproved(x) || !adOk(x)) return `${x.name}(미노출⚠️)`;
+    return x.name;
+  });
+  console.log(`   ${k.padEnd(7)} ${names.join(' > ') || '(비어 있음)'}`);
+});
+
+console.log('\n\n═══════════════ 가게찾기 Top5 / 목록 순서 ═══════════════');
+const tKeys = Object.keys(topRanks);
+console.log('카테고리별 Top5 (topRanks):');
+if (!tKeys.length) console.log('   (지정 없음 — 전부 자동 정렬)');
+tKeys.forEach(k => {
+  const ids = Array.isArray(topRanks[k]) ? topRanks[k] : [];
+  const names = ids.map(id => {
+    const d = storesSnap.docs.find(x => x.id === String(id));
+    if (!d) return `${id}(삭제됨⚠️)`;
+    const x = d.data() || {};
+    return x.category !== k ? `${x.name}(카테고리≠${k}⚠️)` : x.name;
+  });
+  console.log(`   ${k.padEnd(9)} ${names.join(' > ') || '(비어 있음)'}`);
+});
+
+const lKeys = Object.keys(listOrders).filter(k => Array.isArray(listOrders[k]) && listOrders[k].length);
+console.log('\n카테고리별 목록 순서 (listOrders):');
+if (!lKeys.length) console.log('   (지정 없음 — 선택한 정렬 기준만 적용)');
+lKeys.forEach(k => console.log(`   ${k.padEnd(9)} ${listOrders[k].length}건`));
 
 process.exit(0);

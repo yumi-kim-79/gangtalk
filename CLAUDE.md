@@ -202,6 +202,52 @@ npm run build:all
 
 ## 작업 로그
 
+### 2026-09-01: 제휴관 · Top5 관리자 설정 앱 동기화 (`feature/rn-app`)
+
+관리자 웹이 쓰는 값과 앱이 읽는 값을 다시 대조해 어긋난 부분을 맞췄다.
+현황판 때와 같은 유형의 누락 — **관리자는 저장하는데 앱은 그 필드를 아예 안 읽던 것**이 2건.
+
+#### A. 제휴관 (partners)
+
+1. **`config/marketing.partnerOrder` 미구독 (핵심)**
+   - 관리자 `PartnersManagePage` 의 드래그 정렬 → `partnerOrder` 저장
+   - 웹 `PartnersPage.filtered` 는 이 순서를 우선 적용하는데 **앱은 필드 자체를 안 읽었다**
+   - `subscribePartnerConfig()` 로 `partnerOrder` + `partnerTopRanks` 를 한 문서에서 같이 구독
+     (같은 `config/marketing` 문서라 구독을 나누면 비용만 2배)
+   - `applyPartnerOrder()` 신설 — 미지정 업체는 뒤로, 원래 상대 순서 유지
+2. **자동 정렬 점수 공식이 웹과 달랐다**
+   - 웹 `score = round(rating*100 + tags.length*3)` / 앱 `rating*100 + favs`
+   - Top5 자동 폴백 순서가 두 화면에서 다르게 나오던 원인. 웹 공식으로 통일
+3. **검색 대상 필드 불일치**
+   - 웹 `searchTextOf` = name·manager·intro·benefits·tags·address, 토큰 **AND** 매칭
+   - 앱 = name·intro·benefits·tags·region, 단순 부분일치
+   - `partnerSearchText` / `matchesPartnerQuery` 로 웹과 동일하게 이식
+4. **썸네일 후보 필드 부족** — 웹 `pickThumb` 는 12개 필드 + 배열(images/photos/pictures)
+   첫 항목까지 보는데 앱은 5개만 봤다. `pickPartnerThumb()` 로 동일하게 확장
+
+#### B. 가게찾기 (stores)
+
+1. **`config/marketing.listOrders` 미구독**
+   - 카테고리별 하단 목록 순서. 웹 `StoreFinder.filtered` 가 적용 중인데 앱은 안 읽었다
+   - `subscribeStoreMarketing()` 으로 `topRanks` + `listOrders` 동시 구독,
+     `applyListOrder(list, order, sort)` 적용 (미지정분은 선택한 정렬 기준 유지)
+   - 검색 중에는 웹과 동일하게 연관순 우선 — 지정 순서 미적용
+2. **Top5 카테고리 검사 조건**
+   - 웹 `topFromRanks` 는 카테고리 탭이 '전체'일 때 `s.category === catKey` 를 **검사하지 않는다**
+   - 앱은 항상 검사해서, 관리자가 다른 카테고리 업소를 지정해 둔 경우 화면이 달랐다. 웹에 맞춤
+
+#### 진단 스크립트
+`scripts/check-metrics.mjs` 에 제휴관·Top5 섹션 추가 — `partnerOrder` 순번,
+제휴업체 승인/기간, `partnerTopRanks` / `topRanks` 각 항목의 삭제·카테고리 불일치·미노출 경고,
+`listOrders` 지정 건수를 출력한다.
+
+#### 미이식 (동기화와 무관한 UI)
+제휴관 배너 슬라이더, 원형 카테고리 아이콘 그리드, 제휴관 지역 필터(`region`).
+지역 필터가 없어 웹 `topByCat` 의 지역 조건은 앱에서 항상 '전체'로 동작한다.
+
+- **검증**: `tsc --noEmit` 0 errors / `eslint .` 0 errors
+
+
 ### 2026-09-01: 현황판 승인 규칙 불일치 수정 (달토·엘리트 누락) (`feature/rn-app`)
 
 #### 증상
