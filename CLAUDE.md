@@ -202,6 +202,30 @@ npm run build:all
 
 ## 작업 로그
 
+### 2026-09-01: 개발 캐시 정리 스크립트 (`scripts/clean-dev.sh`)
+
+맥북 저장공간이 부족해 빌드 전 정리를 반복하게 되어 스크립트로 고정.
+
+```
+bash scripts/clean-dev.sh          # 기본 — 재생성 빠른 것만
+bash scripts/clean-dev.sh --deep   # node_modules / Pods 까지
+```
+
+대상 (전부 **다시 만들어지는 산출물**):
+- 프로젝트별 `build` / `.gradle` / `.cxx` / `DerivedData` — GangTalk · ridetalk · StudioProjects
+- `~/Library/Developer/Xcode/DerivedData`, `iOS·watchOS·tvOS DeviceSupport`
+- `~/Library/Developer/CoreSimulator/Caches`, 사용 불가 시뮬레이터
+- `~/.gradle/caches`, CocoaPods · Yarn · Xcode 캐시, npm 캐시, watchman 감시 목록
+
+**건드리지 않는 것**: 소스, git, **Xcode Archives**(출시 빌드의 dSYM — 지우면 크래시 심볼화 불가).
+
+확보량을 df 로 계산해 마지막에 출력하고, 재설치 명령을 안내한다.
+
+측정 예 (2026-09-01): `~/GangTalk` 5.1GB → 833MB.
+전체 소비처는 Xcode 47G · `~/Library/Caches` 20G · StudioProjects 17G ·
+ridetalk 7G · CoreSimulator 4.7G 순이었다.
+
+
 ### 2026-09-01: 강톡 화면 웹/앱 정렬 + 글쓰기 버튼 중복 제거 (`feature/rn-app`)
 
 #### 웹 — 글쓰기 버튼이 두 개였다
