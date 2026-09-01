@@ -326,3 +326,94 @@ export async function resolveThumb(raw: string): Promise<string> {
     return '';
   }
 }
+
+
+/* ───────────────────────── 카테고리별 Top5 (가게찾기) ───────────────────────── */
+
+/**
+ * 관리자가 config/marketing.topRanks 에 지정한 카테고리별 순서.
+ * 제휴관의 partnerTopRanks 와 별개 필드다.
+ */
+export function subscribeStoreTopRanks(onData: (ranks: Record<string, string[]>) => void) {
+  return onSnapshot(
+    doc(db, COLLECTIONS.config, 'marketing'),
+    (snap: FirebaseFirestoreTypes.DocumentSnapshot) => {
+      const data = (snap.data() ?? {}) as { topRanks?: unknown };
+      const raw = data.topRanks;
+      if (!raw || typeof raw !== 'object') {
+        onData({});
+        return;
+      }
+      const out: Record<string, string[]> = {};
+      for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+        if (Array.isArray(v)) out[k] = v.map(String);
+      }
+      onData(out);
+    },
+    () => onData({}),
+  );
+}
+
+export interface TopSection {
+  key: string;
+  label: string;
+  list: Store[];
+}
+
+/**
+ * 웹 topLists 이식.
+ * 관리자 지정 순서를 우선 쓰되, 5개가 안 되면 자동 정렬로 나머지를 채운다.
+ * (웹 2026-07-02 수정 내용 — 지정 항목이 2개뿐일 때 2개만 나오던 문제 대응)
+ */
+export function buildTopSections(
+  stores: Store[],
+  ranks: Record<string, string[]>,
+  categories: { key: string; label: string }[],
+  filter: { category: string; region: RegionKey; sort: SortKey },
+): TopSection[] {
+  const byId = new Map(stores.map(s => [s.id, s]));
+  const passes = (s: Store, catKey: string) =>
+    exposedHere(s) &&
+    isApproved(s) &&
+    (filter.region === 'all' || macroOf(s) === filter.region) &&
+    s.category === catKey;
+
+  const targets =
+    filter.category === 'all'
+      ? categories.filter(c => c.key !== 'all')
+      : categories.filter(c => c.key === filter.category);
+
+  return targets
+    .map(cat => {
+      const list: Store[] = [];
+      const seen = new Set<string>();
+
+      // ① 관리자 지정 순서
+      for (const id of ranks[cat.key] ?? []) {
+        const s = byId.get(String(id));
+        if (!s || !passes(s, cat.key) || seen.has(s.id)) continue;
+        list.push(s);
+        seen.add(s.id);
+        if (list.length >= 5) break;
+      }
+
+      // ② 부족분은 자동 정렬로 채움
+      if (list.length < 5) {
+        const auto = filterStores(stores, {
+          category: cat.key,
+          region: filter.region,
+          sort: filter.sort,
+          keyword: '',
+        });
+        for (const s of auto) {
+          if (list.length >= 5) break;
+          if (seen.has(s.id)) continue;
+          list.push(s);
+          seen.add(s.id);
+        }
+      }
+
+      return { key: cat.key, label: cat.label, list };
+    })
+    .filter(sec => sec.list.length > 0);
+}

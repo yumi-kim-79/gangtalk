@@ -1,8 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
+import { STORE_CATEGORIES } from '@/constants/stores';
 import {
+  buildTopSections,
   filterStores,
   mergeRoomsBiz,
   subscribeRoomsBiz,
+  subscribeStoreTopRanks,
   subscribeStores,
   type StoreFilter,
 } from '@/services/stores';
@@ -15,10 +18,12 @@ import type { RoomsBizDoc, Store, StoreDoc } from '@/types/store';
 export function useStores(filter: StoreFilter) {
   const [rawStores, setRawStores] = useState<StoreDoc[]>([]);
   const [roomsBiz, setRoomsBiz] = useState<Map<string, RoomsBizDoc>>(new Map());
+  const [ranks, setRanks] = useState<Record<string, string[]>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    const unsubRanks = subscribeStoreTopRanks(setRanks);
     const unsubStores = subscribeStores(
       rows => {
         setRawStores(rows);
@@ -33,6 +38,7 @@ export function useStores(filter: StoreFilter) {
     return () => {
       unsubStores();
       unsubRooms();
+      unsubRanks();
     };
   }, []);
 
@@ -43,5 +49,18 @@ export function useStores(filter: StoreFilter) {
 
   const stores = useMemo(() => filterStores(merged, filter), [merged, filter]);
 
-  return { stores, total: merged.length, loading, error };
+  /** 카테고리별 Top5 — 검색 중에는 목록에 집중하도록 숨긴다 */
+  const topSections = useMemo(
+    () =>
+      filter.keyword.trim()
+        ? []
+        : buildTopSections(merged, ranks, STORE_CATEGORIES, {
+            category: filter.category,
+            region: filter.region,
+            sort: filter.sort,
+          }),
+    [merged, ranks, filter.keyword, filter.category, filter.region, filter.sort],
+  );
+
+  return { stores, topSections, total: merged.length, loading, error };
 }

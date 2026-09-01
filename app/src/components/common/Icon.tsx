@@ -1,5 +1,5 @@
 import React from 'react';
-import Svg, { Circle, Path } from 'react-native-svg';
+import Svg, { Circle, Path, Rect } from 'react-native-svg';
 
 /**
  * 아이콘 세트.
@@ -19,7 +19,8 @@ export type IconName =
   | 'find'
   | 'chat'
   | 'deal'
-  | 'user';
+  | 'user'
+  | 'signal';
 
 type Props = {
   name: IconName;
@@ -154,6 +155,15 @@ export default function Icon({ name, size = 22, color, filled = true }: Props) {
         <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
           <Circle cx={12} cy={8} r={3.5} stroke={color} strokeWidth={1.6} fill="none" />
           <Path d="M5 20c1.8-3.3 5-5 7-5s5.2 1.7 7 5" {...thin} />
+        </Svg>
+      );
+    // 혼잡도 막대 — 웹 현황판의 .mp-metric-wifi 신호 막대
+    case 'signal':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 24 24">
+          <Rect x={3} y={14} width={4} height={7} rx={1} fill={color} />
+          <Rect x={10} y={9} width={4} height={12} rx={1} fill={color} />
+          <Rect x={17} y={4} width={4} height={17} rx={1} fill={color} />
         </Svg>
       );
   }

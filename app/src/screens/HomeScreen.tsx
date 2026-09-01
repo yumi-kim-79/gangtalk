@@ -13,7 +13,7 @@ import AppHeader from '@/components/common/AppHeader';
 import Icon from '@/components/common/Icon';
 import ChipTabs from '@/components/common/ChipTabs';
 import { STORE_CATEGORIES } from '@/constants/stores';
-import StoreGridCard from '@/components/store/StoreGridCard';
+import StoreStatusCard from '@/components/store/StoreStatusCard';
 import { useAuth } from '@/hooks/useAuth';
 import { useHomeStores } from '@/hooks/useHomeStores';
 import type { MainTabParamList } from '@/navigation/types';
@@ -48,21 +48,19 @@ export default function HomeScreen() {
       <FlatList
         data={stores}
         keyExtractor={item => item.id}
-        numColumns={2}
-        columnWrapperStyle={s.column}
         contentContainerStyle={s.listContent}
         renderItem={({ item }) => (
-          <StoreGridCard store={item} all={all} roomsReady={roomsReady} onPress={openStore} />
+          <StoreStatusCard store={item} all={all} roomsReady={roomsReady} onPress={openStore} />
         )}
         keyboardShouldPersistTaps="handled"
-        initialNumToRender={6}
+        initialNumToRender={8}
         windowSize={5}
         removeClippedSubviews
         ListHeaderComponent={
           <>
             <AppHeader
-              title="강톡"
-              subtitle="강남 지역 현황판"
+              title="현황판"
+              subtitle="강남 지역 업소 현황"
               searchValue={keyword}
               onChangeSearch={setKeyword}
             />
@@ -125,7 +123,6 @@ const styles = (c: ThemeColors) =>
   StyleSheet.create({
     root: { flex: 1, backgroundColor: c.bg },
     listContent: { paddingBottom: spacing.xl },
-    column: { gap: spacing.sm, paddingHorizontal: spacing.page, marginBottom: spacing.sm },
 
     hot: {
       flexDirection: 'row',
