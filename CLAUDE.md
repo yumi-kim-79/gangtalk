@@ -202,6 +202,37 @@ npm run build:all
 
 ## 작업 로그
 
+### 2026-09-01: rooms_biz 0/0 데이터 복구 (과거 사고 잔재)
+
+#### 증상
+앱·웹 현황판의 맞출방/필요인원이 0 으로 표시. 관리자 화면에는 정상 값이 보임.
+
+#### 원인 — 코드가 아니라 데이터
+`scripts/check-metrics.mjs` 로 실측한 결과, `rooms_biz` 14건이
+`needRooms: 0 / needPeople: 0 / manualSaved: true` 인 채 남아 있었다.
+`stores` 에는 정상 값(레이블 17/22, 퍼펙트 15/19 …)이 그대로 있었다.
+
+`manualSaved: true` 는 "관리자가 0 을 의도적으로 저장" 이라는 뜻이라
+웹·앱 모두 이 값을 stores 보다 우선한다 → 실제 값이 가려짐.
+
+`docs/audit/2026-06-19-rooms_biz-입력경로-진단.md` 에 기록된 사고
+("시드 그대로 일괄 저장 → 13개 모두 0/0/manualSaved 덮어쓰기") 의 잔재.
+**코드는 그때 고쳤지만 망가진 데이터는 남아 있었다.**
+관리자 저장에 dirty 체크가 있어 값을 바꾸지 않으면 다시 쓰이지 않으므로
+달토(그 후 값을 수정한 1건) 를 뺀 전부가 계속 0 이었다.
+
+#### 조치
+- `scripts/check-metrics.mjs` — stores vs rooms_biz 실측 비교 + 앱이 채택할 값 계산 (진단용)
+- `scripts/repair-rooms-biz.mjs` — stores 값으로 rooms_biz 되채움 (기본 dry-run, `--apply` 로 반영)
+- 12건 복구 완료. stores 는 건드리지 않음
+
+#### 남은 정책 판단
+현재는 웹과 동일하게 `manualSaved` 를 존중한다(마감/휴업 0 을 의도로 인정).
+사고로 0 이 박히면 조용히 가려지는 위험이 있어,
+"stores 에 양수가 있는데 rooms_biz 가 0/0 이면 stores 우선" 으로 바꾸는 안도 검토 가능.
+단 진짜 마감 0 이 무시되는 부작용이 생긴다. **미결정**
+
+
 ### 2026-09-01: 업체 자가 수정 → 현황판 실시간 반영 점검 (`feature/rn-app`)
 
 #### 점검 결과 — 대부분 이미 구현돼 있음
