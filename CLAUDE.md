@@ -202,6 +202,24 @@ npm run build:all
 
 ## 작업 로그
 
+### 2026-09-01: 정리 스크립트를 3단계로 분리 (`scripts/clean-dev.sh`)
+
+처음 만든 버전은 **매 실행마다 DerivedData 를 지웠다.** 그러면 "빌드 전에 돌리는
+스크립트"인데 정작 **빌드가 매번 15~25분짜리 풀 빌드**가 된다. 실제로 Pods 와
+DerivedData 를 함께 지운 뒤 iOS 빌드가 크게 느려졌다.
+
+DerivedData · Pods · `.gradle` 은 쓰레기가 아니라 **다음 빌드를 빠르게 하는 캐시**다.
+단계를 나눴다:
+
+| 단계 | 지우는 것 | 다음 빌드 |
+|---|---|---|
+| 기본 | iOS·watchOS·tvOS DeviceSupport, 시뮬레이터 캐시, 사용 불가 시뮬레이터, Xcode 임시캐시, watchman, 오래된 metro 임시파일 | **영향 없음** |
+| `--builds` | + DerivedData, 프로젝트 `build`/`.cxx`/`.gradle` | 풀 빌드 |
+| `--deep` | + node_modules, Pods, gradle·CocoaPods·npm 캐시 | 재설치 + 풀 빌드 |
+
+기본 단계만으로도 DeviceSupport 가 보통 10~20GB 나온다.
+어느 단계도 소스 · git · Xcode Archives 는 건드리지 않는다.
+
 ### 2026-09-01: 개발 캐시 정리 스크립트 (`scripts/clean-dev.sh`)
 
 맥북 저장공간이 부족해 빌드 전 정리를 반복하게 되어 스크립트로 고정.
