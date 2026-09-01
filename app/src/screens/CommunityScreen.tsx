@@ -8,6 +8,7 @@ import Icon from '@/components/common/Icon';
 import PostListItem from '@/components/board/PostListItem';
 import { BOARD_TABS } from '@/constants/board';
 import { usePosts } from '@/hooks/usePosts';
+import { useBlocked } from '@/hooks/useBlocked';
 import { useRequireAuth } from '@/hooks/useRequireAuth';
 import type { CommunityStackParamList } from '@/navigation/types';
 import { fontSize, spacing, useTheme, type ThemeColors } from '@/theme';
@@ -23,6 +24,7 @@ export default function CommunityScreen() {
   const [keyword, setKeyword] = useState('');
   const { posts, notices, loading, loadingMore, hasMore, loadMore, error } = usePosts(filter);
   const { requireAuth } = useRequireAuth();
+  const { hidden } = useBlocked();
 
   const onWrite = useCallback(() => {
     if (requireAuth()) navigation.navigate('PostWrite');
@@ -35,13 +37,14 @@ export default function CommunityScreen() {
 
   /** 검색은 이미 받아온 글에 대해서만 (Firestore 전문검색 미지원) */
   const visible = useMemo(() => {
-    const merged = [...notices, ...posts];
+    // 차단한 사용자의 글은 내 화면에서만 감춘다 (Apple 심사지침 1.2)
+    const merged = [...notices, ...posts].filter(p => !hidden(p.authorUid));
     const q = keyword.trim().toLowerCase();
     if (!q) return merged;
     return merged.filter(p =>
       `${p.title} ${p.body} ${p.author}`.toLowerCase().includes(q),
     );
-  }, [notices, posts, keyword]);
+  }, [notices, posts, keyword, hidden]);
 
   return (
     <View style={s.root}>

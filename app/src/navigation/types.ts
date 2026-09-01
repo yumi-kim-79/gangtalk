@@ -20,6 +20,8 @@ export type ProfileStackParamList = {
   ProfileEdit: undefined;
   Favorites: undefined;
   MyPosts: undefined;
+  /** 차단 목록 (Apple 심사지침 1.2) */
+  BlockedUsers: undefined;
   DeleteAccount: undefined;
 };
 

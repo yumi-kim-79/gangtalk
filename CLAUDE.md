@@ -202,6 +202,75 @@ npm run build:all
 
 ## 작업 로그
 
+### 2026-09-01: 신고·차단 구현 + 앱 아이콘/아이덴티티 (`feature/rn-app`)
+
+Apple 심사지침 1.2(사용자 생성 콘텐츠) 필수 요건과 제출 차단 항목을 함께 처리.
+
+#### A. 신고 · 차단 (심사지침 1.2)
+지침이 요구하는 4요소를 모두 채웠다.
+
+| 요건 | 구현 |
+|---|---|
+| ① 불쾌한 콘텐츠 신고 | 게시글·댓글·채팅·초톡 전부 |
+| ② 악용 사용자 차단 | 신고 시트에서 바로 차단 + 마이 > 차단 목록 |
+| ③ 연락처 | 마이 > 문의하기 (기존) |
+| ④ 24시간 내 조치 | 관리자 웹 **신고 관리** 신설 |
+
+**데이터**
+```
+reports/{auto}         reporterUid, targetType, targetId, targetOwnerUid,
+                       excerpt, reason, detail, status(pending|resolved|dismissed)
+blocks/{uid__blocked}  ownerUid, blockedUid, blockedName
+```
+`firestore.rules` — reports 는 본인 신고만 읽고 상태 변경은 관리자만,
+blocks 는 `ownerUid` 본인 것만. 차단 사실이 상대에게 노출되지 않는 구조.
+
+**차단은 클라이언트 필터다.** 상대 글을 서버에서 지우지 않고 내 화면에서만 감춘다
+(상대는 자기 글이 사라진 걸 알 수 없다). 적용 지점:
+`CommunityScreen`(목록) · `PostDetailScreen`(본문+댓글) · `ChatRoomScreen`(메시지).
+
+**신고 진입점**
+- 게시글: 통계 줄 우측 [신고] — 내 글에는 안 보임
+- 댓글: 각 댓글 우측 [신고]
+- 채팅·초톡: 말풍선 **길게 누르기** (400ms)
+
+**신설 파일**
+`constants/moderation.ts` · `services/moderation.ts` · `hooks/useBlocked.ts` ·
+`components/common/ReportSheet.tsx` · `screens/BlockedUsersScreen.tsx` ·
+`web/src/pages/admin/ReportsManagePage.vue`
+
+#### B. 앱 아이콘 — 양 플랫폼 신규 생성
+- **원본이 없었다.** `web/public/icons/icon-512.png` 는 이름과 달리 **164x166** 이라
+  1024 로 확대하면 뭉개진다. 같은 디자인(핑크 바탕 + 말풍선 + '강톡')을
+  **1024 마스터로 다시 그렸다** — 색은 원본에서 샘플링 (`#ef8cb2` / `#4a352f`).
+  4배 슈퍼샘플링 후 축소해 가장자리 계단 제거. 생성 스크립트는 `scripts/` 아님, 1회성.
+- iOS: `AppIcon.appiconset` 에 **이미지가 0개**였다 (Contents.json 만).
+  9개 사이즈 생성 + Contents.json 파일명 연결. 알파 없는 RGB 로 저장
+  (알파 있으면 업로드 거부).
+- Android: RN 기본 초록 로봇이었다. mipmap 5종 x (일반/원형/적응형 전경) +
+  `mipmap-anydpi-v26` 적응형 아이콘 XML + `colors.xml` 배경색.
+- 앱 내 헤더 로고도 512 로 교체.
+
+#### C. iOS 아이덴티티 — 제출 차단 항목
+- `PRODUCT_BUNDLE_IDENTIFIER` 가 RN 템플릿 기본값
+  `org.reactjs.native.example.$(PRODUCT_NAME)` 이었다 (2곳).
+  `GoogleService-Info.plist` 의 `com.appmonster.gangtalk` 와 불일치 → 교체
+- `CFBundleDisplayName` = `Hello App Display Name` → `강톡`
+- `CFBundleDevelopmentRegion` `en` → `ko`
+- **쓰지 않는 `NSLocationWhenInUseUsageDescription` 제거** (지도 미이식).
+  안 쓰는 권한 문구는 리젝 사유
+- `ITSAppUsesNonExemptEncryption = false` 추가 (HTTPS 만 사용 → 수출 규정 면제)
+
+#### D. 심사 리스크 정리
+햄버거 메뉴의 **일정/달력 · 고객센터**는 누르면 "준비 중" 안내만 떠서
+미완성 앱으로 보일 수 있다. `AppHeader.SHOW_TODO_MENU = false` 로 숨김.
+이식이 끝나면 true 로 되돌린다.
+
+- **검증**: `tsc --noEmit` 0 errors / `eslint .` 0 errors /
+  `@vue/compiler-sfc` 로 ReportsManagePage·AdminLayout 컴파일 / plist 파싱 확인
+- **배포 필요**: `npm run deploy:rules` · `npm run deploy:admin`
+
+
 ### 2026-09-01: 업체 관리자 첫 진입 빈 화면 + 로그인 지연 (`feature/rn-app`)
 
 #### 증상

@@ -27,6 +27,9 @@ const LOGO = require('../../assets/logo.png');
 const BRAND_TITLE = '강남톡방';
 const BRAND_SUB = '강남의 모든 공간, 한눈에.';
 
+/** 일정/달력·고객센터 이식 전까지 메뉴에서 숨긴다 */
+const SHOW_TODO_MENU = false;
+
 type Props = {
   /** 검색을 쓰지 않는 화면은 false */
   showSearch?: boolean;
@@ -74,9 +77,18 @@ export default function AppHeader({
     [navigation],
   );
 
+  /**
+   * 웹 메뉴와 같은 구성이되, **앱에 화면이 없는 항목은 노출하지 않는다.**
+   * "준비 중" 안내만 뜨는 메뉴는 심사에서 미완성 앱으로 보일 수 있다
+   * (Apple 심사지침 2.1 / 4.2). 이식이 끝나면 SHOW_TODO_MENU 를 true 로.
+   */
   const menuItems: MenuItem[] = [
-    { key: 'diary', emoji: '📅', label: '일정/달력', todo: true },
-    { key: 'support', emoji: '🎧', label: '고객센터', todo: true },
+    ...(SHOW_TODO_MENU
+      ? ([
+          { key: 'diary', emoji: '📅', label: '일정/달력', todo: true },
+          { key: 'support', emoji: '🎧', label: '고객센터', todo: true },
+        ] as MenuItem[])
+      : []),
     { key: 'favorites', emoji: '❤️', label: '즐겨찾기' },
     isLoggedIn
       ? { key: 'logout', emoji: '🚪', label: '로그아웃' }

@@ -1,12 +1,14 @@
-import React, { useEffect, useMemo, useRef } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useRoute, type RouteProp } from '@react-navigation/native';
 import {
   ActivityIndicator,
   FlatList,
+  Pressable,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
+import ReportSheet, { type ReportTarget } from '@/components/common/ReportSheet';
 import { useChotok } from '@/hooks/useChotok';
 import type { StoresStackParamList } from '@/navigation/types';
 import { fontSize, radius, spacing, useTheme, type ThemeColors } from '@/theme';
@@ -44,6 +46,7 @@ export default function ChotokScreen() {
   const { params } = useRoute<RouteProp<StoresStackParamList, 'Chotok'>>();
   const { messages, parsed, loading, error } = useChotok(params.storeId);
   const listRef = useRef<FlatList<Row>>(null);
+  const [report, setReport] = useState<ReportTarget | null>(null);
 
   const rows = useMemo<Row[]>(() => {
     const out: Row[] = [];
@@ -99,7 +102,20 @@ export default function ChotokScreen() {
               <Text style={s.day}>{item.label}</Text>
             </View>
           ) : (
-            <View style={s.msgRow}>
+            /* 길게 누르면 신고 (Apple 심사지침 1.2) */
+            <Pressable
+              style={s.msgRow}
+              onLongPress={() =>
+                setReport({
+                  type: 'chotok',
+                  id: item.msg.id,
+                  ownerUid: item.msg.authorUid,
+                  ownerName: item.msg.author,
+                  excerpt: item.msg.text,
+                })
+              }
+              delayLongPress={400}
+            >
               <View style={s.avatar}>
                 <Text style={s.avatarText}>{item.msg.author.slice(0, 1)}</Text>
               </View>
@@ -112,7 +128,7 @@ export default function ChotokScreen() {
                   <Text style={s.time}>{timeLabel(item.msg.createdAt)}</Text>
                 </View>
               </View>
-            </View>
+            </Pressable>
           )
         }
         ListEmptyComponent={
@@ -124,6 +140,8 @@ export default function ChotokScreen() {
           )
         }
       />
+
+      <ReportSheet target={report} onClose={() => setReport(null)} />
     </View>
   );
 }

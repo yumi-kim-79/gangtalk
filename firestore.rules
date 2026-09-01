@@ -385,6 +385,37 @@ service cloud.firestore {
       }
     }
 
+    /* ═══════════ 신고 · 차단 (Apple 심사지침 1.2) ═══════════
+     * reports/{auto}
+     *   - create: 로그인 사용자, reporterUid 는 본인만. 상태는 pending 고정
+     *   - read  : 본인이 낸 신고 또는 관리자
+     *   - update: 관리자만 (처리 상태 변경)
+     *   - delete: 관리자만
+     * blocks/{ownerUid__blockedUid}
+     *   - 본인 것만 읽고 쓴다. 차단 사실은 상대에게 노출되지 않아야 하므로
+     *     ownerUid 기준 접근만 허용한다.
+     */
+    match /reports/{reportId} {
+      allow create: if signedIn()
+        && request.resource.data.reporterUid == request.auth.uid
+        && request.resource.data.status == 'pending'
+        && request.resource.data.targetType is string
+        && request.resource.data.reason is string;
+      allow read: if isAdmin()
+        || (signedIn() && resource.data.reporterUid == request.auth.uid);
+      allow update, delete: if isAdmin();
+    }
+
+    match /blocks/{blockId} {
+      allow read: if signedIn() && resource.data.ownerUid == request.auth.uid;
+      allow create: if signedIn()
+        && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.blockedUid is string
+        && request.resource.data.blockedUid != request.auth.uid;
+      allow delete: if signedIn() && resource.data.ownerUid == request.auth.uid;
+      allow update: if false;
+    }
+
     /* ===== 전역 카운터(meta/counters) : 가입순번 ===== */
     match /meta/counters {
       // 읽기: 로그인 사용자

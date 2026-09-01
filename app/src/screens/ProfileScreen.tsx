@@ -89,6 +89,10 @@ export default function ProfileScreen() {
       <Text style={s.sectionTitle}>내 활동</Text>
       <MenuRow label="찜한 업체" onPress={needLogin(() => navigation.navigate('Favorites'))} />
       <MenuRow label="내가 쓴 글" onPress={needLogin(() => navigation.navigate('MyPosts'))} />
+      <MenuRow
+        label="차단 목록"
+        onPress={needLogin(() => navigation.navigate('BlockedUsers'))}
+      />
 
       <Text style={s.sectionTitle}>고객센터</Text>
       <MenuRow label="이용약관" onPress={() => openWeb('/support')} />

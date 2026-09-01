@@ -35,6 +35,7 @@ const AdminTop5Manage     = () => import('@/pages/admin/Top5ManagePage.vue')
 const AdminBannersManage  = () => import('@/pages/admin/BannersManagePage.vue')
 const AdminNewsManage     = () => import('@/pages/admin/NewsManagePage.vue')
 const AdminInbox          = () => import('@/pages/admin/InboxPage.vue')
+const AdminReports        = () => import('@/pages/admin/ReportsManagePage.vue')
 
 const ADMIN_EMAIL = 'gangtalk815@gmail.com'
 
@@ -382,6 +383,7 @@ const routes = [
       { path: 'banners',    name: 'adminBanners',   component: AdminBannersManage },
       { path: 'news',       name: 'adminNews',      component: AdminNewsManage },
       { path: 'inbox',      name: 'adminInbox',     component: AdminInbox },
+      { path: 'reports',    name: 'adminReports',   component: AdminReports },
     ],
   },
 

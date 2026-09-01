@@ -20,6 +20,10 @@ export const COLLECTIONS = {
   connectRequests: 'connectRequests',
   extendRequests: 'extendRequests',
   legalConsults: 'legal_consults',
+  /** 신고 접수 (Apple 심사지침 1.2) */
+  reports: 'reports',
+  /** 사용자 차단 — 문서 id = `${ownerUid}__${blockedUid}` */
+  blocks: 'blocks',
 } as const;
 
 export type CollectionName = (typeof COLLECTIONS)[keyof typeof COLLECTIONS];

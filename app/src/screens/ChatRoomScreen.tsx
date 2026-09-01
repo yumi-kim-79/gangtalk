@@ -13,6 +13,8 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useChatRoom } from '@/hooks/useChat';
+import { useBlocked } from '@/hooks/useBlocked';
+import ReportSheet, { type ReportTarget } from '@/components/common/ReportSheet';
 import { chatDay, chatTime } from '@/services/chat';
 import type { CommunityStackParamList } from '@/navigation/types';
 import { fontSize, radius, spacing, useTheme, type ThemeColors } from '@/theme';
@@ -31,12 +33,16 @@ export default function ChatRoomScreen() {
 
   const { messages, loading, sending, error, send, canSend } = useChatRoom(route.params.roomId);
   const [draft, setDraft] = useState('');
+  const { hidden } = useBlocked();
+  const [report, setReport] = useState<ReportTarget | null>(null);
 
   /** 날짜가 바뀌는 지점에 구분선을 끼워 넣는다 */
   const rows = useMemo<Row[]>(() => {
     const out: Row[] = [];
     let lastDay = '';
     for (const m of messages) {
+      // 차단한 사용자의 메시지는 내 화면에서만 감춘다
+      if (hidden(m.authorUid)) continue;
       const day = chatDay(m.createdAt);
       if (day && day !== lastDay) {
         out.push({ kind: 'day', id: `day-${day}`, label: day });
@@ -45,7 +51,7 @@ export default function ChatRoomScreen() {
       out.push({ kind: 'msg', id: m.id, message: m });
     }
     return out;
-  }, [messages]);
+  }, [messages, hidden]);
 
   const onSend = useCallback(async () => {
     const text = draft;
@@ -72,7 +78,19 @@ export default function ChatRoomScreen() {
             item.kind === 'day' ? (
               <Text style={s.day}>{item.label}</Text>
             ) : (
-              <Bubble message={item.message} colors={c} />
+              <Bubble
+                message={item.message}
+                colors={c}
+                onReport={() =>
+                  setReport({
+                    type: 'chat',
+                    id: item.message.id,
+                    ownerUid: item.message.authorUid,
+                    ownerName: item.message.author,
+                    excerpt: item.message.text,
+                  })
+                }
+              />
             )
           }
           onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: false })}
@@ -106,15 +124,32 @@ export default function ChatRoomScreen() {
           <Text style={s.sendText}>전송</Text>
         </Pressable>
       </View>
+      <ReportSheet target={report} onClose={() => setReport(null)} />
     </KeyboardAvoidingView>
   );
 }
 
-function Bubble({ message, colors }: { message: ChatMessage; colors: ThemeColors }) {
+/**
+ * 말풍선. 남의 메시지를 **길게 누르면** 신고·차단 시트가 열린다
+ * (Apple 심사지침 1.2 — 채팅도 사용자 생성 콘텐츠).
+ */
+function Bubble({
+  message,
+  colors,
+  onReport,
+}: {
+  message: ChatMessage;
+  colors: ThemeColors;
+  onReport: () => void;
+}) {
   const s = styles(colors);
   const mine = message.mine;
   return (
-    <View style={[s.bubbleRow, mine && s.bubbleRowMine]}>
+    <Pressable
+      onLongPress={mine ? undefined : onReport}
+      delayLongPress={400}
+      style={[s.bubbleRow, mine && s.bubbleRowMine]}
+    >
       {!mine ? <Text style={s.author}>{message.author}</Text> : null}
       <View style={s.bubbleLine}>
         {mine ? <Text style={s.time}>{chatTime(message.createdAt)}</Text> : null}
@@ -123,7 +158,7 @@ function Bubble({ message, colors }: { message: ChatMessage; colors: ThemeColors
         </View>
         {!mine ? <Text style={s.time}>{chatTime(message.createdAt)}</Text> : null}
       </View>
-    </View>
+    </Pressable>
   );
 }
 

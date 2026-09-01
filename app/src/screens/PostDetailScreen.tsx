@@ -11,8 +11,10 @@ import {
   View,
 } from 'react-native';
 import Icon from '@/components/common/Icon';
+import ReportSheet, { type ReportTarget } from '@/components/common/ReportSheet';
 import { BOARD_CATEGORY_LABEL } from '@/constants/board';
 import { useAuth } from '@/hooks/useAuth';
+import { useBlocked } from '@/hooks/useBlocked';
 import { usePost } from '@/hooks/usePost';
 import { useRequireAuth } from '@/hooks/useRequireAuth';
 import { createComment, likePost, votePost } from '@/services/board';
@@ -26,12 +28,14 @@ export default function PostDetailScreen() {
   const s = styles(c);
   const route = useRoute<RouteProp<CommunityStackParamList, 'PostDetail'>>();
   const { post, comments, loading } = usePost(route.params.postId);
-  const { profile } = useAuth();
+  const { profile, uid } = useAuth();
   const { requireAuth } = useRequireAuth();
   const [commentText, setCommentText] = useState('');
   const [sending, setSending] = useState(false);
   const [voted, setVoted] = useState(false);
   const [liked, setLiked] = useState(false);
+  const { hidden } = useBlocked();
+  const [report, setReport] = useState<ReportTarget | null>(null);
 
   const postId = route.params.postId;
 
@@ -59,13 +63,13 @@ export default function PostDetailScreen() {
   );
 
   const onSendComment = useCallback(async () => {
-    const uid = requireAuth();
-    if (!uid || sending || !commentText.trim()) return;
+    const myUid = requireAuth();
+    if (!myUid || sending || !commentText.trim()) return;
     setSending(true);
     try {
       await createComment({
         postId,
-        uid,
+        uid: myUid,
         author: profile?.nickname || '익명',
         body: commentText,
       });
@@ -90,8 +94,20 @@ export default function PostDetailScreen() {
       </View>
     );
   }
+  if (hidden(post.authorUid)) {
+    return (
+      <View style={[s.root, s.center]}>
+        <Text style={s.emptyTitle}>차단한 사용자의 글입니다</Text>
+        <Text style={s.emptyDesc}>마이페이지 &gt; 차단 목록에서 해제할 수 있습니다</Text>
+      </View>
+    );
+  }
+
+  /* 차단한 사용자의 댓글은 내 화면에서만 감춘다 */
+  const visibleComments = comments.filter(cm => !hidden(cm.authorUid));
 
   return (
+    <>
     <ScrollView style={s.root} contentContainerStyle={s.content}>
       <View style={s.head}>
         <View style={s.catRow}>
@@ -112,7 +128,26 @@ export default function PostDetailScreen() {
         <View style={s.statRow}>
           <Text style={s.stat}>조회 {post.views}</Text>
           <Text style={s.stat}>추천 {post.likes}</Text>
-          <Text style={s.stat}>댓글 {comments.length}</Text>
+          <Text style={s.stat}>댓글 {visibleComments.length}</Text>
+
+          {/* 신고 (Apple 심사지침 1.2) — 내 글에는 보이지 않는다 */}
+          {post.authorUid && post.authorUid !== uid ? (
+            <Pressable
+              style={s.reportBtn}
+              hitSlop={6}
+              onPress={() =>
+                setReport({
+                  type: 'post',
+                  id: post.id,
+                  ownerUid: post.authorUid,
+                  ownerName: post.author,
+                  excerpt: post.title,
+                })
+              }
+            >
+              <Text style={s.reportText}>신고</Text>
+            </Pressable>
+          ) : null}
         </View>
       </View>
 
@@ -137,13 +172,28 @@ export default function PostDetailScreen() {
       </View>
 
       <View style={s.commentsHead}>
-        <Text style={s.commentsTitle}>댓글 {comments.length}</Text>
+        <Text style={s.commentsTitle}>댓글 {visibleComments.length}</Text>
       </View>
 
-      {comments.length === 0 ? (
+      {visibleComments.length === 0 ? (
         <Text style={s.noComment}>첫 댓글을 남겨보세요</Text>
       ) : (
-        comments.map(cm => <CommentRow key={cm.id} comment={cm} />)
+        visibleComments.map(cm => (
+          <CommentRow
+            key={cm.id}
+            comment={cm}
+            myUid={uid}
+            onReport={() =>
+              setReport({
+                type: 'comment',
+                id: cm.id,
+                ownerUid: cm.authorUid,
+                ownerName: cm.author,
+                excerpt: cm.body,
+              })
+            }
+          />
+        ))
       )}
 
       <View style={s.commentForm}>
@@ -168,6 +218,9 @@ export default function PostDetailScreen() {
         </Pressable>
       </View>
     </ScrollView>
+
+    <ReportSheet target={report} onClose={() => setReport(null)} />
+    </>
   );
 }
 
@@ -245,14 +298,30 @@ function VoteBar({
   );
 }
 
-function CommentRow({ comment }: { comment: Comment }) {
+function CommentRow({
+  comment,
+  myUid,
+  onReport,
+}: {
+  comment: Comment;
+  myUid: string | null;
+  onReport: () => void;
+}) {
   const c = useTheme();
   const s = styles(c);
+  const mine = !!comment.authorUid && comment.authorUid === myUid;
   return (
     <View style={s.comment}>
-      <Text style={s.commentMeta}>
-        {comment.author} · {fullDate(comment.createdAt)}
-      </Text>
+      <View style={s.commentHead}>
+        <Text style={s.commentMeta}>
+          {comment.author} · {fullDate(comment.createdAt)}
+        </Text>
+        {!mine && comment.authorUid ? (
+          <Pressable onPress={onReport} hitSlop={8} style={s.reportBtn}>
+            <Text style={s.reportText}>신고</Text>
+          </Pressable>
+        ) : null}
+      </View>
       <Text style={s.commentBody}>{comment.body}</Text>
     </View>
   );
@@ -315,6 +384,21 @@ const styles = (c: ThemeColors) =>
       borderTopColor: c.line,
     },
     commentsTitle: { fontSize: fontSize.lg, fontWeight: '700', color: c.fg },
+    commentHead: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: spacing.sm,
+    },
+    reportBtn: {
+      marginLeft: 'auto',
+      paddingHorizontal: spacing.sm,
+      paddingVertical: 2,
+      borderRadius: radius.pill,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: c.line,
+    },
+    reportText: { fontSize: fontSize.xs, color: c.muted },
     noComment: {
       paddingHorizontal: spacing.page,
       paddingVertical: spacing.lg,

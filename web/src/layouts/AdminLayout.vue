@@ -120,6 +120,7 @@ const platformMenus = [
   { to: '/admin/partner-top5',  emoji: '🏆', label: '제휴관 Top5' },
   { to: '/admin/news',          emoji: '📰', label: '뉴스/한줄' },
   { to: '/admin/inbox',         emoji: '📬', label: '메시지함' },
+  { to: '/admin/reports',       emoji: '🚨', label: '신고 관리' },
   { to: '/admin/biz-accounts',  emoji: '👥', label: '업체 계정 관리' },
   { to: '/admin/settings',      emoji: '⚙️', label: '설정' },
 ]
