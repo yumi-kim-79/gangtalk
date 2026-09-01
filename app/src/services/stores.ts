@@ -15,6 +15,7 @@ import {
 import { COLLECTIONS } from '@/constants/app';
 import {
   EXPOSURE_KEY,
+  ROOMS_BIZ_FETCH_LIMIT,
   STORE_FETCH_LIMIT,
   type RegionKey,
   type SortKey,
@@ -255,7 +256,7 @@ export function subscribeRoomsBiz(
   onData: (map: Map<string, RoomsBizDoc>) => void,
   onError?: (e: unknown) => void,
 ) {
-  const q = query(collection(db, COLLECTIONS.roomsBiz), fbLimit(STORE_FETCH_LIMIT));
+  const q = query(collection(db, COLLECTIONS.roomsBiz), fbLimit(ROOMS_BIZ_FETCH_LIMIT));
   return onSnapshot(
     q,
     (snap: FirebaseFirestoreTypes.QuerySnapshot) => {

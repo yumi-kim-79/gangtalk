@@ -60,3 +60,10 @@ export const EXPOSURE_KEY_DASHBOARD = 'dashboard';
 
 /** 목록 초기 로드 상한 (웹과 동일) */
 export const STORE_FETCH_LIMIT = 100;
+
+/**
+ * rooms_biz 로드 상한.
+ * stores 와 달리 정렬 기준이 없어 같은 100 으로 두면 stores 100건과
+ * 서로 다른 100건이 잡혀 일부 업소의 지표가 비는 일이 생긴다. 넉넉히 잡는다.
+ */
+export const ROOMS_BIZ_FETCH_LIMIT = 300;

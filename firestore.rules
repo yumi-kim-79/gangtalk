@@ -121,7 +121,18 @@ service cloud.firestore {
                  && (
                       isAdmin()
                       || (
-                           resource.data.ownerId == request.auth.uid
+                           // 소유자 판정 (2026-09-01): ownerId 뿐 아니라 ownerEmail 도 인정.
+                           //   rooms_biz 규칙은 이미 둘 다 허용하는데 stores 는 ownerId 만 봤다.
+                           //   linkStoreToBiz 가 bizUid 없이 이메일만으로 연결한 업체는
+                           //   BizMetricsPage 의 writeBatch(stores + rooms_biz)가 통째로 실패했다.
+                           (
+                             resource.data.ownerId == request.auth.uid
+                             || (
+                                  'ownerEmail' in resource.data
+                                  && resource.data.ownerEmail == request.auth.token.email
+                                )
+                           )
+                           // 소유권 자체는 바꿀 수 없다
                            && request.resource.data.ownerId == resource.data.ownerId
                            && (
                                 !('ownerEmail' in resource.data)

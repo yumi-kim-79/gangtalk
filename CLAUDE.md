@@ -202,6 +202,38 @@ npm run build:all
 
 ## 작업 로그
 
+### 2026-09-01: 업체 자가 수정 → 현황판 실시간 반영 점검 (`feature/rn-app`)
+
+#### 점검 결과 — 대부분 이미 구현돼 있음
+- **업체 계정이 자기 업체만 수정**: `admin/BizMetricsPage.vue` 가 이미
+  `stores where ownerId == uid` + `where ownerEmail == email` 두 쿼리로 자기 가게만 불러온다.
+  라우터 가드(`requiresBiz`)로 `/biz/*` 는 업체 계정만 통과
+- **저장 필드**: 관리자(StoresManagePage)와 **동일**하다 — `writeBatch` 로
+  `stores/{id}`(match, persons, totalRooms, statusMode, status) +
+  `rooms_biz/{id}`(needRooms, needPeople, totalNeeded, totalRooms, manualSaved: true) 동시 저장
+- **앱 현황판 실시간 반영**: `onSnapshot` 구독이라 저장 즉시 반영된다.
+  단, 값이 실제로 맞게 나오는 것은 직전 커밋(`applyRoomsBiz` 이식) 이후부터
+
+#### 발견한 버그 — 이메일로만 연결된 업체는 저장이 통째로 실패
+- `firestore.rules` 의 `stores` update 는 소유자를 **`ownerId` 로만** 판정했는데,
+  `rooms_biz` 규칙은 `ownerId` 또는 `ownerEmail` 을 인정한다 (불일치)
+- `linkStoreToBiz` 는 `if (bizUid) patch.ownerId = bizUid` 라 **bizUid 없이 이메일만으로 연결**될 수 있다
+- 이 경우 BizMetricsPage 의 `writeBatch` 중 stores update 가 거부 → **배치 전체 실패**
+  (rooms_biz 만 성공하는 부분 반영도 안 되므로 저장 자체가 안 됨)
+- 조치: `stores` update 규칙에 `ownerEmail == request.auth.token.email` 분기 추가.
+  소유권 필드(ownerId/ownerEmail) 자체 변경 금지는 그대로 유지
+
+#### 추가 수정
+- `rooms_biz` 구독 상한 100 → 300 (`ROOMS_BIZ_FETCH_LIMIT`).
+  stores 는 `updatedAt desc` 정렬로 100건을 가져오는데 rooms_biz 는 정렬 기준이 없어
+  같은 100 이면 **서로 다른 100건**이 잡혀 일부 업소 지표가 비는 문제
+
+#### 배포 필요
+- `npm run deploy:rules` — 규칙 변경분
+
+- **검증**: `tsc --noEmit` 0 errors / `eslint .` 0 errors
+
+
 ### 2026-09-01: 현황판 — 관리자 입력 반영 경로 수정 (버그) (`feature/rn-app`)
 
 #### 문제
