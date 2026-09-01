@@ -30,8 +30,46 @@
       </p>
     </section>
 
+    <!-- 초톡 붙여넣기 — 카톡 내용 그대로 붙이면 자동 파싱 -->
+    <section v-else-if="currentStore" class="adm-section adm-chotok">
+      <header class="adm-section-head">
+        <h3>💬 초톡 붙여넣기</h3>
+        <span class="adm-metric-hint">카톡 방 목록을 그대로 복사해 붙여넣으세요</span>
+      </header>
+
+      <textarea
+        v-model="chotokText"
+        class="adm-chotok-ta"
+        rows="8"
+        placeholder="카카오톡에서 복사한 내용을 그대로 붙여넣으세요.&#10;&#10;예)&#10;1번방 2명&#10;2번방 3명&#10;5번방 1명"
+      ></textarea>
+
+      <div class="adm-chotok-foot">
+        <div class="adm-chotok-preview">
+          <template v-if="chotokText.trim()">
+            <span>맞출방 <b>{{ chotokParsed.roomCount }}</b></span>
+            <span class="sep">·</span>
+            <span>필요인원 <b>{{ chotokParsed.needSum }}</b></span>
+            <span class="sep">·</span>
+            <span>혼잡도 <b>{{ chotokAutoStatus }}</b></span>
+          </template>
+          <span v-else class="adm-metric-hint">붙여넣으면 맞출방/필요인원이 자동 계산됩니다.</span>
+        </div>
+        <button
+          class="adm-btn primary big"
+          type="button"
+          :disabled="chotokSaving || !chotokParsed.roomCount"
+          @click="onChotokApply"
+        >{{ chotokSaving ? '반영 중…' : '초톡 반영' }}</button>
+      </div>
+
+      <p class="adm-chotok-note">
+        반영하면 현황판 수치가 바뀌고, 붙여넣은 내용은 앱 <b>초톡방</b>에 그대로 올라갑니다.
+      </p>
+    </section>
+
     <!-- 메트릭 편집 -->
-    <section v-else-if="currentStore" class="adm-section">
+    <section v-if="currentStore" class="adm-section">
       <header class="adm-section-head">
         <h3>{{ currentStore.name }}</h3>
         <span class="adm-store-meta-pill">{{ currentStore.region || '-' }} · {{ currentStore.category || '-' }}</span>
@@ -138,7 +176,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { getAuth, onAuthStateChanged } from 'firebase/auth'
 import { db as fbDb } from '@/firebase'
 import {
-  collection, doc, onSnapshot, setDoc, updateDoc,
+  addDoc, collection, doc, onSnapshot, setDoc, updateDoc,
   writeBatch, query, where, serverTimestamp,
 } from 'firebase/firestore'
 
@@ -277,6 +315,120 @@ function statusBadgeClass(label){
   return ''
 }
 
+/* ===== 초톡 붙여넣기 → 자동 파싱 =====
+ * ChatBiz.vue 의 parsePasted 와 **동일 규칙**이어야 한다.
+ *   - 줄이 숫자(방번호)로 시작하면 맞출방 1개
+ *   - 그 뒤 처음 나오는 1~2자리 숫자를 필요인원으로 합산
+ * 반영 시 하는 일:
+ *   1) stores/{id}.match/persons/status  — 현황판 수치
+ *   2) rooms_biz/{id} 미러 + 원문(lastPastedTextRaw) 보관
+ *   3) rooms_biz/{id}/rooms/{id}_room_01/messages 에 원문 1건 추가 → 앱 초톡방에 표시
+ */
+const chotokText = ref('')
+const chotokSaving = ref(false)
+
+function parsePasted(text) {
+  const lines = String(text || '').split(/\r?\n/)
+  let roomCount = 0
+  let needSum = 0
+  for (const raw of lines) {
+    const line = raw.trim()
+    if (!line) continue
+    const m1 = line.match(/^\s*(\d{1,4})\b/)
+    if (!m1) continue
+    roomCount += 1
+    const m2 = line.slice(m1[0].length).match(/(\d{1,2})/)
+    if (m2) {
+      const n = Number.parseInt(m2[1], 10)
+      if (!Number.isNaN(n)) needSum += n
+    }
+  }
+  return { roomCount, needSum }
+}
+
+const chotokParsed = computed(() => parsePasted(chotokText.value))
+const chotokAutoStatus = computed(() =>
+  autoStatusOf(chotokParsed.value.roomCount, form.value.totalRooms),
+)
+
+/* 가게를 바꾸면 입력 중이던 초톡 내용은 비운다 */
+watch(selectedStoreId, () => { chotokText.value = '' })
+
+async function onChotokApply() {
+  const s = currentStore.value
+  if (!s || chotokSaving.value) return
+
+  const text = String(chotokText.value || '').replace(/\r\n/g, '\n')
+  const { roomCount, needSum } = chotokParsed.value
+  if (!roomCount) {
+    alert('붙여넣은 내용에서 방 번호를 찾지 못했습니다.\n숫자로 시작하는 줄이 있어야 합니다.')
+    return
+  }
+
+  chotokSaving.value = true
+  try {
+    // 전체방은 업체가 직접 넣는 값이라 덮어쓰지 않는다 (혼잡도 계산 기준)
+    const totalRooms = Number(form.value.totalRooms || 0)
+    const statusMode = String(form.value.statusMode || 'auto')
+    const status = statusMode === 'manual'
+      ? String(form.value.status || '좋음')
+      : autoStatusOf(roomCount, totalRooms)
+    const now = serverTimestamp()
+
+    const batch = writeBatch(fbDb)
+    batch.update(doc(fbDb, 'stores', s.id), {
+      match: roomCount,
+      persons: needSum,
+      statusMode, status,
+      updatedAt: now,
+    })
+    batch.set(doc(fbDb, 'rooms_biz', s.id), {
+      needRooms: roomCount,
+      needPeople: needSum,
+      need: needSum,
+      totalNeeded: needSum,
+      manualSaved: true,
+      manualSavedAt: now,
+      lastPastedText: text.slice(0, 2000),
+      lastPastedTextRaw: text.slice(0, 2000),
+      lastPastedAt: now,
+      updatedAt: now,
+    }, { merge: true })
+    await batch.commit()
+
+    // 앱 초톡방에 원문 게시 (실패해도 수치 반영은 이미 끝난 상태)
+    try {
+      await addDoc(
+        collection(fbDb, 'rooms_biz', s.id, 'rooms', `${s.id}_room_01`, 'messages'),
+        {
+          text,
+          author: s.name || '업체',
+          authorUid: currentUid.value,
+          kind: 'paste',
+          createdAt: now,
+          updatedAt: now,
+        },
+      )
+    } catch (e) {
+      console.warn('[chotok] 초톡방 게시 실패:', e)
+      alert('현황판 수치는 반영됐지만 초톡방 게시에 실패했습니다.\n(' + (e?.message || e) + ')')
+      chotokText.value = ''
+      return
+    }
+
+    // 폼도 즉시 맞춰 둔다
+    form.value.match = roomCount
+    form.value.persons = needSum
+    chotokText.value = ''
+    alert(`반영되었습니다.\n맞출방 ${roomCount} · 필요인원 ${needSum}`)
+  } catch (e) {
+    console.error(e)
+    alert('반영 실패: ' + (e?.message || e))
+  } finally {
+    chotokSaving.value = false
+  }
+}
+
 /* ===== 저장 — stores + rooms_biz 양쪽 동기 (원자성 보장) ===== */
 const saving = ref(false)
 async function onSave() {
@@ -335,6 +487,20 @@ function fmtTime(v) {
 
 <style scoped>
 .adm-page{ max-width:800px; margin:0 auto; }
+.adm-chotok-ta{
+  width:100%; box-sizing:border-box; margin-top:10px;
+  padding:12px 14px; border:1px solid #f0d3e0; border-radius:12px;
+  font-size:14px; line-height:1.6; resize:vertical; font-family:inherit;
+}
+.adm-chotok-ta:focus{ outline:none; border-color:#ff2e7e; }
+.adm-chotok-foot{
+  display:flex; align-items:center; justify-content:space-between;
+  gap:12px; margin-top:12px; flex-wrap:wrap;
+}
+.adm-chotok-preview{ font-size:14px; color:#555; display:flex; gap:6px; align-items:center; }
+.adm-chotok-preview b{ color:#ff2e7e; font-size:16px; }
+.adm-chotok-preview .sep{ color:#ddd; }
+.adm-chotok-note{ margin:10px 0 0; font-size:12px; color:#999; }
 .adm-page-head{ margin-bottom:18px; }
 .adm-page-title{ margin:0; font-size:22px; font-weight:900; }
 .adm-page-sub{ margin:4px 0 0; font-size:13px; color:#888; }

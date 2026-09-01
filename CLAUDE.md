@@ -202,6 +202,48 @@ npm run build:all
 
 ## 작업 로그
 
+### 2026-09-01: 초톡 자동 파싱 + 앱 초톡방 (`feature/rn-app`)
+
+지금까지는 업체가 맞출방/필요인원을 **손으로** 입력했다. 이제 카톡 내용을 그대로
+붙여넣으면 자동 계산되고, 그 원문을 앱에서 카톡 채팅창처럼 볼 수 있다.
+
+#### A. 업체 관리자 웹 — 초톡 붙여넣기 (`BizMetricsPage.vue`)
+현황판 업데이트 화면 맨 위에 초톡 붙여넣기 섹션 신설.
+- 입력 즉시 **맞출방 / 필요인원 / 혼잡도** 미리보기 (저장 전 확인 가능)
+- 파싱 규칙은 `ChatBiz.vue` 의 `parsePasted` 와 **동일**해야 한다:
+  - 줄이 숫자(방번호)로 시작하면 맞출방 1개
+  - 그 뒤 처음 나오는 1~2자리 숫자를 필요인원으로 합산
+- [초톡 반영] 이 하는 일 3가지
+  1. `stores/{id}` — `match` / `persons` / `status`
+  2. `rooms_biz/{id}` — 미러 + 원문(`lastPastedTextRaw`, `lastPastedAt`)
+  3. `rooms_biz/{id}/rooms/{id}_room_01/messages` — 원문 1건 추가 (앱 초톡방 표시용)
+  1·2 는 `writeBatch` 라 부분 실패가 없다. 3 만 실패하면 그 사실을 알린다.
+- **전체방(totalRooms)은 덮어쓰지 않는다** — 업체가 직접 넣는 혼잡도 기준값이라
+  붙여넣기가 건드리면 안 된다. (`ChatBiz.updateCounts` 는 `totalRooms: roomCount` 로
+  덮어쓰는데 그건 초톡방 전용 동작이라 따라가지 않았다)
+
+#### B. 앱 — 초톡방
+- `services/chotok.ts` — `parseChotok`(웹 `parsePasted` 이식) +
+  `subscribeChotok(storeId, roomId)` (`rooms_biz/{id}/rooms/{roomId}/messages`, createdAt 오름차순)
+- `hooks/useChotok.ts` — 마지막 `kind==='paste'` 원문으로 맞출방/필요인원 재계산
+- `screens/ChotokScreen.tsx` — 카톡 채팅창 형태 (날짜 구분선 · 프로필 · 말풍선 · 시각),
+  상단에 맞출방/필요인원/대화 수 바
+- `components/store/StoreStatusCard.tsx` — 업체명 오른쪽(썸네일 대칭 위치)에 **초톡 버튼**.
+  `onOpenChotok` 을 넘긴 화면에서만 보인다 (현황판)
+- 네비게이션: `StoresStackParamList.Chotok { storeId, storeName }` 추가
+
+#### C. 보안 규칙
+```
+match /rooms_biz/{storeId}/{sub=**}   // 이전: allow write: if isAdmin();
+```
+관리자만 쓸 수 있어서 **업체 계정이 초톡을 붙여넣어도 메시지 게시가 permission-denied**
+였다. 부모 문서와 같은 소유자 조건(`ownerId` 또는 `ownerEmail`)을 그대로 적용.
+
+- **검증**: `tsc --noEmit` 0 errors / `eslint .` 0 errors / Vue script 문법 확인
+  (웹 빌드는 rollup 네이티브 바이너리가 macOS 전용이라 맥에서 확인 필요)
+- **배포 필요**: `npm run deploy:rules` · `npm run web:build` · `npm run deploy:admin` · `npm run deploy:member`
+
+
 ### 2026-09-01: 핫이슈 한줄 뉴스 연동 (`feature/rn-app`)
 
 #### 증상

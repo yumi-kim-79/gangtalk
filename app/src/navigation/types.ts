@@ -4,6 +4,8 @@ import type { NavigatorScreenParams } from '@react-navigation/native';
 export type StoresStackParamList = {
   StoreList: undefined;
   StoreDetail: { storeId: string };
+  /** 초톡방 — 업체가 붙여넣은 카톡 내용 보기 */
+  Chotok: { storeId: string; storeName: string };
 };
 
 /** 제휴관 탭 내부 스택 */

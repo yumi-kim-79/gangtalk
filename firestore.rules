@@ -169,9 +169,17 @@ service cloud.firestore {
              || get(/databases/$(database)/documents/stores/$(storeId)).data.ownerEmail == request.auth.token.email
            ));
     }
+    // 서브컬렉션 (rooms/{roomId}/messages = 초톡)
+    // fix (2026-09-01): 관리자만 쓸 수 있어서 업체 계정이 BizMetricsPage 에서
+    //   초톡을 붙여넣어도 rooms/{id}_room_01/messages 게시가 permission-denied 였다.
+    //   부모 문서(rooms_biz/{storeId})와 같은 소유자 조건을 그대로 적용한다.
     match /rooms_biz/{storeId}/{sub=**} {
       allow read: if true;
-      allow write: if isAdmin();
+      allow write: if isAdmin()
+        || (signedIn() && (
+             get(/databases/$(database)/documents/stores/$(storeId)).data.ownerId == request.auth.uid
+             || get(/databases/$(database)/documents/stores/$(storeId)).data.ownerEmail == request.auth.token.email
+           ));
     }
 
     /* ===== 등록신청(connectRequests) ===== */

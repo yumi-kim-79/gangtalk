@@ -21,6 +21,8 @@ type Props = {
   onPress: (store: Store) => void;
   favorited?: boolean;
   onToggleFavorite?: (store: Store) => void;
+  /** 초톡방 열기 — 업체가 붙여넣은 카톡 내용 보기 */
+  onOpenChotok?: (store: Store) => void;
 };
 
 const TONE_COLOR: Record<StatusTone, string> = {
@@ -40,6 +42,7 @@ function StoreStatusCard({
   onPress,
   favorited,
   onToggleFavorite,
+  onOpenChotok,
 }: Props) {
   const c = useTheme();
   const s = styles(c);
@@ -82,11 +85,24 @@ function StoreStatusCard({
           </View>
         </View>
 
-        {onToggleFavorite ? (
-          <Pressable onPress={() => onToggleFavorite(store)} hitSlop={8} style={s.heart}>
-            <Icon name="heart" size={20} color={favorited ? c.accent : c.line} />
-          </Pressable>
-        ) : null}
+        <View style={s.side}>
+          {onToggleFavorite ? (
+            <Pressable onPress={() => onToggleFavorite(store)} hitSlop={8} style={s.heart}>
+              <Icon name="heart" size={20} color={favorited ? c.accent : c.line} />
+            </Pressable>
+          ) : null}
+
+          {onOpenChotok ? (
+            <Pressable
+              onPress={() => onOpenChotok(store)}
+              hitSlop={6}
+              style={({ pressed }) => [s.chotok, pressed && s.chotokPressed]}
+            >
+              <Icon name="chat" size={14} color={c.accent} />
+              <Text style={s.chotokText}>초톡</Text>
+            </Pressable>
+          ) : null}
+        </View>
       </View>
 
       <View style={s.metrics}>
@@ -147,6 +163,20 @@ const styles = (c: ThemeColors) =>
     rate: { fontSize: fontSize.md, fontWeight: '700', color: c.fg },
     reviews: { fontSize: fontSize.sm, color: c.muted },
     heart: { padding: 2 },
+    side: { alignItems: 'flex-end', gap: spacing.sm, paddingTop: 2 },
+    chotok: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 3,
+      paddingHorizontal: spacing.sm,
+      paddingVertical: 4,
+      borderRadius: radius.pill,
+      borderWidth: 1,
+      borderColor: c.accent,
+      backgroundColor: c.surface,
+    },
+    chotokPressed: { backgroundColor: c.accentWeak },
+    chotokText: { fontSize: fontSize.xs, fontWeight: '800', color: c.accent },
 
     metrics: { flexDirection: 'row', marginTop: spacing.sm },
     metric: { flex: 1, alignItems: 'center', gap: 1 },

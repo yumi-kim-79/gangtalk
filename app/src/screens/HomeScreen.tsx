@@ -47,6 +47,14 @@ export default function HomeScreen() {
     () => navigation.navigate('Stores', { screen: 'StoreList' }),
     [navigation],
   );
+  const openChotok = useCallback(
+    (store: Store) =>
+      navigation.navigate('Stores', {
+        screen: 'Chotok',
+        params: { storeId: store.id, storeName: store.name ?? '업체' },
+      }),
+    [navigation],
+  );
 
   return (
     <View style={s.root}>
@@ -55,7 +63,13 @@ export default function HomeScreen() {
         keyExtractor={item => item.id}
         contentContainerStyle={s.listContent}
         renderItem={({ item }) => (
-          <StoreStatusCard store={item} all={all} roomsReady={roomsReady} onPress={openStore} />
+          <StoreStatusCard
+            store={item}
+            all={all}
+            roomsReady={roomsReady}
+            onPress={openStore}
+            onOpenChotok={openChotok}
+          />
         )}
         keyboardShouldPersistTaps="handled"
         initialNumToRender={8}
