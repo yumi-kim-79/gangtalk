@@ -202,6 +202,38 @@ npm run build:all
 
 ## 작업 로그
 
+### 2026-09-01: 핫이슈 한줄 뉴스 연동 (`feature/rn-app`)
+
+#### 증상
+관리자 "뉴스/한줄 관리" 에서 글을 등록·정렬해도 앱 현황판 핫이슈 바가
+`강남톡방 그랜드오픈 이벤트 진행중!` 에서 바뀌지 않았다.
+
+#### 원인 — 웹도 같은 상태였다
+`config/marketing.newsline` 구독(`subNewsMarketing`) · 3개 소스 머지(`recomputeNews`) ·
+2.5초 자동 순환(`newsRotateTimer`) 이 **전부 구현돼 있는데 템플릿이 쓰지 않았다.**
+`<span class="mp-hot-text">{{ hotIssue }}</span>` — `hotIssue` 는 하드코딩 `ref`.
+즉 관리자 페이지가 저장하는 데이터를 **아무도 화면에 그리지 않는 상태**였다.
+앱은 그 웹을 그대로 이식해서 같은 하드코딩 상수를 갖고 있었다.
+
+#### 수정
+- **웹** `MainPage.vue` — 핫이슈 바를 `currentNews.title` 에 바인딩.
+  등록된 글이 0건일 때만 기존 문구로 폴백
+- **앱** `services/news.ts` 신설 — 웹과 동일한 3개 소스 구독
+  1. `config/marketing.newsline` — 관리자 저장 배열, **순서 그대로 최상단**
+  2. `config/news` — 예전 단일 문서 (items / newsItems / list / title)
+  3. `news` 컬렉션 — 개별 문서
+  2·3 은 1과 중복 제거 후 최신순으로 뒤에 붙인다 (`mergeNews` = 웹 `recomputeNews`)
+- **앱** `hooks/useNewsline.ts` — 최신 10건만 2.5초 순환 (웹과 동일 주기)
+- **앱** `HomeScreen.tsx` — 순환 문구 + `NEW` 배지, 바를 누르면
+  등록 순서 그대로 전체 목록 바텀시트
+
+`normalizeItem` / `tsToMs` 도 웹과 동일하게 이식 — `badge: 'NEW'` 를 `isNew` 로,
+Firestore Timestamp·Date·number·문자열을 모두 ms 로 받는다.
+
+- **검증**: `tsc --noEmit` 0 errors / `eslint .` 0 errors
+- **웹 배포 필요**: `npm run deploy:member`
+
+
 ### 2026-09-01: 제휴관 승인 판정 ↔ 관리자 배지 불일치 (엘레강스 누락) (`feature/rn-app`)
 
 #### 증상

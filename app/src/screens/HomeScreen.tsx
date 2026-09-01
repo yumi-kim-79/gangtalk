@@ -4,7 +4,9 @@ import type { NavigationProp } from '@react-navigation/native';
 import {
   ActivityIndicator,
   FlatList,
+  Modal,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -16,12 +18,13 @@ import { STORE_CATEGORIES } from '@/constants/stores';
 import StoreStatusCard from '@/components/store/StoreStatusCard';
 import { useAuth } from '@/hooks/useAuth';
 import { useHomeStores } from '@/hooks/useHomeStores';
+import { useNewsline } from '@/hooks/useNewsline';
 import type { MainTabParamList } from '@/navigation/types';
 import { fontSize, radius, spacing, useTheme, type ThemeColors } from '@/theme';
 import type { Store } from '@/types/store';
 
-/** TODO: 웹 백로그대로 Firestore config 에서 가져오도록 연동 (현재는 웹과 동일한 하드코딩) */
-const HOT_ISSUE = '강남톡방 그랜드오픈 이벤트 진행중!';
+/** 관리자 "뉴스/한줄 관리" 에 등록된 글이 없을 때만 쓰는 기본 문구 (웹과 동일) */
+const HOT_ISSUE_FALLBACK = '강남톡방 그랜드오픈 이벤트 진행중!';
 
 export default function HomeScreen() {
   const c = useTheme();
@@ -32,6 +35,8 @@ export default function HomeScreen() {
   const [category, setCategory] = useState('all');
   const [keyword, setKeyword] = useState('');
   const { stores, all, loading, roomsReady, error } = useHomeStores(category, keyword);
+  const { visible: news, current: currentNews } = useNewsline();
+  const [newsOpen, setNewsOpen] = useState(false);
 
   const openStore = useCallback(
     (store: Store) =>
@@ -65,13 +70,18 @@ export default function HomeScreen() {
               onChangeSearch={setKeyword}
             />
 
-            <Pressable style={s.hot} android_ripple={{ color: c.accentWeak }}>
+            <Pressable
+              style={s.hot}
+              android_ripple={{ color: c.accentWeak }}
+              onPress={() => news.length && setNewsOpen(true)}
+            >
               <View style={s.hotPill}>
                 <Text style={s.hotPillText}>핫이슈</Text>
               </View>
               <Text style={s.hotText} numberOfLines={1}>
-                {HOT_ISSUE}
+                {currentNews?.title ?? HOT_ISSUE_FALLBACK}
               </Text>
+              {currentNews?.isNew ? <Text style={s.hotNew}>NEW</Text> : null}
               <Icon name="chevronRight" size={16} color={c.muted} />
             </Pressable>
 
@@ -115,6 +125,32 @@ export default function HomeScreen() {
           ) : undefined
         }
       />
+
+      {/* 핫이슈 전체 보기 — 관리자가 등록한 순서 그대로 */}
+      <Modal
+        visible={newsOpen}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setNewsOpen(false)}
+      >
+        <Pressable style={s.sheetDim} onPress={() => setNewsOpen(false)}>
+          <Pressable style={s.sheet} onPress={() => {}}>
+            <View style={s.sheetHandle} />
+            <Text style={s.sheetTitle}>핫이슈</Text>
+            <ScrollView style={s.sheetBody}>
+              {news.map(n => (
+                <View key={n.id} style={s.newsRow}>
+                  <Text style={s.newsText}>{n.title}</Text>
+                  {n.isNew ? <Text style={s.hotNew}>NEW</Text> : null}
+                </View>
+              ))}
+            </ScrollView>
+            <Pressable style={s.sheetClose} onPress={() => setNewsOpen(false)}>
+              <Text style={s.sheetCloseText}>닫기</Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -143,6 +179,57 @@ const styles = (c: ThemeColors) =>
     },
     hotPillText: { fontSize: fontSize.xs, fontWeight: '800', color: '#ffffff' },
     hotText: { flex: 1, fontSize: fontSize.md, fontWeight: '600', color: '#7a2447' },
+    hotNew: {
+      fontSize: fontSize.xs,
+      fontWeight: '800',
+      color: c.accent,
+      letterSpacing: 0.3,
+    },
+
+    sheetDim: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
+    sheet: {
+      maxHeight: '70%',
+      paddingBottom: spacing.xl,
+      borderTopLeftRadius: radius.md,
+      borderTopRightRadius: radius.md,
+      backgroundColor: c.surface,
+    },
+    sheetHandle: {
+      alignSelf: 'center',
+      width: 36,
+      height: 4,
+      marginTop: spacing.sm,
+      borderRadius: 2,
+      backgroundColor: c.line,
+    },
+    sheetTitle: {
+      fontSize: fontSize.lg,
+      fontWeight: '800',
+      color: c.fg,
+      paddingHorizontal: spacing.page,
+      paddingTop: spacing.md,
+      paddingBottom: spacing.sm,
+    },
+    sheetBody: { paddingHorizontal: spacing.page },
+    newsRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+      paddingVertical: spacing.md,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: c.line,
+    },
+    newsText: { flex: 1, fontSize: fontSize.md, color: c.fg },
+    sheetClose: {
+      marginHorizontal: spacing.page,
+      marginTop: spacing.md,
+      height: 44,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: radius.sm,
+      backgroundColor: c.accentWeak,
+    },
+    sheetCloseText: { fontSize: fontSize.md, fontWeight: '700', color: c.accent },
 
     sectionHead: {
       flexDirection: 'row',

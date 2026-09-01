@@ -17,7 +17,7 @@
     <!-- ===== Hot Issue Banner ===== -->
     <section class="mp-hot" @click="goEventDetail">
       <span class="mp-hot-pill">🔥 핫이슈</span>
-      <span class="mp-hot-text">{{ hotIssue }}</span>
+      <span class="mp-hot-text">{{ currentNews.title || hotIssue }}</span>
       <svg class="mp-hot-arrow" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
         <path d="M9 18l6-6-6-6"/>
       </svg>
@@ -887,6 +887,11 @@ const mpCategories = [
 const expandCategories = ref(false)
 
 /* ===== 페이지 고유 액션 (AppHeader 미관여) ===== */
+/* fix (2026-09-01): 관리자 "뉴스/한줄 관리"(config/marketing.newsline) 가
+ * 반영되지 않던 문제. 구독(subNewsMarketing) · 머지(recomputeNews) ·
+ * 2.5초 순환(newsRotateTimer) 은 모두 만들어져 있었는데 핫이슈 바 템플릿이
+ * 하드코딩 문구만 출력하고 있었다. currentNews 를 바인딩하고,
+ * 등록된 글이 하나도 없을 때만 아래 기본 문구로 폴백한다. */
 const hotIssue = ref('강남톡방 그랜드오픈 이벤트 진행중!')
 
 function goEventDetail(){
