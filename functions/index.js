@@ -3102,3 +3102,53 @@ exports.kakaoSignIn = onCall(async (req) => {
     profile: { uid, email, nickname, photoURL, kakaoId },
   };
 });
+
+/* =========================================================
+   회원탈퇴 — 앱 전용 (2026-09-01)
+
+   Apple App Store 5.1.1(v) / Google Play 정책상 앱 안에서 계정 삭제가
+   가능해야 한다. 클라이언트는 자기 Auth 계정을 지울 수 없으므로 여기서 처리한다.
+
+   삭제 범위:
+     - users/{uid}
+     - favorites (ownerId == uid)
+     - Firebase Auth 계정
+   게시글/댓글은 작성자 표기만 남기고 보존한다(대화 맥락 유지).
+========================================================= */
+exports.deleteMyAccount = onCall(async (req) => {
+  const uid = req.auth?.uid;
+  if (!uid) {
+    throw new HttpsError("unauthenticated", "로그인이 필요합니다.");
+  }
+
+  const reason = safeStr(req.data?.reason || "");
+
+  try {
+    // 1) 탈퇴 로그 (운영 참고용)
+    await db.collection("adminInbox").add({
+      kind: "account_deleted",
+      uid,
+      reason,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    }).catch(() => null);
+
+    // 2) 찜 정리
+    const favSnap = await db.collection("favorites").where("ownerId", "==", uid).get();
+    if (!favSnap.empty) {
+      const batch = db.batch();
+      favSnap.docs.forEach((d) => batch.delete(d.ref));
+      await batch.commit();
+    }
+
+    // 3) 사용자 문서 삭제
+    await db.collection("users").doc(uid).delete().catch(() => null);
+
+    // 4) Auth 계정 삭제 (마지막 — 실패 시 재시도 가능하도록)
+    await admin.auth().deleteUser(uid);
+
+    return { ok: true };
+  } catch (e) {
+    console.error("[deleteMyAccount] error:", e);
+    throw new HttpsError("internal", "탈퇴 처리 중 오류가 발생했습니다.");
+  }
+});

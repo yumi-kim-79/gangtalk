@@ -6,7 +6,7 @@ import StoresStackNavigator from '@/navigation/StoresStackNavigator';
 import HomeScreen from '@/screens/HomeScreen';
 import CommunityStackNavigator from '@/navigation/CommunityStackNavigator';
 import ChatStackNavigator from '@/navigation/ChatStackNavigator';
-import ProfileScreen from '@/screens/ProfileScreen';
+import ProfileStackNavigator from '@/navigation/ProfileStackNavigator';
 import { fontSize, useTheme } from '@/theme';
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
@@ -59,7 +59,7 @@ export default function MainTabNavigator() {
       />
       <Tab.Screen
         name="Profile"
-        component={ProfileScreen}
+        component={ProfileStackNavigator}
         options={{ title: '마이', tabBarIcon: UserIcon }}
       />
     </Tab.Navigator>

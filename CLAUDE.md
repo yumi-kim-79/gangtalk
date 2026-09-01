@@ -84,7 +84,16 @@ npm run build:all
 - [ ] `npm run ios:setup` (pod install)
 - [ ] 시뮬레이터/에뮬레이터 실행 확인
 
-### 진행 중 — 채팅 탭
+### 진행 중 — 마이 탭
+- [x] 프로필 카드 / 포인트 / 추천코드
+- [x] 찜한 업체 · 내가 쓴 글
+- [x] 프로필 수정 (닉네임)
+- [x] **회원탈퇴** (Cloud Function `deleteMyAccount`) — 스토어 심사 필수 3종 중 1
+- [ ] 신고 · 차단 — 심사 필수 나머지 2종
+- [ ] 이용약관/개인정보처리방침 — 현재 웹 /support 로 이동, 전용 페이지 필요
+- [ ] 티어/등급 UI (웹 TierLadderView)
+
+### 완료 — 채팅 탭
 - [x] 채팅방 목록 (`rooms`) / 방 입장 / 메시지 송수신
 - [ ] 업체별 채팅 연결 — 방 개설이 관리자 전용이라 보류 (아래 규칙 이슈 참고)
 - [ ] 안 읽음 표시 · 푸시 알림
@@ -184,6 +193,24 @@ npm run build:all
 ---
 
 ## 작업 로그
+
+### 2026-09-01: 마이 탭 이식 (`feature/rn-app`)
+- **`functions/index.js` 에 `deleteMyAccount` 추가** — 클라이언트는 자기 Auth 계정을 지울 수 없어 서버에서 처리
+  - 삭제: `users/{uid}`, `favorites`(ownerId==uid), Firebase Auth 계정
+  - 보존: 게시글/댓글 (대화 맥락 유지 — 탈퇴 화면에도 명시)
+  - `adminInbox` 에 탈퇴 로그 1건 기록
+  - Auth 계정 삭제를 **마지막**에 수행 — 중간 실패 시 재시도가 가능하도록
+- **`services/mypage.ts`**:
+  - `subscribeMyFavorites` — favorites 규칙이 `ownerId == uid` 만 읽게 해서 where 절이 필수. 업체 정보는 favorites 에 없어 stores 를 한 번 읽어 합침(문서별 조회보다 요청 수가 적음)
+  - `subscribeMyPosts` — `where(authorUid)` + `orderBy` 는 복합 색인이 필요해 **where 만 걸고 정렬은 클라이언트**에서 (색인 추가 불필요)
+  - `updateNickname` — `profile.nickname/nick/nicknameLower` 동시 갱신 (웹 스키마와 동일)
+- **화면**: `ProfileScreen`(재작성 — 프로필 카드/포인트/추천코드 + 메뉴), `FavoritesScreen`, `MyPostsScreen`, `ProfileEditScreen`, `DeleteAccountScreen`
+- **`MenuRow` 공용 컴포넌트** 추가
+- 비로그인 상태에서 "찜한 업체 / 내가 쓴 글"을 누르면 `useRequireAuth` 로 로그인 모달
+- 이용약관·개인정보처리방침·문의는 현재 웹 `/support` 로 이동 — **앱 전용 페이지 필요(심사 항목)**
+- 마이 탭을 `ProfileStackNavigator` 로 교체
+- **검증**: `tsc --noEmit` 0 errors / `eslint .` 0 errors / `node --check functions/index.js` 통과
+
 
 ### 2026-09-01: 소셜 로그인 비활성화 + 댓글수 규칙 수정 + 채팅 탭 이식 (`feature/rn-app`)
 

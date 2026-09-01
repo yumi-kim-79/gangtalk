@@ -6,6 +6,15 @@ export type StoresStackParamList = {
   StoreDetail: { storeId: string };
 };
 
+/** 마이 탭 내부 스택 */
+export type ProfileStackParamList = {
+  ProfileHome: undefined;
+  ProfileEdit: undefined;
+  Favorites: undefined;
+  MyPosts: undefined;
+  DeleteAccount: undefined;
+};
+
 /** 채팅 탭 내부 스택 */
 export type ChatStackParamList = {
   ChatList: undefined;
@@ -31,7 +40,7 @@ export type MainTabParamList = {
   Stores: NavigatorScreenParams<StoresStackParamList>;
   Community: NavigatorScreenParams<CommunityStackParamList>;
   Chats: NavigatorScreenParams<ChatStackParamList>;
-  Profile: undefined;
+  Profile: NavigatorScreenParams<ProfileStackParamList>;
 };
 
 /** 루트 스택 */
