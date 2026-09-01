@@ -13,7 +13,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Icon from '@/components/common/Icon';
+import Icon, { type IconName } from '@/components/common/Icon';
 import { useAuth } from '@/hooks/useAuth';
 import { signOut } from '@/services/auth';
 import type { RootStackParamList } from '@/navigation/types';
@@ -41,7 +41,8 @@ type Props = {
 
 type MenuItem = {
   key: string;
-  emoji: string;
+  /** 이모지는 시뮬레이터에서 tofu 로 뜨므로 SVG 아이콘을 쓴다 */
+  icon: IconName;
   label: string;
 };
 
@@ -81,12 +82,12 @@ export default function AppHeader({
 
   /** 웹 AppHeader 의 카드형 드롭다운과 **같은 4항목** */
   const menuItems: MenuItem[] = [
-    { key: 'diary', emoji: '📅', label: '일정/달력' },
-    { key: 'support', emoji: '🎧', label: '고객센터' },
-    { key: 'favorites', emoji: '❤️', label: '즐겨찾기' },
+    { key: 'diary', icon: 'calendar', label: '일정/달력' },
+    { key: 'support', icon: 'support', label: '고객센터' },
+    { key: 'favorites', icon: 'heart', label: '즐겨찾기' },
     isLoggedIn
-      ? { key: 'logout', emoji: '🚪', label: '로그아웃' }
-      : { key: 'login', emoji: '🔑', label: '로그인' },
+      ? { key: 'logout', icon: 'logout', label: '로그아웃' }
+      : { key: 'login', icon: 'login', label: '로그인' },
   ];
 
   const onMenuItem = useCallback(
@@ -193,8 +194,15 @@ export default function AppHeader({
                 ]}
                 onPress={() => onMenuItem(m)}
               >
-                <Text style={s.menuEmoji}>{m.emoji}</Text>
-                <Text style={s.menuLabel}>{m.label}</Text>
+                <Icon
+                  name={m.icon}
+                  size={19}
+                  color={m.key === 'favorites' ? c.accent : c.muted}
+                  filled={m.key === 'favorites'}
+                />
+                <Text style={s.menuLabel} numberOfLines={1}>
+                  {m.label}
+                </Text>
                 <Icon name="chevronRight" size={14} color={c.muted} />
               </Pressable>
             ))}
@@ -268,7 +276,7 @@ const styles = (c: ThemeColors) =>
     menuCard: {
       position: 'absolute',
       right: spacing.page,
-      minWidth: 210,
+      minWidth: 224,
       borderRadius: radius.md,
       backgroundColor: c.surface,
       paddingVertical: spacing.xs,
@@ -287,6 +295,5 @@ const styles = (c: ThemeColors) =>
     },
     menuRowPressed: { backgroundColor: c.chipBg },
     menuDivider: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.line },
-    menuEmoji: { fontSize: fontSize.lg },
     menuLabel: { flex: 1, fontSize: fontSize.lg, fontWeight: '700', color: c.fg },
   });

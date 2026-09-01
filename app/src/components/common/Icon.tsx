@@ -20,7 +20,11 @@ export type IconName =
   | 'chat'
   | 'deal'
   | 'user'
-  | 'signal';
+  | 'signal'
+  | 'calendar'
+  | 'support'
+  | 'logout'
+  | 'login';
 
 type Props = {
   name: IconName;
@@ -155,6 +159,41 @@ export default function Icon({ name, size = 22, color, filled = true }: Props) {
         <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
           <Circle cx={12} cy={8} r={3.5} stroke={color} strokeWidth={1.6} fill="none" />
           <Path d="M5 20c1.8-3.3 5-5 7-5s5.2 1.7 7 5" {...thin} />
+        </Svg>
+      );
+    // ── 헤더 햄버거 메뉴 ──
+    // 이모지(📅🎧🚪🔑)는 시뮬레이터에서 tofu 로 떠서 SVG 로 대체했다.
+    case 'calendar':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+          <Rect x={3} y={5} width={18} height={16} rx={2.5} {...stroke} fill="none" />
+          <Path d="M3 10h18M8 3v4M16 3v4" {...stroke} />
+          <Rect x={7} y={13} width={3} height={3} rx={0.8} fill={color} />
+        </Svg>
+      );
+    case 'support':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+          <Path d="M4 13v-1a8 8 0 0 1 16 0v1" {...stroke} />
+          <Path
+            d="M4 13h2.5a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1zM20 13h-2.5a1 1 0 0 0-1 1v4a1 1 0 0 0 1 1H19a1 1 0 0 0 1-1z"
+            {...stroke}
+          />
+          <Path d="M20 18v1a3 3 0 0 1-3 3h-3" {...stroke} />
+        </Svg>
+      );
+    case 'logout':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+          <Path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3" {...stroke} />
+          <Path d="M10 16l-4-4 4-4M6 12h9" {...stroke} />
+        </Svg>
+      );
+    case 'login':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+          <Path d="M9 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h3" {...stroke} />
+          <Path d="M14 16l4-4-4-4M18 12H9" {...stroke} />
         </Svg>
       );
     // 혼잡도 막대 — 웹 현황판의 .mp-metric-wifi 신호 막대
