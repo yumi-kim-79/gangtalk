@@ -3,7 +3,9 @@
   "version": "0.0.1",
   "private": true,
   "description": "강톡 — app(React Native) / web(Vue, 회원+관리자) / functions(Firebase) 모노레포",
-  "engines": { "node": ">=22" },
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "web:dev": "npm --prefix web run dev",
     "web:build": "npm --prefix web run clean && npm --prefix web run build",
@@ -11,13 +13,15 @@
     "deploy:hosting": "npm run web:build && firebase deploy --only hosting:prod",
     "deploy:admin": "npm run web:build:admin && firebase deploy --only hosting:admin",
     "deploy:functions": "npm --prefix functions install && firebase deploy --only functions",
-    "deploy:rules": "firebase deploy --only firestore:rules,storage",
+    "deploy:rules": "firebase deploy --only firestore:rules",
     "app:start": "npm --prefix app run start",
     "app:ios": "npm --prefix app run ios",
     "app:android": "npm --prefix app run android",
     "app:typecheck": "npm --prefix app run typecheck",
     "build:ios": "bash scripts/build-ios.sh",
     "build:android": "bash scripts/build-android.sh",
-    "build:all": "bash scripts/build-all.sh"
+    "build:all": "bash scripts/build-all.sh",
+    "deploy:indexes": "firebase deploy --only firestore:indexes",
+    "deploy:storage": "firebase deploy --only storage"
   }
 }
