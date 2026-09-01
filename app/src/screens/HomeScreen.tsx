@@ -77,12 +77,7 @@ export default function HomeScreen() {
         removeClippedSubviews
         ListHeaderComponent={
           <>
-            <AppHeader
-              title="현황판"
-              subtitle="강남 지역 업소 현황"
-              searchValue={keyword}
-              onChangeSearch={setKeyword}
-            />
+            <AppHeader searchValue={keyword} onChangeSearch={setKeyword} />
 
             <Pressable
               style={s.hot}

@@ -46,7 +46,7 @@ export default function ProfileScreen() {
 
   return (
     <ScrollView style={s.root} contentContainerStyle={s.content}>
-      <AppHeader title="마이" showSearch={false} />
+      <AppHeader showSearch={false} />
 
       {isLoggedIn ? (
         <>

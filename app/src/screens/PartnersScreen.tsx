@@ -63,8 +63,6 @@ export default function PartnersScreen() {
         ListHeaderComponent={
           <>
             <AppHeader
-              title="제휴관"
-              subtitle="강남의 모든 공간, 한눈에"
               searchValue={keyword}
               searchPlaceholder="업체명, 지역, 업종을 검색해보세요"
               onChangeSearch={setKeyword}

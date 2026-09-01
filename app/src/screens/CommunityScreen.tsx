@@ -60,8 +60,6 @@ export default function CommunityScreen() {
         ListHeaderComponent={
           <>
             <AppHeader
-              title="강톡"
-              subtitle="게시판"
               searchValue={keyword}
               searchPlaceholder="제목, 내용, 작성자 검색"
               onChangeSearch={setKeyword}

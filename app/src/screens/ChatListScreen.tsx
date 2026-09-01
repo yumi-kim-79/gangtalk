@@ -35,7 +35,7 @@ export default function ChatListScreen() {
 
   return (
     <View style={s.root}>
-      <AppHeader title="채팅" subtitle="강톡 채팅방" showSearch={false} />
+      <AppHeader showSearch={false} />
 
       {!initializing && !isLoggedIn ? (
         <Pressable

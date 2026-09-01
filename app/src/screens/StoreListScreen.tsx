@@ -59,12 +59,7 @@ export default function StoreListScreen() {
 
   return (
     <View style={s.root}>
-      <AppHeader
-        title="가게찾기"
-        subtitle="강남 지역 업소 찾기"
-        searchValue={keyword}
-        onChangeSearch={setKeyword}
-      />
+      <AppHeader searchValue={keyword} onChangeSearch={setKeyword} />
 
       <ChipTabs
         items={STORE_CATEGORIES}
