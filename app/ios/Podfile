@@ -5,16 +5,17 @@ require Pod::Executable.execute_command('node', ['-p',
     {paths: [process.argv[1]]},
   )', __dir__]).strip
 
-platform :ios, min_ios_version_supported
+# React Native Firebase 공식 권장 — Firebase iOS SDK 는 Static Framework 필수.
+# 없으면 "The Swift pod `FirebaseAuth` ... cannot yet be integrated as static libraries" 로 실패.
+# https://rnfirebase.io/
+$RNFirebaseAsStaticFramework = true
+
+platform :ios, '16.0'
 prepare_react_native_project!
 
-linkage = ENV['USE_FRAMEWORKS']
-if linkage != nil
-  Pod::UI.puts "Configuring Pod with #{linkage}ally linked Frameworks".green
-  use_frameworks! :linkage => linkage.to_sym
-end
-
 target 'GangTalk' do
+  # use_frameworks! 가 modular header 효과를 포함하므로 use_modular_headers! 는 불필요.
+  use_frameworks! :linkage => :static
   config = use_native_modules!
 
   use_react_native!(
@@ -30,5 +31,26 @@ target 'GangTalk' do
       :mac_catalyst_enabled => false,
       # :ccache_enabled => true
     )
+
+    # Xcode 26 호환성 fix (라이드톡에서 검증된 대응).
+    # RN 생태계 일부 Pod(SocketRocket 등)이 신규 strict 컴파일러 옵션
+    # (-Werror=non-modular-include-in-framework-module 등)을 통과하지 못하는 문제 회피.
+    # 아울러 IPHONEOS_DEPLOYMENT_TARGET 을 16.0 으로 통일해 deployment target 경고 정리.
+    installer.pods_project.targets.each do |target|
+      target.build_configurations.each do |bc|
+        bc.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '16.0'
+        bc.build_settings['GCC_TREAT_WARNINGS_AS_ERRORS'] = 'NO'
+        bc.build_settings['CLANG_WARN_DOCUMENTATION_COMMENTS'] = 'NO'
+
+        ['WARNING_CFLAGS', 'OTHER_CFLAGS', 'OTHER_CPLUSPLUSFLAGS'].each do |key|
+          flags = bc.build_settings[key]
+          if flags.is_a?(Array)
+            bc.build_settings[key] = flags.reject { |f| f.is_a?(String) && f.start_with?('-Werror') }
+          elsif flags.is_a?(String) && flags.include?('-Werror')
+            bc.build_settings[key] = flags.split(' ').reject { |f| f.start_with?('-Werror') }.join(' ')
+          end
+        end
+      end
+    end
   end
 end
