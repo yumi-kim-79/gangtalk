@@ -1,0 +1,100 @@
+/** stores / rooms_biz 컬렉션 도메인 타입 (Firestore 실제 필드 기준) */
+
+export interface StoreManager {
+  name?: string;
+  phone?: string;
+  [k: string]: unknown;
+}
+
+/** stores 문서 원본 */
+export interface StoreDoc {
+  id: string;
+  name?: string;
+  category?: string;
+  region?: string;
+  desc?: string;
+  description?: string;
+  longDesc?: string;
+  adTitle?: string;
+  thumb?: string;
+  cover?: string;
+  coverImg?: string;
+  images?: string[];
+  photos?: string[];
+  img?: string;
+  banner?: string;
+  logo?: string;
+  hours?: string;
+  phone?: string;
+  address?: string;
+
+  /** 급여 — 필드가 여러 세대에 걸쳐 있어 wageOf() 로 통합 조회 */
+  wage?: number | string;
+  hourly?: number | string;
+  payPerHour?: number | string;
+  hourPay?: number | string;
+  hourlyPay?: number | string;
+  hourlyWage?: number | string;
+  pay?: number | string;
+  payNote?: string;
+  tc?: number | string;
+
+  rooms?: number | string;
+  roomCount?: number | string;
+  roomInfo?: number | string;
+
+  likes?: number;
+  wishCount?: number;
+  rating?: number;
+
+  managers?: StoreManager[];
+  manager?: string;
+  ownerId?: string;
+  ownerEmail?: string;
+
+  tags?: string[];
+  services?: string[];
+  events?: string[];
+  eventMain?: string;
+
+  kakao?: string;
+  kakaoOpenChat?: string;
+  openChatUrl?: string;
+  talkId?: string;
+  safePhone?: string;
+  phoneSafe?: string;
+  safe?: boolean;
+
+  approved?: boolean;
+  applyStatus?: string;
+  exposure?: Record<string, boolean>;
+
+  roomBizId?: string;
+  rooms_biz?: string;
+  storeKey?: string;
+
+  updatedAt?: unknown;
+}
+
+/** rooms_biz 병합 결과가 더해진 화면용 모델 */
+export interface Store extends StoreDoc {
+  /** 맞출방 = rooms_biz.totalRooms */
+  match?: number;
+  /** 필요인원 = rooms_biz.totalRemaining */
+  persons?: number;
+  totalRooms?: number;
+  totalNeeded?: number;
+  totalRemaining?: number;
+  roomsBizId?: string | null;
+}
+
+export interface RoomsBizDoc {
+  id: string;
+  roomBizId?: string;
+  storeId?: string;
+  totalRooms?: number;
+  total?: number;
+  totalCurrent?: number;
+  totalNeeded?: number;
+  totalRemaining?: number;
+}

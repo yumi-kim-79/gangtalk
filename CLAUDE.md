@@ -84,9 +84,16 @@ npm run build:all
 - [ ] `npm run ios:setup` (pod install)
 - [ ] 시뮬레이터/에뮬레이터 실행 확인
 
-### Phase 1 이후
-- [ ] Phase 1 인증 (이메일 + SMS, 소셜 로그인 도입 여부 미정)
-- [ ] Phase 2 핵심 화면 / Phase 3 채팅 / Phase 4 마이
+### 진행 중 — 업체 탭 이식
+- [x] 디자인 토큰 이식 (`src/theme`) — 웹 tokens.css 색상 그대로, 라이트/다크
+- [x] 업체 목록 (카테고리·지역·정렬·검색)
+- [x] 업체 상세 (소개/이벤트/시급/영업정보/위치 + 안심문자·안심전화·오픈카톡)
+- [ ] 실기기 확인 후 미세 조정
+- [ ] 지도 보기(MapView) — react-native-maps 도입 필요
+
+### 이후
+- [ ] 인증 (이메일 + SMS, 소셜 로그인 도입 여부 미정)
+- [ ] 홈 / 강톡(게시판) / 채팅 / 마이
 - [ ] Phase 5 심사 필수기능 (탈퇴·신고·차단·푸시·강제업데이트)
 - [ ] Phase 6 구글플레이 / 애플 앱스토어 등록
 
@@ -147,6 +154,32 @@ npm run build:all
 ---
 
 ## 작업 로그
+
+### 2026-09-01: 업체 탭 이식 (`feature/rn-app`)
+- **방향 결정**: UI 는 "앱에 맞게 다듬기" — 정보 구조·필드·필터 조건은 웹 그대로 두고, 조작 방식만 네이티브 관습에 맞춤
+- **디자인 토큰** `src/theme/index.ts` — `web/src/styles/tokens.css` 이식. 색상(핑크 `#ff3f8a`, 다크 `#ff4b94`)·radius·폰트 스케일 동일. `useTheme()` 이 `useColorScheme()` 으로 라이트/다크 자동 전환
+- **도메인 상수** `src/constants/stores.ts` — 카테고리 11종, 지역 5종, 정렬 3종, `EXPOSURE_KEY='gangtalk'`, 조회 상한 100 (웹과 동일)
+- **서비스** `src/services/stores.ts` — StoreFinder.vue 의 로직을 화면에서 분리해 이식:
+  - `subscribeStores` / `subscribeRoomsBiz` — `stores`(updatedAt desc, limit 100) + `rooms_biz`(limit 100) 동시 구독
+  - `mergeRoomsBiz` — 웹 `rebuildStores` 이식. `roomBizId / rooms_biz / storeKey / id` 순으로 키 후보를 찾고 `_room_xx` 접미사를 잘라 매칭. 맞출방=totalRooms, 필요인원=totalRemaining
+  - 값 추출: `wageOf`(급여 필드 7종 폴백) `tcOf` `likesOf` `roomsOf` `managerName` `introOf` `payText` `macroOf`
+  - 노출 조건: `exposedHere`(exposure 키 없으면 노출) `isApproved`(approved===true 또는 applyStatus approved/active)
+  - 검색: `searchTextOf`(업체명·담당자·adTitle·desc·tags·services·events) + `matchesQuery`(단어 AND) + `relevanceScore`(업체명 완전일치 100 / 시작 50 / 포함 30)
+  - 썸네일: `thumbCandidate`(thumb→cover→coverImg→images[0]→photos[0]→img→banner→logo) + `resolveThumb`(gs:// → Storage 다운로드 URL, 모듈 레벨 캐시)
+- **훅** `useStores`(구독+필터 메모이즈) `useStore`(상세 단건) `useThumb`
+- **화면**:
+  - `StoreListScreen` — AppHeader(검색) + 카테고리 칩 + 지역/정렬 + FlatList. 검색어가 있으면 연관순 우선, 없으면 선택 정렬
+  - `StoreDetailScreen` — 히어로 이미지 + 소개/이벤트/시급/영업정보/위치 + 하단 고정 액션바(안심문자 `sms:` / 안심전화 `tel:` / 오픈카톡). 안심번호 우선순위 `safePhone→phoneSafe→phone`, 오픈채팅 `openChatUrl→kakaoOpenChat→kakao` (웹과 동일)
+- **컴포넌트**: `AppHeader`(웹 공통 헤더 이식, 고정 높이 대신 SafeArea 처리) `OptionSheet`(웹 드롭다운 → 하단 시트) `CategoryChips`(웹 2줄 그리드 → 가로 스크롤 칩) `StoreListItem`(row-card 이식, `React.memo`)
+- **네비게이션**: 업체 탭을 `StoresStackNavigator`(목록 → 상세) 로 교체. `StoresStackParamList` 신설
+- **웹 대비 의도적 변경**:
+  - 2줄 카테고리 그리드 → 가로 스크롤 칩 (앱 표준, spacer 항목 제거)
+  - 상단 드롭다운 → 하단 시트 (한 손 조작)
+  - `alert()` 미사용 — 빈 상태/에러를 화면 안에서 안내
+  - 리스트/그리드 뷰 전환은 아직 미이식 (리스트만)
+- **미이식**: 지도 보기(MapView — `react-native-maps` 도입 필요), 배너 슬라이더, 실시간 순위 티커, Top5, 찜/별점(로그인 필요), 관리자 편집 툴바(앱 제외)
+- **검증**: `tsc --noEmit` 0 errors / `eslint .` 0 errors. `stores`·`rooms_biz` 읽기 규칙이 `allow read: if true` 라 비로그인 상태에서도 목록 표시됨
+
 
 ### 2026-09-01: 앱 전환 Phase 0 — React Native 스캐폴드 생성 (`feature/rn-app`)
 - **배경**: 강톡 리뉴얼 방향 확정 — **앱 주력 / 웹은 소개 페이지로 축소 / 관리자는 웹 유지**. 라이드톡(`~/ridetalk`)의 코드 작성 방식·구조를 참고하되 컴포넌트는 가져오지 않고 강톡용으로 새로 작성. 상세 계획은 프로젝트 문서 `강톡-RN-이행계획.md` 참고

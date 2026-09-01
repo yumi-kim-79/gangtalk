@@ -2,7 +2,7 @@ import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import type { MainTabParamList } from '@/navigation/types';
 import HomeScreen from '@/screens/HomeScreen';
-import StoreListScreen from '@/screens/StoreListScreen';
+import StoresStackNavigator from '@/navigation/StoresStackNavigator';
 import CommunityScreen from '@/screens/CommunityScreen';
 import ChatListScreen from '@/screens/ChatListScreen';
 import ProfileScreen from '@/screens/ProfileScreen';
@@ -15,7 +15,7 @@ export default function MainTabNavigator() {
       <Tab.Screen name="Home" component={HomeScreen} options={{ title: '홈' }} />
       <Tab.Screen
         name="Stores"
-        component={StoreListScreen}
+        component={StoresStackNavigator}
         options={{ title: '업체' }}
       />
       <Tab.Screen
