@@ -10,7 +10,7 @@
  * stores / rooms_biz 는 읽기가 공개라 로그인 없이 동작한다.
  */
 import { initializeApp } from 'firebase/app';
-import { getFirestore, collection, getDocs } from 'firebase/firestore';
+import { getFirestore, collection, getDocs, doc, getDoc } from 'firebase/firestore';
 
 const app = initializeApp({
   apiKey: 'AIzaSyCpoG1MamqFD0pMbltCmG46eAhSfnIvqAk',
@@ -24,15 +24,20 @@ const db = getFirestore(app);
 
 const n = v => (v === undefined || v === null ? '-' : String(v));
 
-const [storesSnap, rbSnap] = await Promise.all([
+const [storesSnap, rbSnap, marketingSnap] = await Promise.all([
   getDocs(collection(db, 'stores')),
   getDocs(collection(db, 'rooms_biz')),
+  getDoc(doc(db, 'config', 'marketing')),
 ]);
+
+const marketing = marketingSnap.exists() ? marketingSnap.data() : {};
+const homeOrder = Array.isArray(marketing.homeOrder) ? marketing.homeOrder.map(String) : [];
 
 const rb = new Map();
 rbSnap.forEach(d => rb.set(d.id, d.data() || {}));
 
-console.log(`stores ${storesSnap.size}건 / rooms_biz ${rb.size}건\n`);
+console.log(`stores ${storesSnap.size}건 / rooms_biz ${rb.size}건`);
+console.log(`config/marketing.homeOrder ${homeOrder.length}건 ${homeOrder.length ? '' : '⚠️ 비어 있음 — 순서가 앱에 반영되지 않습니다'}\n`);
 console.log(
   '업체명'.padEnd(10) +
     'stores(match/persons)'.padEnd(24) +
@@ -88,4 +93,58 @@ if (bad.length) {
 } else {
   console.log('\n✅ 모든 업소에서 stores 와 앱 표시가 일치합니다.');
 }
+
+/* ───────── 현황판 노출/기간/순서 진단 ───────── */
+console.log('\n\n[현황판 노출 조건]');
+console.log(
+  '업체명'.padEnd(10) +
+    'exposure.dashboard'.padEnd(20) +
+    'exposure.gangtalk'.padEnd(20) +
+    '노출기간'.padEnd(24) +
+    '현황판 순서',
+);
+console.log('-'.repeat(100));
+
+const now = Date.now();
+const orderPos = new Map(homeOrder.map((id, i) => [id, i + 1]));
+const hidden = [];
+
+storesSnap.forEach(d => {
+  const s = d.data() || {};
+  const exp = s.exposure || {};
+  const dash = exp.dashboard;
+  const gang = exp.gangtalk;
+
+  const start = Number(s.adStart || 0);
+  const end = Number(s.adEnd || 0);
+  let period = '무기한';
+  let periodOk = true;
+  if (start || end) {
+    if (start && now < start) { period = '시작 전'; periodOk = false; }
+    else if (end && now >= end) { period = '만료됨'; periodOk = false; }
+    else period = `D-${Math.ceil((end - now) / 86400000)}`;
+  }
+
+  // 현황판 정책: dashboard 가 undefined 면 미노출
+  const dashOk = dash === true;
+  const pos = orderPos.get(d.id);
+
+  console.log(
+    String(s.name || d.id).padEnd(10) +
+      String(dash === undefined ? '(없음) → 미노출' : dash).padEnd(20) +
+      String(gang === undefined ? '(없음) → 노출' : gang).padEnd(20) +
+      period.padEnd(24) +
+      (pos ? `${pos}번` : '미지정'),
+  );
+
+  if (!dashOk || !periodOk) {
+    hidden.push(`${s.name || d.id} (${!dashOk ? 'dashboard 미지정/OFF' : ''}${!dashOk && !periodOk ? ', ' : ''}${!periodOk ? period : ''})`);
+  }
+});
+
+if (hidden.length) {
+  console.log(`\n현황판에 안 보이는 업소 ${hidden.length}건:`);
+  hidden.forEach(h => console.log('   - ' + h));
+}
+
 process.exit(0);

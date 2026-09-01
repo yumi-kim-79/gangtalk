@@ -78,6 +78,10 @@ export interface StoreDoc {
   statusMode?: string;
   status?: string;
 
+  /** 광고 노출 기간 (ms) — 관리자 15/30/60/90일 버튼 */
+  adStart?: number;
+  adEnd?: number;
+
   approved?: boolean;
   applyStatus?: string;
   exposure?: Record<string, boolean>;

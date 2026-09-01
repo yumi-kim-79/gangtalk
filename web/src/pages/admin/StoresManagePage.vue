@@ -444,19 +444,23 @@ const isDashboardExposed = (s) => {
 }
 
 const approvedStores = computed(() => stores.value.filter(isApproved))
-const exposedStores = computed(() => approvedStores.value.filter(isExposed))
+const exposedStores = computed(() => orderByHome(approvedStores.value.filter(isExposed)))
 const pendingStores = computed(() => stores.value.filter(isPending))
 
-const orderedApproved = computed(() => {
-  const arr = approvedStores.value
+/* homeOrder 기준 정렬 — 탭1(노출/순서) 과 탭2(수동 지표) 가 같은 순서로 보이게 공용화.
+ * (2026-09-01: 탭2 가 정렬 없이 원본 순서라 탭1 에서 순서를 바꿔도 반영되지 않던 문제) */
+function orderByHome(arr){
   if (!homeOrder.value.length) return arr
   const pos = new Map(homeOrder.value.map((id,idx)=>[String(id), idx]))
   return arr.slice().sort((a,b)=>{
     const ai = pos.has(String(a.id)) ? pos.get(String(a.id)) : Infinity
     const bi = pos.has(String(b.id)) ? pos.get(String(b.id)) : Infinity
+    if (ai === bi) return 0
     return ai - bi
   })
-})
+}
+
+const orderedApproved = computed(() => orderByHome(approvedStores.value))
 
 const tabs = computed(() => [
   { key:'expose',  label:'노출 업소 관리', count: approvedStores.value.length },

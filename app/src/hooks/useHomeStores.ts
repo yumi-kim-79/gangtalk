@@ -49,6 +49,7 @@ export function useHomeStores(category: string, keyword: string) {
       sort: 'tc',
       keyword,
       exposureKey: EXPOSURE_KEY_DASHBOARD,
+      checkAdPeriod: true,
     });
     return applyHomeOrder(filtered, homeOrder);
   }, [merged, category, keyword, homeOrder]);

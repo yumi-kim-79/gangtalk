@@ -202,6 +202,37 @@ npm run build:all
 
 ## 작업 로그
 
+### 2026-09-01: 현황판 노출/기간/순서 반영 수정 (`feature/rn-app`)
+
+#### 앱 버그 2건
+1. **노출 기본값 정책이 반대였다**
+   - 웹 PR #124~126(2026-07-02)에서 두 화면의 기본값이 갈렸는데 앱은 옛 정책만 썼다:
+     - 가게찾기(`exposure.gangtalk`): 플래그 없으면 **노출** (기존 데이터 보존)
+     - 현황판(`exposure.dashboard`): 플래그 없으면 **미노출** (관리자가 명시 지정한 가게만)
+   - 앱은 둘 다 "없으면 노출" 이라 **관리자가 지정하지 않은 업소까지 현황판에 나왔다**
+   - `exposedHere(s, key)` 가 키에 따라 기본값을 다르게 판단하도록 수정
+2. **노출 기간(adStart/adEnd) 필터가 없었다**
+   - 관리자 화면의 15/30/60/90일·연장·해제 버튼은 `stores.adStart` / `adEnd` (ms) 를 쓴다
+   - 앱에는 이 필터가 아예 없어 **기간이 만료돼도 계속 노출**됐다
+   - `isActiveAd` 이식 + `StoreFilter.checkAdPeriod` 로 현황판에만 적용 (웹과 동일 —
+     가게찾기의 `isActiveAd` 는 웹에서도 항상 true 로 비활성)
+3. `applyHomeOrder` 비교자에서 미지정 업소끼리 `Infinity - Infinity = NaN` 이 나오던 것 방어
+
+#### 관리자 웹 수정
+- **수동 지표 업데이트 탭이 노출 관리 탭과 순서가 달랐다**
+  - 탭1 은 `orderedApproved`(homeOrder 정렬), 탭2 는 `exposedStores`(필터만, 정렬 없음)
+  - `orderByHome()` 로 공용화해 두 탭이 같은 순서를 쓰도록 수정.
+    이제 탭1 에서 순서를 바꾸면 탭2 에도 그대로 반영된다
+
+#### 진단 스크립트 보강
+`scripts/check-metrics.mjs` 에 현황판 노출 조건 섹션 추가 —
+업소별 `exposure.dashboard` / `exposure.gangtalk` / 노출기간 / homeOrder 순번을 출력하고,
+현황판에 안 보이는 업소와 그 사유를 따로 모아 보여준다.
+`config/marketing.homeOrder` 가 비어 있으면 경고한다.
+
+- **검증**: `tsc --noEmit` 0 errors / `eslint .` 0 errors
+
+
 ### 2026-09-01: rooms_biz 0/0 데이터 복구 (과거 사고 잔재)
 
 #### 증상

@@ -126,12 +126,13 @@ export function subscribeHomeOrder(onData: (ids: string[]) => void) {
 export function applyHomeOrder(stores: Store[], order: string[]): Store[] {
   if (!order.length) return stores;
   const pos = new Map(order.map((id, i) => [String(id), i]));
-  return stores
-    .slice()
-    .sort(
-      (a, b) =>
-        (pos.get(String(a.id)) ?? Infinity) - (pos.get(String(b.id)) ?? Infinity),
-    );
+  return stores.slice().sort((a, b) => {
+    const ai = pos.get(String(a.id)) ?? Infinity;
+    const bi = pos.get(String(b.id)) ?? Infinity;
+    // Infinity - Infinity = NaN 이라 비교자가 망가진다. 미지정끼리는 기존 순서 유지
+    if (ai === bi) return 0;
+    return ai - bi;
+  });
 }
 
 

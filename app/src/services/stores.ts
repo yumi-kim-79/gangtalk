@@ -15,6 +15,7 @@ import {
 import { COLLECTIONS } from '@/constants/app';
 import {
   EXPOSURE_KEY,
+  EXPOSURE_KEY_DASHBOARD,
   ROOMS_BIZ_FETCH_LIMIT,
   STORE_FETCH_LIMIT,
   type RegionKey,
@@ -103,14 +104,32 @@ export function macroOf(s: Store): RegionKey {
 /* ───────────────────────── 노출 조건 ───────────────────────── */
 
 /**
- * exposure 플래그가 없으면 노출로 간주 (웹과 동일).
- * 홈(현황판)은 'dashboard', 업체찾기는 'gangtalk' 키를 본다 — 웹 PR #124~126 에서 분리됨.
+ * 노출 판정.
+ *
+ * ⚠️ 두 화면의 **기본값 정책이 다르다** (웹 PR #124~126, 2026-07-02):
+ *   - 가게찾기(`gangtalk`): 플래그가 없으면 **노출** — 기존 데이터 보존
+ *   - 현황판(`dashboard`) : 플래그가 없으면 **미노출** — 관리자가 명시 지정한 가게만
  */
 export function exposedHere(s: Store, key: string = EXPOSURE_KEY): boolean {
+  const defaultWhenUnset = key !== EXPOSURE_KEY_DASHBOARD;
   const exp = s.exposure;
-  if (!exp || typeof exp !== 'object') return true;
-  if (exp[key] === undefined) return true;
+  if (!exp || typeof exp !== 'object') return defaultWhenUnset;
+  if (exp[key] === undefined) return defaultWhenUnset;
   return !!exp[key];
+}
+
+/**
+ * 광고 노출 기간 (관리자 화면의 15/30/60/90일 버튼이 adStart/adEnd 를 쓴다).
+ * 둘 다 비어 있으면 무기한 노출. 웹 MainPage.isActiveAd 이식.
+ */
+export function isActiveAd(s: Store): boolean {
+  const start = Number(s.adStart ?? 0);
+  const end = Number(s.adEnd ?? 0);
+  if (!start && !end) return true;
+  const now = Date.now();
+  if (start && now < start) return false;
+  if (end && now >= end) return false;
+  return true;
 }
 
 export function isApproved(s: Store): boolean {
@@ -166,6 +185,8 @@ export interface StoreFilter {
   keyword: string;
   /** 노출 플래그 키. 미지정 시 'gangtalk'(업체찾기) */
   exposureKey?: string;
+  /** 광고 기간(adStart/adEnd) 필터 적용 여부. 현황판만 true (웹과 동일) */
+  checkAdPeriod?: boolean;
 }
 
 function sortValue(s: Store, key: SortKey): number {
@@ -178,6 +199,7 @@ export function filterStores(stores: Store[], f: StoreFilter): Store[] {
   const list = stores.filter(s => {
     if (!exposedHere(s, f.exposureKey)) return false;
     if (!isApproved(s)) return false;
+    if (f.checkAdPeriod && !isActiveAd(s)) return false;
     if (f.category !== 'all' && s.category !== f.category) return false;
     if (f.region !== 'all' && macroOf(s) !== f.region) return false;
     if (f.keyword && !matchesQuery(s, f.keyword)) return false;
