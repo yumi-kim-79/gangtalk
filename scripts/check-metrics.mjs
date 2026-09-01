@@ -160,10 +160,12 @@ const partners = new Map();
 partnersSnap.forEach(d => partners.set(d.id, d.data() || {}));
 
 const partnerApproved = (x = {}) => {
+  if (x.active === false) return false;
+  if (x.approved === true) return true;
+  if (x.approved === false) return false;
   const apply = String(x.applyStatus || '').trim().toLowerCase();
-  const hasExplicit = typeof x.approved === 'boolean' || typeof x.active === 'boolean' || !!apply;
-  if (!hasExplicit) return true;
-  return x.active !== false && (x.approved === true || ['approved', '승인', '승인완료'].includes(apply));
+  if (!apply) return true;
+  return ['approved', 'active', '승인', '승인완료'].includes(apply);
 };
 const adOk = (x = {}) => {
   if (!x.adStart && !x.adEnd) return true;

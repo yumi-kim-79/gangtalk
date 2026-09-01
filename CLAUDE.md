@@ -202,6 +202,46 @@ npm run build:all
 
 ## 작업 로그
 
+### 2026-09-01: 제휴관 승인 판정 ↔ 관리자 배지 불일치 (엘레강스 누락) (`feature/rn-app`)
+
+#### 증상
+`partnerOrder` 순서는 앱에 정상 반영되는데 **엘레강스만 앱/웹 제휴관에 안 나왔다**.
+관리자 제휴업체 관리에는 "활성 · 승인" 으로 표시되고 있었다.
+[수정] → [저장] 을 누르자 그때부터 보이기 시작했다.
+
+#### 원인 — 같은 문서를 관리자와 사용자 화면이 다르게 판정
+- 관리자 `PartnersManagePage` 배지:
+  비활성 = `active === false` / 미승인 = `approved === false`
+  → **필드가 없으면 "활성 · 승인" 으로 보인다**
+- 사용자 `isPartnerApproved` (기존):
+  `hasExplicit`(approved·active·applyStatus 중 하나라도 있음) 이면
+  `approved === true` 또는 `applyStatus` 승인계열이어야만 노출
+
+`toggleActive()` 는 **`active` 필드만** 쓴다. 그래서 `approved` 가 없던 업체를
+[비활성화] → [활성화] 하면 `active: true` 만 기록되고,
+`hasExplicit` 이 true 가 되면서 사용자 화면에서 **영구히 사라졌다**.
+관리자 화면에는 계속 "활성 · 승인" 이라 원인을 알 수 없는 상태.
+[수정]→[저장] 은 `onSave` 가 `approved: true` + `applyStatus: 'approved'` 를 쓰므로 복귀한다.
+
+#### 수정 — 관리자 배지와 완전히 동일한 기준으로 통일
+```
+if (active === false)  return false   // 비활성
+if (approved === true) return true    // 명시 승인
+if (approved === false) return false  // 명시 미승인
+if (!applyStatus)      return true    // 승인 정보 없음 → 승인 (배지와 동일)
+return applyStatus 가 승인 계열
+```
+- `web/src/pages/PartnersPage.vue` — 웹도 같은 버그였으므로 함께 수정
+- `app/src/services/partners.ts` — 동일 규칙 이식
+- `scripts/check-metrics.mjs` — 진단 판정도 동일하게 맞춤
+
+#### 확인된 정상 동작
+`partnerOrder` 는 앱에 그대로 반영되고 있었다 (엘레강스 제외 시 관리자 순서와 앱 목록 일치).
+
+- **검증**: `tsc --noEmit` 0 errors / `eslint .` 0 errors
+- **웹 배포 필요**: `npm run deploy:member` (제휴관), `npm run deploy:admin`
+
+
 ### 2026-09-01: 제휴관 · Top5 관리자 설정 앱 동기화 (`feature/rn-app`)
 
 관리자 웹이 쓰는 값과 앱이 읽는 값을 다시 대조해 어긋난 부분을 맞췄다.

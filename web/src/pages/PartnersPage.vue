@@ -687,25 +687,25 @@ function normRegion(raw=''){
   return 'non_gangnam'
 }
 
-/* ───────── 파트너 승인 여부: active + applyStatus/approved 기준 ───────── */
+/* ───────── 파트너 승인 여부: active + applyStatus/approved 기준 =====
+ * fix (2026-09-01): 관리자 목록의 배지와 판정이 어긋나던 문제.
+ *   PartnersManagePage 는 `active === false` 를 '비활성', `approved === false` 를 '미승인'
+ *   으로 표시한다. 즉 필드가 없으면 "활성 · 승인" 으로 보인다.
+ *   그런데 이전 판정은 `hasExplicit` 가 true 이면 approved 가 **명시적으로 true** 여야만
+ *   노출했다. 그래서 approved 필드가 없는 업체를 [비활성화] → [활성화] 하면
+ *   (active: true 만 기록됨) 관리자 화면에는 "활성 · 승인" 인데 사용자 화면에서는
+ *   영구히 사라졌다. (예: 엘레강스 — 수정/저장으로 approved:true 가 기록되고서야 복귀)
+ *   이제 관리자 배지와 완전히 같은 기준으로 판정한다:
+ *     숨김 = active === false  또는  approved === false  또는  applyStatus 가 미승인 계열
+ * ───────────────────────────────────────────────────────────────── */
 function isPartnerApproved(x = {}) {
-  const active = x.active !== false           // active가 false면 무조건 숨김
+  if (x.active === false) return false        // 비활성 → 숨김
+  if (x.approved === true) return true        // 명시 승인
+  if (x.approved === false) return false      // 명시 미승인
 
-  const approvedFlag = x.approved === true    // approved: true → 승인
   const apply = String(x.applyStatus || '').trim().toLowerCase()
-  const applyApproved =
-    ['approved', '승인', '승인완료'].includes(apply)
-
-  // 🔹 승인 관련 필드가 하나도 없는 예전 데이터는 "기본 승인"으로 간주
-  const hasExplicit = (
-    typeof x.approved === 'boolean' ||
-    typeof x.active === 'boolean' ||
-    !!apply
-  )
-  if (!hasExplicit) return true
-
-  // 🔹 active 이면서 (approved === true 또는 applyStatus가 승인 계열) 인 경우만 노출
-  return active && (approvedFlag || applyApproved)
+  if (!apply) return true                     // 승인 정보 없음 → 승인 (관리자 배지와 동일)
+  return ['approved', 'active', '승인', '승인완료'].includes(apply)
 }
 
 /* ───────── 노출 기간 필터 (adStart / adEnd, ms) =====

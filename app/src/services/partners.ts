@@ -29,19 +29,21 @@ const posInt = (v: unknown): number => Math.max(0, Number(v) || 0);
 
 /**
  * 승인 여부 (웹 isPartnerApproved 이식).
- * 승인 관련 필드가 하나도 없는 예전 데이터는 "기본 승인"으로 본다.
+ *
+ * 관리자 PartnersManagePage 의 배지와 **같은 기준**이어야 한다:
+ *   비활성 = active === false / 미승인 = approved === false.
+ * 필드가 없으면 관리자 화면에 "활성 · 승인" 으로 보이므로 여기서도 승인으로 본다.
+ * (이 규칙이 어긋나서, approved 필드가 없는 업체를 비활성화→활성화 하면
+ *  관리자에는 "활성 · 승인" 인데 사용자 화면에서만 사라지는 문제가 있었다)
  */
 export function isPartnerApproved(x: Raw): boolean {
-  const active = x.active !== false;
-  const approvedFlag = x.approved === true;
+  if (x.active === false) return false;
+  if (x.approved === true) return true;
+  if (x.approved === false) return false;
+
   const apply = str(x.applyStatus).trim().toLowerCase();
-  const applyApproved = ['approved', '승인', '승인완료'].includes(apply);
-
-  const hasExplicit =
-    typeof x.approved === 'boolean' || typeof x.active === 'boolean' || !!apply;
-  if (!hasExplicit) return true;
-
-  return active && (approvedFlag || applyApproved);
+  if (!apply) return true;
+  return ['approved', 'active', '승인', '승인완료'].includes(apply);
 }
 
 /** 광고 노출 기간 (웹 isActiveAdPartner 이식) */
