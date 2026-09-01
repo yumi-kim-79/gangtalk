@@ -22,18 +22,103 @@
       </p>
     </div>
 
-    <section class="adm-section">
+    <!-- 요약 -->
+    <section class="adm-summary">
+      <div class="adm-summary-item">
+        <b>{{ orderedStores.length }}</b><span>등록 업소</span>
+      </div>
+      <div class="adm-summary-item">
+        <b class="ok">{{ linkedStoreCount }}</b><span>계정 연결됨</span>
+      </div>
+      <div class="adm-summary-item">
+        <b class="warn">{{ orderedStores.length - linkedStoreCount }}</b><span>계정 없음</span>
+      </div>
+      <div class="adm-summary-item">
+        <b class="warn">{{ unlinkedAccounts.length }}</b><span>업소 미연결 계정</span>
+      </div>
+    </section>
+
+    <!-- 보기 전환 -->
+    <div class="adm-viewtabs">
+      <button
+        type="button" class="adm-viewtab" :class="{ active: view === 'store' }"
+        @click="view = 'store'"
+      >업소 기준 ({{ orderedStores.length }})</button>
+      <button
+        type="button" class="adm-viewtab" :class="{ active: view === 'account' }"
+        @click="view = 'account'"
+      >계정 기준 ({{ accounts.length }})</button>
+    </div>
+
+    <!-- ---------- 업소 기준 ---------- -->
+    <section v-if="view === 'store'" class="adm-section">
       <header class="adm-section-head">
-        <h3>업체 계정 ({{ accounts.length }}개)</h3>
+        <h3>업소별 계정 현황 ({{ orderedStores.length }}개)</h3>
         <div class="adm-section-actions">
-          <button class="adm-btn primary" type="button" @click="openCreate">
+          <button class="adm-btn primary" type="button" @click="openCreate()">
             + 새 업체 계정 생성
           </button>
         </div>
       </header>
+      <p class="adm-hint">
+        현황판 업소 관리와 <b>같은 순서</b>입니다. 계정이 없는 업소는 [계정 생성] 을 누르면
+        업소명이 채워진 채로 생성되고 <b>바로 연결</b>됩니다.
+      </p>
+
+      <ul class="adm-acc-list" v-if="orderedStores.length">
+        <li v-for="s in orderedStores" :key="s.id" class="adm-acc-row">
+          <div class="adm-acc-meta">
+            <strong class="adm-acc-name">
+              {{ s.name || '(이름 없음)' }}
+              <span v-if="s.hidden === true" class="adm-acc-tag off">숨김</span>
+            </strong>
+            <span class="adm-acc-email">{{ s.region || '-' }} · {{ s.category || '-' }}</span>
+            <span class="adm-acc-store">
+              <template v-if="s.ownerEmail">
+                계정: <strong>{{ s.ownerEmail }}</strong>
+                <span v-if="!accountByEmail[String(s.ownerEmail).toLowerCase()]" class="adm-acc-unlinked">
+                  (users 문서 없음 - 로그인 계정이 아닐 수 있습니다)
+                </span>
+              </template>
+              <template v-else>
+                <span class="adm-acc-unlinked">계정 없음</span>
+              </template>
+            </span>
+          </div>
+          <div class="adm-acc-actions">
+            <template v-if="s.ownerEmail">
+              <button
+                class="adm-btn small"
+                type="button"
+                :disabled="!accountByEmail[String(s.ownerEmail).toLowerCase()]"
+                @click="openResetForStore(s)"
+              >비번 재설정</button>
+              <button class="adm-btn small" type="button" @click="openLinkForStore(s)">계정 변경</button>
+            </template>
+            <template v-else>
+              <button class="adm-btn primary small" type="button" @click="openCreate(s)">계정 생성</button>
+              <button class="adm-btn small" type="button" @click="openLinkForStore(s)">기존 계정 연결</button>
+            </template>
+          </div>
+        </li>
+      </ul>
+      <p v-else class="adm-empty">등록된 업소가 없습니다.</p>
+    </section>
+
+    <!-- ---------- 계정 기준 ---------- -->
+    <section v-else class="adm-section">
+      <header class="adm-section-head">
+        <h3>업체 계정 ({{ accounts.length }}개)</h3>
+        <div class="adm-section-actions">
+          <button class="adm-btn primary" type="button" @click="openCreate()">
+            + 새 업체 계정 생성
+          </button>
+        </div>
+      </header>
+      <p class="adm-hint">업소가 연결되지 않은 계정을 위로 정렬했습니다.</p>
 
       <ul class="adm-acc-list" v-if="accounts.length">
-        <li v-for="a in accounts" :key="a.id" class="adm-acc-row">
+        <li v-for="a in sortedAccounts" :key="a.id" class="adm-acc-row">
           <div class="adm-acc-meta">
             <strong class="adm-acc-name">{{ a.company?.name || a.profile?.nickname || '(이름 없음)' }}</strong>
             <span class="adm-acc-email">{{ a.profile?.email || '-' }}</span>
@@ -57,7 +142,7 @@
               :disabled="!!deleting[a.id]"
               @click="deleteAccount(a)"
               title="이 업체 계정과 연결된 출근업소를 모두 삭제합니다"
-            >{{ deleting[a.id] ? '삭제 중…' : '계정 삭제' }}</button>
+            >{{ deleting[a.id] ? '삭제 중...' : '계정 삭제' }}</button>
           </div>
         </li>
       </ul>
@@ -72,7 +157,11 @@
           <button class="adm-modal-close" type="button" @click="modal = ''">✕</button>
         </header>
         <div class="adm-modal-body">
-          <div class="adm-create-notice">
+          <div v-if="form.storeId" class="adm-create-notice linked">
+            <strong>🔗 {{ form.storeLabel }} 에 바로 연결됩니다</strong>
+            <span>계정을 만들면서 이 업소의 소유자(ownerId / ownerEmail)로 설정합니다. 업체가 로그인하면 곧바로 현황판 업데이트를 쓸 수 있습니다.</span>
+          </div>
+          <div v-else class="adm-create-notice">
             <strong>💡 업소 연결은 불필요합니다</strong>
             <span>계정 생성 후 업체가 직접 로그인해 출근업소를 등록합니다. 등록 신청이 들어오면 <code>업소 관리 → 승인 대기</code> 탭에 표시됩니다.</span>
           </div>
@@ -131,21 +220,47 @@
           <button class="adm-modal-close" type="button" @click="modal = ''">✕</button>
         </header>
         <div class="adm-modal-body">
-          <p class="adm-modal-hint">{{ form.targetEmail }} 에 업소를 연결합니다.</p>
+          <!-- 방향 A: 계정 -> 업소 선택 -->
+          <template v-if="form.linkMode === 'byAccount'">
+            <p class="adm-modal-hint">{{ form.targetEmail }} 에 업소를 연결합니다.</p>
+            <label class="adm-field">
+              <span>연결할 업소 *</span>
+              <select v-model="form.storeId">
+                <option value="">선택...</option>
+                <option v-for="s in orderedStores" :key="s.id" :value="s.id">
+                  {{ s.name || '(이름 없음)' }} · {{ s.region || '-' }}
+                  <template v-if="s.ownerEmail"> (현재: {{ s.ownerEmail }})</template>
+                </option>
+              </select>
+            </label>
+          </template>
+
+          <!-- 방향 B: 업소 -> 계정 선택 -->
+          <template v-else>
+            <p class="adm-modal-hint">
+              <b>{{ form.storeLabel }}</b> 의 소유 계정을 지정합니다.
+            </p>
+            <p v-if="form.currentOwnerEmail" class="adm-modal-subhint">
+              현재 소유자: <b>{{ form.currentOwnerEmail }}</b> - 바꾸면 이전 계정은 이 업소를 수정할 수 없게 됩니다.
+            </p>
+            <label class="adm-field">
+              <span>연결할 계정 *</span>
+              <select v-model="form.targetUid">
+                <option value="">선택...</option>
+                <option v-for="a in sortedAccounts" :key="a.id" :value="a.id">
+                  {{ a.company?.name || a.profile?.nickname || '(이름 없음)' }} · {{ a.profile?.email }}
+                  <template v-if="storesByEmail[(a.profile?.email||'').toLowerCase()]?.length">
+                    (보유: {{ storesByEmail[(a.profile?.email||'').toLowerCase()].map(s => s.name).join(', ') }})
+                  </template>
+                </option>
+              </select>
+            </label>
+          </template>
+
           <p class="adm-modal-subhint">
-            ※ 일반적인 경우 업체가 직접 등록(자가등록) 하므로 본 기능은 불필요합니다.
-            기존 업소의 소유자(ownerEmail) 를 수정하거나 데이터 마이그레이션 시에만 사용하세요.
+            ※ 업체가 직접 등록(자가등록) 하는 경우에는 필요 없습니다.
+            기존 업소의 소유자를 지정/변경할 때만 사용하세요.
           </p>
-          <label class="adm-field">
-            <span>연결할 업소 *</span>
-            <select v-model="form.storeId">
-              <option value="">선택…</option>
-              <option v-for="s in stores" :key="s.id" :value="s.id">
-                {{ s.name || '(이름 없음)' }} · {{ s.region || '-' }}
-                <template v-if="s.ownerEmail"> (현재: {{ s.ownerEmail }})</template>
-              </option>
-            </select>
-          </label>
           <p v-if="form.error" class="adm-form-error">{{ form.error }}</p>
         </div>
         <footer class="adm-modal-foot">
@@ -163,7 +278,7 @@
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { db as fbDb } from '@/firebase'
 import {
-  collection, onSnapshot, query, where, limit,
+  collection, doc, onSnapshot, query, where, limit,
 } from 'firebase/firestore'
 import { getFunctions, httpsCallable } from 'firebase/functions'
 
@@ -180,9 +295,13 @@ function isAdminEmail(email) {
 
 const accounts = ref([])
 const stores = ref([])
+const homeOrder = ref([])
 const subscribeError = ref('')
+/** 'store' = 업소 기준(기본) / 'account' = 계정 기준 */
+const view = ref('store')
 let unsubAccounts = null
 let unsubStores = null
+let unsubMarketing = null
 
 onMounted(() => {
   unsubAccounts = onSnapshot(
@@ -210,10 +329,20 @@ onMounted(() => {
     query(collection(fbDb, 'stores'), limit(500)),
     (snap) => { stores.value = snap.docs.map(d => ({ id: d.id, ...d.data() })) },
   )
+  // 업소 목록 순서를 현황판 업소 관리와 맞추기 위해 homeOrder 도 읽는다
+  unsubMarketing = onSnapshot(
+    doc(fbDb, 'config', 'marketing'),
+    (snap) => {
+      const data = snap.exists() ? (snap.data() || {}) : {}
+      homeOrder.value = Array.isArray(data.homeOrder) ? data.homeOrder.map(String) : []
+    },
+    () => { homeOrder.value = [] },
+  )
 })
 onBeforeUnmount(() => {
   if (unsubAccounts) try { unsubAccounts() } catch {}
   if (unsubStores)   try { unsubStores() } catch {}
+  if (unsubMarketing) try { unsubMarketing() } catch {}
 })
 
 const storesByEmail = computed(() => {
@@ -227,6 +356,51 @@ const storesByEmail = computed(() => {
   return map
 })
 
+/* 이메일 -> users 문서. stores.ownerEmail 이 실제 로그인 계정인지 판별용 */
+const accountByEmail = computed(() => {
+  const map = {}
+  for (const a of accounts.value) {
+    const e = String(a.profile?.email || '').toLowerCase()
+    if (e) map[e] = a
+  }
+  return map
+})
+
+/* 업소 목록 - 현황판 업소 관리(StoresManagePage)와 동일하게 homeOrder 순서.
+ * 지정에 없는 업소는 이름순으로 뒤에 붙인다. */
+const orderedStores = computed(() => {
+  const pos = new Map(homeOrder.value.map((id, i) => [String(id), i]))
+  return stores.value.slice().sort((a, b) => {
+    const ai = pos.has(String(a.id)) ? pos.get(String(a.id)) : Infinity
+    const bi = pos.has(String(b.id)) ? pos.get(String(b.id)) : Infinity
+    if (ai !== bi) return ai === bi ? 0 : (ai < bi ? -1 : 1)
+    return String(a.name || '').localeCompare(String(b.name || ''), 'ko')
+  })
+})
+
+const linkedStoreCount = computed(() =>
+  stores.value.filter(s => String(s.ownerEmail || '').trim()).length,
+)
+
+/* 업소가 하나도 연결되지 않은 계정 */
+const unlinkedAccounts = computed(() =>
+  accounts.value.filter(a =>
+    !(storesByEmail.value[String(a.profile?.email || '').toLowerCase()] || []).length,
+  ),
+)
+
+/* 계정 기준 목록 - 미연결 계정을 위로 */
+const sortedAccounts = computed(() => {
+  const linkedOf = (a) =>
+    (storesByEmail.value[String(a.profile?.email || '').toLowerCase()] || []).length
+  return accounts.value.slice().sort((a, b) => {
+    const al = linkedOf(a) ? 1 : 0
+    const bl = linkedOf(b) ? 1 : 0
+    if (al !== bl) return al - bl
+    return String(a.company?.name || '').localeCompare(String(b.company?.name || ''), 'ko')
+  })
+})
+
 /* ===== 모달 상태 ===== */
 const modal = ref('') // '' | 'create' | 'reset' | 'link'
 const form = ref({
@@ -234,8 +408,12 @@ const form = ref({
   email: '',
   password: '',
   storeId: '',
+  storeLabel: '',
+  currentOwnerEmail: '',
   targetUid: '',
   targetEmail: '',
+  /** 'byAccount' = 계정에서 업소 고르기 / 'byStore' = 업소에서 계정 고르기 */
+  linkMode: 'byAccount',
   busy: false,
   error: '',
 })
@@ -243,13 +421,41 @@ const form = ref({
 function resetForm() {
   form.value = {
     storeName: '', email: '', password: '', storeId: '',
-    targetUid: '', targetEmail: '', busy: false, error: '',
+    storeLabel: '', currentOwnerEmail: '',
+    targetUid: '', targetEmail: '', linkMode: 'byAccount',
+    busy: false, error: '',
   }
 }
 
-function openCreate() {
+/** store 를 넘기면 업소명 프리필 + 생성 즉시 연결 */
+function openCreate(store) {
   resetForm()
+  if (store) {
+    form.value.storeId = store.id
+    form.value.storeLabel = store.name || store.id
+    form.value.storeName = store.name || ''
+  }
   modal.value = 'create'
+}
+
+/** 업소 행에서 비번 재설정 - ownerEmail 로 users 문서를 역추적 */
+function openResetForStore(store) {
+  const a = accountByEmail.value[String(store.ownerEmail || '').toLowerCase()]
+  if (!a) {
+    alert('이 업소의 소유 이메일에 해당하는 업체 계정(users 문서)이 없습니다.\n[계정 변경] 으로 기존 계정을 연결하거나 새로 생성해 주세요.')
+    return
+  }
+  openReset(a)
+}
+
+/** 업소 행에서 계정 연결/변경 */
+function openLinkForStore(store) {
+  resetForm()
+  form.value.linkMode = 'byStore'
+  form.value.storeId = store.id
+  form.value.storeLabel = store.name || store.id
+  form.value.currentOwnerEmail = store.ownerEmail || ''
+  modal.value = 'link'
 }
 function openReset(a) {
   resetForm()
@@ -259,6 +465,7 @@ function openReset(a) {
 }
 function openLink(a) {
   resetForm()
+  form.value.linkMode = 'byAccount'
   form.value.targetUid = a.id
   form.value.targetEmail = a.profile?.email || ''
   modal.value = 'link'
@@ -275,14 +482,20 @@ async function onCreate() {
   }
   form.value.busy = true
   try {
-    // storeId 전달 안 함 — 업체가 자가등록 (BizMyStorePage 신규 등록 모드).
-    // createBizAccount 의 storeId 는 선택적 파라미터라 함수 시그니처 변경 0.
-    const res = await fnCreateBiz({ email, password, storeName })
+    // storeId 가 있으면(업소 행에서 시작) createBizAccount 가 그 업소의
+    // ownerId / ownerEmail 까지 한 번에 설정한다. 없으면 업체가 자가등록.
+    const storeId = form.value.storeId || ''
+    const storeLabel = form.value.storeLabel
+    const res = await fnCreateBiz(
+      storeId ? { email, password, storeName, storeId } : { email, password, storeName },
+    )
     console.log('[createBizAccount] ok', res?.data)
     alert(
-      `업체 계정 생성 완료: ${email}\n\n` +
-      `이제 업체가 로그인해 직접 출근업소를 등록할 수 있습니다.\n` +
-      `등록 신청이 들어오면 '업소 관리 → 승인 대기' 탭에서 승인해 주세요.`
+      storeId
+        ? `업체 계정 생성 완료: ${email}\n\n'${storeLabel}' 에 연결되었습니다.\n업체가 로그인하면 바로 현황판 업데이트를 사용할 수 있습니다.`
+        : `업체 계정 생성 완료: ${email}\n\n` +
+          `이제 업체가 로그인해 직접 출근업소를 등록할 수 있습니다.\n` +
+          `등록 신청이 들어오면 '업소 관리 → 승인 대기' 탭에서 승인해 주세요.`,
     )
     modal.value = ''
     resetForm()
@@ -318,10 +531,25 @@ async function onReset() {
 async function onLink() {
   if (form.value.busy) return
   form.value.error = ''
+
   if (!form.value.storeId) {
     form.value.error = '연결할 업소를 선택해 주세요.'
     return
   }
+  // 업소 기준으로 열었으면 계정 선택값(uid)에서 이메일을 채운다
+  if (form.value.linkMode === 'byStore') {
+    if (!form.value.targetUid) {
+      form.value.error = '연결할 계정을 선택해 주세요.'
+      return
+    }
+    const a = accounts.value.find(x => x.id === form.value.targetUid)
+    form.value.targetEmail = a?.profile?.email || ''
+    if (!form.value.targetEmail) {
+      form.value.error = '선택한 계정에 이메일이 없습니다.'
+      return
+    }
+  }
+
   form.value.busy = true
   try {
     await fnLinkStore({
@@ -421,6 +649,36 @@ function fmtTime(v) {
 
 <style scoped>
 .adm-page{ max-width:1100px; margin:0 auto; }
+
+/* 요약 카드 */
+.adm-summary{
+  display:flex; gap:10px; flex-wrap:wrap; margin-bottom:14px;
+}
+.adm-summary-item{
+  flex:1; min-width:130px;
+  display:flex; flex-direction:column; align-items:center; gap:2px;
+  padding:12px 10px; border:1px solid #f0e2e9; border-radius:12px; background:#fff;
+}
+.adm-summary-item b{ font-size:22px; font-weight:900; color:#333; }
+.adm-summary-item b.ok{ color:#16a34a; }
+.adm-summary-item b.warn{ color:#ff2e7e; }
+.adm-summary-item span{ font-size:12px; color:#999; }
+
+/* 보기 전환 탭 */
+.adm-viewtabs{ display:flex; gap:6px; margin-bottom:10px; }
+.adm-viewtab{
+  padding:8px 16px; border:1px solid #eee; border-radius:999px;
+  background:#fff; font-size:13px; font-weight:700; color:#888; cursor:pointer;
+}
+.adm-viewtab.active{ border-color:#ff2e7e; background:#ff2e7e; color:#fff; }
+
+.adm-hint{ margin:0 0 12px; font-size:12px; color:#999; }
+.adm-acc-tag{
+  margin-left:6px; padding:1px 7px; border-radius:999px;
+  font-size:11px; font-weight:700; vertical-align:middle;
+}
+.adm-acc-tag.off{ background:#f1f2f4; color:#999; }
+.adm-create-notice.linked{ border-color:#ff9ec4; background:#fff2f7; }
 .adm-page-head{ margin-bottom:14px; }
 .adm-page-title{ margin:0; font-size:22px; font-weight:900; }
 .adm-page-sub{ margin:4px 0 0; font-size:13px; color:#888; }
