@@ -22,21 +22,28 @@ Hosting public 경로는 `web/dist`, `web/dist-admin` 으로 수정 완료.
 
 ## 1. 정리 + 웹 정상 동작 확인 (먼저 이것부터)
 
+> **주의 — zsh 에서 명령어 뒤에 `#` 주석을 붙이지 마세요.**
+> macOS 기본 zsh 는 대화형 셸에서 `interactive_comments` 가 꺼져 있어 `#` 뒤 문자열이
+> 주석이 아니라 **인자로 그대로 전달**됩니다. `npm run web:build  # → web/dist` 처럼 쓰면
+> `vite build # → web/dist` 가 실행되어 `#` 을 프로젝트 루트로 잡고 빌드가 실패합니다.
+
+
 ```bash
 cd ~/GangTalk
 rm -rf _to_delete pglite-debug.log
 
+nvm install 22
 nvm use 22
-npm --prefix web install          # node_modules 는 그대로 옮겨졌지만 한번 갱신
-npm run web:build                 # → web/dist
-npm run web:build:admin           # → web/dist-admin
+npm --prefix web install
+npm run web:build
+npm run web:build:admin
 ```
 
 빌드 2종이 성공하면 재편이 정상입니다. 배포까지 확인하려면:
 
 ```bash
-npm run deploy:hosting            # gangtox.com
-npm run deploy:admin              # gangtalk815.com
+npm run deploy:hosting
+npm run deploy:admin
 ```
 
 ---
@@ -76,7 +83,7 @@ gradle 플러그인 등록과 `FirebaseApp.configure()` 는 이미 코드에 넣
 
 ```bash
 cd ~/GangTalk/app
-npm run ios:setup                 # bundle install + pod install
+npm run ios:setup
 ```
 
 ---
@@ -85,13 +92,13 @@ npm run ios:setup                 # bundle install + pod install
 
 ```bash
 cd ~/GangTalk
-npm run app:typecheck             # TS 오류 0 이어야 함
+npm run app:typecheck
 npm --prefix app run lint
 
 cd app
-npm start                         # Metro (터미널 1)
-npm run ios                       # 터미널 2
-npm run android                   # 터미널 3
+npm start
+npm run ios
+npm run android
 ```
 
 성공 기준: 하단 탭 5개(홈/업체/강톡/채팅/마이)가 보이는 빈 앱이 실행됨.
@@ -102,11 +109,11 @@ npm run android                   # 터미널 3
 
 ```bash
 cd ~/GangTalk
-npm run build:android                      # AAB + APK
-bash scripts/build-android.sh --apk        # 실기기 테스트용 APK만
-bash scripts/build-android.sh --apk --no-clean   # 반복 테스트
-npm run build:ios                          # pod install 까지, Archive 는 Xcode
-npm run build:all                          # 양쪽 동시
+npm run build:android
+bash scripts/build-android.sh --apk
+bash scripts/build-android.sh --apk --no-clean
+npm run build:ios
+npm run build:all
 ```
 
 Play Console 업로드용 서명 키는 `~/.gradle/gradle.properties` 에 등록:
