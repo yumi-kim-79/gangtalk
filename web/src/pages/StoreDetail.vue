@@ -603,7 +603,18 @@ function showSheet(type){ sheet.value = { open:true, type, title: '담당자' } 
 function closeSheet(){ sheet.value.open = false }
 
 /* 내비/전화 등 */
-function openBizChat(){ router.push({ path:'/chat', query:{ room:`store-${store.id}`, title:store.name } }) }
+/* fix (2026-09-01): 초톡 버튼이 /chat(강톡)으로 가고 있었다.
+ * 초톡 메시지는 rooms_biz/{stores 문서 id}/rooms/{id}_room_01/messages 에 있다.
+ * MainPage.openChotok / StoreFinder.openBizChat 과 같은 규칙으로 ChatBiz 로 보낸다. */
+function openBizChat(){
+  const storeId = String(store?.id || '').trim()
+  if (!storeId) return
+  router.push({
+    name: 'ChatBiz',
+    params: { storeId },
+    query: { name: store.name || '' },
+  }).catch(()=>{})
+}
 
 /* 전화 */
 const normalizeTel = (raw) => String(raw).replace(/[^\d+]/g,'')

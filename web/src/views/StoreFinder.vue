@@ -1789,13 +1789,23 @@ function pushFirstAvailable(cands){
   alert('채팅 라우트가 아직 등록되지 않았습니다.')
   return false
 }
+/* fix (2026-09-01): 초톡이 강톡 페이지로 새던 문제 =====
+ * 이전 구현은 roomId 를 `store-<id>` 로 만들어
+ *   1) { name:'bizChat', params:{ roomId } }  ← bizChat 은 :storeId 를 받는다. roomId 는 무시됨
+ *   2) /chat/room/<rid>
+ *   3) /chat                                  ← 결국 여기로 떨어져 **강톡**이 열렸다
+ * 순서로 시도했다.
+ * 초톡 메시지는 rooms_biz/{stores 문서 id}/rooms/{id}_room_01/messages 에 있으므로
+ * MainPage.openChotok 과 동일하게 **stores 문서 id 그대로** ChatBiz 로 보낸다.
+ * (앱 ChotokScreen · 관리자 초톡 붙여넣기와 같은 키) */
 function openBizChat(s){
-  const rid = `store-${encodeURIComponent(s.id || s.name)}`
-  pushFirstAvailable([
-    { name:'bizChat', params:{ roomId: rid }, query:{ title:s.name } },
-    { path:`/chat/room/${rid}`, query:{ title:s.name } },
-    { path:'/chat', query:{ room: rid, title:s.name } },
-  ])
+  const storeId = String(s?.id || '').trim()
+  if (!storeId) return
+  router.push({
+    name: 'ChatBiz',
+    params: { storeId },
+    query: { name: s.name || '' },
+  }).catch(()=>{})
 }
 function openManagerChat(){
   const s = sheet.value.store

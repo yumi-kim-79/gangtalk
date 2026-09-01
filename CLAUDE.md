@@ -202,6 +202,43 @@ npm run build:all
 
 ## 작업 로그
 
+### 2026-09-01: 초톡 버튼이 강톡 페이지로 새던 문제 (`feature/rn-app`)
+
+#### 원인 — 화면마다 `openBizChat` 구현이 달랐다
+`MainPage.openChotok` 만 ChatBiz 로 제대로 보내고 있었고, 나머지는 **강톡(/chat)** 으로 갔다.
+
+- `views/StoreFinder.vue`
+  ```js
+  const rid = `store-${encodeURIComponent(s.id || s.name)}`
+  pushFirstAvailable([
+    { name:'bizChat', params:{ roomId: rid } },  // bizChat 은 :storeId 를 받는다 → roomId 무시
+    { path:`/chat/room/${rid}` },
+    { path:'/chat' },                            // ← 결국 여기로 떨어짐 = 강톡
+  ])
+  ```
+  roomId 를 `store-<id>` 로 만든 것도 잘못이다. 초톡 키는 **stores 문서 id** 다.
+- `pages/StoreDetail.vue`
+  ```js
+  router.push({ path:'/chat', query:{ room:`store-${store.id}` } })   // 곧장 강톡
+  ```
+
+#### 수정
+두 곳 모두 `MainPage.openChotok` 과 동일하게 **stores 문서 id 그대로** ChatBiz 로 보낸다.
+```js
+router.push({ name:'ChatBiz', params:{ storeId }, query:{ name } })
+```
+이 키가 관리자 초톡 붙여넣기 · 앱 `ChotokScreen` · `rooms_biz` 미러와 모두 같다.
+
+#### 미수정 (사용되지 않는 컴포넌트)
+`components/StatusCard.vue` · `StoreCard.vue` · `BizActionSheet.vue` 에도 같은
+`pushFirstAvailable([... '/gangtalk'])` 패턴이 남아 있으나,
+이들을 쓰는 `StatusGrid.vue` / `pages/Home.vue` 가 **어디서도 import 되지 않는 죽은 파일**이라
+라우터에 걸리지 않는다. 되살릴 때 같이 고칠 것.
+
+- **검증**: `@vue/compiler-sfc` 파싱 + 템플릿 컴파일 + script 문법
+- **배포 필요**: `npm run deploy:hosting`
+
+
 ### 2026-09-01: 웹 초톡방이 빈 방/강톡 대화를 보여주던 버그 (`feature/rn-app`)
 
 #### 증상
