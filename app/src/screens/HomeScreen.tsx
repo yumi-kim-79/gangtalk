@@ -11,7 +11,8 @@ import {
 } from 'react-native';
 import AppHeader from '@/components/common/AppHeader';
 import Icon from '@/components/common/Icon';
-import CategoryChips from '@/components/store/CategoryChips';
+import ChipTabs from '@/components/common/ChipTabs';
+import { STORE_CATEGORIES } from '@/constants/stores';
 import StoreGridCard from '@/components/store/StoreGridCard';
 import { useAuth } from '@/hooks/useAuth';
 import { useHomeStores } from '@/hooks/useHomeStores';
@@ -76,7 +77,12 @@ export default function HomeScreen() {
               <Icon name="chevronRight" size={16} color={c.muted} />
             </Pressable>
 
-            <CategoryChips value={category} onChange={setCategory} fadeColor={c.bg} />
+            <ChipTabs
+              items={STORE_CATEGORIES}
+              value={category}
+              onChange={setCategory}
+              fadeColor={c.bg}
+            />
 
             <View style={s.sectionHead}>
               <Text style={s.sectionTitle}>강남 인기 업소</Text>

@@ -4,7 +4,7 @@ import Icon, { type IconName } from '@/components/common/Icon';
 import type { MainTabParamList } from '@/navigation/types';
 import StoresStackNavigator from '@/navigation/StoresStackNavigator';
 import HomeScreen from '@/screens/HomeScreen';
-import CommunityScreen from '@/screens/CommunityScreen';
+import CommunityStackNavigator from '@/navigation/CommunityStackNavigator';
 import ChatListScreen from '@/screens/ChatListScreen';
 import ProfileScreen from '@/screens/ProfileScreen';
 import { fontSize, useTheme } from '@/theme';
@@ -49,7 +49,7 @@ export default function MainTabNavigator() {
       />
       <Tab.Screen
         name="Community"
-        component={CommunityScreen}
+        component={CommunityStackNavigator}
         options={{ title: '강톡', tabBarIcon: BoardIcon }}
       />
       <Tab.Screen

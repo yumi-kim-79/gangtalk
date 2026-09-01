@@ -12,9 +12,10 @@ import {
 import AppHeader from '@/components/common/AppHeader';
 import Icon from '@/components/common/Icon';
 import OptionSheet from '@/components/common/OptionSheet';
-import CategoryChips from '@/components/store/CategoryChips';
+import ChipTabs from '@/components/common/ChipTabs';
 import StoreListItem from '@/components/store/StoreListItem';
 import {
+  STORE_CATEGORIES,
   REGIONS,
   REGION_LABEL,
   SORT_OPTIONS,
@@ -63,7 +64,12 @@ export default function StoreListScreen() {
         onChangeSearch={setKeyword}
       />
 
-      <CategoryChips value={category} onChange={setCategory} fadeColor={c.bg} />
+      <ChipTabs
+        items={STORE_CATEGORIES}
+        value={category}
+        onChange={setCategory}
+        fadeColor={c.bg}
+      />
 
       <View style={s.filterBar}>
         <Pressable style={s.filterBtn} onPress={() => setRegionOpen(true)}>

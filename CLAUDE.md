@@ -84,7 +84,14 @@ npm run build:all
 - [ ] `npm run ios:setup` (pod install)
 - [ ] 시뮬레이터/에뮬레이터 실행 확인
 
-### 진행 중 — 홈 탭 이식
+### 진행 중 — 강톡(게시판) 탭 이식
+- [x] 게시판 목록 (카테고리 10종 / 공지 상단 고정 / 무한 스크롤 / 검색)
+- [x] 게시글 상세 (본문·이미지·투표 결과·댓글)
+- [ ] 글쓰기 / 댓글 작성 — 로그인 필요
+- [ ] 추천(좋아요) / 투표하기 — 로그인 필요
+- [ ] 힐링톡·우리가게게시판·이벤트톡 (웹에서도 비활성 상태)
+
+### 완료 — 홈 탭 이식
 - [x] 아이콘 시스템 (`react-native-svg` + `components/common/Icon.tsx`) — 웹 SVG path 그대로
 - [x] 홈 목록 (핫이슈 배너 / 카테고리 / 강남 인기 업소 카드 / 비로그인 CTA)
 - [ ] 핫이슈 텍스트 Firestore config 연동 (웹도 하드코딩 상태)
@@ -161,6 +168,28 @@ npm run build:all
 ---
 
 ## 작업 로그
+
+### 2026-09-01: 강톡(게시판) 탭 이식 (`feature/rn-app`)
+- **범위**: `GangTalkPage.vue` 4,025줄 중 `board_posts` 게시판 부분만. 같은 파일에 섞여 있는 채팅/힐링톡/업체목록은 각 탭 작업에서 분리 이식
+- **`services/board.ts`**:
+  - `normalizeCategory` — 세대별 표기 통합 (anon→daily, suggestion/sugg/var-suggest→suggest, poll→vote, 헬스/건강→health 등). 미분류는 daily
+  - `normalizePost` / `normalizeComment` — 웹과 동일 필드 매핑 (body↔content, cmtCount↔comments, createdAt↔createdAtMs↔updatedAt 폴백)
+  - `tsToMs` — Firestore Timestamp / number / ISO 문자열 → ms 통일
+  - `subscribePosts`(첫 20개 실시간) + `loadMorePosts`(커서 `startAfter`) — 웹의 이중 정렬 `orderBy(updatedAt desc, createdAt desc)` 그대로
+  - `subscribePost` / `subscribeComments`(`board_posts/{id}/comments`, createdAt asc)
+  - `incView` — 규칙상 views 단독 변경은 로그인 필요. 비로그인이면 조용히 실패시키고 화면은 그대로 진행
+  - `boardDate`(오늘이면 HH:MM, 아니면 MM.DD) / `fullDate` / `firstLine`
+- **`hooks/usePosts`** — 첫 페이지 구독 + 추가분(older) 별도 보관. 웹과 동일하게 첫 페이지 ID 와 중복되는 추가분은 버려 onSnapshot 갱신에 덮이지 않게 함. 공지/일반 분리 반환
+- **`hooks/usePost`** — 상세 + 댓글 동시 구독, 진입 시 조회수 +1
+- **화면**:
+  - `CommunityScreen` — AppHeader(검색) + 카테고리 탭 + 목록. 공지를 상단 고정하고 `onEndReached` 로 다음 20개 로드. 검색은 이미 받아온 글 대상 (Firestore 전문검색 미지원이라 웹도 동일 한계)
+  - `PostDetailScreen` — 카테고리/공지 뱃지 + 제목 + 작성자·일시 + 조회/추천/댓글 + 첨부 이미지 + 본문 + **투표 결과 막대**(vote 카테고리) + 댓글 목록
+- **`components/board/PostListItem`** — 웹은 번호/제목/작성자/날짜/추천/조회 6열 테이블. 모바일에서 표는 읽기 어려워 제목 줄 + 메타 줄 2단 구조로 바꿈(표시 항목은 동일). 공지는 핑크 배경 + 뱃지
+- **`ChipTabs` 공용화** — 업체 카테고리와 게시판 카테고리가 같은 UI 라 `components/common/ChipTabs.tsx` 로 통합. `components/store/CategoryChips.tsx` 제거
+- **네비게이션**: 강톡 탭을 `CommunityStackNavigator`(목록 → 상세) 로 교체
+- **미이식**: 글쓰기/댓글 작성/추천/투표하기(모두 로그인 필요), 힐링톡·우리가게게시판·이벤트톡(웹에서도 비활성), 뉴스게시판의 별도 소스(웹은 daily 탭에서 board_posts 대신 newsPosts 사용 — 앱은 우선 board_posts 로 통일)
+- **검증**: `tsc --noEmit` 0 errors / `eslint .` 0 errors. `board_posts` 와 하위 `comments` 모두 `allow read: if true` 라 비로그인 열람 가능
+
 
 ### 2026-09-01: 홈 2열 그리드 + 카테고리 한 줄 정리 (`feature/rn-app`)
 - **카테고리 칩을 한 줄로** — 줄바꿈(wrap) 방식이 3줄을 차지해 목록이 화면 밖으로 밀렸다. 다시 한 줄 가로 스크롤로 바꾸되, 앞서 "잘려 보인다"던 문제를 두 가지로 해결:
