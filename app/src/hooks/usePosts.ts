@@ -11,7 +11,11 @@ type Cursor = FirebaseFirestoreTypes.QueryDocumentSnapshot | null;
  * 첫 페이지는 실시간 구독, 이후는 커서 기반 추가 로드.
  * 웹처럼 추가분(olderPosts)을 따로 보관해 onSnapshot 갱신에 덮이지 않게 한다.
  */
-export function usePosts(filter: BoardCategory | 'all') {
+export function usePosts(
+  filter: BoardCategory | 'all',
+  /** 커뮤니티 묶음이 지정되면 '전체' 도 이 카테고리들로만 제한한다 */
+  allowed?: readonly BoardCategory[],
+) {
   const [firstPage, setFirstPage] = useState<Post[]>([]);
   const [older, setOlder] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
@@ -59,20 +63,30 @@ export function usePosts(filter: BoardCategory | 'all') {
     return [...firstPage, ...older.filter(p => !firstIds.has(p.id))];
   }, [firstPage, older]);
 
+  /** 묶음 + 카테고리 칩을 함께 적용 */
+  const inScope = useCallback(
+    (p: Post) => {
+      if (filter !== 'all') return p.category === filter;
+      if (allowed && allowed.length) return allowed.includes(p.category);
+      return true;
+    },
+    [filter, allowed],
+  );
+
   const notices = useMemo(
     () =>
       all
-        .filter(p => p.isNotice && (filter === 'all' || p.category === filter))
+        .filter(p => p.isNotice && inScope(p))
         .sort((a, b) => b.updatedAt - a.updatedAt),
-    [all, filter],
+    [all, inScope],
   );
 
   const posts = useMemo(
     () =>
       all
-        .filter(p => !p.isNotice && (filter === 'all' || p.category === filter))
+        .filter(p => !p.isNotice && inScope(p))
         .sort((a, b) => b.updatedAt - a.updatedAt),
-    [all, filter],
+    [all, inScope],
   );
 
   return { posts, notices, loading, loadingMore, hasMore, loadMore, error };

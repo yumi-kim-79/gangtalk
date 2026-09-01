@@ -202,6 +202,44 @@ npm run build:all
 
 ## 작업 로그
 
+### 2026-09-01: 주제별 커뮤니티 4박스를 실제 이동으로 (`feature/rn-app`)
+
+#### 문제
+박스를 눌러도 강톡은 아무 반응이 없고 나머지 셋은 "서비스 준비중" 안내만 떴다.
+
+#### 알아낸 것 — 4개는 별도 게시판이 아니라 **카테고리 묶음**이다
+웹 `GangTalkPage` 의 `yaCats` / `healCats` 를 보면 전부 같은 `board_posts` 를
+카테고리로 나눠 쓰고 있었다. 그래서 앱에서도 새 컬렉션 없이 묶음만 정의하면 된다.
+
+| 커뮤니티 | 카테고리 |
+|---|---|
+| 강톡 | daily · suggest · pledge · vote · quiz · event |
+| 힐링톡 | quote · health · travel |
+| 우리 가게 게시판 | suggest |
+| 이벤트톡 | event · quiz |
+
+우리 가게 게시판은 전용 카테고리가 없다. 웹 `yaCats` 의 `suggest` 설명이
+"우리가게 업주에게 바란다" 라 그대로 묶었다 — 전용 카테고리가 생기면
+`constants/board.ts` 의 `BOARD_GROUPS` 한 곳만 고치면 된다.
+
+#### 수정
+- `constants/board.ts` — `BOARD_GROUPS` · `tabsForGroup()` 신설
+- `hooks/usePosts.ts` — `allowed?: BoardCategory[]` 인자 추가.
+  카테고리 칩이 '전체' 여도 **묶음 범위 안에서만** 보여준다
+- `components/community/CommunityBoards.tsx` — "서비스 준비중" 배지 제거,
+  4개 모두 누를 수 있고 **선택된 커뮤니티가 보라색으로 강조**된다
+- `screens/CommunityScreen.tsx` — `group` 상태 추가.
+  커뮤니티를 바꾸면 카테고리 칩이 그 묶음 것으로 갈리고 '전체'로 초기화 + 목록 맨 위로
+
+카테고리 칩도 묶음에 따라 달라진다 — 힐링톡을 고르면 전체·명언.동기부여·건강.다이어트·여행.맛집만.
+
+#### 웹은 아직 그대로
+웹은 힐링톡 전용 풀스크린 페이지(`healingPage`)가 **구현은 돼 있으나 `gc-disabled` 로 막혀 있고**,
+우리 가게 게시판·이벤트톡은 화면 자체가 없다. 웹까지 열려면 별도 작업이 필요하다.
+
+- **검증**: `tsc --noEmit` 0 errors / `eslint .` 0 errors
+
+
 ### 2026-09-01: 정리 스크립트를 3단계로 분리 (`scripts/clean-dev.sh`)
 
 처음 만든 버전은 **매 실행마다 DerivedData 를 지웠다.** 그러면 "빌드 전에 돌리는

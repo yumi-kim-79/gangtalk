@@ -6,7 +6,11 @@ import AppHeader from '@/components/common/AppHeader';
 import ChipTabs from '@/components/common/ChipTabs';
 import Icon from '@/components/common/Icon';
 import PostListItem from '@/components/board/PostListItem';
-import { BOARD_TABS } from '@/constants/board';
+import {
+  BOARD_GROUPS,
+  DEFAULT_BOARD_GROUP,
+  tabsForGroup,
+} from '@/constants/board';
 import { usePosts } from '@/hooks/usePosts';
 import CommunityBoards from '@/components/community/CommunityBoards';
 import { useBlocked } from '@/hooks/useBlocked';
@@ -21,15 +25,28 @@ export default function CommunityScreen() {
   const navigation =
     useNavigation<NativeStackNavigationProp<CommunityStackParamList, 'PostList'>>();
 
+  /** 주제별 커뮤니티(묶음) — 웹 4박스 */
+  const [group, setGroup] = useState<string>(DEFAULT_BOARD_GROUP);
   const [filter, setFilter] = useState<BoardCategory | 'all'>('all');
   const [keyword, setKeyword] = useState('');
-  const { posts, notices, loading, loadingMore, hasMore, loadMore, error } = usePosts(filter);
+
+  const currentGroup = useMemo(
+    () => BOARD_GROUPS.find(g => g.key === group) ?? BOARD_GROUPS[0],
+    [group],
+  );
+  const tabs = useMemo(() => tabsForGroup(currentGroup), [currentGroup]);
+
+  const { posts, notices, loading, loadingMore, hasMore, loadMore, error } = usePosts(
+    filter,
+    currentGroup.categories,
+  );
   const { requireAuth } = useRequireAuth();
   const { hidden } = useBlocked();
   const listRef = useRef<FlatList<Post>>(null);
 
-  /** 웹과 동일: '강톡' 박스를 누르면 전체 카테고리 목록으로 들어간다 */
-  const openBoard = useCallback(() => {
+  /** 커뮤니티를 바꾸면 카테고리 칩은 '전체'로 되돌리고 목록 맨 위로 */
+  const openBoard = useCallback((key: string) => {
+    setGroup(key);
     setFilter('all');
     listRef.current?.scrollToOffset({ offset: 0, animated: true });
   }, []);
@@ -85,10 +102,10 @@ export default function CommunityScreen() {
                 </Pressable>
               }
             />
-            <CommunityBoards onOpen={openBoard} />
+            <CommunityBoards value={group} onChange={openBoard} />
 
             <ChipTabs
-              items={BOARD_TABS}
+              items={tabs}
               value={filter}
               onChange={setFilter}
               fadeColor={c.bg}
@@ -102,7 +119,9 @@ export default function CommunityScreen() {
             <View style={s.empty}>
               <Text style={s.emptyTitle}>글이 없습니다</Text>
               <Text style={s.emptyDesc}>
-                {keyword ? '다른 검색어로 찾아보세요' : '다른 카테고리를 눌러보세요'}
+                {keyword
+                  ? '다른 검색어로 찾아보세요'
+                  : `${currentGroup.title}에 아직 글이 없습니다`}
               </Text>
             </View>
           )
