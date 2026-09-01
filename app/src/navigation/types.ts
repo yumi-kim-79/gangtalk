@@ -6,6 +6,12 @@ export type StoresStackParamList = {
   StoreDetail: { storeId: string };
 };
 
+/** 제휴관 탭 내부 스택 */
+export type PartnersStackParamList = {
+  PartnerList: undefined;
+  PartnerDetail: { partnerId: string };
+};
+
 /** 마이 탭 내부 스택 */
 export type ProfileStackParamList = {
   ProfileHome: undefined;
@@ -13,12 +19,6 @@ export type ProfileStackParamList = {
   Favorites: undefined;
   MyPosts: undefined;
   DeleteAccount: undefined;
-};
-
-/** 채팅 탭 내부 스택 */
-export type ChatStackParamList = {
-  ChatList: undefined;
-  ChatRoom: { roomId: string; title: string };
 };
 
 /** 로그인 모달 스택 */
@@ -32,14 +32,21 @@ export type CommunityStackParamList = {
   PostList: undefined;
   PostDetail: { postId: string };
   PostWrite: undefined;
+  ChatList: undefined;
+  ChatRoom: { roomId: string; title: string };
 };
 
 /** 하단 탭 */
 export type MainTabParamList = {
+  /** 현황판 (웹 /dashboard) */
   Home: undefined;
+  /** 가게찾기 (웹 /find) */
   Stores: NavigatorScreenParams<StoresStackParamList>;
+  /** 강톡 — 게시판 + 채팅 (웹 /gangtalk) */
   Community: NavigatorScreenParams<CommunityStackParamList>;
-  Chats: NavigatorScreenParams<ChatStackParamList>;
+  /** 제휴관 (웹 /partners) */
+  Partners: NavigatorScreenParams<PartnersStackParamList>;
+  /** 마이페이지 (웹 /mypage) */
   Profile: NavigatorScreenParams<ProfileStackParamList>;
 };
 

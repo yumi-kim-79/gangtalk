@@ -16,9 +16,9 @@ export type IconName =
   | 'star'
   | 'heart'
   | 'home'
-  | 'store'
-  | 'board'
+  | 'find'
   | 'chat'
+  | 'deal'
   | 'user';
 
 type Props = {
@@ -30,7 +30,19 @@ type Props = {
 };
 
 export default function Icon({ name, size = 22, color, filled = true }: Props) {
-  const stroke = { stroke: color, strokeWidth: 2, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const };
+  const stroke = {
+    stroke: color,
+    strokeWidth: 2,
+    strokeLinecap: 'round' as const,
+    strokeLinejoin: 'round' as const,
+  };
+  /** 하단 탭 아이콘은 웹과 동일하게 1.6 두께 */
+  const thin = {
+    stroke: color,
+    strokeWidth: 1.6,
+    strokeLinecap: 'round' as const,
+    strokeLinejoin: 'round' as const,
+  };
 
   switch (name) {
     // ── 웹 app-search-ic ──
@@ -105,38 +117,43 @@ export default function Icon({ name, size = 22, color, filled = true }: Props) {
         </Svg>
       );
     // ── 하단 탭 ──
+    // ── 하단 탭 — 웹 components/BottomNav.vue 의 path 그대로 ──
     case 'home':
       return (
         <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-          <Path d="M3 11l9-8 9 8" {...stroke} />
-          <Path d="M5 10v10h14V10" {...stroke} />
+          <Path
+            d="M4 11.5 12 4l8 7.5v7a1 1 0 0 1-1 1h-4.5v-5.5h-5V20.5H5a1 1 0 0 1-1-1z"
+            {...thin}
+          />
         </Svg>
       );
-    case 'store':
+    case 'find':
       return (
         <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-          <Path d="M4 8h16l-1 12H5z" {...stroke} />
-          <Path d="M9 8V6a3 3 0 0 1 6 0v2" {...stroke} />
-        </Svg>
-      );
-    case 'board':
-      return (
-        <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-          <Path d="M4 4h16v16H4z" {...stroke} />
-          <Path d="M8 9h8M8 13h8M8 17h5" {...stroke} />
+          <Circle cx={11} cy={11} r={6.5} stroke={color} strokeWidth={1.6} fill="none" />
+          <Path d="m20 20-3.8-3.8" {...thin} />
         </Svg>
       );
     case 'chat':
       return (
         <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-          <Path d="M20 12a8 8 0 0 1-8 8H6l-2 2v-10a8 8 0 0 1 16 0z" {...stroke} />
+          <Path
+            d="M5 5h14a2 2 0 0 1 2 2v7.5a2 2 0 0 1-2 2H11l-4.5 3v-3H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Z"
+            {...thin}
+          />
+        </Svg>
+      );
+    case 'deal':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+          <Path d="M3.5 12.5 9 7l6 10 5.5-5.5" {...thin} />
         </Svg>
       );
     case 'user':
       return (
         <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-          <Circle cx={12} cy={8} r={4} {...stroke} />
-          <Path d="M4 20c0-3.3 3.6-6 8-6s8 2.7 8 6" {...stroke} />
+          <Circle cx={12} cy={8} r={3.5} stroke={color} strokeWidth={1.6} fill="none" />
+          <Path d="M5 20c1.8-3.3 5-5 7-5s5.2 1.7 7 5" {...thin} />
         </Svg>
       );
   }

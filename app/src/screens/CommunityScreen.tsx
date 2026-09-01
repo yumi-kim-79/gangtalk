@@ -4,6 +4,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import AppHeader from '@/components/common/AppHeader';
 import ChipTabs from '@/components/common/ChipTabs';
+import Icon from '@/components/common/Icon';
 import PostListItem from '@/components/board/PostListItem';
 import { BOARD_TABS } from '@/constants/board';
 import { usePosts } from '@/hooks/usePosts';
@@ -64,6 +65,15 @@ export default function CommunityScreen() {
               searchValue={keyword}
               searchPlaceholder="제목, 내용, 작성자 검색"
               onChangeSearch={setKeyword}
+              right={
+                <Pressable
+                  onPress={() => navigation.navigate('ChatList')}
+                  hitSlop={8}
+                  style={s.chatBtn}
+                >
+                  <Icon name="chat" size={22} color={c.fg} />
+                </Pressable>
+              }
             />
             <ChipTabs
               items={BOARD_TABS}
@@ -104,6 +114,7 @@ export default function CommunityScreen() {
 const styles = (c: ThemeColors) =>
   StyleSheet.create({
     root: { flex: 1, backgroundColor: c.bg },
+    chatBtn: { padding: 4 },
     fab: {
       position: 'absolute',
       right: spacing.page,

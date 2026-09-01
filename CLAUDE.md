@@ -84,7 +84,15 @@ npm run build:all
 - [ ] `npm run ios:setup` (pod install)
 - [ ] 시뮬레이터/에뮬레이터 실행 확인
 
-### 진행 중 — 마이 탭
+### 진행 중 — 제휴관 탭 + 하단 탭 구성 교정
+- [x] 하단 탭 5종을 웹 BottomNav 와 일치 (현황판/가게찾기/강톡/제휴관/마이페이지)
+- [x] 제휴관 목록 (카테고리 9종 · 카테고리별 Top5 · 전체 목록 · 검색)
+- [x] 제휴업체 상세
+- [ ] 배너 슬라이더 (웹 상단 광고 배너)
+- [ ] 카테고리 아이콘 그리드 (웹은 원형 아이콘 10칸)
+- [ ] 제휴업체 찜 · 별점
+
+### 완료 — 마이 탭
 - [x] 프로필 카드 / 포인트 / 추천코드
 - [x] 찜한 업체 · 내가 쓴 글
 - [x] 프로필 수정 (닉네임)
@@ -193,6 +201,32 @@ npm run build:all
 ---
 
 ## 작업 로그
+
+### 2026-09-01: 하단 탭 구성 교정 + 제휴관 탭 이식 (`feature/rn-app`)
+
+#### 하단 탭을 웹과 일치시킴 (구성 오류 수정)
+- **문제**: 앱 탭을 홈/업체/강톡/**채팅**/마이 로 잡았는데, 웹 `components/BottomNav.vue` 의 실제 구성은
+  **현황판 / 가게찾기 / 강톡 / 제휴관 / 마이페이지** 였다. 4번째가 채팅이 아니라 **제휴관**
+- 라벨·순서·아이콘을 웹 BottomNav 와 동일하게 교체
+  - 아이콘도 웹의 SVG path 를 그대로 이식 (`home` `find` `chat` `deal` `my`), 두께도 웹과 같은 1.6
+  - 기존 `store`/`board` 아이콘은 제거하고 `find`/`deal` 로 교체
+- **채팅은 강톡 탭 안으로 이동** — 웹도 `GangTalkPage` 한 화면에서 게시판과 채팅을 함께 다룬다.
+  강톡 헤더 우측 채팅 아이콘 → 채팅방 목록. `ChatStackNavigator` 제거, `CommunityStackParamList` 에 편입
+
+#### 제휴관 탭 (신규)
+- `constants/partners.ts` — 웹 `lib/partnerCategories.js` 이식. 확정 9 카테고리(ps/skin/beauty/nail/real/fit/deal/shop/etc)
+  - `normalizePartnerCategory` — 레거시 매핑(salon→beauty, cafe/rental→etc, hair→beauty) + 한글 별칭 매칭
+  - **stores(가게찾기) 카테고리와 완전 분리** — 웹 주석의 경고 그대로 유지
+- `services/partners.ts`:
+  - `isPartnerApproved` — 승인 필드가 하나도 없는 예전 데이터는 "기본 승인"으로 간주 (웹과 동일)
+  - `isActiveAdPartner` — adStart/adEnd 기간 필터. 관리자가 만료 처리한 항목은 자동 제외
+  - `topByCategory` — ① 관리자가 `config/marketing.partnerTopRanks` 에 지정한 순서 우선(삭제·카테고리 변경된 항목은 건너뜀) ② 없으면 score 자동 정렬 폴백. 상위 5개
+  - `isPriceLike` — 혜택 문구가 가격/할인 형태면 강조색
+- `hooks/usePartners`, `components/partner/PartnerCard`(Top5 가로 카드 + 목록 행), `screens/PartnersScreen`, `screens/PartnerDetailScreen`
+- 화면 구성: 헤더(검색) → 카테고리 탭 → **카테고리별 Top5 가로 스크롤** → 전체 목록
+- **미이식**: 상단 배너 슬라이더, 원형 카테고리 아이콘 그리드(웹 10칸), 제휴업체 찜/별점, 지도(내 주변)
+- **검증**: `tsc --noEmit` 0 errors / `eslint .` 0 errors
+
 
 ### 2026-09-01: 마이 탭 이식 (`feature/rn-app`)
 - **`functions/index.js` 에 `deleteMyAccount` 추가** — 클라이언트는 자기 Auth 계정을 지울 수 없어 서버에서 처리

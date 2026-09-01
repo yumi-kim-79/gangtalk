@@ -14,7 +14,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useChatRoom } from '@/hooks/useChat';
 import { chatDay, chatTime } from '@/services/chat';
-import type { ChatStackParamList } from '@/navigation/types';
+import type { CommunityStackParamList } from '@/navigation/types';
 import { fontSize, radius, spacing, useTheme, type ThemeColors } from '@/theme';
 import type { ChatMessage } from '@/types/chat';
 
@@ -26,7 +26,7 @@ export default function ChatRoomScreen() {
   const c = useTheme();
   const s = styles(c);
   const insets = useSafeAreaInsets();
-  const route = useRoute<RouteProp<ChatStackParamList, 'ChatRoom'>>();
+  const route = useRoute<RouteProp<CommunityStackParamList, 'ChatRoom'>>();
   const listRef = useRef<FlatList<Row>>(null);
 
   const { messages, loading, sending, error, send, canSend } = useChatRoom(route.params.roomId);

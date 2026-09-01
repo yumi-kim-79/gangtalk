@@ -15,14 +15,14 @@ import { useAuth } from '@/hooks/useAuth';
 import { useChatRooms } from '@/hooks/useChat';
 import { useRequireAuth } from '@/hooks/useRequireAuth';
 import { boardDate } from '@/services/board';
-import type { ChatStackParamList } from '@/navigation/types';
+import type { CommunityStackParamList } from '@/navigation/types';
 import { fontSize, radius, spacing, useTheme, type ThemeColors } from '@/theme';
 import type { ChatRoom } from '@/types/chat';
 
 export default function ChatListScreen() {
   const c = useTheme();
   const s = styles(c);
-  const navigation = useNavigation<NativeStackNavigationProp<ChatStackParamList, 'ChatList'>>();
+  const navigation = useNavigation<NativeStackNavigationProp<CommunityStackParamList, 'ChatList'>>();
   const { isLoggedIn, initializing } = useAuth();
   const { requireAuth } = useRequireAuth();
   const { rooms, loading, error } = useChatRooms();

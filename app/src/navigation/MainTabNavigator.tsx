@@ -3,10 +3,10 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import Icon, { type IconName } from '@/components/common/Icon';
 import type { MainTabParamList } from '@/navigation/types';
 import StoresStackNavigator from '@/navigation/StoresStackNavigator';
-import HomeScreen from '@/screens/HomeScreen';
 import CommunityStackNavigator from '@/navigation/CommunityStackNavigator';
-import ChatStackNavigator from '@/navigation/ChatStackNavigator';
+import PartnersStackNavigator from '@/navigation/PartnersStackNavigator';
 import ProfileStackNavigator from '@/navigation/ProfileStackNavigator';
+import HomeScreen from '@/screens/HomeScreen';
 import { fontSize, useTheme } from '@/theme';
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
@@ -19,11 +19,12 @@ function tabIcon(name: IconName) {
 }
 
 const HomeIcon = tabIcon('home');
-const StoreIcon = tabIcon('store');
-const BoardIcon = tabIcon('board');
+const FindIcon = tabIcon('find');
 const ChatIcon = tabIcon('chat');
+const DealIcon = tabIcon('deal');
 const UserIcon = tabIcon('user');
 
+/** 라벨·아이콘·순서는 웹 components/BottomNav.vue 와 동일하게 맞춘다 */
 export default function MainTabNavigator() {
   const c = useTheme();
 
@@ -40,27 +41,27 @@ export default function MainTabNavigator() {
       <Tab.Screen
         name="Home"
         component={HomeScreen}
-        options={{ title: '홈', tabBarIcon: HomeIcon }}
+        options={{ title: '현황판', tabBarIcon: HomeIcon }}
       />
       <Tab.Screen
         name="Stores"
         component={StoresStackNavigator}
-        options={{ title: '업체', tabBarIcon: StoreIcon }}
+        options={{ title: '가게찾기', tabBarIcon: FindIcon }}
       />
       <Tab.Screen
         name="Community"
         component={CommunityStackNavigator}
-        options={{ title: '강톡', tabBarIcon: BoardIcon }}
+        options={{ title: '강톡', tabBarIcon: ChatIcon }}
       />
       <Tab.Screen
-        name="Chats"
-        component={ChatStackNavigator}
-        options={{ title: '채팅', tabBarIcon: ChatIcon }}
+        name="Partners"
+        component={PartnersStackNavigator}
+        options={{ title: '제휴관', tabBarIcon: DealIcon }}
       />
       <Tab.Screen
         name="Profile"
         component={ProfileStackNavigator}
-        options={{ title: '마이', tabBarIcon: UserIcon }}
+        options={{ title: '마이페이지', tabBarIcon: UserIcon }}
       />
     </Tab.Navigator>
   );
