@@ -292,12 +292,13 @@ export async function createComment(params: {
     updatedAt: now,
   });
   // 집계 실패가 댓글 작성 자체를 되돌리지는 않게 분리
+  // (firestore.rules 에 cmtCount 허용을 추가했으나, 룰 배포 전에는 실패할 수 있다)
   try {
     await updateDoc(doc(db, COLLECTIONS.boardPosts, params.postId), {
       cmtCount: increment(1),
       updatedAt: now,
     });
   } catch {
-    // 규칙상 cmtCount 단독 변경이 막혀 있으면 목록 숫자만 잠시 어긋난다
+    // 목록의 댓글 수만 잠시 어긋난다 — 댓글 자체는 이미 저장됨
   }
 }

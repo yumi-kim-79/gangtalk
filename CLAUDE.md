@@ -84,7 +84,12 @@ npm run build:all
 - [ ] `npm run ios:setup` (pod install)
 - [ ] 시뮬레이터/에뮬레이터 실행 확인
 
-### 진행 중 — 인증 + 로그인 후 기능
+### 진행 중 — 채팅 탭
+- [x] 채팅방 목록 (`rooms`) / 방 입장 / 메시지 송수신
+- [ ] 업체별 채팅 연결 — 방 개설이 관리자 전용이라 보류 (아래 규칙 이슈 참고)
+- [ ] 안 읽음 표시 · 푸시 알림
+
+### 완료 — 인증 + 로그인 후 기능
 - [x] 카카오 로그인 (Cloud Function `kakaoSignIn` + 커스텀 토큰)
 - [x] 애플 로그인 (iOS, App Store 4.8 대응)
 - [x] 이메일 로그인 / 회원가입 / SMS 인증 / 비밀번호 재설정
@@ -179,6 +184,39 @@ npm run build:all
 ---
 
 ## 작업 로그
+
+### 2026-09-01: 소셜 로그인 비활성화 + 댓글수 규칙 수정 + 채팅 탭 이식 (`feature/rn-app`)
+
+#### 소셜 로그인 — 구현 보존 / 노출만 차단
+- 사용자 방침: **카카오·애플 로그인은 개발만 해두고 반영하지 않는다.** 서비스는 기존대로 이메일 + 문자 인증만 사용
+- `constants/auth.ts` 에 `SOCIAL_LOGIN_ENABLED = false` 추가 — 웹의 `v-if="false"` 패턴과 동일하게 **코드는 전부 보존**
+  - `LoginScreen` 의 카카오/애플 버튼과 구분선을 스위치로 감쌈
+  - `App.tsx` 의 `initializeKakaoSDK` 도 스위치가 켜질 때만 실행
+  - 보존된 코드: `services/auth.ts` 의 `signInWithKakao`/`signInWithApple`, `functions/index.js` 의 `kakaoSignIn`
+- 활성화 절차는 `docs/앱-인증-설정가이드.md` 참고
+
+#### firestore.rules — cmtCount 허용 (버그 수정)
+- 문제: `board_posts` update 허용 목록이 `['views','likes','votesA','votesB','updatedAt']` 뿐이라 **남의 글에 댓글을 달면 목록의 댓글 수가 영영 0** 으로 남음. 웹도 동일한 상태였음
+- 조치: 허용 목록에 `cmtCount` 추가. views/likes 와 같은 신뢰 수준
+- ⚠️ **룰 배포 필요**: `npm run deploy:rules`
+
+#### 채팅 탭
+- **경로 선정 — 규칙 확인 결과** (`firestore.rules`):
+  | 컬렉션 | read | write | 사용 가능 |
+  |---|---|---|---|
+  | `rooms` / `chat_rooms` / `chats` | signedIn | create: signedIn | ✅ |
+  | `rooms_biz/{id}/{sub=**}` | true | **isAdmin 뿐** | ❌ 사용자가 메시지 못 보냄 |
+  | `rooms_open` | — | — | ❌ **규칙 자체가 없어 전면 거부** |
+  → 앱은 `rooms` 만 사용. **웹의 ChatOpen(오픈채팅)은 규칙상 현재 동작 불가 상태**로 보임 — 확인 필요
+- `services/chat.ts` — `subscribeRooms`(방 목록) / `subscribeMessages`(createdAt asc, limit 300 — 웹과 동일) / `sendMessage`
+  - `rooms` 문서의 `updatedAt` 이 없는 방이 섞여 있어 서버 정렬 대신 클라이언트 정렬
+  - `lastMessage` 갱신은 규칙상 관리자만 가능해 생략
+- `hooks/useChat` — `useChatRooms`(비로그인이면 구독 자체를 하지 않음) / `useChatRoom`
+- `screens/ChatListScreen` — 비로그인이면 로그인 유도 카드, 로그인 시 방 목록
+- `screens/ChatRoomScreen` — 말풍선(내 메시지 우측/핑크), 날짜 구분선, `KeyboardAvoidingView`, 새 메시지 시 자동 스크롤
+- **제약**: 방 개설이 `allow create, update: if isAdmin()` 이라 앱에서는 방을 만들 수 없다. 관리자가 웹에서 만든 방에 입장만 가능. 업체별 1:1 채팅을 앱에서 열려면 규칙 또는 Cloud Function 이 필요
+- **검증**: `tsc --noEmit` 0 errors / `eslint .` 0 errors
+
 
 ### 2026-09-01: 인증(카카오/애플/이메일) + 로그인 후 기능 (`feature/rn-app`)
 
@@ -4445,6 +4483,11 @@ GangTalk/
 - `dist/` 폴더는 빌드 결과물이므로 직접 수정 금지
 
 ## 활성/비활성 스위치 메모
+
+- **앱 소셜 로그인 비활성화 상태** — 카카오/애플 로그인 구현 완료, 노출만 차단
+  - 위치: `app/src/constants/auth.ts` 의 `SOCIAL_LOGIN_ENABLED = false`
+  - 활성화: 위 상수를 `true` 로 변경 + `docs/앱-인증-설정가이드.md` 3~4번(콘솔 설정) + Functions 배포
+  - 보존 코드: `app/src/services/auth.ts`(signInWithKakao/signInWithApple), `functions/index.js`(kakaoSignIn), `app/App.tsx`(initializeKakaoSDK)
 - **EventOverlay 비활성화 상태** — 이벤트 있을 때 활성화 필요
   - 위치: `src/pages/MainPage.vue` 의 `const EVENT_OVERLAY_ENABLED = false`
   - 활성화 방법: 위 상수를 `true` 로 변경

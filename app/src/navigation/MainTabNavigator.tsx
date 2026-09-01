@@ -5,7 +5,7 @@ import type { MainTabParamList } from '@/navigation/types';
 import StoresStackNavigator from '@/navigation/StoresStackNavigator';
 import HomeScreen from '@/screens/HomeScreen';
 import CommunityStackNavigator from '@/navigation/CommunityStackNavigator';
-import ChatListScreen from '@/screens/ChatListScreen';
+import ChatStackNavigator from '@/navigation/ChatStackNavigator';
 import ProfileScreen from '@/screens/ProfileScreen';
 import { fontSize, useTheme } from '@/theme';
 
@@ -54,7 +54,7 @@ export default function MainTabNavigator() {
       />
       <Tab.Screen
         name="Chats"
-        component={ChatListScreen}
+        component={ChatStackNavigator}
         options={{ title: '채팅', tabBarIcon: ChatIcon }}
       />
       <Tab.Screen

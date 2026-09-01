@@ -292,7 +292,9 @@ service cloud.firestore {
       allow update: if signedIn() && (
         isAdmin() ||
         isOwner(resource.data.authorUid) ||
-        changesAreOnly(['views', 'likes', 'votesA', 'votesB', 'updatedAt'])
+        // cmtCount 추가 (2026-09-01): 댓글은 남의 글에도 달 수 있는데 허용 목록에
+        //   cmtCount 가 없어 목록의 댓글 수가 영영 0 으로 남는 문제. views/likes 와 동일 신뢰 수준.
+        changesAreOnly(['views', 'likes', 'votesA', 'votesB', 'cmtCount', 'updatedAt'])
       );
 
       allow delete: if signedIn() && (isAdmin() || isOwner(resource.data.authorUid));

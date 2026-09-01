@@ -5,6 +5,7 @@ import { Alert, Platform, ScrollView, StyleSheet, Text, View } from 'react-nativ
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Button from '@/components/common/Button';
 import FormField from '@/components/common/FormField';
+import { SOCIAL_LOGIN_ENABLED } from '@/constants/auth';
 import {
   authErrorMessage,
   resetPassword,
@@ -62,30 +63,35 @@ export default function LoginScreen() {
       <Text style={s.title}>강톡</Text>
       <Text style={s.subtitle}>로그인하고 찜·댓글·글쓰기를 이용하세요</Text>
 
-      <View style={s.social}>
-        <Button
-          label="카카오로 시작하기"
-          variant="kakao"
-          loading={busy === 'kakao'}
-          disabled={busy !== null && busy !== 'kakao'}
-          onPress={() => run('kakao', signInWithKakao)}
-        />
-        {Platform.OS === 'ios' ? (
-          <Button
-            label="Apple로 계속하기"
-            variant="apple"
-            loading={busy === 'apple'}
-            disabled={busy !== null && busy !== 'apple'}
-            onPress={() => run('apple', signInWithApple)}
-          />
-        ) : null}
-      </View>
+      {/* 소셜 로그인 — 구현 보존, 노출만 차단 (constants/auth.ts SOCIAL_LOGIN_ENABLED) */}
+      {SOCIAL_LOGIN_ENABLED ? (
+        <>
+          <View style={s.social}>
+            <Button
+              label="카카오로 시작하기"
+              variant="kakao"
+              loading={busy === 'kakao'}
+              disabled={busy !== null && busy !== 'kakao'}
+              onPress={() => run('kakao', signInWithKakao)}
+            />
+            {Platform.OS === 'ios' ? (
+              <Button
+                label="Apple로 계속하기"
+                variant="apple"
+                loading={busy === 'apple'}
+                disabled={busy !== null && busy !== 'apple'}
+                onPress={() => run('apple', signInWithApple)}
+              />
+            ) : null}
+          </View>
 
-      <View style={s.divider}>
-        <View style={s.line} />
-        <Text style={s.dividerText}>또는 이메일</Text>
-        <View style={s.line} />
-      </View>
+          <View style={s.divider}>
+            <View style={s.line} />
+            <Text style={s.dividerText}>또는 이메일</Text>
+            <View style={s.line} />
+          </View>
+        </>
+      ) : null}
 
       <FormField
         label="이메일"

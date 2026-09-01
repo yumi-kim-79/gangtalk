@@ -6,6 +6,12 @@ export type StoresStackParamList = {
   StoreDetail: { storeId: string };
 };
 
+/** 채팅 탭 내부 스택 */
+export type ChatStackParamList = {
+  ChatList: undefined;
+  ChatRoom: { roomId: string; title: string };
+};
+
 /** 로그인 모달 스택 */
 export type AuthStackParamList = {
   Login: undefined;
@@ -24,7 +30,7 @@ export type MainTabParamList = {
   Home: undefined;
   Stores: NavigatorScreenParams<StoresStackParamList>;
   Community: NavigatorScreenParams<CommunityStackParamList>;
-  Chats: undefined;
+  Chats: NavigatorScreenParams<ChatStackParamList>;
   Profile: undefined;
 };
 
@@ -33,7 +39,6 @@ export type RootStackParamList = {
   Splash: undefined;
   MainTabs: NavigatorScreenParams<MainTabParamList>;
   Auth: NavigatorScreenParams<AuthStackParamList>;
-  ChatRoom: { roomId: string; roomType: 'open' | 'biz' | 'direct' };
 };
 
 declare global {
