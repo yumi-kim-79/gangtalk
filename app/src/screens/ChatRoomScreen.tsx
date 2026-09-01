@@ -54,10 +54,16 @@ export default function ChatRoomScreen() {
   }, [messages, hidden]);
 
   const onSend = useCallback(async () => {
-    const text = draft;
+    const text = draft.trim();
+    if (!text) return;
     setDraft('');
-    await send(text);
-    listRef.current?.scrollToEnd({ animated: true });
+    try {
+      await send(text);
+      listRef.current?.scrollToEnd({ animated: true });
+    } catch {
+      // 전송이 실패하면 입력을 돌려준다 — 그냥 비우면 쓴 글이 사라진다
+      setDraft(prev => (prev ? prev : text));
+    }
   }, [draft, send]);
 
   return (

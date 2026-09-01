@@ -9,6 +9,7 @@ import { NICKNAME_MAX, NICKNAME_MIN, PASSWORD_MIN } from '@/constants/auth';
 import {
   authErrorMessage,
   sendSmsCode,
+  isNicknameTaken,
   signUpWithEmail,
   verifySmsCode,
 } from '@/services/auth';
@@ -89,6 +90,11 @@ export default function SignupScreen() {
 
     setSubmitting(true);
     try {
+      if (await isNicknameTaken(nick)) {
+        setError('이미 사용 중인 닉네임입니다.');
+        setSubmitting(false);
+        return;
+      }
       await signUpWithEmail({
         email,
         password,

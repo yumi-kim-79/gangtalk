@@ -58,8 +58,12 @@ export const SORT_OPTIONS: { key: SortKey; label: string }[] = [
 export const EXPOSURE_KEY = 'gangtalk';
 export const EXPOSURE_KEY_DASHBOARD = 'dashboard';
 
-/** 목록 초기 로드 상한 (웹과 동일) */
-export const STORE_FETCH_LIMIT = 100;
+/**
+ * 목록 초기 로드 상한.
+ * 웹(MainPage.vue:1210 / StoreFinder)은 limit 없이 전부 읽는다.
+ * 100 이던 시절에는 업체가 100곳을 넘으면 앱 현황판에서만 오래된 업소가 사라졌다.
+ */
+export const STORE_FETCH_LIMIT = 300;
 
 /**
  * rooms_biz 로드 상한.

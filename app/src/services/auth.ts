@@ -181,6 +181,28 @@ export async function signInWithEmail(email: string, password: string) {
   return signInWithEmailAndPassword(auth, email.trim(), password);
 }
 
+/**
+ * 닉네임 중복 확인.
+ * 웹은 가입 전에 이 함수를 부르는데 앱은 부르지 않아 같은 닉네임이 여러 개 생겼다.
+ * (functions/index.js:388 checkNicknameDuplicate)
+ * 함수 호출이 실패하면 가입 자체를 막지는 않는다 — 중복은 운영에서 정리 가능하지만
+ * 네트워크 문제로 가입이 막히는 쪽이 더 나쁘다.
+ */
+export async function isNicknameTaken(nick: string): Promise<boolean> {
+  const value = nick.trim();
+  if (!value) return false;
+  try {
+    const call = httpsCallable<{ nick: string }, { exists: boolean }>(
+      fns(),
+      'checkNicknameDuplicate',
+    );
+    const res = await call({ nick: value });
+    return res.data?.exists === true;
+  } catch {
+    return false;
+  }
+}
+
 export async function signUpWithEmail(params: {
   email: string;
   password: string;
