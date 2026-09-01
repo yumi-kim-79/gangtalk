@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "804477097788",
+    "project_id": "gangtalk-b8eb8",
+    "storage_bucket": "gangtalk-b8eb8.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:804477097788:android:537438569269900d0ab039",
+        "android_client_info": {
+          "package_name": "com.appmonster.gangtalk"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "804477097788-bvavbk027p6shpg80ioukifoap4dmd6o.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBt0wmJ-79tzGmtvzKUGMMXMON_pSbSCQ4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "804477097788-bvavbk027p6shpg80ioukifoap4dmd6o.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
