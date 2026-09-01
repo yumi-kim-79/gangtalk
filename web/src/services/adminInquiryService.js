@@ -3,13 +3,18 @@ import {
   collection,
   doc,
   serverTimestamp,
-  writeBatch,
   setDoc,
 } from 'firebase/firestore'
 import { auth, db } from '@/firebase'
 
-/** env 플래그: 원격 쓰기 켜기(=1일 때만) */
-const REMOTE_ENABLED = String(import.meta?.env?.VITE_CONSULT_WRITE || '0') === '1'
+/* 2026-09-01 수정:
+ *   이전에는 VITE_CONSULT_WRITE=1 일 때만 원격에 썼는데 그 값이 어느 .env 에도
+ *   없어서, 상담 신청이 항상 localStorage 큐에만 쌓이고 운영자에게 전달되지
+ *   않았다. 게다가 쓰려던 대상(admin_chats / admin_alerts / users/{uid}/
+ *   consult_requests)은 firestore.rules 에 규칙 자체가 없어 켜도 거부됐다.
+ *   → 관리자 메시지함(InboxPage)이 실제로 읽는 adminInbox 로 직접 쓴다.
+ *     (firestore.rules:295 `allow create: if signedIn()`)
+ *   실패하면 종전처럼 로컬 큐로 폴백한다. */
 /** 세션 중 권한 오류가 난 뒤엔 더 이상 시도하지 않기 위한 키 */
 const SS_SKIP_KEY = 'consult:remote_skip_v1'
 /** 로컬 폴백 큐 키(선택) */
@@ -62,8 +67,8 @@ export class AdminInquiryService {
     const user = auth?.currentUser || null
     if (!user) return null
 
-    // 이미 스킵 플래그가 있거나 원격 비활성화면, 네트워크 호출 안 함
-    const skipByFlag = !REMOTE_ENABLED || sessionStorage.getItem(SS_SKIP_KEY) === '1'
+    // 권한 오류가 한 번 난 세션에서만 네트워크 호출을 건너뛴다
+    const skipByFlag = sessionStorage.getItem(SS_SKIP_KEY) === '1'
     const now = serverTimestamp()
 
     // 사용자 문서 경로(권한 없을 수 있으므로 나중에 조건부 사용)
@@ -97,73 +102,28 @@ export class AdminInquiryService {
     }
 
     // ────────────────────────────────────────────────────────────
-    // 원격 쓰기 시도(권한 OK인 환경에서만)
+    // 원격 쓰기 — 관리자 메시지함(adminInbox)
     // ────────────────────────────────────────────────────────────
     try {
-      // 1) 사용자 소유 하위 컬렉션에 저장
-      const userReqRef = doc(collection(db, userReqRefPath))
+      const ref = doc(collection(db, 'adminInbox'))
       await setDoc(
-        userReqRef,
+        ref,
         cleanDeep({
-          requestId: userReqRef.id,
-          ...payloadCommon,
+          kind: 'consult_request',
+          // InboxPage.vue:34 가 title 을, :41 이 from/type 을 읽는다
+          title: `${type} 상담 요청`,
+          type: String(type),
+          from: userInfo.email || userInfo.displayName || user.uid,
+          body: `${type} 상담을 요청했습니다.`,
+          status: 'open',
+          unread: true,
+          byUid: user.uid,
+          user: userInfo,
+          createdAt: now,
+          updatedAt: now,
         })
       )
-
-      // 2) (선택) 관리자 인박스 복제 — 실패해도 무시
-      try {
-        const threadsCol = collection(db, 'admin_chats')
-        const threadRef = doc(threadsCol)
-        const messagesCol = collection(threadRef, 'messages')
-        const messageRef = doc(messagesCol)
-        const alertsCol = collection(db, 'admin_alerts')
-        const alertRef = doc(alertsCol)
-
-        const batch = writeBatch(db)
-        batch.set(
-          threadRef,
-          cleanDeep({
-            threadId: threadRef.id,
-            type: String(type),
-            status: 'open',
-            participants: ['admin', user.uid],
-            createdBy: user.uid,
-            createdAt: now,
-            updatedAt: now,
-            lastMessagePreview: `${type} 요청이 접수되었습니다.`,
-            lastMessageAt: now,
-            user: userInfo,
-            userRequestRef: userReqRef.path,
-          })
-        )
-        batch.set(
-          messageRef,
-          cleanDeep({
-            messageId: messageRef.id,
-            senderUid: user.uid,
-            text: `[자동생성] ${type} 상담을 요청합니다.`,
-            type: 'text',
-            createdAt: now,
-          })
-        )
-        batch.set(
-          alertRef,
-          cleanDeep({
-            alertId: alertRef.id,
-            kind: 'consult_request',
-            type: String(type),
-            threadId: threadRef.id,
-            byUid: user.uid,
-            createdAt: now,
-            userRequestRef: userReqRef.path,
-          })
-        )
-        await batch.commit()
-      } catch {
-        // 관리자 인박스 실패는 조용히 무시
-      }
-
-      return null
+      return ref.id
     } catch (e) {
       // 권한 문제 감지 → 세션 동안 추가 시도 금지(에러 로그도 중단)
       const msg = String(e?.message || e || '')
@@ -180,7 +140,8 @@ export class AdminInquiryService {
         updatedAt: Date.now(),
         _err: 'permission',
       })
-      return null
+      // 호출부가 실패를 알 수 있게 다시 던진다 (LeftConsultRibbon 이 안내 문구를 띄운다)
+      throw e
     }
   }
 }

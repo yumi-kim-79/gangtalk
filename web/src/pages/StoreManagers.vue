@@ -252,10 +252,13 @@ function openTalk(mgr) {
   if (!id) return
   // 연결톡 규칙이 따로 있으면 여기서 링크 생성
   // 예시: /connect-talk?user=@talkId
+  // '/chat-open' 은 :storeId 가 필수인 경로라(router/index.js:209) 파라미터 없이
+  // path 로 넘기면 매칭되지 않아 catch-all 로 빠졌다. 이름+params 로 넘긴다.
   router.push({
-    path: '/chat-open',
-    query: { talkId: id, storeId: store.id },
-  })
+    name: 'ChatOpen',
+    params: { storeId: String(store.id || '') },
+    query: { talkId: id },
+  }).catch(()=>{})
 }
 
 /* 뒤로가기 */

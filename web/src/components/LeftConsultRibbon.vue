@@ -127,7 +127,9 @@ async function onTap(type: '무료법률상담' | '무료세무상담' | '무료
     // 1) 관리자 알림/스레드 생성
     await adminInquiryService.createInquiry(type)
   } catch (e) {
-    // 알림 실패하더라도 페이지 이동은 계속
+    // 알림 실패하더라도 페이지 이동은 계속한다.
+    // (조용히 삼키면 "신청했는데 연락이 안 온다" 를 추적할 수 없어 로그는 남긴다)
+    console.warn('[consult] 상담 신청 알림 실패:', e)
   } finally {
     // 2) 페이지 이동 (고객센터 레이아웃 복제)
     router.push({ name: 'ConsultHelp', params: { kind: kindFromType(type) } })

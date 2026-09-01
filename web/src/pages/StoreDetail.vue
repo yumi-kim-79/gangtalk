@@ -616,6 +616,16 @@ function openBizChat(){
   }).catch(()=>{})
 }
 
+/* 연결톡 — composables/useBizActions.js:79 와 같은 동작.
+ * 템플릿(:280)에서 쓰는데 이 파일에 정의가 없어 클릭 시 아무 일도 일어나지 않았다. */
+function openConnectTalk(){
+  const mgr = currentMgr.value || {}
+  router.push({
+    path: '/connect',
+    query: { to: `manager-${store.id}`, name: mgr.name || store.manager || '', store: store.name || '' },
+  }).catch(()=>{})
+}
+
 /* 전화 */
 const normalizeTel = (raw) => String(raw).replace(/[^\d+]/g,'')
 function dialPhone(){
@@ -686,7 +696,9 @@ function openKakaoChat(){
   }
   // 2) URL이 없으면 내부 오픈채팅 페이지로 라우팅
   if (store.id) {
-    router.push({ name: 'chat-open', params: { storeId: store.id } })
+    // 라우트 이름은 'ChatOpen' (router/index.js:210). 'chat-open' 은 path 이고
+    // 이름으로 넘기면 매칭되지 않아 catch-all 로 빠졌다.
+    router.push({ name: 'ChatOpen', params: { storeId: store.id } }).catch(()=>{})
   } else {
     alert('잘못된 접근입니다. (업체 ID 없음)')
   }

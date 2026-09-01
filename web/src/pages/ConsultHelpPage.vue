@@ -109,7 +109,7 @@ function goLegalBoard() {
  *  - 아래 SUPPORT_PHONE 값을 실제 담당자 번호로 바꾸면 됨
  *    예) '010-1234-5678'
  =================================================== */
-const SUPPORT_PHONE = '010-0000-0000'
+const SUPPORT_PHONE = '010-5919-0815'
 
 function callSupport() {
   const tel = SUPPORT_PHONE.replace(/[^0-9+]/g, '')
