@@ -226,9 +226,9 @@
           <div class="board-toolbar-info">
             총 <strong>{{ totalCount }}</strong>건 · {{ currentPage }} / {{ totalPages }} 페이지
           </div>
-          <button class="board-write-btn" type="button" @click="openCreate">
-            ✏️ 글쓰기
-          </button>
+          <!-- fix (2026-09-01): 글쓰기 버튼이 헤더(.v2-write-btn)와 여기 두 곳에 있었다.
+               같은 화면에 같은 동작 버튼이 두 개라 혼란스러워 아래쪽을 제거.
+               헤더 버튼 하나만 남긴다 (앱도 동일). -->
         </div>
 
         <div class="board-wrap">

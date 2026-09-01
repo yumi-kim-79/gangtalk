@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
@@ -8,6 +8,7 @@ import Icon from '@/components/common/Icon';
 import PostListItem from '@/components/board/PostListItem';
 import { BOARD_TABS } from '@/constants/board';
 import { usePosts } from '@/hooks/usePosts';
+import CommunityBoards from '@/components/community/CommunityBoards';
 import { useBlocked } from '@/hooks/useBlocked';
 import { useRequireAuth } from '@/hooks/useRequireAuth';
 import type { CommunityStackParamList } from '@/navigation/types';
@@ -25,6 +26,13 @@ export default function CommunityScreen() {
   const { posts, notices, loading, loadingMore, hasMore, loadMore, error } = usePosts(filter);
   const { requireAuth } = useRequireAuth();
   const { hidden } = useBlocked();
+  const listRef = useRef<FlatList<Post>>(null);
+
+  /** 웹과 동일: '강톡' 박스를 누르면 전체 카테고리 목록으로 들어간다 */
+  const openBoard = useCallback(() => {
+    setFilter('all');
+    listRef.current?.scrollToOffset({ offset: 0, animated: true });
+  }, []);
 
   const onWrite = useCallback(() => {
     if (requireAuth()) navigation.navigate('PostWrite');
@@ -49,6 +57,7 @@ export default function CommunityScreen() {
   return (
     <View style={s.root}>
       <FlatList
+        ref={listRef}
         data={visible}
         keyExtractor={item => item.id}
         renderItem={({ item }) => (
@@ -76,6 +85,8 @@ export default function CommunityScreen() {
                 </Pressable>
               }
             />
+            <CommunityBoards onOpen={openBoard} />
+
             <ChipTabs
               items={BOARD_TABS}
               value={filter}
