@@ -22,8 +22,13 @@
       </label>
     </section>
 
+    <!-- 로딩 (빈 화면 방지) -->
+    <section v-if="loading" class="adm-section empty-state">
+      <p class="adm-empty">가게 정보를 불러오는 중…</p>
+    </section>
+
     <!-- 가게 없음 -->
-    <section v-if="!loading && !myStores.length" class="adm-section empty-state">
+    <section v-else-if="!myStores.length" class="adm-section empty-state">
       <p class="adm-empty">
         아직 연결된 가게가 없습니다.<br />
         관리자에게 가게 연결을 요청해 주세요.
@@ -172,6 +177,7 @@
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { getAuth, onAuthStateChanged } from 'firebase/auth'
+import { authReady } from '@/composables/useAuthRole'
 import { db as fbDb } from '@/firebase'
 import {
   addDoc, collection, doc, onSnapshot, setDoc, updateDoc,
@@ -250,8 +256,10 @@ function startStoresWatch(uid, email) {
   if (!uid && !email) loading.value = false
 }
 
-onMounted(() => {
+/* fix (2026-09-01): BizDashboardPage 와 동일 — 최초 인증 확정 후 구독 시작 */
+onMounted(async () => {
   const auth = getAuth()
+  await authReady()
   unsubAuth = onAuthStateChanged(auth, (u) => {
     currentEmail.value = String(u?.email || '').toLowerCase()
     currentUid.value = u?.uid || ''

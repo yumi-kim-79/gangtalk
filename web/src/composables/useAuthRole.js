@@ -114,18 +114,26 @@ async function probeRole(user, { retries = 1, delayMs = 300 } = {}) {
 
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
-      // 1) admins/{uid} — Custom Claims 도입 전 일관성 유지
-      try {
-        const adminSnap = await getDoc(doc(fbDb, 'admins', user.uid))
+      /* perf (2026-09-01): admins → users 를 **직렬**로 읽고 있었다.
+       * 업체 계정은 admins 읽기가 거의 항상 permission-denied 라
+       * 그 왕복이 통째로 로그인 지연으로 잡혔다. 두 문서는 서로
+       * 의존하지 않으므로 병렬로 읽고 admins 우선으로 판정한다. */
+      const [adminRes, userRes] = await Promise.allSettled([
+        getDoc(doc(fbDb, 'admins', user.uid)),
+        getDoc(doc(fbDb, 'users', user.uid)),
+      ])
+
+      if (adminRes.status === 'fulfilled') {
         adminAttempted = true
-        if (adminSnap.exists()) return { role: 'platform', resolved: true }
-      } catch (e1) {
-        // admins 권한 거부 — 본인 doc 만 read 가능 룰 하 통과 가능하지만 실패 시 무시
-        console.warn('[useAuthRole] admins read failed:', e1?.code || e1?.message)
+        if (adminRes.value.exists()) return { role: 'platform', resolved: true }
+      } else {
+        // admins 권한 거부 — 업체 계정에서는 정상 상황
+        console.warn('[useAuthRole] admins read failed:',
+          adminRes.reason?.code || adminRes.reason?.message)
       }
 
-      // 2) users/{uid}
-      const userSnap = await getDoc(doc(fbDb, 'users', user.uid))
+      if (userRes.status === 'rejected') throw userRes.reason
+      const userSnap = userRes.value
       usersAttempted = true
       if (userSnap.exists()) {
         const d = userSnap.data() || {}

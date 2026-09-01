@@ -202,6 +202,43 @@ npm run build:all
 
 ## 작업 로그
 
+### 2026-09-01: 업체 관리자 첫 진입 빈 화면 + 로그인 지연 (`feature/rn-app`)
+
+#### 증상
+업체 계정으로 로그인하면 느리고, 대시보드에 들어가도 **머리말만 있고 아래가 텅 빈 채**
+새로고침해야 카드가 나타났다.
+
+#### 원인 1 — 로딩 상태를 아예 그리지 않았다
+```html
+<section v-if="!loading && !myStores.length"> 가게 없음 </section>
+<section v-else class="adm-store-grid">
+  <article v-for="s in myStores">…</article>
+</section>
+```
+`loading === true` 이면 첫 조건이 false 라 **v-else 가지가 렌더된다.**
+그런데 `myStores` 가 아직 비어 있어 `v-for` 가 0개 → **완전히 빈 화면**.
+로딩 표시가 어디에도 없어 사용자는 고장으로 인식한다.
+→ `v-if="loading"` 가지를 앞에 두어 "가게 정보를 불러오는 중…" 을 그린다.
+
+#### 원인 2 — 인증 확정 전에 구독을 시작했다
+`onAuthStateChanged` 는 세션 복원 전에 **null 로 한 번 발화**할 수 있다.
+그러면 `startStoresWatch('', '')` 가 돌면서 `loading = false` 로 화면을 확정해 버리고,
+뒤늦게 실계정이 와도 이미 그려진 상태가 어긋난 채 남았다. 새로고침하면
+IndexedDB 캐시가 따뜻해 첫 발화부터 실계정이라 정상으로 보였다.
+→ `authReady()` 로 **최초 인증 확정까지 기다린 뒤** 구독 시작
+(`BizDashboardPage` · `BizMetricsPage` 둘 다).
+
+#### 원인 3 — 로그인 시 Firestore 를 직렬로 두 번 읽었다
+`useAuthRole.probeRole` 이 `admins/{uid}` → `users/{uid}` 를 **순서대로** 읽었다.
+업체 계정은 `admins` 읽기가 거의 항상 permission-denied 라
+그 왕복이 통째로 로그인 지연으로 잡혔다.
+두 문서는 서로 의존하지 않으므로 `Promise.allSettled` 로 **병렬** 조회하고
+admins 우선으로 판정하도록 바꿨다. 판정 결과는 동일, 왕복만 절반.
+
+- **검증**: `@vue/compiler-sfc` 템플릿+스타일 컴파일, script 문법, `node --check`
+- **배포 필요**: `npm run deploy:admin`
+
+
 ### 2026-09-01: 업체 현황판 업데이트 화면 모바일 밀도 조정 (`feature/rn-app`)
 
 #### 문제

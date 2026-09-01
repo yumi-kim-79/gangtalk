@@ -10,8 +10,14 @@
       <p class="adm-page-sub">{{ currentEmail || '비로그인' }}</p>
     </header>
 
+    <!-- fix (2026-09-01): 로딩 중에도 v-else 가지가 렌더돼 '완전히 빈 화면'이 나왔다.
+         (섹션은 있는데 v-for 대상이 0개) 로딩 상태를 명시적으로 그린다. -->
+    <section v-if="loading" class="adm-section empty-state">
+      <p class="adm-empty">가게 정보를 불러오는 중…</p>
+    </section>
+
     <!-- 본인 가게 없음 -->
-    <section v-if="!loading && !myStores.length" class="adm-section empty-state">
+    <section v-else-if="!myStores.length" class="adm-section empty-state">
       <p class="adm-empty">
         아직 연결된 가게가 없습니다.<br />
         관리자에게 가게 연결을 요청해 주세요.
@@ -62,6 +68,7 @@
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { RouterLink } from 'vue-router'
 import { getAuth, onAuthStateChanged } from 'firebase/auth'
+import { authReady } from '@/composables/useAuthRole'
 import { db as fbDb } from '@/firebase'
 import {
   collection, doc, onSnapshot, query, where,
@@ -136,8 +143,13 @@ function startStoresWatch(uid, email) {
   if (!uid && !email) loading.value = false
 }
 
-onMounted(() => {
+/* fix (2026-09-01): 첫 진입이 빈 화면이었다가 새로고침해야 보이던 문제.
+ * onAuthStateChanged 는 세션 복원 전에 null 로 한 번 발화할 수 있고,
+ * 그 사이 startStoresWatch('', '') 가 loading 을 꺼서 화면이 확정돼 버렸다.
+ * authReady() 로 **최초 인증 확정까지 기다린 뒤** 구독을 시작한다. */
+onMounted(async () => {
   const auth = getAuth()
+  await authReady()
   unsubAuth = onAuthStateChanged(auth, (u) => {
     currentEmail.value = String(u?.email || '').toLowerCase()
     currentUid.value = u?.uid || ''
