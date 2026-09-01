@@ -1,34 +1,23 @@
 {
-  "name": "gangtalk-web",
+  "name": "gangtalk-monorepo",
+  "version": "0.0.1",
   "private": true,
-  "version": "0.0.0",
-  "type": "module",
-  "engines": {
-    "node": ">=18"
-  },
+  "description": "강톡 — app(React Native) / web(Vue, 회원+관리자) / functions(Firebase) 모노레포",
+  "engines": { "node": ">=22" },
   "scripts": {
-    "clean": "rimraf dist",
-    "clean:admin": "rimraf dist-admin",
-    "dev": "vite --host",
-    "build": "vite build",
-    "build:admin": "cross-env VITE_BUILD_TARGET=admin vite build --outDir dist-admin",
-    "preview": "vite preview --host --port 4173",
-    "start": "vite preview --host --port 4173",
-    "deploy:hosting": "npm run clean && npm run build && firebase deploy --only hosting:prod --debug",
-    "deploy:admin": "npm run clean:admin && npm run build:admin && firebase deploy --only hosting:admin --debug",
-    "deploy:functions": "cd functions && npm i && firebase deploy --only functions --debug",
-    "deploy:all": "npm run clean && npm run build && firebase deploy --only hosting,functions --debug"
-  },
-  "dependencies": {
-    "firebase": "^10.12.5",
-    "sortablejs": "^1.15.7",
-    "vue": "^3.5.18",
-    "vue-router": "^4.5.1"
-  },
-  "devDependencies": {
-    "@vitejs/plugin-vue": "^6.0.1",
-    "cross-env": "^7.0.3",
-    "rimraf": "^5.0.5",
-    "vite": "^7.1.3"
+    "web:dev": "npm --prefix web run dev",
+    "web:build": "npm --prefix web run clean && npm --prefix web run build",
+    "web:build:admin": "npm --prefix web run clean:admin && npm --prefix web run build:admin",
+    "deploy:hosting": "npm run web:build && firebase deploy --only hosting:prod",
+    "deploy:admin": "npm run web:build:admin && firebase deploy --only hosting:admin",
+    "deploy:functions": "npm --prefix functions install && firebase deploy --only functions",
+    "deploy:rules": "firebase deploy --only firestore:rules,storage",
+    "app:start": "npm --prefix app run start",
+    "app:ios": "npm --prefix app run ios",
+    "app:android": "npm --prefix app run android",
+    "app:typecheck": "npm --prefix app run typecheck",
+    "build:ios": "bash scripts/build-ios.sh",
+    "build:android": "bash scripts/build-android.sh",
+    "build:all": "bash scripts/build-all.sh"
   }
 }

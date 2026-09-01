@@ -3,35 +3,53 @@
 ## 프로젝트 개요
 - **앱 이름**: GangTalk (강톡)
 - **목적**: 강남 지역 기반 로컬 커뮤니티 + 업체 디렉토리 + 채팅 + 포인트/티어 시스템
-- **최종 목표**: 웹앱 → 구글플레이 + 애플 앱스토어 출시 (Capacitor 사용)
+- **최종 목표**: **React Native 앱**으로 구글플레이 + 애플 앱스토어 출시. 웹은 소개 페이지로 축소, 관리자는 웹 유지
+- **방향 확정 (2026-09-01)**: Capacitor 래핑 안 함. 라이드톡(`~/ridetalk`) 코드 작성 방식·구조를 참고해 RN 으로 새로 작성
 
 ## 기술 스택
-- **프론트엔드**: Vue 3 + Vite 7 (SPA/PWA, Node 20+ 필요)
-- **백엔드**: Firebase (Firestore, Auth, Functions, Hosting)
-- **앱 변환**: Capacitor (예정)
+- **앱 (주력)**: React Native 0.87 + TypeScript — `app/`
+- **웹**: Vue 3 + Vite 7 — `web/` (회원 소개용 + **관리자 gangtalk815.com**)
+- **백엔드**: Firebase (Firestore, Auth, Functions, Hosting, Storage) — 앱/웹 공용 `gangtalk-b8eb8`
 - **부가 도구**: GangTalkMacro (Python - 카카오톡 매크로)
+
+## 디렉토리 구조 (2026-09-01 재편)
+```
+GangTalk/
+├── app/         # React Native 앱 (주력)
+├── web/         # Vue 앱 — 회원 웹 + 관리자 웹 (빌드 타겟 2종)
+├── functions/   # Cloud Functions
+├── scripts/     # 앱 빌드 스크립트
+├── docs/        # 진단·인수인계 문서
+└── firebase.json / firestore.rules / storage.rules
+```
+- 루트 `package.json` 이 web/app/functions 명령을 위임한다. **배포는 항상 루트에서 실행** (firebase.json 이 루트에 있음)
 
 ## 빌드 & 배포
 
-### gangtox.com (회원, 기본 빌드)
+### 웹 (루트에서 실행)
 ```bash
-nvm use 20
-npm run build                   # → dist/index.html
-firebase deploy --only hosting:prod
-# 또는: npm run deploy:hosting
+nvm use 22
+npm run web:dev              # 개발 서버
+npm run deploy:hosting       # gangtox.com  (web/dist)
+npm run deploy:admin         # gangtalk815.com (web/dist-admin)
+npm run deploy:functions     # Cloud Functions
+npm run deploy:rules         # Firestore/Storage 룰
 ```
 
-### gangtalk815.com (관리자 전용 빌드)
+### 앱
 ```bash
-nvm use 20
-npm run build:admin             # VITE_BUILD_TARGET=admin → dist-admin/index.html
-firebase deploy --only hosting:admin
-# 또는: npm run deploy:admin (clean + build + deploy)
+npm run app:start            # Metro
+npm run app:ios / app:android
+npm run app:typecheck
+npm run build:android        # AAB + APK
+npm run build:ios            # pod install 까지, Archive 는 Xcode
+npm run build:all
 ```
 
-- `vite.config.js` 가 `VITE_BUILD_TARGET=admin` 일 때 `index-admin.html` 을 entry 로 사용하고
+- `web/vite.config.js` 가 `VITE_BUILD_TARGET=admin` 일 때 `index-admin.html` 을 entry 로 사용하고
   `closeBundle` 훅에서 `dist-admin/index-admin.html` → `index.html` 로 rename.
 - Firebase Hosting 멀티 사이트: `.firebaserc` 에 `prod=gangtalk-b8eb8`, `admin=gangtalk815` 두 타겟 정의.
+- Hosting public 경로는 `web/dist`, `web/dist-admin`.
 
 ## 공통 스타일 기준 (전사 통일)
 - **헤더 + 검색창은 `src/components/common/AppHeader.vue` 공통 컴포넌트 사용으로 단일화.**
@@ -153,16 +171,23 @@ firebase deploy --only hosting:admin
   - `tsconfig.json` — `@/*` → `src/*` 경로 별칭, `strict` + `noUnusedLocals/Parameters`
   - `babel.config.js` — `module-resolver` 로 동일 별칭
 - **신규 `scripts/`** (라이드톡 빌드 스크립트 방식 이식): `clean-build.sh` / `build-android.sh` (AAB+APK, `--aab` `--apk` `--no-clean`) / `build-ios.sh` (pod install 까지, Archive 는 Xcode) / `build-all.sh` (Android 백그라운드 + iOS pod 병렬)
-- **건드리지 않음 (중요)**:
-  - 기존 Vue 앱 전체 (`src/`, `index.html`, `vite.config.js`) — **디렉토리 이동 없음. 배포 경로 그대로 동작**
-  - `firebase.json` / `.firebaserc` / `firestore.rules` / `storage.rules` / `functions/`
-  - 관리자 빌드 (`index-admin.html`, `dist-admin`) — 웹으로 계속 유지, 앱에 포함하지 않음
+- **디렉토리 재편 (실서비스 전이라 함께 진행)**:
+  - 기존 Vue 앱 전체(`src`, `public`, `index.html`, `index-admin.html`, `vite.config.js`, `package.json`) → `web/` 로 이동. 회원/관리자 두 빌드 타겟은 한 프로젝트 안에 그대로 유지
+  - `firebase.json` hosting public: `dist` → `web/dist`, `dist-admin` → `web/dist-admin`
+  - 루트 `package.json` 신설 — web/app/functions 명령 위임. **배포는 항상 루트에서 실행**
+  - `web/package.json` 에서 배포 스크립트 제거(루트로 이관), 빌드/개발 스크립트만 유지
+  - `vite.config.js` 는 상대 경로만 사용하므로 **수정 불필요**
+- **건드리지 않음**:
+  - `.firebaserc` / `firestore.rules` / `storage.rules` / `functions/` / `firestore.indexes.json`
+  - Vue 소스 코드 자체 (경로만 이동)
+  - 관리자 빌드 — 웹으로 계속 유지, 앱에 포함하지 않음
 - **`.gitignore` 보강**: `.firebase/`, `.claude/`, `_to_delete/`
-- **다음 (Phase 0 잔여 — 사용자 Mac 에서 수행)**:
-  - `cd app && npm install`
-  - Firebase 콘솔에서 `gangtalk-b8eb8` 에 Android(`com.appmonster.gangtalk`) / iOS 앱 추가 → `google-services.json` → `app/android/app/`, `GoogleService-Info.plist` → `app/ios/GangTalk/`
-  - `npm run ios:setup` (bundle install + pod install)
-  - `npm run typecheck` 통과 확인
+- **Firebase 네이티브 설정 선반영**: `android/build.gradle` + `android/app/build.gradle` 에 google-services 플러그인, `AppDelegate.swift` 에 `FirebaseApp.configure()`
+- **다음 (Phase 0 잔여 — Mac 에서 수행)**: 명령어 전체는 `docs/앱-Phase0-인수인계.md` 참고
+  - 웹 빌드 2종 정상 확인 (`npm run web:build`, `npm run web:build:admin`)
+  - `npm --prefix app install`
+  - Firebase 콘솔에서 Android/iOS 앱 추가 → 설정 파일 배치
+  - `npm run ios:setup` → `npm run app:typecheck` 통과 확인
 
 
 ### 2026-07-02: 강톡 게시판 목록 카테고리 라벨 제거 (`fix/board-remove-category-labels`)

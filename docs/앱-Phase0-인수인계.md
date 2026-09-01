@@ -1,101 +1,137 @@
-# 앱 전환 Phase 0 — 인수인계 (Mac 에서 직접 해야 할 작업)
+# 앱 전환 Phase 0 — Mac 실행 명령서
 
 브랜치: `feature/rn-app`
-생성물: `app/` (React Native 스캐폴드), `scripts/` (빌드 스크립트), `.nvmrc`
 
-기존 Vue 앱과 배포 경로는 **하나도 건드리지 않았습니다.** `npm run build` / `firebase deploy` 는 그대로 동작합니다.
+## 바뀐 디렉토리 구조
+
+```
+GangTalk/
+├── app/         # React Native 앱 (신규, 주력)
+├── web/         # 기존 Vue — 회원 웹 + 관리자 웹 (빌드 타겟 2종)
+├── functions/   # Cloud Functions (그대로)
+├── scripts/     # 앱 빌드 스크립트 (신규)
+├── docs/
+├── package.json # 루트에서 web/app/functions 명령 위임 (신규)
+└── firebase.json / firestore.rules / storage.rules
+```
+
+Hosting public 경로는 `web/dist`, `web/dist-admin` 으로 수정 완료.
+**배포는 항상 루트에서** 실행합니다 (firebase.json 이 루트에 있음).
 
 ---
 
-## 0. 정리 (선택)
-
-작업 중 git 잠금 파일을 옮겨둔 `_to_delete/` 폴더가 남아 있습니다. 내용 확인 후 삭제하세요.
+## 1. 정리 + 웹 정상 동작 확인 (먼저 이것부터)
 
 ```bash
 cd ~/GangTalk
-ls _to_delete      # 전부 빈 .lock 파일
-rm -rf _to_delete
+rm -rf _to_delete pglite-debug.log
+
+nvm use 22
+npm --prefix web install          # node_modules 는 그대로 옮겨졌지만 한번 갱신
+npm run web:build                 # → web/dist
+npm run web:build:admin           # → web/dist-admin
+```
+
+빌드 2종이 성공하면 재편이 정상입니다. 배포까지 확인하려면:
+
+```bash
+npm run deploy:hosting            # gangtox.com
+npm run deploy:admin              # gangtalk815.com
 ```
 
 ---
 
-## 1. 의존성 설치
+## 2. 앱 의존성 설치
 
 ```bash
 cd ~/GangTalk/app
-nvm use 22
 npm install
 ```
 
-> 클라우드 쪽에서는 네트워크 프록시 제약으로 설치가 완료되지 않아 Mac 에서 직접 실행이 필요합니다.
+> 클라우드 쪽 리눅스 VM 은 프록시 제약으로 npm install 이 끝까지 가지 않아 Mac 에서 직접 실행이 필요합니다.
 
 ---
 
-## 2. Firebase 앱 등록 (`gangtalk-b8eb8`)
+## 3. Firebase 앱 등록 (`gangtalk-b8eb8`)
 
 Firebase 콘솔 → 프로젝트 설정 → 내 앱
 
-**Android 앱 추가**
-- 패키지 이름: `com.appmonster.gangtalk`
-- 다운로드한 `google-services.json` → `app/android/app/google-services.json`
+**Android 추가** — 패키지 이름 `com.appmonster.gangtalk`
+```bash
+# 다운로드한 파일을 아래 경로로
+mv ~/Downloads/google-services.json ~/GangTalk/app/android/app/google-services.json
+```
 
-**iOS 앱 추가**
-- 번들 ID: `com.appmonster.gangtalk`
-- 다운로드한 `GoogleService-Info.plist` → `app/ios/GangTalk/GoogleService-Info.plist`
-- Xcode 에서 프로젝트에 **파일 추가**(드래그) 까지 해야 번들에 포함됩니다
+**iOS 추가** — 번들 ID `com.appmonster.gangtalk`
+```bash
+mv ~/Downloads/GoogleService-Info.plist ~/GangTalk/app/ios/GangTalk/GoogleService-Info.plist
+```
+> iOS 는 파일을 옮긴 뒤 **Xcode 에서 프로젝트에 드래그해 추가**해야 번들에 포함됩니다.
 
-> gradle 플러그인 등록(`com.google.gms:google-services`)과 `FirebaseApp.configure()` 는 이미 코드에 넣어뒀습니다. 설정 파일만 배치하면 됩니다.
+gradle 플러그인 등록과 `FirebaseApp.configure()` 는 이미 코드에 넣어뒀습니다.
 
 ---
 
-## 3. iOS 네이티브 세팅
+## 4. iOS 네이티브 세팅
 
 ```bash
 cd ~/GangTalk/app
-npm run ios:setup     # bundle install + pod install
+npm run ios:setup                 # bundle install + pod install
 ```
 
 ---
 
-## 4. 검증
+## 5. 검증
 
 ```bash
-cd ~/GangTalk/app
-npm run typecheck     # TS 오류 0 이어야 함
-npm run lint
-npm start             # Metro
-npm run ios           # 시뮬레이터 (별도 터미널)
-npm run android
+cd ~/GangTalk
+npm run app:typecheck             # TS 오류 0 이어야 함
+npm --prefix app run lint
+
+cd app
+npm start                         # Metro (터미널 1)
+npm run ios                       # 터미널 2
+npm run android                   # 터미널 3
 ```
 
-성공하면 하단 탭 5개(홈/업체/강톡/채팅/마이)가 보이는 빈 앱이 뜹니다.
+성공 기준: 하단 탭 5개(홈/업체/강톡/채팅/마이)가 보이는 빈 앱이 실행됨.
 
 ---
 
-## 5. 앞으로 쓸 빌드 명령
+## 6. 앞으로 쓸 빌드 명령
 
 ```bash
-npm run build:android          # AAB + APK
-npm run build:android -- --apk # 실기기 테스트용 APK만
-npm run build:ios              # pod install 까지, Archive 는 Xcode
-npm run build:all              # 양쪽 동시
+cd ~/GangTalk
+npm run build:android                      # AAB + APK
+bash scripts/build-android.sh --apk        # 실기기 테스트용 APK만
+bash scripts/build-android.sh --apk --no-clean   # 반복 테스트
+npm run build:ios                          # pod install 까지, Archive 는 Xcode
+npm run build:all                          # 양쪽 동시
 ```
 
-Play Console 업로드용 서명 키는 `~/.gradle/gradle.properties` 에 `GANGTALK_UPLOAD_*` 로 등록해야 합니다 (라이드톡 `RIDETALK_UPLOAD_*` 와 동일 방식). 미등록 시 `build-android.sh` 가 경고합니다.
+Play Console 업로드용 서명 키는 `~/.gradle/gradle.properties` 에 등록:
+
+```properties
+GANGTALK_UPLOAD_STORE_FILE=gangtalk-upload.keystore
+GANGTALK_UPLOAD_KEY_ALIAS=gangtalk-upload
+GANGTALK_UPLOAD_STORE_PASSWORD=********
+GANGTALK_UPLOAD_KEY_PASSWORD=********
+```
+
+키스토어 신규 생성이 필요하면:
+
+```bash
+keytool -genkeypair -v -storetype PKCS12 \
+  -keystore ~/GangTalk/app/android/app/gangtalk-upload.keystore \
+  -alias gangtalk-upload -keyalg RSA -keysize 2048 -validity 10000
+```
+
+> 이 키스토어를 잃어버리면 같은 앱으로 업데이트를 못 올립니다. 안전한 곳에 백업하세요.
 
 ---
 
-## 6. 아직 결정하지 않은 것
+## 7. Phase 1 진입 전 결정할 것
 
-- **디렉토리 재편** — 계획서상 기존 Vue 를 `web/`, 관리자 빌드를 `admin/` 으로 옮기기로 했으나, `firebase.json` · `vite.config.js` · `.firebaserc` 경로가 함께 바뀌어 배포가 잠시 깨질 수 있어 **이번에는 보류**했습니다. 배포 여유가 있을 때 별도 작업으로 진행하는 것을 권장합니다
-- **소셜 로그인 도입 여부** — 현재 이메일 + SMS 만. 카카오 로그인을 넣을지 Phase 1 시작 전 결정 필요
-- **수익화** — 광고/인앱결제 도입 여부 미정 (미도입 시 Phase 5 작업량 감소)
-
----
-
-## 7. Phase 1 진입 조건
-
-- [ ] `npm run typecheck` 통과
-- [ ] iOS 시뮬레이터 / Android 에뮬레이터에서 앱 실행 확인
-- [ ] Firebase 연결 확인 (로그인 시도 시 Auth 응답)
-- [ ] Firestore 보안 백로그 처리 (`stores` 빈 `ownerId` 점유 룰 제거, `messages` participants 멤버십 검증)
+- **소셜 로그인** — 현재 이메일 + SMS 만. 카카오 로그인 추가 여부
+- **수익화** — 광고/인앱결제 도입 여부 (미도입 시 Phase 5 작업량 감소)
+- **Firestore 보안 백로그** — `stores` 빈 `ownerId` 점유 룰 제거, `messages` participants 멤버십 검증. 앱 배포 후엔 고치기 어려우므로 Phase 1 전 처리 권장

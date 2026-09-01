@@ -6,7 +6,7 @@
   "hosting": [
     {
       "target": "prod",
-      "public": "dist",
+      "public": "web/dist",
       "ignore": [
         "firebase.json",
         "**/.*",
@@ -59,7 +59,7 @@
     },
     {
       "target": "staging",
-      "public": "dist",
+      "public": "web/dist",
       "ignore": [
         "firebase.json",
         "**/.*",
@@ -112,7 +112,7 @@
     },
     {
       "target": "admin",
-      "public": "dist-admin",
+      "public": "web/dist-admin",
       "ignore": [
         "firebase.json",
         "**/.*",
