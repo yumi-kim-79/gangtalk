@@ -59,6 +59,9 @@ export type RootStackParamList = {
   Splash: undefined;
   MainTabs: NavigatorScreenParams<MainTabParamList>;
   Auth: NavigatorScreenParams<AuthStackParamList>;
+  /** 헤더 햄버거 메뉴 — 어느 탭에서든 열린다 */
+  Diary: undefined;
+  Support: undefined;
 };
 
 declare global {

@@ -16,7 +16,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from '@/components/common/Icon';
 import { useAuth } from '@/hooks/useAuth';
 import { signOut } from '@/services/auth';
-import type { MainTabParamList } from '@/navigation/types';
+import type { RootStackParamList } from '@/navigation/types';
 import { fontSize, radius, spacing, useTheme, type ThemeColors } from '@/theme';
 
 // 이미지는 상대 경로로 — babel module-resolver 의 extensions 에 png 가 없어
@@ -27,8 +27,6 @@ const LOGO = require('../../assets/logo.png');
 const BRAND_TITLE = '강남톡방';
 const BRAND_SUB = '강남의 모든 공간, 한눈에.';
 
-/** 일정/달력·고객센터 이식 전까지 메뉴에서 숨긴다 */
-const SHOW_TODO_MENU = false;
 
 type Props = {
   /** 검색을 쓰지 않는 화면은 false */
@@ -45,8 +43,6 @@ type MenuItem = {
   key: string;
   emoji: string;
   label: string;
-  /** 앱에 아직 없는 화면은 안내만 */
-  todo?: boolean;
 };
 
 /**
@@ -65,7 +61,9 @@ export default function AppHeader({
   const c = useTheme();
   const insets = useSafeAreaInsets();
   const s = styles(c);
-  const navigation = useNavigation<NavigationProp<MainTabParamList>>();
+  /* 헤더는 어느 탭·어느 스택 안에서든 쓰이므로 **루트 기준**으로 이동한다.
+   * (중첩 네비게이터에서 getParent() 를 타면 어느 단계가 잡히는지가 화면마다 달라진다) */
+  const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const { isLoggedIn } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -73,22 +71,18 @@ export default function AppHeader({
   const notifBadge = 0;
 
   const openNotif = useCallback(
-    () => navigation.navigate('Profile', { screen: 'ProfileHome' }),
+    () =>
+      navigation.navigate('MainTabs', {
+        screen: 'Profile',
+        params: { screen: 'ProfileHome' },
+      }),
     [navigation],
   );
 
-  /**
-   * 웹 메뉴와 같은 구성이되, **앱에 화면이 없는 항목은 노출하지 않는다.**
-   * "준비 중" 안내만 뜨는 메뉴는 심사에서 미완성 앱으로 보일 수 있다
-   * (Apple 심사지침 2.1 / 4.2). 이식이 끝나면 SHOW_TODO_MENU 를 true 로.
-   */
+  /** 웹 AppHeader 의 카드형 드롭다운과 **같은 4항목** */
   const menuItems: MenuItem[] = [
-    ...(SHOW_TODO_MENU
-      ? ([
-          { key: 'diary', emoji: '📅', label: '일정/달력', todo: true },
-          { key: 'support', emoji: '🎧', label: '고객센터', todo: true },
-        ] as MenuItem[])
-      : []),
+    { key: 'diary', emoji: '📅', label: '일정/달력' },
+    { key: 'support', emoji: '🎧', label: '고객센터' },
     { key: 'favorites', emoji: '❤️', label: '즐겨찾기' },
     isLoggedIn
       ? { key: 'logout', emoji: '🚪', label: '로그아웃' }
@@ -98,16 +92,23 @@ export default function AppHeader({
   const onMenuItem = useCallback(
     async (m: MenuItem) => {
       setMenuOpen(false);
-      if (m.todo) {
-        Alert.alert(m.label, '앱에서는 준비 중입니다. 웹에서 이용해 주세요.');
+      if (m.key === 'diary') {
+        navigation.navigate('Diary');
+        return;
+      }
+      if (m.key === 'support') {
+        navigation.navigate('Support');
         return;
       }
       if (m.key === 'favorites') {
-        navigation.navigate('Profile', { screen: 'Favorites' });
+        navigation.navigate('MainTabs', {
+          screen: 'Profile',
+          params: { screen: 'Favorites' },
+        });
         return;
       }
       if (m.key === 'login') {
-        navigation.getParent()?.navigate('Auth', { screen: 'Login' });
+        navigation.navigate('Auth', { screen: 'Login' });
         return;
       }
       if (m.key === 'logout') {
