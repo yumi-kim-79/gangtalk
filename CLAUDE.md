@@ -162,6 +162,18 @@ npm run build:all
 
 ## 작업 로그
 
+### 2026-09-01: 홈 2열 그리드 + 카테고리 한 줄 정리 (`feature/rn-app`)
+- **카테고리 칩을 한 줄로** — 줄바꿈(wrap) 방식이 3줄을 차지해 목록이 화면 밖으로 밀렸다. 다시 한 줄 가로 스크롤로 바꾸되, 앞서 "잘려 보인다"던 문제를 두 가지로 해결:
+  1. 칩 압축 — 뱃지(H/5/10/TP/1%) 제거하고 라벨만. 높이 34→32, 좌우 패딩 12→14 로 폭 축소
+  2. 오른쪽 끝 페이드(`react-native-svg` LinearGradient, 28px) — 잘린 게 아니라 이어진다는 신호. `fadeColor` prop 으로 화면 배경색과 맞춤
+- **홈을 2열 그리드로** — 1열 카드는 한 화면에 1.5개밖에 안 보였다. `FlatList numColumns={2}` + `StoreGridCard` 신설
+  - 지표 3열(맞출방/필요인원/혼잡도)이 2열 폭에서 뭉개져, **혼잡도는 이미지 위 컬러 뱃지**로 올리고 맞출방·인원은 한 줄 텍스트로 압축
+  - 이미지 16:9 → 4:3 (세로 공간 절약 대비 정보량 유지)
+  - `React.memo` 유지, `initialNumToRender` 4→6
+- **`StoreCard.tsx` 제거** — `StoreGridCard` 로 대체되어 미사용
+- **검증**: `tsc --noEmit` 0 errors / `eslint .` 0 errors
+
+
 ### 2026-09-01: 홈 탭 이식 + 아이콘 시스템 (`feature/rn-app`)
 - **아이콘 시스템 신설** — 실기기 확인 결과 이모지(🔍 ⭐️ 🎤 등)가 tofu(□?)로 깨져 표시됨. 웹은 애초에 이모지가 아니라 SVG 를 쓰고 있었음
   - `react-native-svg` 추가 + `src/components/common/Icon.tsx`

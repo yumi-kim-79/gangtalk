@@ -63,7 +63,7 @@ export default function StoreListScreen() {
         onChangeSearch={setKeyword}
       />
 
-      <CategoryChips value={category} onChange={setCategory} />
+      <CategoryChips value={category} onChange={setCategory} fadeColor={c.bg} />
 
       <View style={s.filterBar}>
         <Pressable style={s.filterBtn} onPress={() => setRegionOpen(true)}>

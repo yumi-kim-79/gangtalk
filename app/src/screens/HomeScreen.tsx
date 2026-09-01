@@ -12,7 +12,7 @@ import {
 import AppHeader from '@/components/common/AppHeader';
 import Icon from '@/components/common/Icon';
 import CategoryChips from '@/components/store/CategoryChips';
-import StoreCard from '@/components/store/StoreCard';
+import StoreGridCard from '@/components/store/StoreGridCard';
 import { useAuth } from '@/hooks/useAuth';
 import { useHomeStores } from '@/hooks/useHomeStores';
 import type { MainTabParamList } from '@/navigation/types';
@@ -47,11 +47,14 @@ export default function HomeScreen() {
       <FlatList
         data={stores}
         keyExtractor={item => item.id}
+        numColumns={2}
+        columnWrapperStyle={s.column}
+        contentContainerStyle={s.listContent}
         renderItem={({ item }) => (
-          <StoreCard store={item} all={all} roomsReady={roomsReady} onPress={openStore} />
+          <StoreGridCard store={item} all={all} roomsReady={roomsReady} onPress={openStore} />
         )}
         keyboardShouldPersistTaps="handled"
-        initialNumToRender={4}
+        initialNumToRender={6}
         windowSize={5}
         removeClippedSubviews
         ListHeaderComponent={
@@ -73,7 +76,7 @@ export default function HomeScreen() {
               <Icon name="chevronRight" size={16} color={c.muted} />
             </Pressable>
 
-            <CategoryChips value={category} onChange={setCategory} />
+            <CategoryChips value={category} onChange={setCategory} fadeColor={c.bg} />
 
             <View style={s.sectionHead}>
               <Text style={s.sectionTitle}>강남 인기 업소</Text>
@@ -115,6 +118,8 @@ export default function HomeScreen() {
 const styles = (c: ThemeColors) =>
   StyleSheet.create({
     root: { flex: 1, backgroundColor: c.bg },
+    listContent: { paddingBottom: spacing.xl },
+    column: { gap: spacing.md, paddingHorizontal: spacing.page, marginBottom: spacing.md },
 
     hot: {
       flexDirection: 'row',
