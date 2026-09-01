@@ -4642,6 +4642,18 @@ GangTalk/
 - DashboardPage.vue - 대시보드
 
 ## 주의사항
+
+- **배포 시 `FIREBASE_TOKEN` 을 쓰지 말 것** (2026-09-01)
+  - 환경변수 `FIREBASE_TOKEN` 의 계정에는 Firebase Rules / Storage 권한이 없어
+    `firestore:rules`, `storage` 배포가 **403 The caller does not have permission** 으로 실패한다
+    (hosting 배포는 통과해서 알아채기 어렵다)
+  - `package.json` 의 모든 `deploy:*` 스크립트는 `env -u FIREBASE_TOKEN` 을 붙여
+    `firebase login` 계정으로 배포하도록 해뒀다
+  - 직접 명령을 칠 때도 `env -u FIREBASE_TOKEN firebase deploy ...` 형태로
+  - 근본 해결: 셸 프로필(`~/.zshrc` 등)에서 `FIREBASE_TOKEN` 설정 제거
+- **`deploy:rules` 는 firestore 규칙만** 배포한다.
+  storage 규칙은 `deploy:storage` — 이전에는 한 명령에 묶여 있어
+  storage 실패가 firestore 규칙 배포까지 막았다
 - `.env` 파일에 Firebase 설정 키가 있으므로 외부 노출 금지
 - `GangTalkMacro/.venv/` 는 용량이 크므로 git에서 제외 필요
 - `dist/` 폴더는 빌드 결과물이므로 직접 수정 금지

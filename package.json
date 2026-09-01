@@ -10,10 +10,10 @@
     "web:dev": "npm --prefix web run dev",
     "web:build": "npm --prefix web run clean && npm --prefix web run build",
     "web:build:admin": "npm --prefix web run clean:admin && npm --prefix web run build:admin",
-    "deploy:hosting": "npm run web:build && firebase deploy --only hosting:prod",
-    "deploy:admin": "npm run web:build:admin && firebase deploy --only hosting:admin",
-    "deploy:functions": "npm --prefix functions install && firebase deploy --only functions",
-    "deploy:rules": "firebase deploy --only firestore:rules",
+    "deploy:hosting": "npm run web:build && env -u FIREBASE_TOKEN firebase deploy --only hosting:prod",
+    "deploy:admin": "npm run web:build:admin && env -u FIREBASE_TOKEN firebase deploy --only hosting:admin",
+    "deploy:functions": "npm --prefix functions install && env -u FIREBASE_TOKEN firebase deploy --only functions",
+    "deploy:rules": "env -u FIREBASE_TOKEN firebase deploy --only firestore:rules",
     "app:start": "npm --prefix app run start",
     "app:ios": "npm --prefix app run ios",
     "app:android": "npm --prefix app run android",
@@ -21,7 +21,7 @@
     "build:ios": "bash scripts/build-ios.sh",
     "build:android": "bash scripts/build-android.sh",
     "build:all": "bash scripts/build-all.sh",
-    "deploy:indexes": "firebase deploy --only firestore:indexes",
-    "deploy:storage": "firebase deploy --only storage"
+    "deploy:indexes": "env -u FIREBASE_TOKEN firebase deploy --only firestore:indexes",
+    "deploy:storage": "env -u FIREBASE_TOKEN firebase deploy --only storage"
   }
 }
