@@ -84,6 +84,10 @@ export interface StoreDoc {
 
   approved?: boolean;
   applyStatus?: string;
+  /** 관리자 강제 숨김 */
+  hidden?: boolean;
+  /** 신규 구조: 신청 상태 없이 active 만 쓰는 업체 */
+  active?: boolean;
   exposure?: Record<string, boolean>;
 
   roomBizId?: string;

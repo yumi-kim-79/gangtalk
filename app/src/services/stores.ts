@@ -132,10 +132,47 @@ export function isActiveAd(s: Store): boolean {
   return true;
 }
 
+/**
+ * 승인 판정 — 가게찾기(StoreFinder) 기준.
+ *   approved===true / applyStatus approved·active / (상태 없고 active===true)
+ */
 export function isApproved(s: Store): boolean {
   if (s.approved === true) return true;
   const status = String(s.applyStatus ?? '').toLowerCase();
-  return status === 'approved' || status === 'active';
+  if (status === 'approved' || status === 'active') return true;
+  // 새 구조: 신청 상태는 비어 있고 active 플래그만 true 인 업체
+  if (!status && s.active === true) return true;
+  return false;
+}
+
+/**
+ * 승인 판정 — 현황판(MainPage) 기준. **가게찾기와 규칙이 다르다.**
+ *
+ * 핵심 차이: `applyStatus` 와 `approved` 가 **둘 다 없는 예전 데이터는 기본 승인**.
+ * 이 분기가 없어서 달토·엘리트처럼 승인 필드가 없는 업소가 현황판에서 통째로 빠졌다.
+ */
+export function isApprovedOnDashboard(s: Store): boolean {
+  // 강제 숨김
+  if (s.hidden === true) return false;
+
+  const hasApply = s.applyStatus !== undefined;
+  const hasApprovedFlag = s.approved !== undefined;
+  const apply = String(s.applyStatus ?? '').trim().toLowerCase();
+
+  // 예전 데이터: 승인 관련 필드가 하나도 없으면 기본 승인
+  if (!hasApply && !hasApprovedFlag) return true;
+
+  if (s.approved === true || ['approved', '승인', '완료'].includes(apply)) return true;
+
+  if (
+    s.approved === false ||
+    ['pending', '대기', 'waiting', '신청', '검토중', 'rejected', '거절', '반려'].includes(apply)
+  ) {
+    return false;
+  }
+
+  // 알 수 없는 값은 안전하게 미노출
+  return false;
 }
 
 /* ───────────────────────── 검색 ───────────────────────── */
@@ -187,6 +224,8 @@ export interface StoreFilter {
   exposureKey?: string;
   /** 광고 기간(adStart/adEnd) 필터 적용 여부. 현황판만 true (웹과 동일) */
   checkAdPeriod?: boolean;
+  /** 승인 판정 규칙. 현황판은 'dashboard' (승인 필드 없는 예전 데이터를 기본 승인) */
+  approvalRule?: 'finder' | 'dashboard';
 }
 
 function sortValue(s: Store, key: SortKey): number {
@@ -198,7 +237,9 @@ function sortValue(s: Store, key: SortKey): number {
 export function filterStores(stores: Store[], f: StoreFilter): Store[] {
   const list = stores.filter(s => {
     if (!exposedHere(s, f.exposureKey)) return false;
-    if (!isApproved(s)) return false;
+    const approved =
+      f.approvalRule === 'dashboard' ? isApprovedOnDashboard(s) : isApproved(s);
+    if (!approved) return false;
     if (f.checkAdPeriod && !isActiveAd(s)) return false;
     if (f.category !== 'all' && s.category !== f.category) return false;
     if (f.region !== 'all' && macroOf(s) !== f.region) return false;

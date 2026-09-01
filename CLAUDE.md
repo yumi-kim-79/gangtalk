@@ -202,6 +202,38 @@ npm run build:all
 
 ## 작업 로그
 
+### 2026-09-01: 현황판 승인 규칙 불일치 수정 (달토·엘리트 누락) (`feature/rn-app`)
+
+#### 증상
+노출/순서/기간 수정 후에도 앱 현황판에 **달토(순서 1)·엘리트(순서 5)** 가 아예 안 보였다.
+순서 자체는 적용되고 있었다 (레이블 2 / 유앤미 3 / 도파민 4 / 퍼펙트 6).
+
+#### 원인 — 두 화면의 `isApproved` 가 웹에서도 서로 다르다
+- `views/StoreFinder.vue:1288` (가게찾기)
+  `applyStatus` 도 `approved` 도 없으면 → **미승인** (엄격)
+- `pages/MainPage.vue:1832` (현황판)
+  `hidden === true` 면 제외하고, 두 필드가 **모두 없으면 → 승인** (예전 데이터 기본 승인)
+
+앱에는 StoreFinder 판정만 이식돼 있어서, 두 필드가 없는 옛 업소가
+현황판에서 **조용히 사라졌다**. 달토·엘리트가 정확히 이 경우 (`exposure.dashboard: true`,
+`applyStatus`/`approved` 없음).
+
+#### 수정
+- `app/src/services/stores.ts`
+  - `isApprovedOnDashboard()` 신설 — MainPage 규칙 그대로 (`hidden` 체크 + 두 필드 부재 시 승인)
+  - `isApproved()` 에 `!status && active === true` 분기 추가 (새 구조 대응)
+  - `StoreFilter.approvalRule?: 'finder' | 'dashboard'` 로 분기
+- `app/src/types/store.ts` — `StoreDoc` 에 `hidden?` / `active?` 추가
+- `app/src/hooks/useHomeStores.ts` — `approvalRule: 'dashboard'`
+
+#### 남은 정합성 메모
+현황판/가게찾기는 **같은 데이터를 다른 규칙으로** 본다 (노출 키·노출 기본값·승인 판정·
+노출 기간·rooms_biz 병합 5가지). 앱에서 한쪽만 이식하면 매번 이런 누락이 생기므로,
+현황판 관련 수정 시 반드시 `MainPage.vue` 쪽 원본을 확인할 것.
+
+- **검증**: `tsc --noEmit` 0 errors / `eslint .` 0 errors
+
+
 ### 2026-09-01: 현황판 노출/기간/순서 반영 수정 (`feature/rn-app`)
 
 #### 앱 버그 2건

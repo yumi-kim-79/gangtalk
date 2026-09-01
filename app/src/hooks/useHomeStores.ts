@@ -50,6 +50,7 @@ export function useHomeStores(category: string, keyword: string) {
       keyword,
       exposureKey: EXPOSURE_KEY_DASHBOARD,
       checkAdPeriod: true,
+      approvalRule: 'dashboard',
     });
     return applyHomeOrder(filtered, homeOrder);
   }, [merged, category, keyword, homeOrder]);
