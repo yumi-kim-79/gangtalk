@@ -3,6 +3,7 @@
  * (같은 파일에 있던 채팅/힐링톡/업체목록은 각 탭 작업에서 따로 옮긴다)
  */
 import {
+  addDoc,
   collection,
   doc,
   getDocs,
@@ -220,4 +221,83 @@ export function fullDate(ms: number): string {
   const d = new Date(ms);
   const p2 = (n: number) => String(n).padStart(2, '0');
   return `${d.getFullYear()}.${p2(d.getMonth() + 1)}.${p2(d.getDate())} ${p2(d.getHours())}:${p2(d.getMinutes())}`;
+}
+
+/* ───────────────────────── 쓰기 (로그인 필요) ───────────────────────── */
+
+/** 글쓰기. 규칙상 authorUid 가 로그인 uid 와 같아야 한다 */
+export async function createPost(params: {
+  uid: string;
+  author: string;
+  category: BoardCategory;
+  title: string;
+  body: string;
+  /** 투표 글이면 두 선택지 */
+  optA?: string;
+  optB?: string;
+}): Promise<string> {
+  const now = Date.now();
+  const ref = await addDoc(collection(db, COLLECTIONS.boardPosts), {
+    category: params.category,
+    title: params.title.trim(),
+    body: params.body.trim(),
+    content: params.body.trim(),
+    author: params.author || '익명',
+    authorUid: params.uid,
+    views: 0,
+    likes: 0,
+    cmtCount: 0,
+    ...(params.category === 'vote'
+      ? { optA: params.optA?.trim() ?? '', optB: params.optB?.trim() ?? '', votesA: 0, votesB: 0 }
+      : {}),
+    isNotice: false,
+    images: [],
+    source: 'app',
+    createdAt: now,
+    updatedAt: now,
+  });
+  return ref.id;
+}
+
+/** 추천(좋아요) +1. 규칙상 likes 단독 변경은 로그인 사용자면 허용 */
+export async function likePost(postId: string): Promise<void> {
+  await updateDoc(doc(db, COLLECTIONS.boardPosts, postId), {
+    likes: increment(1),
+    updatedAt: Date.now(),
+  });
+}
+
+/** 투표하기 — A/B 중 하나 +1 */
+export async function votePost(postId: string, choice: 'A' | 'B'): Promise<void> {
+  await updateDoc(doc(db, COLLECTIONS.boardPosts, postId), {
+    [choice === 'A' ? 'votesA' : 'votesB']: increment(1),
+    updatedAt: Date.now(),
+  });
+}
+
+/** 댓글 작성. 게시글의 cmtCount 도 함께 올린다 */
+export async function createComment(params: {
+  postId: string;
+  uid: string;
+  author: string;
+  body: string;
+}): Promise<void> {
+  const now = Date.now();
+  await addDoc(collection(db, COLLECTIONS.boardPosts, params.postId, 'comments'), {
+    body: params.body.trim(),
+    author: params.author || '익명',
+    authorUid: params.uid,
+    parentId: null,
+    createdAt: now,
+    updatedAt: now,
+  });
+  // 집계 실패가 댓글 작성 자체를 되돌리지는 않게 분리
+  try {
+    await updateDoc(doc(db, COLLECTIONS.boardPosts, params.postId), {
+      cmtCount: increment(1),
+      updatedAt: now,
+    });
+  } catch {
+    // 규칙상 cmtCount 단독 변경이 막혀 있으면 목록 숫자만 잠시 어긋난다
+  }
 }

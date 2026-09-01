@@ -84,7 +84,18 @@ npm run build:all
 - [ ] `npm run ios:setup` (pod install)
 - [ ] 시뮬레이터/에뮬레이터 실행 확인
 
-### 진행 중 — 강톡(게시판) 탭 이식
+### 진행 중 — 인증 + 로그인 후 기능
+- [x] 카카오 로그인 (Cloud Function `kakaoSignIn` + 커스텀 토큰)
+- [x] 애플 로그인 (iOS, App Store 4.8 대응)
+- [x] 이메일 로그인 / 회원가입 / SMS 인증 / 비밀번호 재설정
+- [x] 업체 찜 · 별점
+- [x] 게시판 글쓰기 · 댓글 · 추천 · 투표
+- [x] 마이 탭 기본 (프로필/포인트/추천코드/로그아웃)
+- [ ] **Mac·콘솔 설정 필요** — `docs/앱-인증-설정가이드.md`
+- [ ] 회원탈퇴 / 신고 / 차단 (스토어 심사 필수)
+- [ ] 즐겨찾기 목록 · 내 글 목록
+
+### 완료 — 강톡(게시판) 탭 이식
 - [x] 게시판 목록 (카테고리 10종 / 공지 상단 고정 / 무한 스크롤 / 검색)
 - [x] 게시글 상세 (본문·이미지·투표 결과·댓글)
 - [ ] 글쓰기 / 댓글 작성 — 로그인 필요
@@ -168,6 +179,42 @@ npm run build:all
 ---
 
 ## 작업 로그
+
+### 2026-09-01: 인증(카카오/애플/이메일) + 로그인 후 기능 (`feature/rn-app`)
+
+#### 카카오 로그인 — 커스텀 토큰 방식
+- **라이드톡 방식을 쓸 수 없음**: 라이드톡은 카카오 프로필을 Firestore 에 직접 저장하고 Firebase Auth 세션을 만들지 않는다(`app/src/screens/LoginScreen.tsx` 주석: "Firebase Auth 통합은 Blaze 후"). 강톡은 `firestore.rules` 전반이 `request.auth.uid` 를 검사하므로 **실제 Auth 세션이 반드시 필요**
+- **`functions/index.js` 에 `kakaoSignIn` 추가** — 앱이 넘긴 카카오 access token 을 `https://kapi.kakao.com/v2/user/me` 로 검증 → `admin.auth().createCustomToken(uid)` 발급. uid 규칙 `kakao_{회원번호}`
+  - 같은 이메일로 이미 이메일 가입한 계정이 있으면 `auth/email-already-exists` 가 나므로, 이메일 없이 재시도하는 분기 포함
+- 앱은 `signInWithCustomToken` 으로 세션 생성 후 `users/{uid}` upsert
+
+#### 인증 서비스 (`services/auth.ts`)
+- `ensureUserDoc` — 웹 `store/user.js _fbSignupUser` 의 트랜잭션 이식. `meta/counters.userSeq` 증가 → 가입순번 → `makeMyCodeV2`(이메일 첫 글자 + 5자리) 추천코드. 이미 가입된 uid 면 순번을 다시 매기지 않고 프로필만 갱신
+- 가입 포인트 0, 추천 보너스는 기존 Functions 가 지급 (웹과 동일)
+- `sendSmsCode` / `verifySmsCode` — 기존 CoolSMS Cloud Function 재사용. **`enforceAppCheck: true` 라 App Check 설정 전에는 실패** → 전용 안내 문구로 구분 표시
+- `signInWithApple` — iOS 전용. 소셜 로그인 도입 시 App Store 4.8 필수
+- `authErrorMessage` — Firebase 에러코드 → 한국어 문구
+
+#### 화면
+- `LoginScreen` — 카카오 / 애플(iOS) / 이메일 + 비밀번호 찾기. 로그인은 **탭을 벗어나지 않도록 루트 모달**로 띄운다
+- `SignupScreen` — 이메일·비밀번호·닉네임·휴대폰 인증(발송/확인)·추천인 코드. 웹 AuthPage 필드 구성 그대로
+- `PostWriteScreen` — 카테고리 선택 + 제목/내용, 투표 글이면 선택지 A/B
+- `ProfileScreen` — 로그인 상태별 분기, 포인트·추천코드 표시, 로그아웃
+- `useRequireAuth` — 로그인 필요한 동작 앞에 세우는 가드. 비로그인이면 로그인 모달을 띄우고 중단
+
+#### 로그인 후 기능
+- **찜** (`services/favorites.ts`) — 문서 ID `{uid}__store__{storeId}` 고정(웹과 동일, 규칙상 1인 1건). `stores.likes` 집계를 트랜잭션으로 함께 조정
+- **별점** — `stores/{id}/ratings/{uid}` + `stores.ratingSum/ratingCount/rating` 트랜잭션 갱신. `ratingSum` 이 없던 옛 문서는 `rating × ratingCount` 로 역산(웹과 동일). 같은 별을 다시 누르면 취소
+- **추천/투표/댓글/글쓰기** (`services/board.ts`) — 규칙의 `changesAreOnly(['views','likes','votesA','votesB','updatedAt'])` 에 맞춰 단독 필드만 갱신
+  - ⚠️ `cmtCount` 는 위 허용 목록에 없어 **작성자 외에는 댓글 수 집계가 반영되지 않는다**. 댓글 자체는 저장되므로 try/catch 로 분리하고 목록 숫자만 잠시 어긋나게 둠. 규칙에 `cmtCount` 추가 검토 필요
+- 낙관적 UI — 찜/별점/추천은 즉시 반영 후 실패 시 되돌린다
+
+#### 추가된 네이티브 의존성
+`@react-native-kakao/core` `@react-native-kakao/user` `@invertase/react-native-apple-authentication` `@react-native-firebase/app-check` `@react-native-async-storage/async-storage`
+→ **pod install + 카카오/애플/App Check 콘솔 설정 필요. `docs/앱-인증-설정가이드.md` 참고**
+
+- **검증**: `tsc --noEmit` 0 errors / `eslint .` 0 errors / `node --check functions/index.js` 통과
+
 
 ### 2026-09-01: 강톡(게시판) 탭 이식 (`feature/rn-app`)
 - **범위**: `GangTalkPage.vue` 4,025줄 중 `board_posts` 게시판 부분만. 같은 파일에 섞여 있는 채팅/힐링톡/업체목록은 각 탭 작업에서 분리 이식

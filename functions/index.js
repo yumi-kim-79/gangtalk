@@ -3001,3 +3001,104 @@ exports.cleanupOldVendorDigests = onSchedule(
     }
   }
 );
+
+/* =========================================================
+   카카오 로그인 — 앱 전용 (2026-09-01)
+
+   Firebase Auth 는 카카오를 기본 제공하지 않는다. 앱이 카카오 SDK 로 받은
+   access token 을 여기서 카카오 서버에 검증한 뒤 Firebase 커스텀 토큰을 발급한다.
+   클라이언트는 signInWithCustomToken 으로 실제 Auth 세션을 얻는다.
+
+   ⚠️ Firestore 규칙이 request.auth.uid 를 검사하므로,
+      "카카오 프로필만 Firestore 에 저장" 하는 방식은 쓸 수 없다.
+
+   uid 규칙: kakao_{카카오회원번호}
+========================================================= */
+exports.kakaoSignIn = onCall(async (req) => {
+  const accessToken = safeStr(req.data?.accessToken || "");
+  if (!accessToken) {
+    throw new HttpsError("invalid-argument", "accessToken 이 필요합니다.");
+  }
+
+  // 1) 카카오 서버에 토큰 검증 + 프로필 조회
+  let profile;
+  try {
+    const res = await fetch("https://kapi.kakao.com/v2/user/me", {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-type": "application/x-www-form-urlencoded;charset=utf-8",
+      },
+    });
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      console.warn("[kakaoSignIn] kakao api error:", res.status, text);
+      throw new HttpsError("unauthenticated", "카카오 인증에 실패했습니다.");
+    }
+    profile = await res.json();
+  } catch (e) {
+    if (e instanceof HttpsError) throw e;
+    console.error("[kakaoSignIn] fetch error:", e);
+    throw new HttpsError("internal", "카카오 서버 통신에 실패했습니다.");
+  }
+
+  const kakaoId = safeStr(profile?.id);
+  if (!kakaoId) {
+    throw new HttpsError("unauthenticated", "카카오 회원 정보를 확인할 수 없습니다.");
+  }
+
+  const account = profile?.kakao_account || {};
+  const kProfile = account?.profile || {};
+  const email = safeStr(account?.email || "");
+  const nickname = safeStr(kProfile?.nickname || "");
+  const photoURL = safeStr(kProfile?.profile_image_url || "");
+
+  const uid = `kakao_${kakaoId}`;
+
+  // 2) Auth 사용자 생성/갱신 — 이메일은 카카오에서 동의한 경우에만 들어온다
+  try {
+    await admin.auth().updateUser(uid, {
+      ...(email ? { email } : {}),
+      ...(nickname ? { displayName: nickname } : {}),
+      ...(photoURL ? { photoURL } : {}),
+    });
+  } catch (e) {
+    if (e?.code === "auth/user-not-found") {
+      await admin.auth().createUser({
+        uid,
+        ...(email ? { email } : {}),
+        ...(nickname ? { displayName: nickname } : {}),
+        ...(photoURL ? { photoURL } : {}),
+      });
+    } else if (e?.code === "auth/email-already-exists") {
+      // 같은 이메일로 이미 이메일 가입한 계정이 있는 경우 — 이메일 없이 진행
+      try {
+        await admin.auth().updateUser(uid, {
+          ...(nickname ? { displayName: nickname } : {}),
+          ...(photoURL ? { photoURL } : {}),
+        });
+      } catch (e2) {
+        if (e2?.code === "auth/user-not-found") {
+          await admin.auth().createUser({
+            uid,
+            ...(nickname ? { displayName: nickname } : {}),
+            ...(photoURL ? { photoURL } : {}),
+          });
+        } else {
+          throw e2;
+        }
+      }
+    } else {
+      console.error("[kakaoSignIn] updateUser error:", e);
+      throw new HttpsError("internal", "계정 생성에 실패했습니다.");
+    }
+  }
+
+  // 3) 커스텀 토큰 발급
+  const token = await admin.auth().createCustomToken(uid, { provider: "kakao" });
+
+  return {
+    token,
+    profile: { uid, email, nickname, photoURL, kakaoId },
+  };
+});

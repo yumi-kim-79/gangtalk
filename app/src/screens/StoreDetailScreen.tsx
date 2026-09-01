@@ -14,6 +14,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from '@/components/common/Icon';
 import { CATEGORY_LABEL } from '@/constants/stores';
+import { useFavorite } from '@/hooks/useFavorite';
 import { useStore } from '@/hooks/useStore';
 import { useThumb } from '@/hooks/useThumb';
 import { eventTextOf, likesOf, payText, scoreOf, wageOf } from '@/services/stores';
@@ -35,6 +36,7 @@ export default function StoreDetailScreen() {
   const insets = useSafeAreaInsets();
   const route = useRoute<RouteProp<StoresStackParamList, 'StoreDetail'>>();
   const { store, loading, error } = useStore(route.params.storeId);
+  const { favorited, myRating, toggle, rate } = useFavorite(route.params.storeId);
 
   const openUrl = useCallback((url: string) => {
     if (url) Linking.openURL(url).catch(() => {});
@@ -70,6 +72,25 @@ export default function StoreDetailScreen() {
             <Icon name="star" size={16} color="#f5b301" />
             <Text style={s.score}>{scoreOf(store)}</Text>
             <Text style={s.count}>({likesOf(store)})</Text>
+            <View style={s.flex} />
+            <Pressable onPress={toggle} hitSlop={8} style={s.wishBtn}>
+              <Icon name="heart" size={22} color={favorited ? c.accent : c.line} />
+            </Pressable>
+          </View>
+
+          <View style={s.starsRow}>
+            {[1, 2, 3, 4, 5].map(n => (
+              <Pressable key={n} onPress={() => rate(n)} hitSlop={4} style={s.starBtn}>
+                <Icon
+                  name="star"
+                  size={26}
+                  color={myRating >= n ? '#f5b301' : c.line}
+                />
+              </Pressable>
+            ))}
+            <Text style={s.starHint}>
+              {myRating > 0 ? `내 별점 ${myRating}점 (다시 누르면 취소)` : '별점을 남겨보세요'}
+            </Text>
           </View>
         </View>
 
@@ -227,6 +248,11 @@ const styles = (c: ThemeColors) =>
     name: { fontSize: fontSize.xxl, fontWeight: '800', color: c.fg },
     meta: { fontSize: fontSize.md, color: c.muted, marginTop: 4 },
     rateRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: spacing.sm },
+    flex: { flex: 1 },
+    wishBtn: { padding: 4 },
+    starsRow: { flexDirection: 'row', alignItems: 'center', gap: 2, marginTop: spacing.sm },
+    starBtn: { padding: 2 },
+    starHint: { marginLeft: spacing.sm, fontSize: fontSize.xs, color: c.muted },
 
     score: { fontSize: fontSize.md, fontWeight: '700', color: c.fg },
     count: { fontSize: fontSize.sm, color: c.muted },

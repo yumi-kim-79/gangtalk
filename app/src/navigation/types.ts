@@ -6,10 +6,17 @@ export type StoresStackParamList = {
   StoreDetail: { storeId: string };
 };
 
+/** 로그인 모달 스택 */
+export type AuthStackParamList = {
+  Login: undefined;
+  Signup: undefined;
+};
+
 /** 강톡(게시판) 탭 내부 스택 */
 export type CommunityStackParamList = {
   PostList: undefined;
   PostDetail: { postId: string };
+  PostWrite: undefined;
 };
 
 /** 하단 탭 */
@@ -24,8 +31,8 @@ export type MainTabParamList = {
 /** 루트 스택 */
 export type RootStackParamList = {
   Splash: undefined;
-  Login: undefined;
   MainTabs: NavigatorScreenParams<MainTabParamList>;
+  Auth: NavigatorScreenParams<AuthStackParamList>;
   ChatRoom: { roomId: string; roomType: 'open' | 'biz' | 'direct' };
 };
 

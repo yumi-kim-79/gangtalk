@@ -1,12 +1,13 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { ActivityIndicator, FlatList, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import AppHeader from '@/components/common/AppHeader';
 import ChipTabs from '@/components/common/ChipTabs';
 import PostListItem from '@/components/board/PostListItem';
 import { BOARD_TABS } from '@/constants/board';
 import { usePosts } from '@/hooks/usePosts';
+import { useRequireAuth } from '@/hooks/useRequireAuth';
 import type { CommunityStackParamList } from '@/navigation/types';
 import { fontSize, spacing, useTheme, type ThemeColors } from '@/theme';
 import type { BoardCategory, Post } from '@/types/post';
@@ -20,6 +21,11 @@ export default function CommunityScreen() {
   const [filter, setFilter] = useState<BoardCategory | 'all'>('all');
   const [keyword, setKeyword] = useState('');
   const { posts, notices, loading, loadingMore, hasMore, loadMore, error } = usePosts(filter);
+  const { requireAuth } = useRequireAuth();
+
+  const onWrite = useCallback(() => {
+    if (requireAuth()) navigation.navigate('PostWrite');
+  }, [requireAuth, navigation]);
 
   const openPost = useCallback(
     (post: Post) => navigation.navigate('PostDetail', { postId: post.id }),
@@ -87,6 +93,10 @@ export default function CommunityScreen() {
           ) : undefined
         }
       />
+
+      <Pressable style={s.fab} onPress={onWrite} android_ripple={{ color: '#ffffff33' }}>
+        <Text style={s.fabText}>글쓰기</Text>
+      </Pressable>
     </View>
   );
 }
@@ -94,6 +104,23 @@ export default function CommunityScreen() {
 const styles = (c: ThemeColors) =>
   StyleSheet.create({
     root: { flex: 1, backgroundColor: c.bg },
+    fab: {
+      position: 'absolute',
+      right: spacing.page,
+      bottom: spacing.xl,
+      flexDirection: 'row',
+      alignItems: 'center',
+      height: 48,
+      paddingHorizontal: spacing.lg,
+      borderRadius: 24,
+      backgroundColor: c.accent,
+      shadowColor: '#000',
+      shadowOpacity: 0.2,
+      shadowRadius: 8,
+      shadowOffset: { width: 0, height: 4 },
+      elevation: 4,
+    },
+    fabText: { fontSize: fontSize.md, fontWeight: '700', color: '#ffffff' },
     loading: { marginVertical: spacing.lg },
     error: {
       marginHorizontal: spacing.page,

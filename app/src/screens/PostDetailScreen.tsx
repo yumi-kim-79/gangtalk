@@ -1,16 +1,21 @@
-import React from 'react';
+import React, { useCallback, useState } from 'react';
 import { useRoute, type RouteProp } from '@react-navigation/native';
 import {
   ActivityIndicator,
   Image,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import Icon from '@/components/common/Icon';
 import { BOARD_CATEGORY_LABEL } from '@/constants/board';
+import { useAuth } from '@/hooks/useAuth';
 import { usePost } from '@/hooks/usePost';
+import { useRequireAuth } from '@/hooks/useRequireAuth';
+import { createComment, likePost, votePost } from '@/services/board';
 import { fullDate } from '@/services/board';
 import type { CommunityStackParamList } from '@/navigation/types';
 import { fontSize, radius, spacing, useTheme, type ThemeColors } from '@/theme';
@@ -21,6 +26,54 @@ export default function PostDetailScreen() {
   const s = styles(c);
   const route = useRoute<RouteProp<CommunityStackParamList, 'PostDetail'>>();
   const { post, comments, loading } = usePost(route.params.postId);
+  const { profile } = useAuth();
+  const { requireAuth } = useRequireAuth();
+  const [commentText, setCommentText] = useState('');
+  const [sending, setSending] = useState(false);
+  const [voted, setVoted] = useState(false);
+  const [liked, setLiked] = useState(false);
+
+  const postId = route.params.postId;
+
+  const onLike = useCallback(async () => {
+    if (!requireAuth() || liked) return;
+    setLiked(true);
+    try {
+      await likePost(postId);
+    } catch {
+      setLiked(false);
+    }
+  }, [requireAuth, liked, postId]);
+
+  const onVote = useCallback(
+    async (choice: 'A' | 'B') => {
+      if (!requireAuth() || voted) return;
+      setVoted(true);
+      try {
+        await votePost(postId, choice);
+      } catch {
+        setVoted(false);
+      }
+    },
+    [requireAuth, voted, postId],
+  );
+
+  const onSendComment = useCallback(async () => {
+    const uid = requireAuth();
+    if (!uid || sending || !commentText.trim()) return;
+    setSending(true);
+    try {
+      await createComment({
+        postId,
+        uid,
+        author: profile?.nickname || '익명',
+        body: commentText,
+      });
+      setCommentText('');
+    } finally {
+      setSending(false);
+    }
+  }, [requireAuth, sending, commentText, postId, profile]);
 
   if (loading) {
     return (
@@ -69,7 +122,19 @@ export default function PostDetailScreen() {
 
       <Text style={s.body}>{post.body || '내용이 없습니다.'}</Text>
 
-      {post.category === 'vote' && (post.optA || post.optB) ? <VoteResult post={post} /> : null}
+      {post.category === 'vote' && (post.optA || post.optB) ? (
+        <VoteResult post={post} voted={voted} onVote={onVote} />
+      ) : null}
+
+      <View style={s.likeRow}>
+        <Pressable
+          onPress={onLike}
+          style={({ pressed }) => [s.likeBtn, liked && s.likeBtnOn, pressed && s.pressed]}
+        >
+          <Icon name="heart" size={18} color={liked ? '#ffffff' : c.accent} />
+          <Text style={[s.likeText, liked && s.likeTextOn]}>추천 {post.likes + (liked ? 1 : 0)}</Text>
+        </Pressable>
+      </View>
 
       <View style={s.commentsHead}>
         <Text style={s.commentsTitle}>댓글 {comments.length}</Text>
@@ -81,16 +146,41 @@ export default function PostDetailScreen() {
         comments.map(cm => <CommentRow key={cm.id} comment={cm} />)
       )}
 
-      <View style={s.loginHint}>
-        <Icon name="chat" size={16} color={c.muted} />
-        <Text style={s.loginHintText}>댓글 작성은 로그인 후 이용할 수 있습니다</Text>
+      <View style={s.commentForm}>
+        <TextInput
+          style={s.commentInput}
+          value={commentText}
+          onChangeText={setCommentText}
+          placeholder="댓글을 입력하세요"
+          placeholderTextColor={c.muted}
+          multiline
+        />
+        <Pressable
+          onPress={onSendComment}
+          disabled={sending || !commentText.trim()}
+          style={({ pressed }) => [
+            s.sendBtn,
+            (!commentText.trim() || sending) && s.sendBtnOff,
+            pressed && s.pressed,
+          ]}
+        >
+          <Text style={s.sendText}>{sending ? '등록 중' : '등록'}</Text>
+        </Pressable>
       </View>
     </ScrollView>
   );
 }
 
-/** 투표 글은 결과 막대만 표시 (투표하기는 로그인 필요 — 인증 작업 때 추가) */
-function VoteResult({ post }: { post: Post }) {
+/** 투표 결과 + 투표하기 (로그인 필요) */
+function VoteResult({
+  post,
+  voted,
+  onVote,
+}: {
+  post: Post;
+  voted: boolean;
+  onVote: (choice: 'A' | 'B') => void;
+}) {
   const c = useTheme();
   const s = styles(c);
   const total = post.votesA + post.votesB;
@@ -99,9 +189,25 @@ function VoteResult({ post }: { post: Post }) {
 
   return (
     <View style={s.vote}>
-      <VoteBar label={post.optA || 'A'} count={post.votesA} pct={pctA} colors={c} />
-      <VoteBar label={post.optB || 'B'} count={post.votesB} pct={pctB} colors={c} />
-      <Text style={s.voteTotal}>총 {total}표</Text>
+      <VoteBar
+        label={post.optA || 'A'}
+        count={post.votesA}
+        pct={pctA}
+        colors={c}
+        disabled={voted}
+        onPress={() => onVote('A')}
+      />
+      <VoteBar
+        label={post.optB || 'B'}
+        count={post.votesB}
+        pct={pctB}
+        colors={c}
+        disabled={voted}
+        onPress={() => onVote('B')}
+      />
+      <Text style={s.voteTotal}>
+        총 {total + (voted ? 1 : 0)}표{voted ? ' · 투표 완료' : ' · 항목을 누르면 투표됩니다'}
+      </Text>
     </View>
   );
 }
@@ -111,15 +217,19 @@ function VoteBar({
   count,
   pct,
   colors,
+  disabled,
+  onPress,
 }: {
   label: string;
   count: number;
   pct: number;
   colors: ThemeColors;
+  disabled: boolean;
+  onPress: () => void;
 }) {
   const s = styles(colors);
   return (
-    <View style={s.voteRow}>
+    <Pressable style={s.voteRow} onPress={onPress} disabled={disabled}>
       <View style={s.voteLabelRow}>
         <Text style={s.voteLabel} numberOfLines={1}>
           {label}
@@ -131,7 +241,7 @@ function VoteBar({
       <View style={s.voteTrack}>
         <View style={[s.voteFill, { width: `${pct}%` }]} />
       </View>
-    </View>
+    </Pressable>
   );
 }
 
@@ -221,15 +331,50 @@ const styles = (c: ThemeColors) =>
     commentMeta: { fontSize: fontSize.xs, color: c.muted },
     commentBody: { fontSize: fontSize.md, lineHeight: 21, color: c.fg },
 
-    loginHint: {
+    pressed: { opacity: 0.8 },
+    likeRow: { alignItems: 'center', paddingBottom: spacing.lg },
+    likeBtn: {
       flexDirection: 'row',
       alignItems: 'center',
-      justifyContent: 'center',
+      gap: spacing.sm,
+      paddingHorizontal: spacing.xl,
+      paddingVertical: spacing.md,
+      borderRadius: radius.pill,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: c.accent,
+      backgroundColor: c.surface,
+    },
+    likeBtnOn: { backgroundColor: c.accent },
+    likeText: { fontSize: fontSize.md, fontWeight: '700', color: c.accent },
+    likeTextOn: { color: '#ffffff' },
+
+    commentForm: {
+      flexDirection: 'row',
+      alignItems: 'flex-end',
       gap: spacing.sm,
       margin: spacing.page,
-      padding: spacing.md,
-      borderRadius: radius.sm,
-      backgroundColor: c.chipBg,
     },
-    loginHintText: { fontSize: fontSize.sm, color: c.muted },
+    commentInput: {
+      flex: 1,
+      minHeight: 44,
+      maxHeight: 120,
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.sm,
+      borderRadius: radius.sm,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: c.chipBorder,
+      backgroundColor: c.surface,
+      fontSize: fontSize.md,
+      color: c.fg,
+    },
+    sendBtn: {
+      height: 44,
+      paddingHorizontal: spacing.lg,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: radius.sm,
+      backgroundColor: c.accent,
+    },
+    sendBtnOff: { opacity: 0.4 },
+    sendText: { fontSize: fontSize.md, fontWeight: '700', color: '#ffffff' },
   });

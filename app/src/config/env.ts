@@ -11,5 +11,7 @@ export const env = {
   webUrl: Config.WEB_URL ?? 'https://gangtox.com',
   /** 지도 API 키 (Android/iOS 별도 발급) */
   mapsApiKey: Config.MAPS_API_KEY ?? '',
+  /** 카카오 네이티브 앱 키 — 카카오 개발자 콘솔 > 앱 키 */
+  kakaoAppKey: Config.KAKAO_APP_KEY ?? '',
   isDev: __DEV__,
 } as const;
