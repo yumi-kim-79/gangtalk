@@ -10,6 +10,7 @@ import {
   View,
 } from 'react-native';
 import AppHeader from '@/components/common/AppHeader';
+import Icon from '@/components/common/Icon';
 import OptionSheet from '@/components/common/OptionSheet';
 import CategoryChips from '@/components/store/CategoryChips';
 import StoreListItem from '@/components/store/StoreListItem';
@@ -67,11 +68,11 @@ export default function StoreListScreen() {
       <View style={s.filterBar}>
         <Pressable style={s.filterBtn} onPress={() => setRegionOpen(true)}>
           <Text style={s.filterText}>{REGION_LABEL[region]}</Text>
-          <Text style={s.caret}>▾</Text>
+          <Icon name="chevronDown" size={14} color={c.muted} />
         </Pressable>
         <Pressable style={s.filterBtn} onPress={() => setSortOpen(true)}>
           <Text style={s.filterText}>{sortLabel}</Text>
-          <Text style={s.caret}>▾</Text>
+          <Icon name="chevronDown" size={14} color={c.muted} />
         </Pressable>
         <View style={s.spacer} />
         <Text style={s.count}>{stores.length}곳</Text>
@@ -146,7 +147,7 @@ const styles = (c: ThemeColors) =>
       backgroundColor: c.surface,
     },
     filterText: { fontSize: fontSize.sm, color: c.fg },
-    caret: { fontSize: fontSize.xs, color: c.muted },
+
     spacer: { flex: 1 },
     count: { fontSize: fontSize.sm, color: c.muted },
     center: { alignItems: 'center', justifyContent: 'center', paddingVertical: 64, gap: 4 },

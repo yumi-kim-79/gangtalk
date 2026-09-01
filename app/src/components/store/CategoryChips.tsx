@@ -1,56 +1,55 @@
 import React from 'react';
-import { Pressable, ScrollView, StyleSheet, Text } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { STORE_CATEGORIES } from '@/constants/stores';
 import { fontSize, radius, spacing, useTheme, type ThemeColors } from '@/theme';
 
 type Props = { value: string; onChange: (key: string) => void };
 
 /**
- * 웹은 2줄 고정 그리드였지만, 앱에서는 가로 스크롤 칩이 표준이라 형태를 바꿨다.
- * (카테고리 항목·순서·라벨은 그대로)
+ * 카테고리 선택.
+ * 가로 스크롤은 오른쪽 항목이 잘려 보여 선택지를 놓치기 쉬워서,
+ * 웹처럼 전부 보이도록 줄바꿈(wrap) 방식으로 되돌렸다.
  */
 export default function CategoryChips({ value, onChange }: Props) {
   const c = useTheme();
   const s = styles(c);
 
   return (
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      contentContainerStyle={s.row}
-      keyboardShouldPersistTaps="handled"
-    >
+    <View style={s.wrap}>
       {STORE_CATEGORIES.map(cat => {
         const active = cat.key === value;
-        const prefix = cat.badge ?? cat.emoji ?? '';
         return (
           <Pressable
             key={cat.key}
             onPress={() => onChange(cat.key)}
             style={[s.chip, active && s.chipActive]}
-            android_ripple={{ color: c.chipBorder, borderless: false }}
+            android_ripple={{ color: c.chipBorder }}
           >
-            <Text style={[s.label, active && s.labelActive]}>
-              {prefix ? `${prefix} ` : ''}
-              {cat.label}
-            </Text>
+            {cat.badge ? (
+              <Text style={[s.badge, active && s.badgeActive]}>{cat.badge}</Text>
+            ) : null}
+            <Text style={[s.label, active && s.labelActive]}>{cat.label}</Text>
           </Pressable>
         );
       })}
-    </ScrollView>
+    </View>
   );
 }
 
 const styles = (c: ThemeColors) =>
   StyleSheet.create({
-    row: {
+    wrap: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: spacing.sm,
       paddingHorizontal: spacing.page,
       paddingVertical: spacing.sm,
-      gap: spacing.sm,
     },
     chip: {
-      minHeight: 36,
-      justifyContent: 'center',
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.xs,
+      height: 34,
       paddingHorizontal: spacing.md,
       borderRadius: radius.pill,
       backgroundColor: c.chipBg,
@@ -58,6 +57,8 @@ const styles = (c: ThemeColors) =>
       borderColor: c.chipBorder,
     },
     chipActive: { backgroundColor: c.chipActiveBg, borderColor: c.chipActiveBg },
+    badge: { fontSize: fontSize.xs, fontWeight: '800', color: c.muted },
+    badgeActive: { color: c.chipActiveFg },
     label: { fontSize: fontSize.md, color: c.fg },
     labelActive: { color: c.chipActiveFg, fontWeight: '700' },
   });

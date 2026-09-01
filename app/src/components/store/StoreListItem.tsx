@@ -1,5 +1,6 @@
 import React from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import Icon from '@/components/common/Icon';
 import { useThumb } from '@/hooks/useThumb';
 import { CATEGORY_LABEL } from '@/constants/stores';
 import {
@@ -56,7 +57,7 @@ function StoreListItem({ store, onPress }: Props) {
 
         <View style={s.infoRow}>
           {manager ? <Text style={s.manager}>{manager}</Text> : null}
-          <Text style={s.star}>⭐️</Text>
+          <Icon name="star" size={13} color="#f5b301" />
           <Text style={s.score}>{scoreOf(store)}</Text>
           <Text style={s.count}>({likesOf(store)})</Text>
         </View>
@@ -99,7 +100,7 @@ const styles = (c: ThemeColors) =>
     desc: { fontSize: fontSize.sm, color: c.muted, marginTop: 2 },
     infoRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: 4 },
     manager: { fontSize: fontSize.sm, color: c.fg, marginRight: spacing.xs },
-    star: { fontSize: fontSize.sm },
+
     score: { fontSize: fontSize.sm, fontWeight: '700', color: c.fg },
     count: { fontSize: fontSize.sm, color: c.muted },
     bottomRow: {

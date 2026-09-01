@@ -84,7 +84,14 @@ npm run build:all
 - [ ] `npm run ios:setup` (pod install)
 - [ ] 시뮬레이터/에뮬레이터 실행 확인
 
-### 진행 중 — 업체 탭 이식
+### 진행 중 — 홈 탭 이식
+- [x] 아이콘 시스템 (`react-native-svg` + `components/common/Icon.tsx`) — 웹 SVG path 그대로
+- [x] 홈 목록 (핫이슈 배너 / 카테고리 / 강남 인기 업소 카드 / 비로그인 CTA)
+- [ ] 핫이슈 텍스트 Firestore config 연동 (웹도 하드코딩 상태)
+- [ ] 이벤트 상세 화면 (핫이슈 배너 이동 대상)
+- [ ] 찜(하트) — 로그인 필요
+
+### 완료 — 업체 탭 이식
 - [x] 디자인 토큰 이식 (`src/theme`) — 웹 tokens.css 색상 그대로, 라이트/다크
 - [x] 업체 목록 (카테고리·지역·정렬·검색)
 - [x] 업체 상세 (소개/이벤트/시급/영업정보/위치 + 안심문자·안심전화·오픈카톡)
@@ -154,6 +161,27 @@ npm run build:all
 ---
 
 ## 작업 로그
+
+### 2026-09-01: 홈 탭 이식 + 아이콘 시스템 (`feature/rn-app`)
+- **아이콘 시스템 신설** — 실기기 확인 결과 이모지(🔍 ⭐️ 🎤 등)가 tofu(□?)로 깨져 표시됨. 웹은 애초에 이모지가 아니라 SVG 를 쓰고 있었음
+  - `react-native-svg` 추가 + `src/components/common/Icon.tsx`
+  - 웹 `AppHeader.vue` / `StoreDetail.vue` 의 path 를 그대로 이식: search(circle+M21 21l-4.3-4.3), filter(3선+3점), bell, menu, chevronRight/Down, star(M12 17.27…), heart(M12.1 21.35…)
+  - 하단 탭 아이콘 5종(home/store/board/chat/user) 신규 — 기존에는 아이콘이 없어 플랫폼 기본 글리프가 깨져 보였음
+  - 카테고리 이모지(🎤🎶🍸🛋️📌)는 라벨만 남기고 제거
+- **카테고리 칩 잘림 수정** — 가로 스크롤이라 오른쪽 항목이 잘려 선택지를 놓침. 웹처럼 줄바꿈(wrap)으로 되돌려 11종 전부 노출
+- **노출 키 분리** — 웹 PR #124~126 과 동일하게 홈은 `exposure.dashboard`, 업체찾기는 `exposure.gangtalk`. `exposedHere(s, key)` / `StoreFilter.exposureKey` 로 파라미터화
+- **`services/dashboard.ts`** — MainPage.vue 이식:
+  - `computeStatus` — statusMode==='manual' 이면 저장값(여유/혼잡 구 라벨 포함), 아니면 ① 같은 카테고리 업체들의 match/persons 분포로 0~1 정규화 후 평균 ② 실패 시 totalRooms/maxPersons 대비 비율. 0.6↑ 좋음 / 0.3↑ 보통 / 나머지 나쁨
+  - `ratingOf`(없으면 4.8) `reviewCountOf`(없으면 128) — 웹과 동일한 폴백값
+  - `subscribeHomeOrder` — `config/marketing.homeOrder` (관리자가 웹에서 지정한 순서)
+  - `applyHomeOrder` — 지정 업체를 앞으로, 미지정은 기존 순서 유지
+- **`hooks/useHomeStores`** — stores + rooms_biz + homeOrder 3중 구독. `roomsReady` 가 false 인 동안 맞출방/필요인원은 `—`, 혼잡도는 `보통` 고정 (웹과 동일하게 미확정값 표시 방지)
+- **`components/store/StoreCard`** — 웹 `.mp-store` 카드 이식. 16:9 이미지 + 인기 뱃지 + 이름/지역·유형 + 하트 + 별점/리뷰수 + 지표 3종(맞출방·필요인원·혼잡도). 혼잡도는 좋음 `#16a34a` / 보통 `#f59e0b` / 나쁨 `#dc2626`
+- **`screens/HomeScreen`** — AppHeader + 핫이슈 배너 + 카테고리 + "강남 인기 업소" + 비로그인 CTA. FlatList 의 `ListHeaderComponent` 로 상단 전체를 감싸 스크롤 성능 확보
+- **미이식**: 핫이슈 Firestore 연동(웹도 하드코딩), 이벤트 상세 이동, 찜/하트 동작(로그인 필요), 내 주변(위치 기반), 뉴스 티커, 관리자 순서 편집 UI(앱 제외)
+- **주의 — 네이티브 의존성 추가**: `react-native-svg` 는 pod install 필요. 또한 리눅스 VM 에서 `npm install` 을 돌리면 macOS 전용 `fsevents` 가 비워지므로, Mac 에서 `npm install` 재실행 필요
+- **검증**: `tsc --noEmit` 0 errors / `eslint .` 0 errors (warning 0)
+
 
 ### 2026-09-01: 업체 탭 이식 (`feature/rn-app`)
 - **방향 결정**: UI 는 "앱에 맞게 다듬기" — 정보 구조·필드·필터 조건은 웹 그대로 두고, 조작 방식만 네이티브 관습에 맞춤

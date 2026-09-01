@@ -101,12 +101,15 @@ export function macroOf(s: Store): RegionKey {
 
 /* ───────────────────────── 노출 조건 ───────────────────────── */
 
-/** exposure 플래그가 없으면 노출로 간주 (웹과 동일) */
-export function exposedHere(s: Store): boolean {
+/**
+ * exposure 플래그가 없으면 노출로 간주 (웹과 동일).
+ * 홈(현황판)은 'dashboard', 업체찾기는 'gangtalk' 키를 본다 — 웹 PR #124~126 에서 분리됨.
+ */
+export function exposedHere(s: Store, key: string = EXPOSURE_KEY): boolean {
   const exp = s.exposure;
   if (!exp || typeof exp !== 'object') return true;
-  if (exp[EXPOSURE_KEY] === undefined) return true;
-  return !!exp[EXPOSURE_KEY];
+  if (exp[key] === undefined) return true;
+  return !!exp[key];
 }
 
 export function isApproved(s: Store): boolean {
@@ -160,6 +163,8 @@ export interface StoreFilter {
   region: RegionKey;
   sort: SortKey;
   keyword: string;
+  /** 노출 플래그 키. 미지정 시 'gangtalk'(업체찾기) */
+  exposureKey?: string;
 }
 
 function sortValue(s: Store, key: SortKey): number {
@@ -170,7 +175,7 @@ function sortValue(s: Store, key: SortKey): number {
 
 export function filterStores(stores: Store[], f: StoreFilter): Store[] {
   const list = stores.filter(s => {
-    if (!exposedHere(s)) return false;
+    if (!exposedHere(s, f.exposureKey)) return false;
     if (!isApproved(s)) return false;
     if (f.category !== 'all' && s.category !== f.category) return false;
     if (f.region !== 'all' && macroOf(s) !== f.region) return false;

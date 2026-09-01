@@ -1,0 +1,143 @@
+import React from 'react';
+import Svg, { Circle, Path } from 'react-native-svg';
+
+/**
+ * 아이콘 세트.
+ * 웹(components/common/AppHeader.vue, pages/StoreDetail.vue)이 쓰던 SVG path 를 그대로 옮겼다.
+ * 이모지는 기기·시뮬레이터에 따라 폰트 폴백이 실패해 tofu(□) 로 보이므로 UI 크롬에는 쓰지 않는다.
+ */
+export type IconName =
+  | 'search'
+  | 'filter'
+  | 'bell'
+  | 'menu'
+  | 'chevronRight'
+  | 'chevronDown'
+  | 'star'
+  | 'heart'
+  | 'home'
+  | 'store'
+  | 'board'
+  | 'chat'
+  | 'user';
+
+type Props = {
+  name: IconName;
+  size?: number;
+  color: string;
+  /** star / heart 처럼 채움이 기본인 아이콘의 채움 여부 */
+  filled?: boolean;
+};
+
+export default function Icon({ name, size = 22, color, filled = true }: Props) {
+  const stroke = { stroke: color, strokeWidth: 2, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const };
+
+  switch (name) {
+    // ── 웹 app-search-ic ──
+    case 'search':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+          <Circle cx={11} cy={11} r={7} {...stroke} />
+          <Path d="M21 21l-4.3-4.3" {...stroke} />
+        </Svg>
+      );
+    // ── 웹 app-search-filter ──
+    case 'filter':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+          <Path d="M4 6h12" {...stroke} />
+          <Path d="M4 12h8" {...stroke} />
+          <Path d="M4 18h14" {...stroke} />
+          <Circle cx={18} cy={6} r={2} fill={color} />
+          <Circle cx={14} cy={12} r={2} fill={color} />
+          <Circle cx={20} cy={18} r={2} fill={color} />
+        </Svg>
+      );
+    case 'bell':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+          <Path d="M18 16v-5a6 6 0 1 0-12 0v5l-2 3h16z" {...stroke} />
+          <Path d="M10 21a2 2 0 0 0 4 0" {...stroke} />
+        </Svg>
+      );
+    case 'menu':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+          <Path d="M4 7h16M4 12h16M4 17h16" {...stroke} />
+        </Svg>
+      );
+    case 'chevronRight':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+          <Path d="M9 6l6 6-6 6" {...stroke} />
+        </Svg>
+      );
+    case 'chevronDown':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+          <Path d="M6 9l6 6 6-6" {...stroke} />
+        </Svg>
+      );
+    // ── 웹 StoreDetail 별점 ──
+    case 'star':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 24 24">
+          <Path
+            d="M12 17.27 18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"
+            fill={filled ? color : 'none'}
+            stroke={color}
+            strokeWidth={filled ? 0 : 2}
+            strokeLinejoin="round"
+          />
+        </Svg>
+      );
+    // ── 웹 StoreDetail 찜 ──
+    case 'heart':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 24 24">
+          <Path
+            d="M12.1 21.35 10 19.28C5.4 15.36 2 12.28 2 8.5 2 6 4 4 6.5 4c1.74 0 3.41.81 4.5 2.09C12.09 4.81 13.76 4 15.5 4 18 4 20 6 20 8.5c0 3.78-3.4 6.86-8 10.78l-1.9 2.07z"
+            fill={filled ? color : 'none'}
+            stroke={color}
+            strokeWidth={filled ? 0 : 2}
+            strokeLinejoin="round"
+          />
+        </Svg>
+      );
+    // ── 하단 탭 ──
+    case 'home':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+          <Path d="M3 11l9-8 9 8" {...stroke} />
+          <Path d="M5 10v10h14V10" {...stroke} />
+        </Svg>
+      );
+    case 'store':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+          <Path d="M4 8h16l-1 12H5z" {...stroke} />
+          <Path d="M9 8V6a3 3 0 0 1 6 0v2" {...stroke} />
+        </Svg>
+      );
+    case 'board':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+          <Path d="M4 4h16v16H4z" {...stroke} />
+          <Path d="M8 9h8M8 13h8M8 17h5" {...stroke} />
+        </Svg>
+      );
+    case 'chat':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+          <Path d="M20 12a8 8 0 0 1-8 8H6l-2 2v-10a8 8 0 0 1 16 0z" {...stroke} />
+        </Svg>
+      );
+    case 'user':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+          <Circle cx={12} cy={8} r={4} {...stroke} />
+          <Path d="M4 20c0-3.3 3.6-6 8-6s8 2.7 8 6" {...stroke} />
+        </Svg>
+      );
+  }
+}

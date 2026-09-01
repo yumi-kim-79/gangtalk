@@ -3,11 +3,14 @@
 export interface StoreCategory {
   key: string;
   label: string;
+  /** 하퍼/쩜오 등 유형 뱃지 (웹과 동일) */
   badge?: string;
-  emoji?: string;
 }
 
-/** 웹의 2줄 그리드용 spacer 는 앱에서 불필요하므로 제거 */
+/**
+ * 웹의 2줄 그리드용 spacer 는 앱에서 불필요하므로 제거.
+ * 웹이 쓰던 이모지(🎤🎶🍸🛋️📌)는 기기에 따라 tofu 로 깨져 라벨만 남겼다.
+ */
 export const STORE_CATEGORIES: StoreCategory[] = [
   { key: 'all', label: '전체' },
   { key: 'hopper', label: '하퍼', badge: 'H' },
@@ -15,11 +18,11 @@ export const STORE_CATEGORIES: StoreCategory[] = [
   { key: 'ten', label: '텐카페', badge: '10' },
   { key: 'tenpro', label: '텐프로', badge: 'TP' },
   { key: 'onep', label: '1%', badge: '1%' },
-  { key: 'nrb', label: '노래방', emoji: '🎤' },
-  { key: 'kara', label: '가라오케', emoji: '🎶' },
-  { key: 'bar', label: '바', emoji: '🍸' },
-  { key: 'lounge', label: '라운지', emoji: '🛋️' },
-  { key: 'etc', label: '기타', emoji: '📌' },
+  { key: 'nrb', label: '노래방' },
+  { key: 'kara', label: '가라오케' },
+  { key: 'bar', label: '바' },
+  { key: 'lounge', label: '라운지' },
+  { key: 'etc', label: '기타' },
 ];
 
 export const CATEGORY_LABEL: Record<string, string> = Object.fromEntries(
@@ -48,8 +51,12 @@ export const SORT_OPTIONS: { key: SortKey; label: string }[] = [
   { key: 'rooms', label: '룸 많은순' },
 ];
 
-/** 강톡 노출 플래그 키 — stores.exposure[EXPOSURE_KEY] */
+/**
+ * 노출 플래그 키 — stores.exposure[key].
+ * 웹 PR #124~126 에서 현황판(홈)과 가게찾기 노출이 분리됐다.
+ */
 export const EXPOSURE_KEY = 'gangtalk';
+export const EXPOSURE_KEY_DASHBOARD = 'dashboard';
 
 /** 목록 초기 로드 상한 (웹과 동일) */
 export const STORE_FETCH_LIMIT = 100;

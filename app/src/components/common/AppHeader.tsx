@@ -8,6 +8,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Icon from '@/components/common/Icon';
 import { fontSize, spacing, useTheme, type ThemeColors } from '@/theme';
 
 type Props = {
@@ -54,7 +55,7 @@ export default function AppHeader({
 
       {showSearch ? (
         <View style={s.searchBox}>
-          <Text style={s.searchIcon}>🔍</Text>
+          <Icon name="search" size={18} color={c.muted} />
           <TextInput
             style={s.input}
             value={searchValue}
@@ -104,8 +105,8 @@ const styles = (c: ThemeColors) =>
       borderRadius: 14,
       backgroundColor: c.chipBg,
     },
-    searchIcon: { fontSize: fontSize.md, marginRight: spacing.sm },
-    input: { flex: 1, fontSize: fontSize.md, color: c.fg, padding: 0 },
+    searchIcon: { marginRight: spacing.sm },
+    input: { flex: 1, fontSize: fontSize.md, color: c.fg, padding: 0, marginLeft: spacing.sm },
     clear: { paddingHorizontal: spacing.sm, paddingVertical: spacing.xs },
     clearText: { fontSize: fontSize.md, color: c.muted },
   });

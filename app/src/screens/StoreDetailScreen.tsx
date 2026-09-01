@@ -12,6 +12,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Icon from '@/components/common/Icon';
 import { CATEGORY_LABEL } from '@/constants/stores';
 import { useStore } from '@/hooks/useStore';
 import { useThumb } from '@/hooks/useThumb';
@@ -66,7 +67,7 @@ export default function StoreDetailScreen() {
             {store.region || '-'} · {CATEGORY_LABEL[store.category ?? ''] ?? ''}
           </Text>
           <View style={s.rateRow}>
-            <Text style={s.star}>⭐️</Text>
+            <Icon name="star" size={16} color="#f5b301" />
             <Text style={s.score}>{scoreOf(store)}</Text>
             <Text style={s.count}>({likesOf(store)})</Text>
           </View>
@@ -226,7 +227,7 @@ const styles = (c: ThemeColors) =>
     name: { fontSize: fontSize.xxl, fontWeight: '800', color: c.fg },
     meta: { fontSize: fontSize.md, color: c.muted, marginTop: 4 },
     rateRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: spacing.sm },
-    star: { fontSize: fontSize.md },
+
     score: { fontSize: fontSize.md, fontWeight: '700', color: c.fg },
     count: { fontSize: fontSize.sm, color: c.muted },
 
