@@ -9,6 +9,7 @@ import {
   View,
 } from 'react-native';
 import ReportSheet, { type ReportTarget } from '@/components/common/ReportSheet';
+import { useBlocked } from '@/hooks/useBlocked';
 import { useChotok } from '@/hooks/useChotok';
 import type { StoresStackParamList } from '@/navigation/types';
 import { fontSize, radius, spacing, useTheme, type ThemeColors } from '@/theme';
@@ -45,6 +46,7 @@ export default function ChotokScreen() {
   const s = styles(c);
   const { params } = useRoute<RouteProp<StoresStackParamList, 'Chotok'>>();
   const { messages, parsed, loading, error } = useChotok(params.storeId);
+  const { hidden } = useBlocked();
   const listRef = useRef<FlatList<Row>>(null);
   const [report, setReport] = useState<ReportTarget | null>(null);
 
@@ -52,6 +54,8 @@ export default function ChotokScreen() {
     const out: Row[] = [];
     let lastDay = '';
     for (const m of messages) {
+      // 차단한 사용자의 메시지는 감춘다 (다른 목록 화면들과 동일)
+      if (hidden(m.authorUid)) continue;
       const day = dayLabel(m.createdAt);
       if (day && day !== lastDay) {
         out.push({ type: 'day', id: `day_${day}`, label: day });
@@ -60,7 +64,7 @@ export default function ChotokScreen() {
       out.push({ type: 'msg', id: m.id, msg: m });
     }
     return out;
-  }, [messages]);
+  }, [messages, hidden]);
 
   // 새 메시지가 오면 항상 맨 아래로
   useEffect(() => {

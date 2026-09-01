@@ -6,6 +6,9 @@ import type { BoardCategory, Post } from '@/types/post';
 
 type Cursor = FirebaseFirestoreTypes.QueryDocumentSnapshot | null;
 
+/** 빈 카테고리에서 자동으로 더 당겨올 최대 페이지 수 (무한 페이징 방지) */
+const AUTO_PAGE_LIMIT = 5;
+
 /**
  * 게시판 목록.
  * 첫 페이지는 실시간 구독, 이후는 커서 기반 추가 로드.
@@ -88,6 +91,23 @@ export function usePosts(
         .sort((a, b) => b.updatedAt - a.updatedAt),
     [all, inScope],
   );
+
+  /* 구독은 카테고리 구분 없이 최신 20건만 받는다.
+   * 그래서 글이 뜸한 묶음(예: 이벤트)으로 바꾸면 최근 20건 안에 한 건도 없어
+   * 목록이 통째로 비어 버린다 — 사용자는 "글이 없다"고 오해한다.
+   * 결과가 비어 있고 더 받을 게 남았으면 자동으로 다음 페이지를 당겨온다. */
+  const autoPages = useRef(0);
+  useEffect(() => {
+    autoPages.current = 0;
+  }, [filter, allowed]);
+
+  useEffect(() => {
+    if (loading || loadingMore || !hasMore) return;
+    if (posts.length > 0 || notices.length > 0) return;
+    if (autoPages.current >= AUTO_PAGE_LIMIT) return;
+    autoPages.current += 1;
+    loadMore().catch(() => {});
+  }, [posts.length, notices.length, loading, loadingMore, hasMore, loadMore]);
 
   return { posts, notices, loading, loadingMore, hasMore, loadMore, error };
 }

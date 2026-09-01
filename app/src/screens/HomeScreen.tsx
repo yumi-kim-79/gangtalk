@@ -19,6 +19,7 @@ import StoreStatusCard from '@/components/store/StoreStatusCard';
 import { useAuth } from '@/hooks/useAuth';
 import { useHomeStores } from '@/hooks/useHomeStores';
 import { useNewsline } from '@/hooks/useNewsline';
+import { useRequireAuth } from '@/hooks/useRequireAuth';
 import type { MainTabParamList } from '@/navigation/types';
 import { fontSize, radius, spacing, useTheme, type ThemeColors } from '@/theme';
 import type { Store } from '@/types/store';
@@ -31,6 +32,7 @@ export default function HomeScreen() {
   const s = styles(c);
   const navigation = useNavigation<NavigationProp<MainTabParamList>>();
   const { isLoggedIn, initializing } = useAuth();
+  const { requireAuth } = useRequireAuth();
 
   const [category, setCategory] = useState('all');
   const [keyword, setKeyword] = useState('');
@@ -123,7 +125,11 @@ export default function HomeScreen() {
         }
         ListFooterComponent={
           !initializing && !isLoggedIn ? (
-            <Pressable style={s.cta} android_ripple={{ color: c.accentWeak }}>
+            <Pressable
+              style={s.cta}
+              onPress={() => requireAuth()}
+              android_ripple={{ color: c.accentWeak }}
+            >
               <Text style={s.ctaSmall}>지금 가입하면</Text>
               <Text style={s.ctaTitle}>맞춤 업소 추천을 받아보세요!</Text>
               <Text style={s.ctaDesc}>내 취향에 딱 맞는 공간을 찾아드립니다.</Text>

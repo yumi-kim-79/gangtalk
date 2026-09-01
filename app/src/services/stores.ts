@@ -51,7 +51,8 @@ export function payText(s: Store): string {
 }
 
 export function likesOf(s: Store): number {
-  return num(s.likes ?? s.wishCount ?? 0);
+  // 웹 StoreDetail.vue:375 와 같은 후보 순서 — 레거시 favs 까지 본다
+  return num(s.likes ?? s.wishCount ?? (s as { favs?: number }).favs ?? 0);
 }
 
 export function roomsOf(s: Store): number {

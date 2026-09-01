@@ -70,6 +70,8 @@ export type RootStackParamList = {
    * 나중에 마이페이지 탭을 눌렀을 때 찜한 업체가 먼저 뜬다.
    */
   Favorites: undefined;
+  /** 이용약관 / 개인정보처리방침 — 스토어 심사상 앱 안에서 열려야 한다 */
+  Legal: { kind: 'terms' | 'privacy' };
 };
 
 declare global {

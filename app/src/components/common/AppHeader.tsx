@@ -64,7 +64,13 @@ export default function AppHeader({
   const s = styles(c);
   /* 헤더는 어느 탭·어느 스택 안에서든 쓰이므로 **루트 기준**으로 이동한다.
    * (중첩 네비게이터에서 getParent() 를 타면 어느 단계가 잡히는지가 화면마다 달라진다) */
-  const navigation = useNavigation<NavigationProp<RootStackParamList>>();
+  const local = useNavigation();
+  /* ProfileScreen 안에서 쓰이면 useNavigation() 이 ProfileStack 을 잡는데
+   * 그 스택에도 Favorites 가 있어 마이 탭 스택으로 push 되어 버린다
+   * (다음에 마이 탭을 눌렀을 때 찜한 업체가 먼저 뜨는 회귀).
+   * id 로 루트를 명시해 어느 탭에서든 같은 곳으로 간다. */
+  const navigation = (local.getParent<NavigationProp<RootStackParamList>>('Root' as never) ??
+    local) as NavigationProp<RootStackParamList>;
   const { isLoggedIn } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
 

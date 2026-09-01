@@ -7,19 +7,33 @@ export function usePost(postId: string) {
   const [post, setPost] = useState<Post | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    setLoading(true);
+    setError(null);
     incView(postId);
-    const unsubPost = subscribePost(postId, p => {
-      setPost(p);
-      setLoading(false);
+    // onError 를 넘기지 않으면 구독 실패 시 loading 이 영원히 true 로 남아
+    // 상세 화면이 스피너로 멈춘다
+    const unsubPost = subscribePost(
+      postId,
+      p => {
+        setPost(p);
+        setLoading(false);
+      },
+      () => {
+        setError('글을 불러오지 못했습니다.');
+        setLoading(false);
+      },
+    );
+    const unsubComments = subscribeComments(postId, setComments, () => {
+      setComments([]);
     });
-    const unsubComments = subscribeComments(postId, setComments);
     return () => {
       unsubPost();
       unsubComments();
     };
   }, [postId]);
 
-  return { post, comments, loading };
+  return { post, comments, loading, error };
 }

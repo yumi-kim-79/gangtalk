@@ -9,6 +9,7 @@ import {
 } from '@react-native-firebase/firestore';
 import { COLLECTIONS } from '@/constants/app';
 import { db } from '@/services/firebase';
+import { congestionFromScore, normName, parseNeedFromPastedText } from '@/services/pastedText';
 import { num } from '@/services/stores';
 import type { RoomsBizDoc, Store, StoreDoc } from '@/types/store';
 
@@ -158,21 +159,90 @@ function readRoomsBiz(rb: RoomsBizDoc | undefined) {
   const inputPeople = num(rb.needPeople);
   const manualSaved = rb.manualSaved === true;
 
-  // 관리자/업체 수동 저장은 0/0 도 의도된 값으로 존중한다
-  const rooms = manualSaved ? Math.max(0, inputRooms) : Math.max(0, inputRooms);
-  const people = manualSaved ? Math.max(0, inputPeople) : Math.max(0, inputPeople);
+  let rooms = 0;
+  let people = 0;
+  let pastedText = '';
 
-  const hasInput = manualSaved || inputRooms > 0 || inputPeople > 0;
+  if (manualSaved) {
+    // 관리자/업체 수동 저장은 0/0 도 의도된 값으로 존중하고 파싱을 건너뛴다
+    rooms = Math.max(0, inputRooms);
+    people = Math.max(0, inputPeople);
+  } else {
+    // ChatBiz 자동 갱신 업소는 needRooms 대신 붙여넣기 원문만 남긴다.
+    // 이 단계가 없어 앱만 0 으로 표시되던 문제. (웹 MainPage.vue:1509)
+    pastedText = String(rb.lastPastedText || rb.manualText || rb.bannerText || '').trim();
+    if (pastedText) {
+      const parsed = parseNeedFromPastedText(pastedText);
+      rooms = num(parsed.rooms);
+      people = num(parsed.people);
+    }
+    // 파싱이 0/0 이거나 줄바꿈 없는 한 줄이면 시트/수동값을 우선 채택
+    const isOneLine = !!pastedText && !/\n/.test(pastedText);
+    if ((rooms === 0 && people === 0) || isOneLine) {
+      rooms = Math.max(rooms, inputRooms);
+      people = Math.max(people, inputPeople);
+    }
+    rooms = Math.max(0, rooms);
+    people = Math.max(0, people);
+  }
+
+  // "진짜 0" 과 "데이터 없음" 을 구분한다.
+  // pastedText 존재만으로는 통과시키지 않는다 — "응" 같은 한 줄 메시지가
+  // stores 의 실제 값을 0 으로 덮어쓰던 사고(웹 2026-06-19 진단)를 그대로 방어.
+  const hasInput = manualSaved || inputRooms > 0 || inputPeople > 0 || rooms > 0 || people > 0;
   const hasPositive = rooms > 0 || people > 0;
 
   return {
     rooms,
     people,
     manualSaved,
-    congestion: rb.congestion ? String(rb.congestion) : null,
+    congestion:
+      (rb.congestion ? String(rb.congestion) : null) || congestionFromScore(rb.congestionScore),
     // 입력이 없는 빈 문서는 무시 → stores 값으로 폴백
     active: hasInput && (hasPositive || manualSaved),
   };
+}
+
+/** 동명 업소 충돌 마커 — 잘못된 매핑보다 매핑 안 하고 legacy 폴백이 안전 */
+const AMBIGUOUS = '__AMBIGUOUS__';
+
+function buildIndex(pairs: Array<[string, string]>): Map<string, string> {
+  const m = new Map<string, string>();
+  for (const [key, id] of pairs) {
+    if (!key || !id) continue;
+    const prev = m.get(key);
+    if (prev && prev !== AMBIGUOUS && prev !== id) m.set(key, AMBIGUOUS);
+    else if (!prev) m.set(key, id);
+  }
+  return m;
+}
+
+/**
+ * store 에 붙일 rooms_biz 문서를 찾는다.
+ * 웹은 4단계로 매칭하는데(MainPage.vue:1450-1472) 앱은 id 계열 3키만 봤다.
+ * 이름/vendorKey 로만 연결된 업소가 앱에서만 legacy 값으로 떨어지던 원인.
+ */
+function resolveRoomsBiz(
+  raw: StoreDoc,
+  rbMap: Map<string, RoomsBizDoc>,
+  byName: Map<string, RoomsBizDoc>,
+  byVendor: Map<string, RoomsBizDoc>,
+): RoomsBizDoc | undefined {
+  const direct = rbMap.get(String(raw.id));
+  if (direct) return direct;
+
+  const nm = normName(raw.name);
+  if (nm) {
+    const hit = byName.get(nm);
+    if (hit) return hit;
+  }
+
+  const vk = String(raw.vendorKey ?? '').toLowerCase();
+  if (vk) {
+    const hit = byVendor.get(vk);
+    if (hit) return hit;
+  }
+  return undefined;
 }
 
 /** stores + rooms_biz 를 현황판 기준으로 병합 */
@@ -180,9 +250,29 @@ export function applyRoomsBiz(
   rawStores: StoreDoc[],
   rbMap: Map<string, RoomsBizDoc>,
 ): Store[] {
+  // rooms_biz 문서를 이름/vendorKey 로도 찾을 수 있게 역인덱스를 만든다.
+  // rbMap 은 한 문서를 여러 키로 가리키므로 doc.id 로 중복을 제거한다.
+  const docs = new Map<string, RoomsBizDoc>();
+  rbMap.forEach(rb => docs.set(String(rb.id), rb));
+  const uniq = Array.from(docs.values());
+
+  const nameIdx = buildIndex(uniq.map(rb => [normName(rb.name ?? rb.id), String(rb.id)]));
+  const vendorIdx = buildIndex(uniq.map(rb => [String(rb.id).toLowerCase(), String(rb.id)]));
+  const pick = (idx: Map<string, string>) => {
+    const m = new Map<string, RoomsBizDoc>();
+    idx.forEach((id, key) => {
+      if (id === AMBIGUOUS) return;
+      const rb = docs.get(id);
+      if (rb) m.set(key, rb);
+    });
+    return m;
+  };
+  const byName = pick(nameIdx);
+  const byVendor = pick(vendorIdx);
+
   return rawStores.map(raw => {
     const s: Store = { ...raw };
-    const rb = readRoomsBiz(rbMap.get(String(raw.id)));
+    const rb = readRoomsBiz(resolveRoomsBiz(raw, rbMap, byName, byVendor));
 
     const legacyMatch = num(raw.match ?? raw.needRooms);
     const legacyPersons = num(raw.persons ?? raw.needPeople);

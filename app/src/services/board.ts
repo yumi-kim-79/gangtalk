@@ -12,6 +12,7 @@ import {
   onSnapshot,
   orderBy,
   query,
+  serverTimestamp,
   startAfter,
   updateDoc,
   type FirebaseFirestoreTypes,
@@ -183,8 +184,9 @@ export function subscribeComments(
 export async function incView(postId: string): Promise<void> {
   try {
     await updateDoc(doc(db, COLLECTIONS.boardPosts, postId), {
+      // updatedAt 을 건드리지 않는다 — 목록 정렬 키라서, 글을 열기만 해도
+      // 그 글이 최신 글 자리로 올라가 버린다. 웹 GangTalkPage.vue:1505 와 동일.
       views: increment(1),
-      updatedAt: Date.now(),
     });
   } catch {
     // 비로그인/권한 없음 — 조회수는 부가 기능이라 무시
@@ -236,7 +238,6 @@ export async function createPost(params: {
   optA?: string;
   optB?: string;
 }): Promise<string> {
-  const now = Date.now();
   const ref = await addDoc(collection(db, COLLECTIONS.boardPosts), {
     category: params.category,
     title: params.title.trim(),
@@ -253,8 +254,11 @@ export async function createPost(params: {
     isNotice: false,
     images: [],
     source: 'app',
-    createdAt: now,
-    updatedAt: now,
+    // 웹(GangTalkPage.vue:1820)이 serverTimestamp 로 쓰므로 반드시 같은 타입이어야 한다.
+    // number 로 쓰면 Firestore 값 타입 정렬(Number < Timestamp) 때문에
+    // orderBy('updatedAt','desc') 목록에서 웹 글 뒤로 전부 밀려 첫 페이지에 못 뜬다.
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
   });
   return ref.id;
 }
@@ -263,7 +267,7 @@ export async function createPost(params: {
 export async function likePost(postId: string): Promise<void> {
   await updateDoc(doc(db, COLLECTIONS.boardPosts, postId), {
     likes: increment(1),
-    updatedAt: Date.now(),
+    updatedAt: serverTimestamp(),
   });
 }
 
@@ -271,7 +275,7 @@ export async function likePost(postId: string): Promise<void> {
 export async function votePost(postId: string, choice: 'A' | 'B'): Promise<void> {
   await updateDoc(doc(db, COLLECTIONS.boardPosts, postId), {
     [choice === 'A' ? 'votesA' : 'votesB']: increment(1),
-    updatedAt: Date.now(),
+    updatedAt: serverTimestamp(),
   });
 }
 
@@ -282,21 +286,22 @@ export async function createComment(params: {
   author: string;
   body: string;
 }): Promise<void> {
-  const now = Date.now();
   await addDoc(collection(db, COLLECTIONS.boardPosts, params.postId, 'comments'), {
     body: params.body.trim(),
     author: params.author || '익명',
     authorUid: params.uid,
     parentId: null,
-    createdAt: now,
-    updatedAt: now,
+    // 댓글 구독은 orderBy('createdAt','asc') — number 로 쓰면
+    // 웹 댓글(Timestamp)보다 항상 앞에 고정된다.
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
   });
   // 집계 실패가 댓글 작성 자체를 되돌리지는 않게 분리
   // (firestore.rules 에 cmtCount 허용을 추가했으나, 룰 배포 전에는 실패할 수 있다)
   try {
     await updateDoc(doc(db, COLLECTIONS.boardPosts, params.postId), {
       cmtCount: increment(1),
-      updatedAt: now,
+      updatedAt: serverTimestamp(),
     });
   } catch {
     // 목록의 댓글 수만 잠시 어긋난다 — 댓글 자체는 이미 저장됨

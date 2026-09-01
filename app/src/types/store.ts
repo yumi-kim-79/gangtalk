@@ -93,6 +93,8 @@ export interface StoreDoc {
   roomBizId?: string;
   rooms_biz?: string;
   storeKey?: string;
+  /** 레거시 rooms_biz 문서 ID 와 맞물리는 키 (웹 _storeIdByVendor) */
+  vendorKey?: string;
 
   updatedAt?: unknown;
 }
@@ -123,4 +125,13 @@ export interface RoomsBizDoc {
   totalCurrent?: number;
   totalNeeded?: number;
   totalRemaining?: number;
+
+  /** ChatBiz 자동 갱신 업소가 남기는 붙여넣기 원문 (needRooms 대신) */
+  lastPastedText?: string;
+  manualText?: string;
+  bannerText?: string;
+  /** 혼잡도를 라벨 대신 점수로 저장한 세대 */
+  congestionScore?: number | string;
+  /** 이름 기반 매핑용 */
+  name?: string;
 }

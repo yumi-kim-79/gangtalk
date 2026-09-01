@@ -415,7 +415,12 @@ service cloud.firestore {
         && request.resource.data.blockedUid is string
         && request.resource.data.blockedUid != request.auth.uid;
       allow delete: if signedIn() && resource.data.ownerUid == request.auth.uid;
-      allow update: if false;
+      // 같은 사람을 다시 차단하면 문서 ID 가 같아 create 가 아니라 update 로 평가된다.
+      // 소유자/대상이 그대로인 재기록만 허용 (moderation.ts blockUser 의 setDoc).
+      allow update: if signedIn()
+        && resource.data.ownerUid == request.auth.uid
+        && request.resource.data.ownerUid == resource.data.ownerUid
+        && request.resource.data.blockedUid == resource.data.blockedUid;
     }
 
     /* ===== 전역 카운터(meta/counters) : 가입순번 ===== */

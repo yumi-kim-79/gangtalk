@@ -8,9 +8,11 @@ import SplashScreen from '@/screens/SplashScreen';
 import DiaryScreen from '@/screens/DiaryScreen';
 import SupportScreen from '@/screens/SupportScreen';
 import FavoritesScreen from '@/screens/FavoritesScreen';
+import LegalScreen from '@/screens/LegalScreen';
 import { useTheme } from '@/theme';
 
-const Stack = createNativeStackNavigator<RootStackParamList>();
+/** id 를 붙여야 중첩 스택 안에서도 getParent('Root') 로 확실히 루트를 잡을 수 있다 */
+const Stack = createNativeStackNavigator<RootStackParamList, 'Root'>();
 
 export default function RootNavigator() {
   const { initializing } = useAuth();
@@ -19,7 +21,7 @@ export default function RootNavigator() {
   if (initializing) return <SplashScreen />;
 
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
+    <Stack.Navigator id="Root" screenOptions={{ headerShown: false }}>
       <Stack.Screen name="MainTabs" component={MainTabNavigator} />
       {/* 로그인은 어디서든 모달로 띄운다 — 탭을 벗어나지 않아 흐름이 끊기지 않는다 */}
       <Stack.Screen
@@ -58,6 +60,18 @@ export default function RootNavigator() {
           headerTintColor: c.fg,
           headerStyle: { backgroundColor: c.surface },
         }}
+      />
+
+      {/* 이용약관 / 개인정보처리방침 — 웹으로 내보내지 않고 앱 안에서 연다 */}
+      <Stack.Screen
+        name="Legal"
+        component={LegalScreen}
+        options={({ route }) => ({
+          headerShown: true,
+          title: route.params?.kind === 'terms' ? '이용약관' : '개인정보처리방침',
+          headerTintColor: c.fg,
+          headerStyle: { backgroundColor: c.surface },
+        })}
       />
     </Stack.Navigator>
   );

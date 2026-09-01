@@ -1,10 +1,9 @@
 import React, { useCallback, useMemo } from 'react';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, type NavigationProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import {
   Alert,
   Clipboard,
-  Linking,
   Pressable,
   ScrollView,
   Share,
@@ -20,7 +19,7 @@ import { REFERRAL_REWARD_POINT, tierByPoints } from '@/constants/tiers';
 import { useAuth } from '@/hooks/useAuth';
 import { useRequireAuth } from '@/hooks/useRequireAuth';
 import { signOut } from '@/services/auth';
-import type { ProfileStackParamList } from '@/navigation/types';
+import type { ProfileStackParamList, RootStackParamList } from '@/navigation/types';
 import { fontSize, radius, spacing, useTheme, type ThemeColors } from '@/theme';
 
 export default function ProfileScreen() {
@@ -44,9 +43,12 @@ export default function ProfileScreen() {
     ]);
   }, []);
 
-  const openWeb = useCallback((path: string) => {
-    Linking.openURL(`${env.webUrl}${path}`).catch(() => {});
-  }, []);
+  /* 약관·개인정보·고객센터는 루트 스택 화면이라 마이 탭 스택으로는 못 간다 */
+  const rootNav = navigation.getParent<NavigationProp<RootStackParamList>>('Root' as never);
+  const openLegal = useCallback(
+    (kind: 'terms' | 'privacy') => rootNav?.navigate('Legal', { kind }),
+    [rootNav],
+  );
 
   const needLogin = useCallback(
     (go: () => void) => () => {
@@ -198,9 +200,9 @@ export default function ProfileScreen() {
       />
 
       <Text style={s.sectionTitle}>고객센터</Text>
-      <MenuRow label="이용약관" onPress={() => openWeb('/support')} />
-      <MenuRow label="개인정보처리방침" onPress={() => openWeb('/support')} />
-      <MenuRow label="문의하기" onPress={() => openWeb('/support')} />
+      <MenuRow label="이용약관" onPress={() => openLegal('terms')} />
+      <MenuRow label="개인정보처리방침" onPress={() => openLegal('privacy')} />
+      <MenuRow label="문의하기" onPress={() => rootNav?.navigate('Support')} />
 
       {isLoggedIn ? (
         <>

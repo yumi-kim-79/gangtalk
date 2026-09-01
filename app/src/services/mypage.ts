@@ -37,7 +37,14 @@ export function subscribeMyFavorites(
   return onSnapshot(
     query(collection(db, COLLECTIONS.favorites), where('ownerId', '==', uid)),
     async (snap: FirebaseFirestoreTypes.QuerySnapshot) => {
+      // type 을 보지 않으면 제휴업체 찜(type:'partner')의 targetId 가
+      // 우연히 같은 stores 문서에 매칭돼 엉뚱한 업체가 뜰 수 있다.
+      // (레거시 문서는 type 이 없어 store 로 간주)
       const targetIds = snap.docs
+        .filter(d => {
+          const t = String((d.data() as Raw)?.type ?? 'store');
+          return t === 'store';
+        })
         .map(d => String((d.data() as Raw)?.targetId ?? ''))
         .filter(Boolean);
 

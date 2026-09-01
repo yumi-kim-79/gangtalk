@@ -95,7 +95,9 @@ function normalizePartner(id: string, x: Raw): Partner {
     tags: Array.isArray(x.tags) ? (x.tags as unknown[]).map(t => str(t)) : [],
     intro: str(x.intro || x.desc || x.about || x.bio).trim(),
     benefits: str(x.benefits),
-    favs: posInt(x.favs ?? x.likes ?? x.hearts ?? x.bookmarks),
+    // 토글은 likes 만 올리므로(웹 PartnerDetail.vue:230) likes 를 먼저 본다.
+    // favs 를 먼저 보면 레거시 favs 가 남은 문서에서 숫자가 영영 갱신되지 않는다.
+    favs: posInt(x.likes ?? x.favs ?? x.hearts ?? x.bookmarks),
     lat: Number(x.lat) || undefined,
     lng: Number(x.lng) || undefined,
   };
