@@ -202,6 +202,54 @@ npm run build:all
 
 ## 작업 로그
 
+### 2026-09-01: 웹 초톡방이 빈 방/강톡 대화를 보여주던 버그 (`feature/rn-app`)
+
+#### 증상
+웹 현황판에서 초톡을 누르면 초톡 내용이 안 보이고, 강톡 대화가 뜨기도 했다.
+
+#### 원인 1 — `ChatBiz.resolveStoreKey()` 가 storeId 를 **업소명으로 바꿨다**
+storeId 가 Firestore auto-id 처럼 보이면 `stores` 문서에서
+`vendorKey / slug / key / bizKey / rooms_biz / id / storeId / title / name` 순으로
+키를 찾아 `finalStoreId` 를 **교체**했다. 국내 업소는 앞의 필드가 전부 없으므로
+마지막 `d.name` 이 걸려 `finalStoreId = '레이블'` 같은 한글 이름이 됐다.
+
+실제 데이터는 전부 **stores 문서 id** 기준이다:
+
+| 대상 | 경로 |
+|---|---|
+| 현황판 / 가게찾기 | `stores/{docId}` |
+| 지표 미러 | `rooms_biz/{docId}` |
+| 초톡 메시지 | `rooms_biz/{docId}/rooms/{docId}_room_01/messages` |
+| 관리자 초톡 붙여넣기 | 위와 동일 |
+| 앱 `ChotokScreen` | 위와 동일 |
+
+**ChatBiz 만 다른 문서를 보고 있었다.**
+
+추가로 `sanitize()` 는 소문자로 바꾸는데 **Firestore 문서 id 는 대소문자를 구분한다.**
+`o7JEtq84...` 를 소문자로 만들면 그 자체로 존재하지 않는 문서가 된다.
+`looksLikeAutoId` 도 소문자화한 값에 `/^[a-z0-9]{20,}$/` 를 적용해서
+사실상 모든 auto-id 가 이 경로를 탔다.
+
+#### 원인 2 — 폴백이 강톡 채팅을 읽었다
+후보 목록 마지막에 `rooms/{roomId}/messages` 가 있었다.
+`rooms` 는 **강톡 오픈채팅** 컬렉션이다 (앱 `services/chat.ts` 와 같은 소스).
+정본 경로가 비어 있으니 폴백이 여기까지 내려갔고, roomId 가 겹치면
+초톡방에 강톡 대화가 그대로 떴다.
+
+#### 수정
+- `resolveStoreKey()` — `rawStoreId` 를 **그대로 정본**으로 사용 (대소문자 보존).
+  이름/슬러그에서 뽑던 값은 `aliasKey` 로만 남겨 레거시 방 탐색에만 쓴다
+- 구독 후보 1순위를 정본 `rooms_biz/{docId}/rooms/{docId}_room_01/messages` 로 고정,
+  2순위에 레거시 별칭 `rooms_biz/{alias}/...` 추가
+- **`rooms` 폴백 제거** — 초톡과 무관한 소스
+
+이 수정으로 상단 맞출방/필요인원도 정상 표시된다
+(같은 `finalStoreId` 로 `rooms_biz` 문서를 구독하기 때문).
+
+- **검증**: `@vue/compiler-sfc` 파싱 + 템플릿 컴파일, script 문법 확인
+- **배포 필요**: `npm run deploy:hosting`
+
+
 ### 2026-09-01: 앱 공통 헤더를 웹과 동일하게 + 웹 현황판에 초톡 버튼 (`feature/rn-app`)
 
 #### A. 앱 헤더 — 웹 `AppHeader.vue` 와 동일 구성으로 교체

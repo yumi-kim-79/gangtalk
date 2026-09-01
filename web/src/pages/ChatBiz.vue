@@ -469,62 +469,52 @@ function looksLikeAutoId(v) {
   return /^[a-z0-9]{20,}$/.test(s) // Firestore auto-id 패턴 대략
 }
 
-/** stores/{rawStoreId}에서 사람이 읽는 키 추출 */
+/* fix (2026-09-01): 초톡 내용이 안 보이던 원인 =====
+ * 이전 구현은 storeId 가 Firestore auto-id 처럼 보이면 stores 문서에서
+ * vendorKey/slug/... 를 찾고, 그것도 없으면 **업소명(d.name)** 을 키로 삼아
+ * finalStoreId 를 바꿔버렸다. 국내 업소는 vendorKey 류가 없으므로 결과적으로
+ * finalStoreId = '레이블' 같은 한글 이름이 되었다.
+ *
+ * 그런데 실제 데이터는 전부 **stores 문서 id** 기준이다:
+ *   - 현황판/가게찾기      : stores/{docId}
+ *   - 지표 미러           : rooms_biz/{docId}
+ *   - 초톡 메시지          : rooms_biz/{docId}/rooms/{docId}_room_01/messages
+ *   - 관리자 초톡 붙여넣기   : 위와 동일 경로에 기록
+ *   - 앱 ChotokScreen     : 위와 동일 경로를 구독
+ * 그래서 ChatBiz 만 엉뚱한 문서를 보고 **항상 빈 방**이었고,
+ * 뒤쪽 legacy 후보(rooms/{id}/messages = 강톡 채팅)로 흘러 강톡 대화가 뜨기도 했다.
+ *
+ * 또 sanitize() 는 소문자로 바꾸는데 Firestore 문서 id 는 대소문자를 구분한다.
+ * 'o7JEtq84...' 를 소문자로 만들면 그 자체로 다른 문서가 된다.
+ *
+ * 이제 **rawStoreId 를 그대로 정본**으로 쓰고, 이름/슬러그에서 뽑던 키는
+ * aliasKey 로만 남겨 레거시 방을 찾는 후보로만 사용한다.
+ * ───────────────────────────────────────────────────────────── */
 async function resolveStoreKey() {
-  if (!looksLikeAutoId(rawStoreId)) {
-    finalStoreId.value = sanitize(rawStoreId)
-    finalRoomId.value = String(
-      route.query.roomId ?? `${finalStoreId.value}_room_01`,
-    )
-    aliasKey.value = finalStoreId.value
-    return
-  }
+  // 정본 - 대소문자 보존, 변환 없음
+  finalStoreId.value = rawStoreId
+  finalRoomId.value = String(route.query.roomId ?? `${rawStoreId}_room_01`)
+  aliasKey.value = sanitize(rawStoreId)
 
+  if (!looksLikeAutoId(rawStoreId)) return
+
+  // auto-id 인 경우에만 레거시 별칭 후보를 추가로 수집 (정본은 바꾸지 않는다)
   try {
     const s = await getDoc(doc(fbDb, 'stores', rawStoreId))
     if (s.exists()) {
       const d = s.data() || {}
-      const picks = [
-        d.vendorKey,
-        d.slug,
-        d.key,
-        d.bizKey,
-        d.rooms_biz,
-        d.id,
-        d.storeId,
-        d.title,
-        d.name,
-      ]
-        .map((x) => sanitize(x))
-        .filter(Boolean)
-
-      const first = picks[0]
+      const first = [
+        d.vendorKey, d.slug, d.key, d.bizKey, d.rooms_biz,
+        d.id, d.storeId, d.title, d.name,
+      ].map((x) => sanitize(x)).filter(Boolean)[0]
       if (first) {
         aliasKey.value = first
-        finalStoreId.value = first
-        finalRoomId.value = String(
-          route.query.roomId ?? `${first}_room_01`,
-        )
-        console.info(
-          '[CHAT_RESOLVE] stores 문서에서 vendorKey 추출:',
-          first,
-        )
-        return
+        console.info('[CHAT_RESOLVE] 레거시 별칭 후보:', first, '(정본은', rawStoreId, ')')
       }
     }
   } catch (e) {
-    console.warn(
-      '[CHAT_RESOLVE] stores 문서에서 vendorKey 추출 실패:',
-      e?.message || e,
-    )
+    console.warn('[CHAT_RESOLVE] 별칭 후보 조회 실패:', e?.message || e)
   }
-
-  // 실패시: 원래 값 그대로 사용
-  finalStoreId.value = sanitize(rawStoreId)
-  finalRoomId.value = String(
-    route.query.roomId ?? `${finalStoreId.value}_room_01`,
-  )
-  aliasKey.value = finalStoreId.value
 }
 
 /** alias 기반 레거시 roomId 후보 생성 */
@@ -568,17 +558,22 @@ async function subscribeMessages() {
     ),
   })
 
-  // 2) legacy chat_rooms (최종 roomId)
+  // 2) 레거시 별칭 rooms_biz (예전에 vendorKey 로 만들어진 방)
+  const alias = aliasKey.value
+  if (alias && alias !== finalStoreId.value) {
+    candidates.push({
+      label: `rooms_biz(alias:${alias})`,
+      col: collection(
+        fbDb, 'rooms_biz', alias, 'rooms', `${alias}_room_01`, 'messages',
+      ),
+    })
+  }
+
+  // 3) legacy chat_rooms (최종 roomId + alias 전부)
   candidates.push({
     label: 'chat_rooms',
-    col: collection(
-      fbDb,
-      'chat_rooms',
-      finalRoomId.value,
-      'messages',
-    ),
+    col: collection(fbDb, 'chat_rooms', finalRoomId.value, 'messages'),
   })
-  // 3) legacy chat_rooms (alias 전부)
   for (const rid of aliasRoomIds.value) {
     candidates.push({
       label: `chat_rooms(alias:${rid})`,
@@ -586,22 +581,10 @@ async function subscribeMessages() {
     })
   }
 
-  // 4) legacy rooms (최종 + alias)
-  candidates.push({
-    label: 'rooms(legacy)',
-    col: collection(
-      fbDb,
-      'rooms',
-      finalRoomId.value,
-      'messages',
-    ),
-  })
-  for (const rid of aliasRoomIds.value) {
-    candidates.push({
-      label: `rooms(legacy alias:${rid})`,
-      col: collection(fbDb, 'rooms', rid, 'messages'),
-    })
-  }
+  /* fix (2026-09-01): 'rooms' 폴백 제거.
+   * rooms/{id}/messages 는 **강톡 오픈채팅** 컬렉션이다 (앱 services/chat.ts 와 동일).
+   * roomId 가 우연히 겹치면 초톡방에 강톡 대화가 그대로 떴다. 초톡과 무관한 소스라
+   * 후보에서 뺀다. */
 
   // 순서대로 “문서가 1개 이상 있는” 경로를 찾아 구독
   for (const c of candidates) {
