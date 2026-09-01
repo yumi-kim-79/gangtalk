@@ -202,6 +202,35 @@ npm run build:all
 
 ## 작업 로그
 
+### 2026-09-01: 마이 탭이 찜한 업체로 열리던 문제 (`feature/rn-app`)
+
+#### 증상
+헤더 햄버거 → 즐겨찾기를 한 번 쓰고 나면, 이후 **마이페이지 탭을 누를 때마다
+찜한 업체 화면이 먼저** 떴다.
+
+#### 원인 — 탭 스택에 화면을 밀어 넣었다
+햄버거의 즐겨찾기가
+```js
+navigate('MainTabs', { screen: 'Profile', params: { screen: 'Favorites' } })
+```
+로 **마이 탭 안쪽 스택에 Favorites 를 push** 했다.
+React Navigation 은 탭별 스택 상태를 유지하므로, 그 뒤로 마이 탭을 누르면
+마지막 상태(= Favorites 가 올라간 스택)로 돌아간다. 버그가 아니라 정상 동작이고,
+**넣은 위치가 잘못됐다.**
+
+#### 수정
+즐겨찾기도 일정/달력·고객센터처럼 **루트 스택**으로 띄운다.
+- `RootStackParamList` 에 `Favorites` 추가 + `RootNavigator` 에 등록
+- `AppHeader` 는 `navigate('Favorites')` 로 단순화
+- 마이 탭 안의 `ProfileStack.Favorites` 는 그대로 — 같은 화면이 두 경로에 있다
+
+`FavoritesScreen` 은 이제 두 곳에서 열리므로 업체 상세 이동을
+`navigate('MainTabs', { screen:'Stores', params:{ screen:'StoreDetail', ... } })` 로
+**루트 경로 명시**로 바꿨다. 탭 안에서 열렸을 때는 액션이 부모로 올라가 그대로 처리된다.
+
+- **검증**: `tsc --noEmit` 0 errors / `eslint .` 0 errors
+
+
 ### 2026-09-01: 웹 마이페이지를 앱 구조로 재편 (B안) (`feature/rn-app`)
 
 `UserSection.vue` 의 템플릿을 앱 `screens/ProfileScreen.tsx` 와 **1:1로 대응**하게 다시 짰다.

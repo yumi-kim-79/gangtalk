@@ -5,14 +5,17 @@ import { ActivityIndicator, FlatList, StyleSheet, Text, View } from 'react-nativ
 import StoreListItem from '@/components/store/StoreListItem';
 import { useAuth } from '@/hooks/useAuth';
 import { subscribeMyFavorites } from '@/services/mypage';
-import type { MainTabParamList } from '@/navigation/types';
+import type { RootStackParamList } from '@/navigation/types';
 import { fontSize, useTheme, type ThemeColors } from '@/theme';
 import type { Store } from '@/types/store';
 
 export default function FavoritesScreen() {
   const c = useTheme();
   const s = styles(c);
-  const navigation = useNavigation<NavigationProp<MainTabParamList>>();
+  /* 이 화면은 두 곳에 있다 — 마이 탭 스택 안, 그리고 헤더 메뉴용 루트 스택.
+   * 어느 쪽에서 열려도 같게 동작하도록 **루트 경로로 명시 이동**한다.
+   * (탭 안에서 열렸을 때는 액션이 부모로 올라가 그대로 처리된다) */
+  const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const { uid } = useAuth();
 
   const [stores, setStores] = useState<Store[]>([]);
@@ -36,7 +39,10 @@ export default function FavoritesScreen() {
 
   const openStore = useCallback(
     (store: Store) =>
-      navigation.navigate('Stores', { screen: 'StoreDetail', params: { storeId: store.id } }),
+      navigation.navigate('MainTabs', {
+        screen: 'Stores',
+        params: { screen: 'StoreDetail', params: { storeId: store.id } },
+      }),
     [navigation],
   );
 

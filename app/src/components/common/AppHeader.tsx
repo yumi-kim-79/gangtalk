@@ -102,10 +102,8 @@ export default function AppHeader({
         return;
       }
       if (m.key === 'favorites') {
-        navigation.navigate('MainTabs', {
-          screen: 'Profile',
-          params: { screen: 'Favorites' },
-        });
+        // 탭 안으로 밀면 마이 탭 스택에 남아 다음에 탭을 눌렀을 때 이 화면이 먼저 뜬다
+        navigation.navigate('Favorites');
         return;
       }
       if (m.key === 'login') {

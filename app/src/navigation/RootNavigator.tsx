@@ -7,6 +7,7 @@ import MainTabNavigator from '@/navigation/MainTabNavigator';
 import SplashScreen from '@/screens/SplashScreen';
 import DiaryScreen from '@/screens/DiaryScreen';
 import SupportScreen from '@/screens/SupportScreen';
+import FavoritesScreen from '@/screens/FavoritesScreen';
 import { useTheme } from '@/theme';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -44,6 +45,16 @@ export default function RootNavigator() {
         options={{
           headerShown: true,
           title: '고객센터',
+          headerTintColor: c.fg,
+          headerStyle: { backgroundColor: c.surface },
+        }}
+      />
+      <Stack.Screen
+        name="Favorites"
+        component={FavoritesScreen}
+        options={{
+          headerShown: true,
+          title: '찜한 업체',
           headerTintColor: c.fg,
           headerStyle: { backgroundColor: c.surface },
         }}

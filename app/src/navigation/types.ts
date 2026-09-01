@@ -62,6 +62,14 @@ export type RootStackParamList = {
   /** 헤더 햄버거 메뉴 — 어느 탭에서든 열린다 */
   Diary: undefined;
   Support: undefined;
+  /**
+   * 즐겨찾기.
+   * 마이 탭 안(`ProfileStack.Favorites`)에도 같은 화면이 있지만,
+   * 헤더 메뉴에서는 **루트 스택**으로 띄운다.
+   * 탭 안으로 밀어 넣으면 그 탭의 스택 상태로 남아
+   * 나중에 마이페이지 탭을 눌렀을 때 찜한 업체가 먼저 뜬다.
+   */
+  Favorites: undefined;
 };
 
 declare global {
