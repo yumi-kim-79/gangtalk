@@ -9,7 +9,7 @@
   <div class="adm-page">
     <header class="adm-page-head">
       <h2 class="adm-page-title">📊 현황판 업데이트</h2>
-      <p class="adm-page-sub">맞출방 / 필요인원 / 와이파이를 입력하면 강남톡방 현황판에 즉시 반영됩니다.</p>
+      <p class="adm-page-sub">입력하면 강남톡방 현황판에 즉시 반영됩니다.</p>
     </header>
 
     <!-- 가게 선택 (가게가 2개 이상일 때만 표시) -->
@@ -30,50 +30,48 @@
       </p>
     </section>
 
-    <!-- 초톡 붙여넣기 — 카톡 내용 그대로 붙이면 자동 파싱 -->
-    <section v-else-if="currentStore" class="adm-section adm-chotok">
-      <header class="adm-section-head">
-        <h3>💬 초톡 붙여넣기</h3>
-        <span class="adm-metric-hint">카톡 방 목록을 그대로 복사해 붙여넣으세요</span>
-      </header>
-
-      <textarea
-        v-model="chotokText"
-        class="adm-chotok-ta"
-        rows="8"
-        placeholder="카카오톡에서 복사한 내용을 그대로 붙여넣으세요.&#10;&#10;예)&#10;1번방 2명&#10;2번방 3명&#10;5번방 1명"
-      ></textarea>
-
-      <div class="adm-chotok-foot">
-        <div class="adm-chotok-preview">
-          <template v-if="chotokText.trim()">
-            <span>맞출방 <b>{{ chotokParsed.roomCount }}</b></span>
-            <span class="sep">·</span>
-            <span>필요인원 <b>{{ chotokParsed.needSum }}</b></span>
-            <span class="sep">·</span>
-            <span>혼잡도 <b>{{ chotokAutoStatus }}</b></span>
-          </template>
-          <span v-else class="adm-metric-hint">붙여넣으면 맞출방/필요인원이 자동 계산됩니다.</span>
-        </div>
-        <button
-          class="adm-btn primary big"
-          type="button"
-          :disabled="chotokSaving || !chotokParsed.roomCount"
-          @click="onChotokApply"
-        >{{ chotokSaving ? '반영 중…' : '초톡 반영' }}</button>
-      </div>
-
-      <p class="adm-chotok-note">
-        반영하면 현황판 수치가 바뀌고, 붙여넣은 내용은 앱 <b>초톡방</b>에 그대로 올라갑니다.
-      </p>
-    </section>
-
-    <!-- 메트릭 편집 -->
-    <section v-if="currentStore" class="adm-section">
+    <!-- 업체 카드 — 초톡 붙여넣기 + 지표를 한 화면에 -->
+    <section v-else-if="currentStore" class="adm-section">
       <header class="adm-section-head">
         <h3>{{ currentStore.name }}</h3>
         <span class="adm-store-meta-pill">{{ currentStore.region || '-' }} · {{ currentStore.category || '-' }}</span>
       </header>
+
+      <!-- 초톡 붙여넣기 -->
+      <div class="adm-chotok">
+        <div class="adm-chotok-head">
+          <b>💬 초톡 붙여넣기</b>
+          <span>카톡 방 목록을 그대로 붙여넣으면 자동 계산됩니다</span>
+        </div>
+
+        <textarea
+          v-model="chotokText"
+          class="adm-chotok-ta"
+          rows="3"
+          placeholder="예) 1번방 2명 / 2번방 3명 / 5번방 1명"
+        ></textarea>
+
+        <div class="adm-chotok-foot">
+          <div class="adm-chotok-preview">
+            <template v-if="chotokText.trim()">
+              <span>맞출방 <b>{{ chotokParsed.roomCount }}</b></span>
+              <span class="sep">·</span>
+              <span>필요인원 <b>{{ chotokParsed.needSum }}</b></span>
+              <span class="sep">·</span>
+              <span>혼잡도 <b>{{ chotokAutoStatus }}</b></span>
+            </template>
+            <span v-else class="adm-chotok-idle">붙여넣으면 앱 초톡방에도 그대로 올라갑니다</span>
+          </div>
+          <button
+            class="adm-btn primary"
+            type="button"
+            :disabled="chotokSaving || !chotokParsed.roomCount"
+            @click="onChotokApply"
+          >{{ chotokSaving ? '반영 중…' : '초톡 반영' }}</button>
+        </div>
+      </div>
+
+      <div class="adm-divider"><span>또는 직접 입력</span></div>
 
       <div class="adm-metric-grid">
         <!-- 맞출방 -->
@@ -119,7 +117,7 @@
             />
             <button type="button" class="adm-counter-btn" @click="inc('totalRooms')">+</button>
           </div>
-          <p class="adm-metric-hint">맞출방 ÷ 전체방 비율로 혼잡도 자동 계산</p>
+          <p class="adm-metric-hint">혼잡도 자동 계산 기준</p>
         </div>
 
         <!-- 혼잡도 (자동/수동) -->
@@ -153,7 +151,7 @@
             <span class="adm-status-badge" :class="statusBadgeClass(autoStatusOf(form.match, form.totalRooms))">
               {{ autoStatusOf(form.match, form.totalRooms) }}
             </span>
-            <span class="adm-metric-hint">맞출방/필요인원/전체방 입력 시 자동 계산됩니다.</span>
+            <span class="adm-metric-hint">전체방 대비 맞출방 비율</span>
           </div>
         </div>
       </div>
@@ -486,125 +484,132 @@ function fmtTime(v) {
 </script>
 
 <style scoped>
-.adm-page{ max-width:800px; margin:0 auto; }
-.adm-chotok-ta{
-  width:100%; box-sizing:border-box; margin-top:10px;
-  padding:12px 14px; border:1px solid #f0d3e0; border-radius:12px;
-  font-size:14px; line-height:1.6; resize:vertical; font-family:inherit;
-}
-.adm-chotok-ta:focus{ outline:none; border-color:#ff2e7e; }
-.adm-chotok-foot{
-  display:flex; align-items:center; justify-content:space-between;
-  gap:12px; margin-top:12px; flex-wrap:wrap;
-}
-.adm-chotok-preview{ font-size:14px; color:#555; display:flex; gap:6px; align-items:center; }
-.adm-chotok-preview b{ color:#ff2e7e; font-size:16px; }
-.adm-chotok-preview .sep{ color:#ddd; }
-.adm-chotok-note{ margin:10px 0 0; font-size:12px; color:#999; }
-.adm-page-head{ margin-bottom:18px; }
-.adm-page-title{ margin:0; font-size:22px; font-weight:900; }
-.adm-page-sub{ margin:4px 0 0; font-size:13px; color:#888; }
+/* 2026-09-01: 모바일 한 화면에 들어오도록 전체 밀도 축소 + 카드 1개로 통합 */
+.adm-page{ max-width:720px; margin:0 auto; }
+.adm-page-head{ margin-bottom:12px; }
+.adm-page-title{ margin:0; font-size:19px; font-weight:900; }
+.adm-page-sub{ margin:3px 0 0; font-size:12px; color:#999; }
 
 .adm-section{
   background:#fff; border:1px solid #f0f0f0; border-radius:14px;
-  padding:24px; margin-bottom:14px;
+  padding:16px; margin-bottom:10px;
 }
 .adm-section.empty-state{ text-align:center; }
 .adm-empty{ color:#aaa; font-size:14px; margin:0; }
 
-.adm-selector label{ display:flex; flex-direction:column; gap:6px; }
-.adm-selector span{ font-size:12px; font-weight:700; color:#666; }
+.adm-selector label{ display:flex; align-items:center; gap:10px; }
+.adm-selector span{ font-size:12px; font-weight:700; color:#666; flex:none; }
 .adm-selector select{
-  height:40px; padding:0 12px;
+  flex:1; height:38px; padding:0 10px;
   border:1.5px solid #eee; border-radius:10px;
   font-size:14px; background:#fff;
 }
 
 .adm-section-head{
   display:flex; align-items:center; justify-content:space-between;
-  gap:10px; margin-bottom:20px; flex-wrap:wrap;
+  gap:8px; margin-bottom:12px; flex-wrap:wrap;
 }
-.adm-section-head h3{ margin:0; font-size:18px; font-weight:900; }
+.adm-section-head h3{ margin:0; font-size:17px; font-weight:900; }
 .adm-store-meta-pill{
-  font-size:12px; color:#888; background:#f5f5f5;
-  padding:4px 10px; border-radius:999px;
+  font-size:11px; color:#888; background:#f5f5f5;
+  padding:3px 9px; border-radius:999px;
 }
 
+/* ── 초톡 붙여넣기 ── */
+.adm-chotok{
+  background:#fff8fb; border:1px solid #ffe0ec;
+  border-radius:12px; padding:12px;
+}
+.adm-chotok-head{ display:flex; flex-direction:column; gap:2px; margin-bottom:8px; }
+.adm-chotok-head b{ font-size:14px; font-weight:800; color:#333; }
+.adm-chotok-head span{ font-size:11px; color:#a08; opacity:.7; }
+.adm-chotok-ta{
+  width:100%; box-sizing:border-box; display:block;
+  padding:10px 12px; border:1px solid #f0d3e0; border-radius:10px;
+  font-size:14px; line-height:1.5; resize:vertical; font-family:inherit;
+  background:#fff;
+}
+.adm-chotok-ta:focus{ outline:none; border-color:#ff2e7e; }
+.adm-chotok-foot{
+  display:flex; align-items:center; justify-content:space-between;
+  gap:10px; margin-top:10px;
+}
+.adm-chotok-preview{
+  flex:1; min-width:0;
+  font-size:13px; color:#555;
+  display:flex; gap:5px; align-items:center; flex-wrap:wrap;
+}
+.adm-chotok-preview b{ color:#ff2e7e; font-size:15px; }
+.adm-chotok-preview .sep{ color:#e6c9d6; }
+.adm-chotok-idle{ font-size:11px; color:#b9a2ad; }
+
+/* 구분선 */
+.adm-divider{
+  display:flex; align-items:center; gap:10px;
+  margin:14px 0 12px; color:#c9c9c9; font-size:11px;
+}
+.adm-divider::before, .adm-divider::after{
+  content:''; flex:1; height:1px; background:#f0f0f0;
+}
+
+/* ── 지표 ── */
 .adm-metric-grid{
-  display:grid;
-  grid-template-columns:1fr 1fr;
-  gap:18px;
-  margin-bottom:24px;
+  display:grid; grid-template-columns:1fr 1fr;
+  gap:12px; margin-bottom:14px;
 }
-.adm-metric-box{
-  display:flex; flex-direction:column; gap:10px;
-}
-.adm-metric-box label{
-  font-size:13px; font-weight:700; color:#444;
-}
-.adm-metric-box:nth-child(3){
-  grid-column:1 / -1;
-}
+.adm-metric-box{ display:flex; flex-direction:column; gap:6px; min-width:0; }
+.adm-metric-box label{ font-size:12px; font-weight:700; color:#555; }
+/* 전체방 · 혼잡도는 한 줄 전체 */
+.adm-metric-box:nth-child(3),
+.adm-metric-box:nth-child(4){ grid-column:1 / -1; }
 
 .adm-counter{
-  display:flex; gap:8px; align-items:center;
-  background:#fff8fb;
-  padding:10px;
-  border-radius:12px;
+  display:flex; gap:6px; align-items:center;
+  background:#fafafa; padding:5px; border-radius:10px;
 }
 .adm-counter-btn{
-  width:48px; height:48px;
-  border:none;
-  background:#ff2e7e; color:#fff;
-  border-radius:10px;
-  font-size:24px; font-weight:900;
-  cursor:pointer;
+  flex:none; width:36px; height:36px;
+  border:none; background:#ff2e7e; color:#fff;
+  border-radius:8px; font-size:18px; font-weight:900;
+  line-height:1; cursor:pointer;
 }
-.adm-counter-btn:active{ transform:scale(.95); }
+.adm-counter-btn:active{ transform:scale(.94); }
 .adm-counter-input{
-  flex:1;
-  height:48px;
-  text-align:center;
-  font-size:28px; font-weight:900;
-  border:1.5px solid #ffd6e4;
-  background:#fff; color:#ff2e7e;
-  border-radius:10px;
+  flex:1; min-width:0; width:100%;
+  height:36px; text-align:center;
+  font-size:19px; font-weight:900;
+  border:1.5px solid #ffd6e4; background:#fff; color:#ff2e7e;
+  border-radius:8px;
+  -moz-appearance:textfield;
 }
+.adm-counter-input::-webkit-outer-spin-button,
+.adm-counter-input::-webkit-inner-spin-button{ -webkit-appearance:none; margin:0; }
 .adm-counter-input:focus{ outline:none; border-color:#ff2e7e; }
 
-.adm-metric-hint{
-  margin:6px 0 0; font-size:11px; color:#888;
-}
+.adm-metric-hint{ margin:4px 0 0; font-size:11px; color:#999; }
 
 .adm-status-mode{
-  display:flex; gap:14px; font-size:13px; color:#555;
-  margin-bottom:8px;
+  display:flex; gap:12px; font-size:12px; color:#555; margin-bottom:6px;
 }
 .adm-status-mode label{ cursor:pointer; display:inline-flex; align-items:center; gap:4px; }
 
-.adm-status-group{
-  display:flex; gap:6px;
-}
+.adm-status-group{ display:flex; gap:6px; }
 .adm-status-btn{
-  flex:1; height:48px;
-  border:1.5px solid #eee;
-  background:#fff; color:#666;
-  border-radius:10px; font-weight:700; font-size:14px;
-  cursor:pointer;
+  flex:1; height:38px;
+  border:1.5px solid #eee; background:#fff; color:#666;
+  border-radius:9px; font-weight:700; font-size:13px; cursor:pointer;
 }
 .adm-status-btn.active.good{ background:#21c36b; border-color:#21c36b; color:#fff; }
 .adm-status-btn.active.mid{  background:#f2a100; border-color:#f2a100; color:#fff; }
 .adm-status-btn.active.bad{  background:#ff4d4d; border-color:#ff4d4d; color:#fff; }
 
 .adm-status-preview{
-  display:flex; align-items:center; gap:10px;
-  padding:10px 14px;
-  background:#fff8fb; border-radius:10px;
+  display:flex; align-items:center; gap:8px;
+  padding:7px 10px; background:#fafafa; border-radius:9px;
 }
 .adm-status-badge{
-  display:inline-block; padding:4px 14px; border-radius:999px;
-  font-size:14px; font-weight:800;
-  background:#f5f5f5; color:#888;
+  display:inline-block; padding:3px 12px; border-radius:999px;
+  font-size:13px; font-weight:800; background:#f5f5f5; color:#888;
 }
 .adm-status-badge.good{ background:#e9f7ef; color:#21c36b; }
 .adm-status-badge.mid{ background:#fff3e0; color:#f2a100; }
@@ -612,35 +617,52 @@ function fmtTime(v) {
 
 .adm-section-foot{
   display:flex; align-items:center; justify-content:space-between;
-  flex-wrap:wrap; gap:10px;
-  padding-top:10px;
-  border-top:1px solid #f5f5f5;
+  flex-wrap:wrap; gap:8px;
+  padding-top:10px; border-top:1px solid #f5f5f5;
 }
-.adm-last-time{ font-size:12px; color:#aaa; }
+.adm-last-time{ font-size:11px; color:#bbb; }
 .adm-btn{
-  height:46px; padding:0 28px;
+  height:40px; padding:0 18px;
   border:1px solid #eee; background:#fafafa; color:#333;
-  border-radius:10px; font-weight:700; font-size:14px;
-  cursor:pointer;
+  border-radius:9px; font-weight:700; font-size:13px;
+  white-space:nowrap; cursor:pointer;
 }
 .adm-btn.primary{ background:#ff2e7e; border-color:#ff2e7e; color:#fff; }
-.adm-btn.big{ height:50px; font-size:15px; }
-.adm-btn:disabled{ opacity:.6; cursor:not-allowed; }
+.adm-btn.big{ height:44px; padding:0 24px; font-size:14px; }
+.adm-btn:disabled{ opacity:.5; cursor:not-allowed; }
 
-@media (max-width:768px){
-  .adm-metric-grid{ grid-template-columns:1fr; }
-  .adm-metric-box:nth-child(3),
-  .adm-metric-box:nth-child(4){ grid-column:1; }
+/* ── 모바일 ── */
+@media (max-width:480px){
+  .adm-page-title{ font-size:17px; }
+  .adm-section{ padding:12px; border-radius:12px; }
+  .adm-section-head{ margin-bottom:10px; }
+  .adm-section-head h3{ font-size:15px; }
+  .adm-metric-grid{ gap:10px; margin-bottom:12px; }
+  .adm-counter-btn{ width:32px; height:32px; font-size:17px; }
+  .adm-counter-input{ height:32px; font-size:17px; }
+  .adm-chotok-foot{ flex-wrap:wrap; }
+  .adm-chotok-preview{ flex-basis:100%; }
+  .adm-chotok-foot .adm-btn{ width:100%; }
+  .adm-section-foot .adm-btn{ flex:1; }
 }
 
+/* ── 다크 ── */
 :root[data-theme="dark"] .adm-section,
 :root[data-theme="black"] .adm-section{ background:#1c1c1c; border-color:#2a2a2a; color:#eee; }
+:root[data-theme="dark"] .adm-chotok,
+:root[data-theme="black"] .adm-chotok{ background:#241a1f; border-color:#3a2027; }
+:root[data-theme="dark"] .adm-chotok-ta,
+:root[data-theme="black"] .adm-chotok-ta{ background:#181818; border-color:#3a2027; color:#eee; }
 :root[data-theme="dark"] .adm-counter,
-:root[data-theme="black"] .adm-counter{ background:#2a1a22; }
+:root[data-theme="black"] .adm-counter{ background:#242424; }
 :root[data-theme="dark"] .adm-counter-input,
-:root[data-theme="black"] .adm-counter-input{ background:#222; border-color:#3a2027; color:#ff7fb8; }
-:root[data-theme="dark"] .adm-wifi-btn,
-:root[data-theme="black"] .adm-wifi-btn{ background:#222; border-color:#2a2a2a; color:#ddd; }
+:root[data-theme="black"] .adm-counter-input{ background:#181818; border-color:#3a2027; color:#ff7fb8; }
+:root[data-theme="dark"] .adm-status-preview,
+:root[data-theme="black"] .adm-status-preview{ background:#242424; }
 :root[data-theme="dark"] .adm-selector select,
 :root[data-theme="black"] .adm-selector select{ background:#222; border-color:#2a2a2a; color:#eee; }
+:root[data-theme="dark"] .adm-divider::before,
+:root[data-theme="dark"] .adm-divider::after,
+:root[data-theme="black"] .adm-divider::before,
+:root[data-theme="black"] .adm-divider::after{ background:#2a2a2a; }
 </style>
