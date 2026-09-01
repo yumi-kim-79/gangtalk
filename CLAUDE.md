@@ -202,6 +202,31 @@ npm run build:all
 
 ## 작업 로그
 
+### 2026-09-01: 웹 강톡도 커뮤니티 4개 전부 진입 가능하게 (`feature/rn-app`)
+
+앱만 열어두고 웹은 여전히 힐링톡·우리가게·이벤트톡이 `gc-disabled` + "서비스 준비중"
+이었다. 앱과 같은 분류로 웹도 열었다.
+
+- `COMMUNITY_GROUPS` 신설 — **앱 `constants/board.ts` 의 `BOARD_GROUPS` 와 같은 분류**
+  ```
+  gangtalk daily·suggest·pledge·vote·quiz·event
+  healing  quote·health·travel
+  store    suggest
+  event    event·quiz
+  ```
+- `catPage` 에 `group` 추가, `openCategoryPage(key, group)` 로 확장
+- `yaTabsInPage` 를 상수 → **computed** 로 바꿔 묶음에 속한 카테고리 pill 만 노출
+- `catPosts` 는 '전체' 여도 묶음 범위 안에서만 (`allow.includes`)
+- `catLabel` 이 묶음 제목을 쓰도록
+- 준비중 카드 3개를 실제 버튼으로 교체, `gc-soon` 배지 제거, 핑크 카드용 화살표 색 추가
+
+`healingPage` 전용 풀스크린은 손대지 않았다 (여전히 미사용). 필요하면 힐링톡만
+그 페이지로 되돌릴 수 있다.
+
+- **검증**: `@vue/compiler-sfc` 템플릿+스타일 컴파일, script 문법
+- **배포 필요**: `npm run deploy:hosting`
+
+
 ### 2026-09-01: 햄버거 메뉴 이모지를 SVG 아이콘으로 교체 (`feature/rn-app`)
 
 메뉴 항목의 이모지(📅🎧❤️🚪🔑)가 시뮬레이터에서 전부 tofu(`?`)로 떴다.

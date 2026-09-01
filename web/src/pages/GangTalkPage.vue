@@ -51,7 +51,7 @@
     <!-- ===== 커뮤니티 2x2 그리드 ===== -->
     <section class="community-grid">
       <!-- 1) 강톡 — 솔리드 다크 배경 + 텍스트 + 화살표 -->
-      <button type="button" class="gc-card gc-gangtok" @click="openCategoryPage('all')">
+      <button type="button" class="gc-card gc-gangtok" @click="openCategoryPage('all','gangtalk')">
         <svg class="gc-arrow" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
         <div class="gc-body">
           <div class="gc-title white">강톡</div>
@@ -59,32 +59,32 @@
         </div>
       </button>
 
-      <!-- 2) 힐링톡 — 서비스 준비중 (클릭 비활성) -->
-      <div class="gc-card gc-healing gc-disabled" aria-disabled="true">
+      <!-- 2) 힐링톡 (2026-09-01: 서비스 준비중 해제 — 앱과 동일하게 카테고리 묶음으로 진입) -->
+      <button type="button" class="gc-card gc-healing" @click="openCategoryPage('all','healing')">
+        <svg class="gc-arrow pinkish" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
         <div class="gc-body">
           <div class="gc-title pink">힐링톡</div>
           <div class="gc-sub muted">명언·건강·여행·다이어트</div>
         </div>
-        <span class="gc-soon">서비스 준비중</span>
-      </div>
+      </button>
 
-      <!-- 3) 우리 가게 게시판 — 서비스 준비중 (클릭 비활성) -->
-      <div class="gc-card gc-store gc-disabled" aria-disabled="true">
+      <!-- 3) 우리 가게 게시판 -->
+      <button type="button" class="gc-card gc-store" @click="openCategoryPage('all','store')">
+        <svg class="gc-arrow pinkish" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
         <div class="gc-body">
           <div class="gc-title pink">우리 가게 게시판</div>
           <div class="gc-sub muted">공지·소식·가게 이야기</div>
         </div>
-        <span class="gc-soon">서비스 준비중</span>
-      </div>
+      </button>
 
-      <!-- 4) 이벤트톡 — 서비스 준비중 (클릭 비활성) -->
-      <div class="gc-card gc-event gc-disabled" aria-disabled="true">
+      <!-- 4) 이벤트톡 -->
+      <button type="button" class="gc-card gc-event" @click="openCategoryPage('all','event')">
+        <svg class="gc-arrow pinkish" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
         <div class="gc-body">
           <div class="gc-title pink">이벤트톡</div>
           <div class="gc-sub muted">이벤트·혜택·참여</div>
         </div>
-        <span class="gc-soon">서비스 준비중</span>
-      </div>
+      </button>
     </section>
 
     <!-- ===== 베스트 탭 (pill 스타일, 작은 크기) ===== -->
@@ -794,7 +794,6 @@ const selectedCat = ref(null)
 const yahoCardsToShow = computed(()=> !selectedCat.value ? yahoCategoryCards.value : yahoCategoryCards.value.filter(c => c.key === selectedCat.value))
 function onMainTabClick(key){ yaTab.value = key; selectedCat.value = (selectedCat.value === key) ? null : key }
 
-const yaTabsInPage = [{ key:'all', label:'전체', icon:'✨' }, ...yaCats]
 function catIcon(cat){
   const k = String(cat||'');
   if (k === 'hot') return '❤️';
@@ -1933,11 +1932,32 @@ const closeVote = () => { votePostId.value = null }
 
 const healMap = { travel:'travel', health:'health', quote:'quote' }
 
-const catPage = ref({ open:false, filter:'all' })
+/* 주제 별 커뮤니티 묶음 (2026-09-01)
+ * 4개는 별도 게시판이 아니라 같은 board_posts 를 카테고리로 나눈 묶음이다.
+ * 앱 `app/src/constants/board.ts` 의 BOARD_GROUPS 와 **같은 분류**여야 한다.
+ * 우리 가게 게시판은 전용 카테고리가 없어 suggest("우리가게 업주에게 바란다")로 묶었다. */
+const COMMUNITY_GROUPS = {
+  gangtalk: { title: '강톡 게시판',       cats: ['daily','suggest','pledge','vote','quiz','event'] },
+  healing:  { title: '힐링톡',            cats: ['quote','health','travel'] },
+  store:    { title: '우리 가게 게시판',   cats: ['suggest'] },
+  event:    { title: '이벤트톡',          cats: ['event','quiz'] },
+}
+
+const catPage = ref({ open:false, filter:'all', group:'gangtalk' })
+const currentGroup = computed(() =>
+  COMMUNITY_GROUPS[catPage.value.group] || COMMUNITY_GROUPS.gangtalk
+)
+/* 묶음 안의 카테고리만 pill 로 노출 */
+const yaTabsInPage = computed(() => [
+  { key:'all', label:'전체', icon:'✨' },
+  ...currentGroup.value.cats
+      .map(k => yaCats.find(c => c.key === k))
+      .filter(Boolean),
+])
 const catLabel = computed(() =>
   catPage.value.filter === 'all'
-    ? '강톡 게시판'
-    : (yaCats.find(x => x.key === catPage.value.filter)?.label || '강톡 게시판')
+    ? currentGroup.value.title
+    : (yaCats.find(x => x.key === catPage.value.filter)?.label || currentGroup.value.title)
 )
 
 const catPosts = computed(() => {
@@ -1948,9 +1968,15 @@ const catPosts = computed(() => {
     return newsPosts.value
   }
 
-  // 나머지 카테고리는 기존 board_posts 기준
+  // 나머지 카테고리는 기존 board_posts 기준.
+  // '전체' 여도 **선택한 커뮤니티 묶음 안에서만** 보여준다 (앱과 동일)
+  const allow = currentGroup.value.cats.map(k => yaMap[k] || k)
   const list = posts.value.filter(
-    p => !isNotice(p) && (f === 'all' ? true : p.category === (yaMap[f] || f))
+    p => !isNotice(p) && (
+      f === 'all'
+        ? allow.includes(p.category)
+        : p.category === (yaMap[f] || f)
+    )
   )
   return list.slice().sort((a,b)=> (b.updatedAt || 0) - (a.updatedAt || 0))
 })
@@ -2067,9 +2093,10 @@ function onCatFilterClick(key){
 }
 
 // ✅ 카테고리 풀스크린 열릴 때 시작, 닫을 때 중지
-function openCategoryPage (key = 'all') {
+function openCategoryPage (key = 'all', group = 'gangtalk') {
   if (key !== 'all') yaTab.value = key
-  catPage.value = { open: true, filter: key || 'all' }
+  catPage.value = { open: true, filter: key || 'all', group: COMMUNITY_GROUPS[group] ? group : 'gangtalk' }
+  currentPage.value = 1
   startListTicker(() => catPosts.value, { minMs: 15000, maxMs: 35000 })
 }
 function closeCatPage () {
@@ -2752,6 +2779,9 @@ const FALLBACK_BIZ_IMG = 'https://images.unsplash.com/photo-1517248135467-4c7edc
 .gc-sub.muted{ color: #888; }
 
 /* 카드 하단 중앙 "서비스 준비중" pill */
+/* 2026-09-01: 준비중 카드가 실제 버튼이 되면서 핑크 카드용 화살표 색 추가 */
+.gc-arrow.pinkish{ color:#ff2e7e; }
+
 .gc-soon{
   position: absolute;
   left: 50%;
