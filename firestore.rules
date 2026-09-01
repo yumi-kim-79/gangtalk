@@ -139,7 +139,9 @@ service cloud.firestore {
                                 || request.resource.data.ownerEmail == resource.data.ownerEmail
                               )
                          )
-                      || changesAreOnly(['rating', 'ratingSum', 'ratingCount', 'updatedAt'])
+                      // 찜(하트)은 로그인 사용자가 stores.likes 만 단독으로 바꾼다
+                      // app/src/services/favorites.ts 의 runTransaction 이 여기에 걸린다
+                      || changesAreOnly(['rating', 'ratingSum', 'ratingCount', 'likes', 'updatedAt'])
                     );
     }
 

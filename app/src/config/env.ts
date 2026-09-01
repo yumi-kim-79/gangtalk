@@ -13,5 +13,11 @@ export const env = {
   mapsApiKey: Config.MAPS_API_KEY ?? '',
   /** 카카오 네이티브 앱 키 — 카카오 개발자 콘솔 > 앱 키 */
   kakaoAppKey: Config.KAKAO_APP_KEY ?? '',
+  /**
+   * App Check 디버그 토큰 (시뮬레이터/에뮬레이터 전용).
+   * 비워두면 첫 실행 로그에 새 토큰이 찍히며, 그것을
+   * Firebase Console > App Check > 디버그 토큰에 등록하면 된다.
+   */
+  appCheckDebugToken: Config.APPCHECK_DEBUG_TOKEN ?? '',
   isDev: __DEV__,
 } as const;

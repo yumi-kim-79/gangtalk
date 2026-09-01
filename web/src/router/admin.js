@@ -33,6 +33,7 @@ const PartnerTop5      = () => import('@/pages/admin/PartnerTop5ManagePage.vue')
 const NewsManage       = () => import('@/pages/admin/NewsManagePage.vue')
 const InboxPage        = () => import('@/pages/admin/InboxPage.vue')
 const BizAccountsPage  = () => import('@/pages/admin/BizAccountsPage.vue')
+const ReportsManage    = () => import('@/pages/admin/ReportsManagePage.vue')
 const SettingsPage     = () => import('@/pages/admin/SettingsPage.vue')
 
 const BizLogin         = () => import('@/pages/admin/BizLoginPage.vue')
@@ -68,6 +69,9 @@ const routes = [
       { path: 'news',          name: 'adminNews',         component: NewsManage },
       { path: 'inbox',         name: 'adminInboxPage',    component: InboxPage },
       { path: 'biz-accounts',  name: 'adminBizAccounts',  component: BizAccountsPage },
+      // AdminLayout.vue:123 의 '신고 관리' 메뉴가 가리키는 경로.
+      // 라우트가 없어 catch-all(:pathMatch) 로 빠져 대시보드로 튕기던 것을 연결.
+      { path: 'reports',       name: 'adminReports',      component: ReportsManage },
       { path: 'settings',      name: 'adminSettings',     component: SettingsPage },
     ],
   },

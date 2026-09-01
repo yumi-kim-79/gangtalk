@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Button from '@/components/common/Button';
 import FormField from '@/components/common/FormField';
+import { signOut } from '@/services/auth';
 import { deleteMyAccount } from '@/services/mypage';
 import { fontSize, radius, spacing, useTheme, type ThemeColors } from '@/theme';
 
@@ -26,12 +27,25 @@ export default function DeleteAccountScreen() {
         {
           text: '탈퇴하기',
           style: 'destructive',
-          onPress: () => {
+          onPress: async () => {
             setBusy(true);
             setError('');
-            deleteMyAccount(reason)
-              .catch(() => setError('탈퇴 처리에 실패했습니다. 잠시 후 다시 시도해 주세요.'))
-              .finally(() => setBusy(false));
+            try {
+              await deleteMyAccount(reason);
+              // 함수가 Auth 계정을 지운 뒤에도 클라이언트 세션은 남아 있다.
+              // 명시적으로 로그아웃해야 watchAuth 가 로그인 화면으로 되돌린다.
+              await signOut().catch(() => {});
+              Alert.alert('탈퇴 완료', '그동안 이용해 주셔서 감사합니다.');
+            } catch (e) {
+              const msg = e instanceof Error ? e.message : '';
+              setError(
+                msg.includes('not-found')
+                  ? '이미 탈퇴 처리된 계정입니다.'
+                  : '탈퇴 처리에 실패했습니다. 잠시 후 다시 시도해 주세요.',
+              );
+            } finally {
+              setBusy(false);
+            }
           },
         },
       ],
