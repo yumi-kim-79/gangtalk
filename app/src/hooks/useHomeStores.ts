@@ -1,12 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { EXPOSURE_KEY_DASHBOARD } from '@/constants/stores';
-import { applyHomeOrder, subscribeHomeOrder } from '@/services/dashboard';
-import {
-  filterStores,
-  mergeRoomsBiz,
-  subscribeRoomsBiz,
-  subscribeStores,
-} from '@/services/stores';
+import { applyHomeOrder, applyRoomsBiz, subscribeHomeOrder } from '@/services/dashboard';
+import { filterStores, subscribeRoomsBiz, subscribeStores } from '@/services/stores';
 import type { RoomsBizDoc, StoreDoc } from '@/types/store';
 
 /**
@@ -44,7 +39,8 @@ export function useHomeStores(category: string, keyword: string) {
     };
   }, []);
 
-  const merged = useMemo(() => mergeRoomsBiz(rawStores, roomsBiz), [rawStores, roomsBiz]);
+  /** 현황판은 가게찾기와 병합 규칙이 달라 applyRoomsBiz 를 쓴다 (관리자 입력 반영) */
+  const merged = useMemo(() => applyRoomsBiz(rawStores, roomsBiz), [rawStores, roomsBiz]);
 
   const stores = useMemo(() => {
     const filtered = filterStores(merged, {

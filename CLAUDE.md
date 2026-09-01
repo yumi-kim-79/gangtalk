@@ -202,6 +202,38 @@ npm run build:all
 
 ## 작업 로그
 
+### 2026-09-01: 현황판 — 관리자 입력 반영 경로 수정 (버그) (`feature/rn-app`)
+
+#### 문제
+앱 현황판의 **필요인원이 항상 0** 으로 표시됐다. 관리자가 값을 넣어도 반영 안 됨.
+
+원인: 현황판에 **가게찾기(StoreFinder)의 병합 로직**을 잘못 재사용했다. 두 화면은 rooms_biz 를 읽는 필드가 다르다.
+- 관리자(`StoresManagePage.saveAllMetrics`)가 저장하는 필드:
+  - `stores/{id}` → `match`, `persons`, `totalRooms`, `maxPersons`, `statusMode`, `status`
+  - `rooms_biz/{id}` → `needRooms`, `needPeople`, `totalNeeded`, `totalRooms`, `manualSaved: true`
+- 앱이 읽던 것: `totalRemaining ?? (totalNeeded - totalCurrent)`
+  → 관리자는 `totalCurrent` 를 쓰지 않으므로 **항상 0**
+
+#### 조치 — 웹 `MainPage.applyRoomsBiz` 를 그대로 이식
+- `services/dashboard.ts` 에 `applyRoomsBiz` / `resolveStatus` 신설
+- 값 우선순위 (웹과 동일):
+  - 맞출방 = `rooms_biz.needRooms` → 없으면 `stores.match` → `stores.needRooms`
+  - 필요인원 = `rooms_biz.needPeople` → 없으면 `stores.persons` → `stores.needPeople`
+  - 최대방수 = `stores.totalRooms ?? rooms`, 최대인원 = `stores.maxPersons ?? capacity ?? max`
+  - 혼잡도 = `statusMode==='manual'` 이면 `stores.status` → `rooms_biz.congestion` → 자동계산
+- **빈 문서 0 덮어쓰기 방어 이식** (`docs/audit/2026-06-19-현황판-실시간데이터-0덮어쓰기-진단.md`):
+  `hasInput`(manualSaved 이거나 needRooms/needPeople 중 하나가 양수)일 때만 rooms_biz 값을 채택.
+  입력이 없는 빈 rooms_biz 문서의 0 이 stores 실값을 덮어쓰지 않게 한다. 수동 저장(manualSaved)은 0/0 도 의도로 존중
+- 가게찾기는 기존 `mergeRoomsBiz` 유지 — 웹도 두 화면이 서로 다른 규칙을 쓴다
+
+#### 미이식 (자동 파싱 경로)
+웹 MainPage 에는 `manualSaved` 가 아닐 때 `lastPastedText`/최근 채팅 메시지를 파싱해
+방/인원을 추출하는 `parseNeedFromLastPastedText`(약 100줄, 층별 텍스트 파서)가 있다.
+**관리자 수동 입력 경로와 무관**하고 ChatBiz 자동 갱신용이라 이번에는 제외했다.
+
+- **검증**: `tsc --noEmit` 0 errors / `eslint .` 0 errors
+
+
 ### 2026-09-01: 현황판 카드 구조 변경 + 가게찾기 Top5 추가 (`feature/rn-app`)
 
 #### 현황판 — 2열 그리드 → 1열 가로 카드

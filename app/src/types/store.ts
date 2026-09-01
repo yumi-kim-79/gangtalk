@@ -65,6 +65,19 @@ export interface StoreDoc {
   phoneSafe?: string;
   safe?: boolean;
 
+  /** 관리자 현황판 입력 — stores 문서에 직접 저장되는 값 */
+  match?: number;
+  persons?: number;
+  needRooms?: number;
+  needPeople?: number;
+  totalRooms?: number;
+  maxPersons?: number;
+  capacity?: number;
+  max?: number;
+  /** 'auto' | 'manual' — manual 이면 status 를 그대로 쓴다 */
+  statusMode?: string;
+  status?: string;
+
   approved?: boolean;
   applyStatus?: string;
   exposure?: Record<string, boolean>;
@@ -78,20 +91,25 @@ export interface StoreDoc {
 
 /** rooms_biz 병합 결과가 더해진 화면용 모델 */
 export interface Store extends StoreDoc {
-  /** 맞출방 = rooms_biz.totalRooms */
-  match?: number;
-  /** 필요인원 = rooms_biz.totalRemaining */
-  persons?: number;
-  totalRooms?: number;
   totalNeeded?: number;
   totalRemaining?: number;
   roomsBizId?: string | null;
+  /** rooms_biz 가 직접 지정한 혼잡도 (있으면 자동계산보다 우선) */
+  congestion?: string;
 }
 
 export interface RoomsBizDoc {
   id: string;
   roomBizId?: string;
   storeId?: string;
+
+  /** 관리자/업체 수동 저장 — StoresManagePage.saveAllMetrics 가 쓰는 필드 */
+  needRooms?: number;
+  needPeople?: number;
+  manualSaved?: boolean;
+  congestion?: string;
+
+  /** 가게찾기(StoreFinder) 계열 필드 */
   totalRooms?: number;
   total?: number;
   totalCurrent?: number;

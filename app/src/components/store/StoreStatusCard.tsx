@@ -4,8 +4,8 @@ import Icon from '@/components/common/Icon';
 import { CATEGORY_LABEL } from '@/constants/stores';
 import { useThumb } from '@/hooks/useThumb';
 import {
-  computeStatus,
   ratingOf,
+  resolveStatus,
   reviewCountOf,
   statusTone,
   type StatusTone,
@@ -45,7 +45,7 @@ function StoreStatusCard({
   const s = styles(c);
   const thumb = useThumb(store);
 
-  const label = roomsReady ? computeStatus(store, all) : '보통';
+  const label = roomsReady ? resolveStatus(store, all) : '보통';
   const tone = roomsReady ? statusTone(label) : 'mid';
 
   return (

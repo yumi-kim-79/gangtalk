@@ -10,7 +10,7 @@ import {
 import { COLLECTIONS } from '@/constants/app';
 import { db } from '@/services/firebase';
 import { num } from '@/services/stores';
-import type { Store } from '@/types/store';
+import type { RoomsBizDoc, Store, StoreDoc } from '@/types/store';
 
 export type StatusLabel = '좋음' | '보통' | '나쁨';
 export type StatusTone = 'ok' | 'mid' | 'busy';
@@ -132,4 +132,86 @@ export function applyHomeOrder(stores: Store[], order: string[]): Store[] {
       (a, b) =>
         (pos.get(String(a.id)) ?? Infinity) - (pos.get(String(b.id)) ?? Infinity),
     );
+}
+
+
+/* ───────────────────────── 현황판 병합 (관리자 입력 반영) ───────────────────────── */
+
+/**
+ * 웹 MainPage.applyRoomsBiz 이식.
+ *
+ * ⚠️ 가게찾기(StoreFinder)의 병합과 필드가 다르다.
+ *   - 관리자(StoresManagePage.saveAllMetrics)는 두 곳에 동시에 쓴다:
+ *       stores/{id}      : match, persons, totalRooms, maxPersons, statusMode, status
+ *       rooms_biz/{id}   : needRooms, needPeople, totalRooms, manualSaved
+ *   - 즉 현황판 숫자의 1차 소스는 rooms_biz.needRooms/needPeople,
+ *     비어 있으면 stores.match/persons 로 폴백한다.
+ *
+ * 웹이 겪었던 버그를 그대로 방어한다 (docs/audit/2026-06-19-현황판-실시간데이터-0덮어쓰기-진단.md):
+ *   빈 rooms_biz 문서의 0 이 stores 의 실제 값을 덮어써 "10초 후 지표 0" 이 되던 문제 →
+ *   `hasInput` 으로 "진짜 0" 과 "데이터 없음" 을 구분한다.
+ */
+function readRoomsBiz(rb: RoomsBizDoc | undefined) {
+  if (!rb) return null;
+  const inputRooms = num(rb.needRooms);
+  const inputPeople = num(rb.needPeople);
+  const manualSaved = rb.manualSaved === true;
+
+  // 관리자/업체 수동 저장은 0/0 도 의도된 값으로 존중한다
+  const rooms = manualSaved ? Math.max(0, inputRooms) : Math.max(0, inputRooms);
+  const people = manualSaved ? Math.max(0, inputPeople) : Math.max(0, inputPeople);
+
+  const hasInput = manualSaved || inputRooms > 0 || inputPeople > 0;
+  const hasPositive = rooms > 0 || people > 0;
+
+  return {
+    rooms,
+    people,
+    manualSaved,
+    congestion: rb.congestion ? String(rb.congestion) : null,
+    // 입력이 없는 빈 문서는 무시 → stores 값으로 폴백
+    active: hasInput && (hasPositive || manualSaved),
+  };
+}
+
+/** stores + rooms_biz 를 현황판 기준으로 병합 */
+export function applyRoomsBiz(
+  rawStores: StoreDoc[],
+  rbMap: Map<string, RoomsBizDoc>,
+): Store[] {
+  return rawStores.map(raw => {
+    const s: Store = { ...raw };
+    const rb = readRoomsBiz(rbMap.get(String(raw.id)));
+
+    const legacyMatch = num(raw.match ?? raw.needRooms);
+    const legacyPersons = num(raw.persons ?? raw.needPeople);
+
+    s.match = rb?.active ? rb.rooms : legacyMatch;
+    s.persons = rb?.active ? rb.people : legacyPersons;
+    s.totalRooms = num(raw.totalRooms ?? raw.rooms);
+    s.maxPersons = num(raw.maxPersons ?? raw.capacity ?? raw.max);
+    if (rb?.congestion) s.congestion = rb.congestion;
+
+    return s;
+  });
+}
+
+/**
+ * 최종 혼잡도.
+ * 우선순위: 관리자 수동(statusMode==='manual') → rooms_biz.congestion → 자동계산
+ */
+export function resolveStatus(s: Store, all: Store[]): StatusLabel {
+  if (String(s.statusMode ?? 'auto') === 'manual') {
+    const saved = String(s.status ?? '');
+    if (saved === '여유') return '좋음';
+    if (saved === '혼잡') return '나쁨';
+    if (saved === '좋음' || saved === '보통' || saved === '나쁨') return saved;
+  }
+  if (s.congestion) {
+    const cg = s.congestion;
+    if (cg === '여유') return '좋음';
+    if (cg === '혼잡') return '나쁨';
+    if (cg === '좋음' || cg === '보통' || cg === '나쁨') return cg;
+  }
+  return computeStatus(s, all);
 }
