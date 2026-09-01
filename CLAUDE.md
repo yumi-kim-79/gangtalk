@@ -134,6 +134,37 @@ firebase deploy --only hosting:admin
 
 ## 작업 로그
 
+### 2026-09-01: 앱 전환 Phase 0 — React Native 스캐폴드 생성 (`feature/rn-app`)
+- **배경**: 강톡 리뉴얼 방향 확정 — **앱 주력 / 웹은 소개 페이지로 축소 / 관리자는 웹 유지**. 라이드톡(`~/ridetalk`)의 코드 작성 방식·구조를 참고하되 컴포넌트는 가져오지 않고 강톡용으로 새로 작성. 상세 계획은 프로젝트 문서 `강톡-RN-이행계획.md` 참고
+- **신규 `app/` — React Native 0.87.1 + React 19.2.3 + TypeScript**:
+  - `@react-native-community/cli init` 이 네트워크 프록시 문제로 실패해, `@react-native-community/template@0.87.1` 을 직접 받아 플레이스홀더 치환 방식으로 스캐폴드 구성
+  - 번들 ID / applicationId / namespace: `com.appmonster.gangtalk` (라이드톡 `com.appmonster.ridetalk` 과 동일 규칙)
+  - `app.json` displayName: `강톡`
+  - iOS 프로젝트명 `GangTalk.xcodeproj` / `GangTalk.xcworkspace`
+- **폴더 컨벤션 (라이드톡 방식)**: `src/` 아래 `screens` `components` `hooks` `services` `stores` `navigation` `constants` `config` `types` `utils` `assets`
+- **작성한 뼈대 파일**:
+  - `src/services/firebase/index.ts` — Firebase 접근 **단일 창구**. 화면에서 `@react-native-firebase/*` 직접 import 금지 (현 Vue 코드의 페이지 직접 호출 문제를 반복하지 않기 위함)
+  - `src/services/firebase/firestore.ts` — `col()` / `docRef()` 헬퍼
+  - `src/constants/app.ts` — `COLLECTIONS` 상수로 Firestore 컬렉션명 21종 중앙화 (문자열 직접 사용 금지)
+  - `src/config/env.ts` — `react-native-config` 단일 진입점
+  - `src/hooks/useAuth.ts` — `onAuthStateChanged` 구독
+  - `src/navigation/` — `RootNavigator`(스택) + `MainTabNavigator`(탭 5종: 홈/업체/강톡/채팅/마이) + `types.ts` 타입 안전 라우팅
+  - `src/screens/` — 탭 5종 + Splash + Login 임시 화면 (`ScreenPlaceholder` 공용)
+  - `tsconfig.json` — `@/*` → `src/*` 경로 별칭, `strict` + `noUnusedLocals/Parameters`
+  - `babel.config.js` — `module-resolver` 로 동일 별칭
+- **신규 `scripts/`** (라이드톡 빌드 스크립트 방식 이식): `clean-build.sh` / `build-android.sh` (AAB+APK, `--aab` `--apk` `--no-clean`) / `build-ios.sh` (pod install 까지, Archive 는 Xcode) / `build-all.sh` (Android 백그라운드 + iOS pod 병렬)
+- **건드리지 않음 (중요)**:
+  - 기존 Vue 앱 전체 (`src/`, `index.html`, `vite.config.js`) — **디렉토리 이동 없음. 배포 경로 그대로 동작**
+  - `firebase.json` / `.firebaserc` / `firestore.rules` / `storage.rules` / `functions/`
+  - 관리자 빌드 (`index-admin.html`, `dist-admin`) — 웹으로 계속 유지, 앱에 포함하지 않음
+- **`.gitignore` 보강**: `.firebase/`, `.claude/`, `_to_delete/`
+- **다음 (Phase 0 잔여 — 사용자 Mac 에서 수행)**:
+  - `cd app && npm install`
+  - Firebase 콘솔에서 `gangtalk-b8eb8` 에 Android(`com.appmonster.gangtalk`) / iOS 앱 추가 → `google-services.json` → `app/android/app/`, `GoogleService-Info.plist` → `app/ios/GangTalk/`
+  - `npm run ios:setup` (bundle install + pod install)
+  - `npm run typecheck` 통과 확인
+
+
 ### 2026-07-02: 강톡 게시판 목록 카테고리 라벨 제거 (`fix/board-remove-category-labels`)
 - **목적**: 진단(`docs/audit/2026-07-02-강톡게시판-라벨제거-진단.md`) 지정 대로 게시판 목록에서 앞쪽 카테고리 라벨(기타/건의/뉴스게시판 등) 완전 제거. 카테고리 개념 자체는 유지
 - **수정 — `src/pages/GangTalkPage.vue` 단일 파일 (5줄 편집)**:
