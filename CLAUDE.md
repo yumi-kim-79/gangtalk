@@ -202,6 +202,45 @@ npm run build:all
 
 ## 작업 로그
 
+### 2026-09-01: 모바일에서만 가게찾기 카드가 안 열리던 문제 (`feature/rn-app`)
+
+#### 증상
+PC 는 정상인데 **모바일 gangtox.com 에서만** 가게찾기 카드를 눌러도 업체상세가 안 열렸다.
+
+#### 원인 — Vue 이벤트 바인딩이 함수를 **호출하지 않았다**
+```html
+@touchstart.passive="editMode ? noop() : tapStart"
+@touchmove.passive="editMode ? noop() : tapMove"
+```
+`a ? b() : c` 는 단순 참조도 함수 표현식도 아니므로 Vue 가 **인라인 문**으로 보고
+`$event => { editMode ? noop() : tapStart }` 로 감싼다.
+즉 `tapStart` 는 **평가만 되고 호출되지 않는다.** `press.active` 가 계속 false.
+
+이어서
+```html
+@touchend.stop.prevent="tapEnd(() => openStore(s))"
+```
+는 실제 호출이라 `tapEnd` 가 도는데, `press.t === 0` 이라
+`elapsed = Date.now() - 0` = 수천억 ms → `elapsed <= MAX_PRESS_MS(700)` 이 영원히 false
+→ **`openStore` 가 절대 호출되지 않는다.**
+
+PC 는 `@click.stop.prevent="... : openStore(s)"` 가 실제 호출이라 멀쩡했고,
+모바일은 `touchend.prevent` 가 합성 click 까지 막아서 완전히 죽었다.
+
+#### 수정
+- `tapStart($event)` / `tapMove($event)` / `mouseStart($event)` / `mouseMove($event)` 로 **호출** 형태로 교정
+- `tapEnd` 에 `if (!st.active) return` 가드 추가 (MainPage 와 동일)
+- **시간 게이트(50~700ms) 제거** — 스크롤/탭 구분은 `moved`(12px) 가 이미 한다.
+  시간 조건은 빠른 탭도 느린 탭도 삼켰고, 이 카드에는 롱프레스 동작이 따로 없다.
+
+#### 참고 — 정상이던 곳
+`components/finder/StoreListView.vue` 는 `@touchstart.passive="tapStart"` 처럼
+**함수 참조**로 바인딩해 문제가 없었다. `MainPage` 는 터치 핸들러 자체가 없고 `@click` 만 쓴다.
+
+- **검증**: `@vue/compiler-sfc` 컴파일 + 컴파일 결과에 `tapStart(` 호출 존재 확인
+- **배포 필요**: `npm run deploy:hosting`
+
+
 ### 2026-09-01: 초톡 버튼이 강톡 페이지로 새던 문제 (`feature/rn-app`)
 
 #### 원인 — 화면마다 `openBizChat` 구현이 달랐다

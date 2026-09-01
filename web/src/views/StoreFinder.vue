@@ -249,11 +249,11 @@
             @drop="onDrop"
             @dragend="onDragEnd"
             @click.stop.prevent="editMode ? noop() : openStore(s)"
-            @touchstart.passive="editMode ? noop() : tapStart"
-            @touchmove.passive="editMode ? noop() : tapMove"
+            @touchstart.passive="editMode ? noop() : tapStart($event)"
+            @touchmove.passive="editMode ? noop() : tapMove($event)"
             @touchend.stop.prevent="editMode ? noop() : tapEnd(() => openStore(s))"
-            @mousedown="editMode ? noop() : mouseStart"
-            @mousemove="editMode ? noop() : mouseMove"
+            @mousedown="editMode ? noop() : mouseStart($event)"
+            @mousemove="editMode ? noop() : mouseMove($event)"
             @mouseup="editMode ? noop() : mouseEnd(() => openStore(s))"
           >
             <div class="m-thumb" v-lazy-bg="thumbOf(s) || ''">
@@ -1832,7 +1832,7 @@ async function copyToClipboard(text){
 
 /* 탭/클릭 보정 */
 const noop = () => {}
-const PRESS_THRESHOLD = 12, MIN_PRESS_MS = 50, MAX_PRESS_MS = 700
+const PRESS_THRESHOLD = 12
 const press = ref({ active:false, x:0, y:0, t:0, moved:false })
 function tapStart(e){
   const p = e.touches?.[0] || e
@@ -1846,10 +1846,15 @@ function tapMove(e){
 }
 function tapEnd(cb){
   const st = press.value
-  const elapsed = Date.now() - st.t
-  const isTap = !st.moved && elapsed >= MIN_PRESS_MS && elapsed <= MAX_PRESS_MS
+  /* fix (2026-09-01): press 가 시작되지 않은 채로 들어오면 st.t === 0 이라
+   * elapsed 가 '현재 시각'(수천억 ms)이 되어 isTap 이 영원히 false 였다.
+   * MainPage 와 동일하게 active 가드를 둔다. */
+  if (!st.active) return
   press.value.active = false
-  if (isTap && typeof cb === 'function') cb()
+  /* 스크롤과 탭을 가르는 건 '움직였는지'다. 시간 게이트(50~700ms)는
+   * 빠른 탭과 느린 탭을 모두 삼켜서 카드가 안 열리는 원인만 됐다.
+   * 이 카드에는 롱프레스 동작이 따로 없으므로 시간 조건은 두지 않는다. */
+  if (!st.moved && typeof cb === 'function') cb()
 }
 function mouseStart(e){ tapStart(e) }
 function mouseMove(e){ tapMove(e) }
