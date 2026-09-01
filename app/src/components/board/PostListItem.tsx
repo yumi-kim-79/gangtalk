@@ -53,7 +53,7 @@ const styles = (c: ThemeColors) =>
   StyleSheet.create({
     row: {
       paddingHorizontal: spacing.page,
-      paddingVertical: spacing.md,
+      paddingVertical: spacing.sm,
       borderBottomWidth: StyleSheet.hairlineWidth,
       borderBottomColor: c.line,
       backgroundColor: c.surface,
@@ -70,7 +70,7 @@ const styles = (c: ThemeColors) =>
     },
     badgeText: { fontSize: 10, fontWeight: '800', color: '#ffffff' },
     title: { flex: 1, fontSize: fontSize.md, fontWeight: '600', color: c.fg },
-    cmt: { fontSize: fontSize.sm, fontWeight: '700', color: c.accent },
+    cmt: { fontSize: fontSize.xs, fontWeight: '700', color: c.accent },
     metaLine: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
     cat: {
       fontSize: fontSize.xs,

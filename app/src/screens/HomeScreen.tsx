@@ -125,16 +125,16 @@ const styles = (c: ThemeColors) =>
   StyleSheet.create({
     root: { flex: 1, backgroundColor: c.bg },
     listContent: { paddingBottom: spacing.xl },
-    column: { gap: spacing.md, paddingHorizontal: spacing.page, marginBottom: spacing.md },
+    column: { gap: spacing.sm, paddingHorizontal: spacing.page, marginBottom: spacing.sm },
 
     hot: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: spacing.sm,
       marginHorizontal: spacing.page,
-      marginTop: spacing.md,
+      marginTop: spacing.sm,
       paddingHorizontal: spacing.md,
-      paddingVertical: spacing.md,
+      paddingVertical: spacing.sm,
       borderRadius: radius.md,
       backgroundColor: c.accentWeak,
     },
@@ -152,10 +152,10 @@ const styles = (c: ThemeColors) =>
       alignItems: 'center',
       justifyContent: 'space-between',
       paddingHorizontal: spacing.page,
-      paddingTop: spacing.sm,
-      paddingBottom: spacing.md,
+      paddingTop: spacing.xs,
+      paddingBottom: spacing.sm,
     },
-    sectionTitle: { fontSize: fontSize.xl, fontWeight: '800', color: c.fg },
+    sectionTitle: { fontSize: fontSize.lg, fontWeight: '800', color: c.fg },
     moreBtn: { flexDirection: 'row', alignItems: 'center', gap: 2 },
     moreText: { fontSize: fontSize.sm, color: c.muted },
 

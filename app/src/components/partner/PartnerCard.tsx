@@ -117,7 +117,8 @@ export function PartnerRow({
   );
 }
 
-const CARD_W = 220;
+/** Top5 가로 카드 폭 — 화면당 2.5장이 보이도록 (220 → 150) */
+const CARD_W = 150;
 
 const styles = (c: ThemeColors) =>
   StyleSheet.create({
@@ -130,27 +131,27 @@ const styles = (c: ThemeColors) =>
       overflow: 'hidden',
     },
     pressed: { opacity: 0.9 },
-    image: { width: '100%', aspectRatio: 16 / 9, backgroundColor: c.chipBg },
+    image: { width: '100%', aspectRatio: 4 / 3, backgroundColor: c.chipBg },
     imageEmpty: { alignItems: 'center', justifyContent: 'center' },
-    imageEmptyText: { fontSize: 24, fontWeight: '800', color: c.muted },
+    imageEmptyText: { fontSize: 20, fontWeight: '800', color: c.muted },
     rank: {
       position: 'absolute',
-      top: 8,
-      left: 8,
-      width: 26,
-      height: 26,
-      borderRadius: 13,
+      top: 6,
+      left: 6,
+      width: 22,
+      height: 22,
+      borderRadius: 11,
       alignItems: 'center',
       justifyContent: 'center',
       backgroundColor: c.accent,
     },
-    rankText: { fontSize: fontSize.sm, fontWeight: '800', color: '#ffffff' },
+    rankText: { fontSize: fontSize.xs, fontWeight: '800', color: '#ffffff' },
 
-    body: { padding: spacing.md, gap: 2 },
-    name: { fontSize: fontSize.lg, fontWeight: '700', color: c.fg },
-    sub: { fontSize: fontSize.sm, color: c.muted, fontWeight: '400' },
-    intro: { fontSize: fontSize.sm, color: c.fg },
-    benefit: { fontSize: fontSize.sm, color: c.muted, marginTop: 2 },
+    body: { padding: spacing.sm, gap: 1 },
+    name: { fontSize: fontSize.md, fontWeight: '700', color: c.fg },
+    sub: { fontSize: fontSize.xs, color: c.muted, fontWeight: '400' },
+    intro: { fontSize: fontSize.xs, color: c.fg },
+    benefit: { fontSize: fontSize.xs, color: c.muted, marginTop: 1 },
     benefitPrice: { color: c.accent, fontWeight: '700' },
 
     row: {
@@ -162,9 +163,9 @@ const styles = (c: ThemeColors) =>
       borderBottomWidth: StyleSheet.hairlineWidth,
       borderBottomColor: c.line,
     },
-    rowThumb: { width: 96, height: 72, borderRadius: radius.sm, backgroundColor: c.chipBg },
+    rowThumb: { width: 74, height: 56, borderRadius: radius.sm, backgroundColor: c.chipBg },
     rowBody: { flex: 1, gap: 2 },
-    rowTitle: { fontSize: fontSize.lg },
+    rowTitle: { fontSize: fontSize.md },
     ratingRow: { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 2 },
-    rate: { fontSize: fontSize.sm, fontWeight: '700', color: c.fg },
+    rate: { fontSize: fontSize.xs, fontWeight: '700', color: c.fg },
   });

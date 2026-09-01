@@ -102,9 +102,9 @@ const styles = (c: ThemeColors) =>
       overflow: 'hidden',
     },
     pressed: { opacity: 0.9 },
-    image: { width: '100%', aspectRatio: 4 / 3, backgroundColor: c.chipBg },
+    image: { width: '100%', aspectRatio: 3 / 2, backgroundColor: c.chipBg },
     imageEmpty: { alignItems: 'center', justifyContent: 'center' },
-    imageEmptyText: { fontSize: 28, fontWeight: '800', color: c.muted },
+    imageEmptyText: { fontSize: 22, fontWeight: '800', color: c.muted },
     badge: {
       position: 'absolute',
       top: 6,
@@ -125,12 +125,12 @@ const styles = (c: ThemeColors) =>
     },
     statusText: { fontSize: 10, fontWeight: '800', color: '#ffffff' },
 
-    body: { padding: spacing.sm, gap: 1 },
+    body: { padding: spacing.sm, gap: 0 },
     name: { fontSize: fontSize.md, fontWeight: '700', color: c.fg },
     sub: { fontSize: fontSize.xs, color: c.muted },
-    ratingRow: { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 3 },
+    ratingRow: { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 2 },
     rate: { fontSize: fontSize.xs, fontWeight: '700', color: c.fg },
     reviews: { fontSize: fontSize.xs, color: c.muted },
-    metrics: { fontSize: fontSize.xs, color: c.muted, marginTop: 3 },
+    metrics: { fontSize: fontSize.xs, color: c.muted, marginTop: 2 },
     metricNum: { fontWeight: '800', color: c.accent },
   });

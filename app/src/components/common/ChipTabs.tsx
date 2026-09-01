@@ -74,11 +74,11 @@ export default function ChipTabs<T extends string>({
 const styles = (c: ThemeColors) =>
   StyleSheet.create({
     wrap: { position: 'relative' },
-    row: { paddingHorizontal: spacing.page, paddingVertical: spacing.sm, gap: 6 },
+    row: { paddingHorizontal: spacing.page, paddingVertical: spacing.xs, gap: 5 },
     chip: {
-      height: 32,
+      height: 30,
       justifyContent: 'center',
-      paddingHorizontal: 14,
+      paddingHorizontal: 12,
       borderRadius: radius.pill,
       backgroundColor: c.chipBg,
       borderWidth: StyleSheet.hairlineWidth,

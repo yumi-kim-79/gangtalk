@@ -140,7 +140,7 @@ const styles = (c: ThemeColors) =>
       fontSize: fontSize.sm,
       color: c.muted,
     },
-    section: { marginTop: spacing.md },
+    section: { marginTop: spacing.sm },
     sectionHead: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -148,15 +148,15 @@ const styles = (c: ThemeColors) =>
       paddingHorizontal: spacing.page,
       paddingBottom: spacing.sm,
     },
-    sectionTitle: { fontSize: fontSize.xl, fontWeight: '800', color: c.fg },
+    sectionTitle: { fontSize: fontSize.lg, fontWeight: '800', color: c.fg },
     moreBtn: { flexDirection: 'row', alignItems: 'center', gap: 2 },
     moreText: { fontSize: fontSize.sm, color: c.muted },
-    cardRow: { paddingHorizontal: spacing.page, gap: spacing.md, paddingBottom: spacing.sm },
+    cardRow: { paddingHorizontal: spacing.page, gap: spacing.sm, paddingBottom: spacing.xs },
 
     listHead: {
       paddingHorizontal: spacing.page,
-      paddingTop: spacing.xl,
-      paddingBottom: spacing.sm,
+      paddingTop: spacing.lg,
+      paddingBottom: spacing.xs,
     },
     listCount: { fontSize: fontSize.md, fontWeight: '700', color: c.fg },
 

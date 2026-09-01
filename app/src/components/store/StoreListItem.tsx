@@ -76,7 +76,8 @@ function StoreListItem({ store, onPress }: Props) {
 /** 목록이 길어 리렌더 비용이 커서 메모이즈 */
 export default React.memo(StoreListItem);
 
-const THUMB = 92;
+/** 목록 썸네일 — 한 화면에 더 많은 업체가 들어오도록 축소 (92 → 72) */
+const THUMB = 72;
 
 const styles = (c: ThemeColors) =>
   StyleSheet.create({
@@ -84,32 +85,32 @@ const styles = (c: ThemeColors) =>
       flexDirection: 'row',
       backgroundColor: c.surface,
       paddingHorizontal: spacing.page,
-      paddingVertical: spacing.md,
-      gap: spacing.md,
+      paddingVertical: spacing.sm,
+      gap: spacing.sm,
       borderBottomWidth: StyleSheet.hairlineWidth,
       borderBottomColor: c.line,
     },
     cardPressed: { backgroundColor: c.chipBg },
     thumb: { width: THUMB, height: THUMB, borderRadius: radius.sm, backgroundColor: c.chipBg },
     thumbEmpty: { alignItems: 'center', justifyContent: 'center' },
-    thumbEmptyText: { fontSize: fontSize.xl, fontWeight: '800', color: c.muted },
+    thumbEmptyText: { fontSize: fontSize.lg, fontWeight: '800', color: c.muted },
     right: { flex: 1, justifyContent: 'space-between' },
-    titleLine: { fontSize: fontSize.lg },
-    name: { fontSize: fontSize.lg, fontWeight: '700', color: c.fg },
-    meta: { fontSize: fontSize.sm, color: c.muted, fontWeight: '400' },
-    desc: { fontSize: fontSize.sm, color: c.muted, marginTop: 2 },
-    infoRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: 4 },
-    manager: { fontSize: fontSize.sm, color: c.fg, marginRight: spacing.xs },
+    titleLine: { fontSize: fontSize.md },
+    name: { fontSize: fontSize.md, fontWeight: '700', color: c.fg },
+    meta: { fontSize: fontSize.xs, color: c.muted, fontWeight: '400' },
+    desc: { fontSize: fontSize.xs, color: c.muted, marginTop: 1 },
+    infoRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: 2 },
+    manager: { fontSize: fontSize.xs, color: c.fg, marginRight: spacing.xs },
 
-    score: { fontSize: fontSize.sm, fontWeight: '700', color: c.fg },
-    count: { fontSize: fontSize.sm, color: c.muted },
+    score: { fontSize: fontSize.xs, fontWeight: '700', color: c.fg },
+    count: { fontSize: fontSize.xs, color: c.muted },
     bottomRow: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
-      marginTop: 4,
+      marginTop: 2,
       gap: spacing.sm,
     },
-    event: { flex: 1, fontSize: fontSize.sm, color: c.accent },
-    pay: { fontSize: fontSize.sm, fontWeight: '700', color: c.fg },
+    event: { flex: 1, fontSize: fontSize.xs, color: c.accent },
+    pay: { fontSize: fontSize.xs, fontWeight: '700', color: c.fg },
   });
