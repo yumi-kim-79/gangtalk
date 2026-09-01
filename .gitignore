@@ -38,3 +38,10 @@ functions/.env.*
 
 # admin 빌드 산출물
 dist-admin/
+
+# Firebase CLI 캐시
+.firebase/
+
+# 에이전트/작업용 임시
+.claude/
+_to_delete/
