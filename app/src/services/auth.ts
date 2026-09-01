@@ -126,6 +126,8 @@ export interface UserProfile {
   nickname: string;
   points: number;
   myRefCode: string;
+  /** 리워드 잔액 (원) — 웹 userReward 와 같은 필드를 본다 */
+  reward: number;
   type?: string;
   provider?: string;
 }
@@ -134,18 +136,40 @@ export async function fetchUserProfile(uid: string): Promise<UserProfile | null>
   const snap = await getDoc(doc(db, 'users', uid));
   if (!snap.exists()) return null;
   const d = (snap.data() ?? {}) as {
-    profile?: { email?: string; nickname?: string; nick?: string };
+    profile?: {
+      email?: string;
+      nickname?: string;
+      nick?: string;
+      referralCode?: string;
+      reward?: number;
+      rewardAmount?: number;
+    };
+    referral?: { myCode?: string };
     points?: number;
+    reward?: number;
     myRefCode?: string;
     type?: string;
     provider?: string;
   };
+
+  /* 추천코드 — 웹 useMyPageCore.myCode 와 **같은 우선순위**로 읽는다.
+   * (referral.myCode 가 정본, myRefCode / profile.referralCode 는 미러) */
+  const refCode = String(
+    d.referral?.myCode || d.myRefCode || d.profile?.referralCode || '',
+  ).trim();
+
+  /* 리워드 — 웹 MyPage.userReward 와 동일한 폴백 순서 */
+  const reward = Number(
+    d.profile?.reward ?? d.profile?.rewardAmount ?? d.reward ?? 0,
+  );
+
   return {
     uid,
     email: String(d.profile?.email ?? ''),
     nickname: String(d.profile?.nickname ?? d.profile?.nick ?? ''),
     points: Number(d.points ?? 0),
-    myRefCode: String(d.myRefCode ?? ''),
+    myRefCode: refCode,
+    reward,
     type: d.type,
     provider: d.provider,
   };

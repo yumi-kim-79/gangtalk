@@ -1,11 +1,22 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { Alert, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  Alert,
+  Clipboard,
+  Linking,
+  Pressable,
+  ScrollView,
+  Share,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import AppHeader from '@/components/common/AppHeader';
 import Icon from '@/components/common/Icon';
 import MenuRow from '@/components/common/MenuRow';
 import { env } from '@/config/env';
+import { REFERRAL_REWARD_POINT, tierByPoints } from '@/constants/tiers';
 import { useAuth } from '@/hooks/useAuth';
 import { useRequireAuth } from '@/hooks/useRequireAuth';
 import { signOut } from '@/services/auth';
@@ -44,6 +55,40 @@ export default function ProfileScreen() {
     [requireAuth],
   );
 
+  const points = profile?.points ?? 0;
+  const reward = profile?.reward ?? 0;
+  const refCode = profile?.myRefCode ?? '';
+  const tier = useMemo(() => tierByPoints(points), [points]);
+
+  /** 추천코드 복사
+   * RN 0.87 의 core Clipboard 는 deprecated 경고를 띄우지만 아직 동작한다.
+   * 별도 네이티브 모듈(@react-native-clipboard/clipboard)을 넣으면 재빌드가
+   * 필요해 지금은 core 를 쓴다. */
+  const onCopyCode = useCallback(() => {
+    if (!refCode) {
+      Alert.alert('추천코드', '추천코드가 아직 없습니다.\n잠시 후 다시 시도해 주세요.');
+      return;
+    }
+    Clipboard.setString(refCode);
+    Alert.alert('복사 완료', `추천코드 ${refCode} 를 복사했습니다.`);
+  }, [refCode]);
+
+  /** 초대 링크 공유 — 웹 copyMyInviteLink 와 같은 URL 형식 */
+  const onShareCode = useCallback(async () => {
+    if (!refCode) {
+      Alert.alert('추천코드', '추천코드가 아직 없습니다.\n잠시 후 다시 시도해 주세요.');
+      return;
+    }
+    const url = `${env.webUrl}/auth?mode=signup&ref=${encodeURIComponent(refCode)}`;
+    try {
+      await Share.share({
+        message: `강남톡방에 초대합니다!\n제 추천코드 ${refCode} 로 가입하면 서로 ${REFERRAL_REWARD_POINT.toLocaleString()}P 를 받아요.\n${url}`,
+      });
+    } catch {
+      // 사용자가 공유 시트를 닫은 경우 — 무시
+    }
+  }, [refCode]);
+
   return (
     <ScrollView style={s.root} contentContainerStyle={s.content}>
       <AppHeader showSearch={false} />
@@ -67,9 +112,67 @@ export default function ProfileScreen() {
             </Pressable>
           </View>
 
+          {/* 포인트 · 리워드 — 웹 마이페이지와 같은 지표 */}
           <View style={s.stats}>
-            <Stat label="포인트" value={`${(profile?.points ?? 0).toLocaleString()}P`} colors={c} />
-            <Stat label="추천코드" value={profile?.myRefCode || '-'} colors={c} />
+            <Stat label="보유 포인트" value={`${points.toLocaleString()}P`} colors={c} />
+            <Stat
+              label="리워드"
+              value={`${Math.floor(reward).toLocaleString()}원`}
+              colors={c}
+            />
+          </View>
+
+          {/* 회원 등급 + 다음 등급까지 진행바 */}
+          <View style={s.tierBox}>
+            <View style={s.tierHead}>
+              <Text style={s.tierLabel}>회원 등급</Text>
+              <View style={s.tierBadge}>
+                <Text style={s.tierBadgeText}>{tier.current.label}</Text>
+              </View>
+            </View>
+
+            <View style={s.tierBar}>
+              <View style={[s.tierBarFill, { width: `${tier.progressPct}%` }]} />
+            </View>
+
+            <Text style={s.tierNext}>
+              {tier.next
+                ? `다음: ${tier.next.label} (${tier.toNext.toLocaleString()}P 남음)`
+                : '최고 등급입니다'}
+            </Text>
+          </View>
+
+          {/* 내 추천코드 */}
+          <View style={s.refBox}>
+            <Text style={s.refLabel}>내 추천코드</Text>
+            <View style={s.refRow}>
+              <View style={s.refCodeBox}>
+                <Text style={s.refCode}>{refCode || '-'}</Text>
+              </View>
+              <Pressable
+                style={({ pressed }) => [s.refCopy, pressed && s.pressed]}
+                onPress={onCopyCode}
+              >
+                <Text style={s.refCopyText}>복사</Text>
+              </Pressable>
+            </View>
+          </View>
+
+          {/* 추천 리워드 안내 + 공유 */}
+          <View style={s.inviteBox}>
+            <Text style={s.inviteText}>
+              추천 리워드 — 친구가 회원가입 시 서로{' '}
+              <Text style={s.inviteStrong}>
+                {REFERRAL_REWARD_POINT.toLocaleString()}P
+              </Text>
+              !
+            </Text>
+            <Pressable
+              style={({ pressed }) => [s.inviteBtn, pressed && s.pressed]}
+              onPress={onShareCode}
+            >
+              <Text style={s.inviteBtnText}>내 코드 공유하기</Text>
+            </Pressable>
           </View>
         </>
       ) : (
@@ -185,6 +288,97 @@ const styles = (c: ThemeColors) =>
       paddingHorizontal: spacing.page,
       marginBottom: spacing.sm,
     },
+    pressed: { opacity: 0.85 },
+
+    /* 회원 등급 */
+    tierBox: {
+      marginHorizontal: spacing.page,
+      marginBottom: spacing.sm,
+      padding: spacing.lg,
+      borderRadius: radius.md,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: c.line,
+      backgroundColor: c.surface,
+    },
+    tierHead: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: spacing.md,
+    },
+    tierLabel: { fontSize: fontSize.md, color: c.muted },
+    tierBadge: {
+      paddingHorizontal: spacing.md,
+      paddingVertical: 4,
+      borderRadius: radius.pill,
+      backgroundColor: c.accentWeak,
+    },
+    tierBadgeText: { fontSize: fontSize.md, fontWeight: '800', color: c.accent },
+    tierBar: {
+      height: 6,
+      borderRadius: 3,
+      backgroundColor: c.chipBg,
+      overflow: 'hidden',
+    },
+    tierBarFill: { height: '100%', borderRadius: 3, backgroundColor: c.accent },
+    tierNext: { marginTop: spacing.sm, fontSize: fontSize.sm, color: c.muted },
+
+    /* 추천코드 */
+    refBox: {
+      marginHorizontal: spacing.page,
+      marginBottom: spacing.sm,
+      padding: spacing.lg,
+      borderRadius: radius.md,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: c.line,
+      backgroundColor: c.surface,
+    },
+    refLabel: { fontSize: fontSize.md, color: c.muted, marginBottom: spacing.sm },
+    refRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+    refCodeBox: {
+      flex: 1,
+      height: 44,
+      justifyContent: 'center',
+      paddingHorizontal: spacing.md,
+      borderRadius: radius.sm,
+      backgroundColor: c.accentWeak,
+    },
+    refCode: {
+      fontSize: fontSize.xl,
+      fontWeight: '800',
+      color: c.accent,
+      letterSpacing: 1,
+    },
+    refCopy: {
+      height: 44,
+      paddingHorizontal: spacing.lg,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: radius.sm,
+      borderWidth: 1,
+      borderColor: c.line,
+    },
+    refCopyText: { fontSize: fontSize.md, fontWeight: '700', color: c.muted },
+
+    /* 추천 리워드 */
+    inviteBox: {
+      marginHorizontal: spacing.page,
+      marginBottom: spacing.lg,
+      padding: spacing.lg,
+      borderRadius: radius.md,
+      backgroundColor: c.accentWeak,
+      gap: spacing.md,
+    },
+    inviteText: { fontSize: fontSize.md, color: '#a03465', lineHeight: 19 },
+    inviteStrong: { fontWeight: '800', color: c.accent },
+    inviteBtn: {
+      height: 44,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: radius.pill,
+      backgroundColor: c.accent,
+    },
+    inviteBtnText: { fontSize: fontSize.md, fontWeight: '800', color: '#ffffff' },
     stat: {
       flex: 1,
       alignItems: 'center',

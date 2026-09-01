@@ -202,6 +202,38 @@ npm run build:all
 
 ## 작업 로그
 
+### 2026-09-01: 앱 마이페이지에 포인트·등급·추천코드 이식 (`feature/rn-app`)
+
+웹 마이페이지에만 있던 지표를 앱에서도 쓰게 했다.
+
+#### 데이터 — 웹과 **같은 필드·같은 우선순위**로 읽는다
+`services/auth.ts` 의 `fetchUserProfile` 확장:
+```
+추천코드  referral.myCode  →  myRefCode  →  profile.referralCode
+리워드    profile.reward   →  profile.rewardAmount  →  reward
+포인트    points
+```
+웹 `useMyPageCore.myCode` / `MyPage.userReward` 의 폴백 순서를 그대로 옮겼다.
+앱은 `myRefCode` 만 보고 있어서 `referral.myCode` 가 정본인 계정에서 코드가 비어 보였다.
+
+#### 등급
+`constants/tiers.ts` 신설 — 웹 `UserSection.TIERS` 와 임계값·라벨·순서 동일
+(다이소 1만 → … → 에르메스 1억). `tierByPoints()` 가 현재 등급 · 다음 등급 ·
+진행률 · 남은 포인트를 웹과 같은 계산으로 돌려준다.
+
+#### 화면 (`ProfileScreen`)
+- **보유 포인트 / 리워드** 2칸 지표
+- **회원 등급** 배지 + 진행바 + "다음: 뉴발란스 (100,000P 남음)"
+- **내 추천코드** + [복사]
+- **추천 리워드** 안내 + [내 코드 공유하기] — 웹 `copyMyInviteLink` 와 같은
+  초대 URL(`/auth?mode=signup&ref=CODE`)을 네이티브 공유 시트로 보낸다
+
+복사는 RN core `Clipboard` 를 쓴다. deprecated 경고가 뜨지만 동작하고,
+`@react-native-clipboard/clipboard` 를 넣으면 네이티브 재빌드가 필요해 미뤘다.
+
+- **검증**: `tsc --noEmit` 0 errors / `eslint .` 0 errors
+
+
 ### 2026-09-01: 주제별 커뮤니티 4박스를 실제 이동으로 (`feature/rn-app`)
 
 #### 문제
