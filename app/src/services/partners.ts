@@ -80,7 +80,7 @@ function pickPartnerThumb(x: Raw): string {
   return '';
 }
 
-function normalizePartner(id: string, x: Raw): Partner {
+export function normalizePartner(id: string, x: Raw): Partner {
   return {
     id,
     name: str(x.name),

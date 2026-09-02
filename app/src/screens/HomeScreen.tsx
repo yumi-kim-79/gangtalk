@@ -18,6 +18,7 @@ import { STORE_CATEGORIES } from '@/constants/stores';
 import StoreStatusCard from '@/components/store/StoreStatusCard';
 import { useAuth } from '@/hooks/useAuth';
 import { useHomeStores } from '@/hooks/useHomeStores';
+import { useMyFavorites } from '@/hooks/useMyFavorites';
 import { useNewsline } from '@/hooks/useNewsline';
 import { useRequireAuth } from '@/hooks/useRequireAuth';
 import type { MainTabParamList } from '@/navigation/types';
@@ -33,6 +34,8 @@ export default function HomeScreen() {
   const navigation = useNavigation<NavigationProp<MainTabParamList>>();
   const { isLoggedIn, initializing } = useAuth();
   const { requireAuth } = useRequireAuth();
+  /* 웹 현황판 카드에는 하트가 있는데 앱만 없었다 (MainPage.vue:107-111) */
+  const { isStoreFav, toggleStore } = useMyFavorites();
 
   const [category, setCategory] = useState('all');
   const [keyword, setKeyword] = useState('');
@@ -71,6 +74,8 @@ export default function HomeScreen() {
             roomsReady={roomsReady}
             onPress={openStore}
             onOpenChotok={openChotok}
+            favorited={isStoreFav(item.id)}
+            onToggleFavorite={st => toggleStore(st.id)}
           />
         )}
         keyboardShouldPersistTaps="handled"

@@ -16,13 +16,54 @@ import { getFunctions, httpsCallable } from '@react-native-firebase/functions';
 import { COLLECTIONS } from '@/constants/app';
 import { FUNCTIONS_REGION } from '@/constants/auth';
 import { normalizePost } from '@/services/board';
+import { normalizePartner } from '@/services/partners';
 import { app, db } from '@/services/firebase';
+import type { Partner } from '@/types/partner';
 import type { Post } from '@/types/post';
 import type { Store } from '@/types/store';
 
 type Raw = Record<string, unknown>;
 
 /* ───────────────────────── 찜 목록 ───────────────────────── */
+
+/**
+ * 내가 찜한 제휴업체.
+ * 웹 FavoritesPage 는 전체/업체/제휴업체 탭을 주는데 앱은 업체만 보여 줬다.
+ */
+export function subscribeMyPartnerFavorites(
+  uid: string,
+  onData: (partners: Partner[]) => void,
+  onError?: (e: unknown) => void,
+) {
+  return onSnapshot(
+    query(collection(db, COLLECTIONS.favorites), where('ownerId', '==', uid)),
+    async (snap: FirebaseFirestoreTypes.QuerySnapshot) => {
+      const targetIds = snap.docs
+        .filter(d => String((d.data() as Raw)?.type ?? 'store') === 'partner')
+        .map(d => String((d.data() as Raw)?.targetId ?? ''))
+        .filter(Boolean);
+
+      if (!targetIds.length) {
+        onData([]);
+        return;
+      }
+      try {
+        const ps = await getDocs(collection(db, COLLECTIONS.partners));
+        const want = new Set(targetIds);
+        onData(
+          ps.docs
+            .filter((d: FirebaseFirestoreTypes.QueryDocumentSnapshot) => want.has(d.id))
+            .map((d: FirebaseFirestoreTypes.QueryDocumentSnapshot) =>
+              normalizePartner(d.id, d.data() as Record<string, unknown>),
+            ),
+        );
+      } catch (e) {
+        onError?.(e);
+      }
+    },
+    e => onError?.(e),
+  );
+}
 
 /**
  * 내가 찜한 업체.
