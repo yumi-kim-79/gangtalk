@@ -18,10 +18,6 @@
       <div>참여자: <b>{{ matched }}</b></div>
       <div class="grow"></div>
       <div class="muted sm">업데이트 항상 가능 · 매일 07:00 리셋</div>
-
-      <button class="chip sm" @click="toggleJoin">
-        {{ joined ? '참여취소' : '참여하기' }}
-      </button>
     </section>
 
     <!-- ✅ 메시지 영역 (배경 이미지 없음) -->
@@ -81,7 +77,6 @@ import {
   serverTimestamp,
   orderBy,
   query,
-  deleteDoc,
 } from 'firebase/firestore'
 import { safeAdd, safeUpdate } from '@/lib/firestoreSafe'
 
@@ -646,8 +641,15 @@ async function subscribeMessages() {
 }
 
 /* ---------------- chat actions ---------------- */
-async function toggleJoin() {
-  if (!me.value) return
+/**
+ * 초톡방 자동 참여.
+ *
+ * 2026-09-02: '참여하기' 버튼을 없앴다. 방을 열어 본 것이 곧 참여인데
+ * 버튼을 한 번 더 누르게 할 이유가 없다. 앱도 같은 방식(useChotok).
+ * 이미 참여 중이면 아무것도 쓰지 않는다 (joinedAt 을 매번 갱신하지 않기 위해).
+ */
+async function ensureJoined() {
+  if (!me.value || !finalStoreId.value) return
   const pRef = doc(
     fbDb,
     'rooms_biz',
@@ -658,19 +660,18 @@ async function toggleJoin() {
   try {
     const cur = await getDoc(pRef)
     if (cur.exists()) {
-      await deleteDoc(pRef)
-      joined.value = false
-    } else {
-      await setDoc(pRef, {
-        uid: me.value.uid,
-        name: me.value.displayName || me.value.email || '익명',
-        joinedAt: serverTimestamp(),
-      })
       joined.value = true
+      return
     }
+    await setDoc(pRef, {
+      uid: me.value.uid,
+      name: me.value.displayName || me.value.email || '익명',
+      joinedAt: serverTimestamp(),
+    })
+    joined.value = true
   } catch (e) {
-    console.warn('참여 토글 실패:', e)
-    alert('참여 권한이 없습니다.')
+    // 실패해도 화면은 그대로 — 읽기는 누구나 가능하다
+    console.warn('자동 참여 실패:', e)
   }
 }
 
@@ -696,6 +697,9 @@ onMounted(async () => {
 
   // 상단/하위 문서 보장(권한자만 실제 생성)
   await ensureRoom()
+
+  // 방에 들어온 것 = 참여. 버튼 없이 자동 등록한다 (앱 useChotok 과 동일)
+  await ensureJoined()
 
   // rooms_biz 메타
   unsubs.push(

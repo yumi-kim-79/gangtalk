@@ -1,13 +1,12 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   defaultRoomId,
   parseChotok,
+  joinChotok,
   sendChotokMessage,
   subscribeChotok,
   subscribeChotokDoc,
-  subscribeMyJoin,
   subscribeParticipantCount,
-  toggleChotokJoin,
   type ChotokDocMetrics,
   type ChotokMessage,
 } from '@/services/chotok';
@@ -22,7 +21,6 @@ export function useChotok(storeId: string) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [docMetrics, setDocMetrics] = useState<ChotokDocMetrics | null>(null);
-  const [joined, setJoined] = useState(false);
   const [participants, setParticipants] = useState(0);
   const { uid, profile } = useAuth();
 
@@ -54,13 +52,20 @@ export function useChotok(storeId: string) {
     return subscribeParticipantCount(storeId, setParticipants);
   }, [storeId]);
 
+  /* 방에 들어오면 자동으로 참여 등록.
+   * 버튼을 눌러야만 참여로 잡히던 방식은 의미가 없어서 걷어냈다.
+   * 이미 참여 중이면 joinChotok 이 아무것도 쓰지 않는다. */
+  const autoJoined = useRef('');
   useEffect(() => {
-    if (!storeId || !uid) {
-      setJoined(false);
-      return;
-    }
-    return subscribeMyJoin(storeId, uid, setJoined);
-  }, [storeId, uid]);
+    if (!storeId || !uid) return;
+    const key = `${storeId}:${uid}`;
+    if (autoJoined.current === key) return;
+    autoJoined.current = key;
+    joinChotok({ storeId, uid, name: profile?.nickname || '익명' }).catch(() => {
+      // 실패하면 다음 진입 때 다시 시도할 수 있게 표시를 되돌린다
+      autoJoined.current = '';
+    });
+  }, [storeId, uid, profile?.nickname]);
 
   const send = useCallback(
     async (text: string) => {
@@ -75,14 +80,7 @@ export function useChotok(storeId: string) {
     [storeId, uid, profile?.nickname],
   );
 
-  const toggleJoin = useCallback(async () => {
-    if (!uid) throw new Error('로그인이 필요합니다.');
-    await toggleChotokJoin({
-      storeId,
-      uid,
-      name: profile?.nickname || '익명',
-    });
-  }, [storeId, uid, profile?.nickname]);
+
 
   /**
    * 상단 지표 — 웹 ChatBiz.recomputeFromLastPasted(:335-365) 와 같은 우선순위.
@@ -117,9 +115,7 @@ export function useChotok(storeId: string) {
     loading,
     error,
     participants,
-    joined,
     send,
-    toggleJoin,
     canWrite: !!uid,
   };
 }

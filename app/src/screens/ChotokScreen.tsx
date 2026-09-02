@@ -55,9 +55,7 @@ export default function ChotokScreen() {
     loading,
     error,
     participants,
-    joined,
     send,
-    toggleJoin,
     canWrite,
   } = useChotok(params.storeId);
   const { hidden } = useBlocked();
@@ -89,13 +87,7 @@ export default function ChotokScreen() {
     }
   }, [draft, sending, send]);
 
-  const onToggleJoin = useCallback(async () => {
-    try {
-      await toggleJoin();
-    } catch {
-      Alert.alert('참여', '로그인이 필요합니다.');
-    }
-  }, [toggleJoin]);
+
 
   const rows = useMemo<Row[]>(() => {
     const out: Row[] = [];
@@ -142,9 +134,6 @@ export default function ChotokScreen() {
           <Text style={s.statNum}>{participants}</Text>
           <Text style={s.statLabel}>참여자</Text>
         </View>
-        <Pressable style={s.joinBtn} onPress={onToggleJoin}>
-          <Text style={s.joinBtnText}>{joined ? '참여취소' : '참여하기'}</Text>
-        </Pressable>
       </View>
 
       {loading ? <ActivityIndicator color={c.accent} style={s.loading} /> : null}
@@ -247,18 +236,6 @@ const styles = (c: ThemeColors) =>
     statLabel: { fontSize: fontSize.xs, color: c.muted },
 
     list: { padding: spacing.md, paddingBottom: spacing.xl },
-
-    /* 참여하기 — 웹 .chip.sm 과 같은 자리 */
-    joinBtn: {
-      marginRight: spacing.md,
-      paddingHorizontal: spacing.md,
-      paddingVertical: 5,
-      borderRadius: radius.pill,
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: c.line,
-      backgroundColor: c.surface,
-    },
-    joinBtnText: { fontSize: fontSize.sm, fontWeight: '700', color: c.fg },
 
     /* 입력창 — 웹 .composer */
     composer: {

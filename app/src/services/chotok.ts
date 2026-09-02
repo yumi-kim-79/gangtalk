@@ -227,22 +227,30 @@ export function subscribeParticipantCount(
   );
 }
 
-/** 참여 / 참여취소 — 웹 ChatBiz.toggleJoin(:649-674) 이식 */
-export async function toggleChotokJoin(params: {
+/**
+ * 초톡방 참여 등록.
+ *
+ * 2026-09-02: '참여하기' 버튼을 없애고 **방에 들어오면 자동으로 참여**시킨다.
+ * 방을 열어 본 것이 곧 참여인데 버튼을 한 번 더 누르게 할 이유가 없다.
+ * 이미 참여 중이면 아무것도 쓰지 않는다 (joinedAt 을 매번 갱신하지 않기 위해).
+ */
+export async function joinChotok(params: {
   storeId: string;
   uid: string;
   name: string;
-}): Promise<boolean> {
+}): Promise<void> {
   const ref = doc(db, COLLECTIONS.roomsBiz, params.storeId, 'participants', params.uid);
   const cur = await getDoc(ref);
-  if (cur.exists()) {
-    await deleteDoc(ref);
-    return false;
-  }
+  if (cur.exists()) return;
+
   await setDoc(ref, {
     uid: params.uid,
     name: params.name || '익명',
     joinedAt: serverTimestamp(),
   });
-  return true;
+}
+
+/** 참여 해제 — 화면에는 노출하지 않지만 운영상 필요할 수 있어 남겨 둔다 */
+export async function leaveChotok(storeId: string, uid: string): Promise<void> {
+  await deleteDoc(doc(db, COLLECTIONS.roomsBiz, storeId, 'participants', uid));
 }
