@@ -17,11 +17,16 @@ import {
   type FirebaseFirestoreTypes,
 } from '@react-native-firebase/firestore';
 import { getFunctions, httpsCallable } from '@react-native-firebase/functions';
+import {
+  getDownloadURL,
+  putFile,
+  ref as storageRef,
+} from '@react-native-firebase/storage';
 import { COLLECTIONS } from '@/constants/app';
 import { FUNCTIONS_REGION } from '@/constants/auth';
 import { normalizePost } from '@/services/board';
 import { normalizePartner } from '@/services/partners';
-import { app, db } from '@/services/firebase';
+import { app, db, storage } from '@/services/firebase';
 import type { Partner } from '@/types/partner';
 import type { Post } from '@/types/post';
 import type { Store } from '@/types/store';
@@ -149,6 +154,69 @@ export async function updateNickname(uid: string, nickname: string): Promise<voi
     'profile.nicknameLower': nick.toLowerCase(),
     updatedAt: serverTimestamp(),
   });
+}
+
+export interface ProfilePatch {
+  nickname: string;
+  phone: string;
+  bgColor: string;
+  textColor: string;
+  /** 로컬 파일 URI 면 업로드하고, http URL 이면 그대로 쓴다. 빈 문자열이면 사진 삭제 */
+  photo: string;
+}
+
+/**
+ * 로컬 이미지 → Storage 업로드.
+ * 웹 uploadDataUrlToStorage(ProfileEditSheet.vue:544)와 **같은 경로 규칙**
+ * (`profiles/{uid}/avatar_{stamp}.jpg`)을 써야 storage.rules 가 통과한다.
+ */
+async function uploadAvatar(uid: string, localUri: string): Promise<{ url: string; path: string }> {
+  const stamp = new Date()
+    .toISOString()
+    .replace(/[-:T]/g, '')
+    .slice(0, 14);
+  const path = `profiles/${uid}/avatar_${stamp}.jpg`;
+  const ref = storageRef(storage, path);
+  await putFile(ref, localUri.replace(/^file:\/\//, ''), { contentType: 'image/jpeg' });
+  const url = await getDownloadURL(ref);
+  return { url, path };
+}
+
+/**
+ * 프로필 저장 — 닉네임 / 연락처 / 아바타 사진 / 배경색 / 글자색.
+ *
+ * 웹 ProfileEditSheet.onSave 와 **같은 필드**에 쓴다. 한쪽만 다른 필드에 쓰면
+ * 웹에서 고른 색이 앱에서 안 보이는(= 지금까지의) 문제가 그대로 재발한다.
+ * 점(.) 표기 경로는 updateDoc 만 해석하므로 set(merge) 을 쓰면 안 된다.
+ */
+export async function saveProfile(uid: string, patch: ProfilePatch): Promise<void> {
+  const nick = patch.nickname.trim();
+  if (!nick) throw new Error('닉네임을 입력해 주세요.');
+
+  let photoUrl = patch.photo;
+  let photoPath: string | null = null;
+
+  if (photoUrl && !/^https?:\/\//i.test(photoUrl)) {
+    const up = await uploadAvatar(uid, photoUrl);
+    photoUrl = up.url;
+    photoPath = up.path;
+  }
+
+  const payload: Record<string, unknown> = {
+    'profile.nickname': nick,
+    'profile.nick': nick,
+    'profile.nicknameLower': nick.toLowerCase(),
+    'profile.phone': patch.phone.trim() || null,
+    'profile.photoUrl': photoUrl || null,
+    'profile.bgColor': patch.bgColor || null,
+    'profile.textColor': patch.textColor || null,
+    updatedAt: serverTimestamp(),
+  };
+  // 새로 올린 사진일 때만 경로를 갱신한다 (그대로 둔 사진의 경로를 지우지 않도록)
+  if (photoPath) payload['profile.photoPath'] = photoPath;
+  else if (!photoUrl) payload['profile.photoPath'] = null;
+
+  await updateDoc(doc(db, COLLECTIONS.users, uid), payload);
 }
 
 /* ───────────────────────── 회원탈퇴 ───────────────────────── */

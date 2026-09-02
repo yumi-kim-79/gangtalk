@@ -131,6 +131,16 @@ export interface UserProfile {
   myRefCode: string;
   /** 리워드 잔액 (원) — 웹 userReward 와 같은 필드를 본다 */
   reward: number;
+  /** 연락처 (선택) — 웹 profile.phone */
+  phone: string;
+  /** 아바타 사진 URL — 웹 profile.photoUrl (Storage 다운로드 URL) */
+  photoUrl: string;
+  /** Storage 경로 — 사진 교체 시 옛 파일 추적용. 웹 profile.photoPath */
+  photoPath: string;
+  /** 아바타 배경색 — 웹 profile.bgColor. 빈 문자열이면 기본색 */
+  bgColor: string;
+  /** 아바타 글자색 — 웹 profile.textColor. 빈 문자열이면 기본색 */
+  textColor: string;
   type?: string;
   provider?: string;
 }
@@ -145,6 +155,11 @@ function normalizeUserProfile(uid: string, raw: unknown): UserProfile {
       referralCode?: string;
       reward?: number;
       rewardAmount?: number;
+      phone?: string;
+      photoUrl?: string;
+      photoPath?: string;
+      bgColor?: string;
+      textColor?: string;
     };
     referral?: { myCode?: string };
     points?: number;
@@ -173,6 +188,16 @@ function normalizeUserProfile(uid: string, raw: unknown): UserProfile {
     points: Number(d.points ?? 0),
     myRefCode: refCode,
     reward,
+    phone: String(d.profile?.phone ?? ''),
+    /* 웹은 사진이 없을 때 data:image/svg+xml 자리표시자를 넣어 둔 문서가 있다.
+     * 그걸 그대로 <Image> 로 넘기면 RN 은 svg 를 못 그려 빈 칸이 되므로 사진 없음으로 본다. */
+    photoUrl: (() => {
+      const u = String(d.profile?.photoUrl ?? '');
+      return u.startsWith('data:image/svg+xml') ? '' : u;
+    })(),
+    photoPath: String(d.profile?.photoPath ?? ''),
+    bgColor: String(d.profile?.bgColor ?? ''),
+    textColor: String(d.profile?.textColor ?? ''),
     type: d.type,
     provider: d.provider,
   };

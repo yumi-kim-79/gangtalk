@@ -17,6 +17,18 @@ mkdir -p "$LOG_DIR"
 
 cd "$APP_DIR"
 
+# ── 네이티브 의존성 동기화 ─────────────────────────────
+# 새 네이티브 모듈(react-native-image-picker 등)을 추가하면 Pods 가 뒤처진다.
+# package.json 이 Podfile.lock 보다 새로우면 pod install 을 먼저 돌린다.
+if [ -f ios/Podfile ] && { [ ! -f ios/Podfile.lock ] || [ package.json -nt ios/Podfile.lock ]; }; then
+  echo "📦 CocoaPods 동기화…"
+  if [ -f Gemfile ]; then
+    (cd ios && bundle exec pod install) > "$LOG_DIR/pod.log" 2>&1 || echo "⚠️  pod install 실패 — $LOG_DIR/pod.log 확인"
+  else
+    (cd ios && pod install) > "$LOG_DIR/pod.log" 2>&1 || echo "⚠️  pod install 실패 — $LOG_DIR/pod.log 확인"
+  fi
+fi
+
 echo "🚀 강톡 개발 빌드 (Android + iOS)"
 echo "═══════════════════════════════════════"
 

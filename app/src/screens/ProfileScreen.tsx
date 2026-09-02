@@ -13,6 +13,7 @@ import {
   View,
 } from 'react-native';
 import AppHeader from '@/components/common/AppHeader';
+import Avatar from '@/components/common/Avatar';
 import Icon from '@/components/common/Icon';
 import MenuRow from '@/components/common/MenuRow';
 import { env } from '@/config/env';
@@ -101,9 +102,13 @@ export default function ProfileScreen() {
       {isLoggedIn ? (
         <>
           <View style={s.card}>
-            <View style={s.avatar}>
-              <Icon name="user" size={28} color={c.muted} />
-            </View>
+            <Avatar
+              nickname={profile?.nickname || '회원'}
+              photoUrl={profile?.photoUrl ?? ''}
+              bgColor={profile?.bgColor ?? ''}
+              textColor={profile?.textColor ?? ''}
+              size={56}
+            />
             <View style={s.info}>
               <Text style={s.nickname}>{profile?.nickname || '회원'}</Text>
               <Text style={s.email}>{profile?.email || user?.email || ''}</Text>
@@ -274,14 +279,6 @@ const styles = (c: ThemeColors) =>
       backgroundColor: c.surface,
       borderWidth: StyleSheet.hairlineWidth,
       borderColor: c.line,
-    },
-    avatar: {
-      width: 56,
-      height: 56,
-      borderRadius: 28,
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: c.chipBg,
     },
     info: { flex: 1, gap: 2 },
     nickname: { fontSize: fontSize.xl, fontWeight: '800', color: c.fg },
