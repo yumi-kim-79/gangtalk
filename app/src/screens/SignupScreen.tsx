@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Button from '@/components/common/Button';
 import FormField from '@/components/common/FormField';
@@ -9,13 +9,14 @@ import { NICKNAME_MAX, NICKNAME_MIN, PASSWORD_MIN } from '@/constants/auth';
 import {
   authErrorMessage,
   sendSmsCode,
+  isEmailTaken,
   isNicknameTaken,
   isReferralCodeValid,
   signUpWithEmail,
   verifySmsCode,
 } from '@/services/auth';
 import type { AuthStackParamList } from '@/navigation/types';
-import { fontSize, spacing, useTheme, type ThemeColors } from '@/theme';
+import { fontSize, radius, spacing, useTheme, type ThemeColors } from '@/theme';
 
 export default function SignupScreen() {
   const c = useTheme();
@@ -30,6 +31,9 @@ export default function SignupScreen() {
   const [phone, setPhone] = useState('');
   const [smsCode, setSmsCode] = useState('');
   const [refCode, setRefCode] = useState('');
+  /* 웹 AuthPage 의 '중복확인' 버튼과 같은 동작 — 결과를 즉시 알려준다 */
+  const [emailChecking, setEmailChecking] = useState(false);
+  const [nickChecking, setNickChecking] = useState(false);
 
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
@@ -69,6 +73,42 @@ export default function SignupScreen() {
     }
   };
 
+  const onCheckEmail = async () => {
+    const v = email.trim();
+    if (!v) {
+      Alert.alert('이메일', '이메일을 입력해 주세요.');
+      return;
+    }
+    setEmailChecking(true);
+    try {
+      const taken = await isEmailTaken(v);
+      Alert.alert(
+        '이메일',
+        taken ? '이미 사용 중인 이메일입니다.' : '사용 가능한 이메일입니다.',
+      );
+    } finally {
+      setEmailChecking(false);
+    }
+  };
+
+  const onCheckNick = async () => {
+    const v = nickname.trim();
+    if (!v) {
+      Alert.alert('닉네임', '닉네임을 입력해 주세요.');
+      return;
+    }
+    setNickChecking(true);
+    try {
+      const taken = await isNicknameTaken(v);
+      Alert.alert(
+        '닉네임',
+        taken ? '이미 사용 중인 닉네임입니다.' : '사용 가능한 닉네임입니다.',
+      );
+    } finally {
+      setNickChecking(false);
+    }
+  };
+
   const onSubmit = async () => {
     setError('');
     const nick = nickname.trim();
@@ -91,6 +131,11 @@ export default function SignupScreen() {
 
     setSubmitting(true);
     try {
+      if (await isEmailTaken(email.trim())) {
+        setError('이미 사용 중인 이메일입니다.');
+        setSubmitting(false);
+        return;
+      }
       if (await isNicknameTaken(nick)) {
         setError('이미 사용 중인 닉네임입니다.');
         setSubmitting(false);
@@ -130,6 +175,17 @@ export default function SignupScreen() {
         onChangeText={setEmail}
         placeholder="gangtalk@example.com"
         keyboardType="email-address"
+        right={
+          <Pressable
+            style={s.checkBtn}
+            onPress={onCheckEmail}
+            disabled={emailChecking}
+          >
+            <Text style={s.checkBtnText}>
+              {emailChecking ? '확인중…' : '중복확인'}
+            </Text>
+          </Pressable>
+        }
       />
       <FormField
         label="비밀번호"
@@ -151,6 +207,17 @@ export default function SignupScreen() {
         onChangeText={setNickname}
         placeholder={`${NICKNAME_MIN}~${NICKNAME_MAX}자`}
         maxLength={NICKNAME_MAX}
+        right={
+          <Pressable
+            style={s.checkBtn}
+            onPress={onCheckNick}
+            disabled={nickChecking}
+          >
+            <Text style={s.checkBtnText}>
+              {nickChecking ? '확인중…' : '중복확인'}
+            </Text>
+          </Pressable>
+        }
       />
 
       <FormField
@@ -240,4 +307,14 @@ const styles = (c: ThemeColors) =>
     ok: { fontSize: fontSize.sm, color: '#16a34a', fontWeight: '600' },
     error: { fontSize: fontSize.sm, color: '#dc2626' },
     submit: { marginTop: spacing.md },
+    /* 웹 AuthPage 의 .btn.sm.ghost 와 같은 자리·역할 */
+    checkBtn: {
+      paddingHorizontal: spacing.md,
+      paddingVertical: 6,
+      borderRadius: radius.sm,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: c.line,
+      backgroundColor: c.surface,
+    },
+    checkBtnText: { fontSize: fontSize.sm, fontWeight: '700', color: c.fg },
   });

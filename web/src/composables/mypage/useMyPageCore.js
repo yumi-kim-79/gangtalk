@@ -107,6 +107,10 @@ export function useMyPageCore(){
       uid: a.uid || a.user?.uid || profile?.uid || me?.uid || null,
       companyId: company?.id || company?.docId || null,
       points: a.points,
+      // reward 가 이 목록에 없어서 MyPage.userReward 의 s.reward 가 항상 undefined 였다.
+      // Firestore 에 12,000 이 있어도 화면에는 0원으로 표시되던 직접 원인.
+      // (store/user.js 의 onSnapshot → me.auth 까지는 들어오는데 여기서 걸러졌다)
+      reward: Number(a.reward ?? profile?.reward ?? profile?.rewardAmount ?? 0),
       referral: a.referral,
       email: profile?.email || a?.email || ''
     }

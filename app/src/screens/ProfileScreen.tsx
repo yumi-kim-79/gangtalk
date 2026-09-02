@@ -4,6 +4,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import {
   Alert,
   Clipboard,
+  Image,
   Pressable,
   ScrollView,
   Share,
@@ -15,7 +16,7 @@ import AppHeader from '@/components/common/AppHeader';
 import Icon from '@/components/common/Icon';
 import MenuRow from '@/components/common/MenuRow';
 import { env } from '@/config/env';
-import { REFERRAL_REWARD_POINT, tierByPoints } from '@/constants/tiers';
+import { REFERRAL_REWARD_POINT, TIER_BADGES, tierByPoints } from '@/constants/tiers';
 import { useAuth } from '@/hooks/useAuth';
 import { useRequireAuth } from '@/hooks/useRequireAuth';
 import { signOut } from '@/services/auth';
@@ -129,6 +130,13 @@ export default function ProfileScreen() {
             <View style={s.tierHead}>
               <Text style={s.tierLabel}>회원 등급</Text>
               <View style={s.tierBadge}>
+                {TIER_BADGES[tier.current.key] ? (
+                  <Image
+                    source={TIER_BADGES[tier.current.key]}
+                    style={s.tierBadgeImg}
+                    resizeMode="contain"
+                  />
+                ) : null}
                 <Text style={s.tierBadgeText}>{tier.current.label}</Text>
               </View>
             </View>
@@ -310,11 +318,16 @@ const styles = (c: ThemeColors) =>
     },
     tierLabel: { fontSize: fontSize.md, color: c.muted },
     tierBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
       paddingHorizontal: spacing.md,
       paddingVertical: 4,
       borderRadius: radius.pill,
       backgroundColor: c.accentWeak,
     },
+    /* 웹 .tier-badge-img 와 같은 크기감 */
+    tierBadgeImg: { width: 18, height: 18 },
     tierBadgeText: { fontSize: fontSize.md, fontWeight: '800', color: c.accent },
     tierBar: {
       height: 6,

@@ -57,5 +57,25 @@ export function tierByPoints(points: number): TierInfo {
   };
 }
 
+/**
+ * 등급 배지 이미지 — 웹 `public/tiers/badges/badge_{key}.png` 를 그대로 복사해 왔다.
+ * (웹 UserSection.vue:382 `tierBadgeSrc` 와 같은 그림)
+ *
+ * babel module-resolver 의 extensions 목록에 .png 가 없어 `@/` 별칭이 듣지 않는다.
+ * 반드시 상대경로 require 로 적을 것.
+ */
+export const TIER_BADGES: Record<string, number> = {
+  daiso: require('../assets/tiers/badge_daiso.png'),
+  newbalance: require('../assets/tiers/badge_newbalance.png'),
+  nike: require('../assets/tiers/badge_nike.png'),
+  ck: require('../assets/tiers/badge_ck.png'),
+  ysl: require('../assets/tiers/badge_ysl.png'),
+  prada: require('../assets/tiers/badge_prada.png'),
+  gucci: require('../assets/tiers/badge_gucci.png'),
+  lv: require('../assets/tiers/badge_lv.png'),
+  chanel: require('../assets/tiers/badge_chanel.png'),
+  hermes: require('../assets/tiers/badge_hermes.png'),
+};
+
 /** 친구 가입 시 서로 받는 포인트 — 웹 마이페이지 문구와 동일 */
 export const REFERRAL_REWARD_POINT = 20_000;

@@ -257,6 +257,26 @@ export async function isReferralCodeValid(code: string): Promise<boolean> {
   }
 }
 
+/**
+ * 이메일 중복 확인 — 웹 AuthPage.checkEmailDuplicate 와 같은 판정.
+ * (Auth 기준으로 이미 있는 계정이면 Firestore 확인까지 갈 필요도 없다)
+ */
+export async function isEmailTaken(email: string): Promise<boolean> {
+  const value = email.trim();
+  if (!value) return false;
+  try {
+    const call = httpsCallable<{ email: string }, { exists: boolean }>(
+      fns(),
+      'checkEmailDuplicate',
+    );
+    const res = await call({ email: value });
+    return res.data?.exists === true;
+  } catch {
+    // 확인 실패가 가입을 막지는 않는다 — 실제 중복이면 createUser 가 거른다
+    return false;
+  }
+}
+
 export async function signUpWithEmail(params: {
   email: string;
   password: string;
