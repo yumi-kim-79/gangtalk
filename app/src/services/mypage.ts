@@ -269,15 +269,27 @@ async function postTitleOf(postId: string, cache: Map<string, string>): Promise<
   }
 }
 
+export interface MyCommentsResult {
+  items: MyComment[];
+  /** true = collectionGroup 조회가 막혀 폴백(최근 글 일부만 훑기)으로 얻은 불완전한 결과 */
+  partial: boolean;
+}
+
 /**
  * 내가 쓴 댓글 · 대댓글.
  *
- * 웹 UserSection.vue:537-575 와 같은 2단 전략:
- *   1) collectionGroup('comments') 로 한 번에 (색인·규칙이 받쳐 줄 때)
- *   2) 실패하면 board_posts 를 훑어 각 글의 comments 를 개별 조회
- * firestore.rules 에 collectionGroup 용 match 가 없어 1번이 거부될 수 있다.
+ * 정상 경로는 collectionGroup('comments').where('authorUid','==',uid) 한 번.
+ * 이게 되려면 두 가지가 **둘 다** 있어야 한다.
+ *   - firestore.rules 의 match /{path=**}/comments/{commentId} 블록
+ *     (board_posts/{postId}/comments 블록은 경로 고정이라 그룹 조회에 안 먹는다)
+ *   - firestore.indexes.json 의 comments.authorUid COLLECTION_GROUP 색인
+ * 둘 중 하나라도 없으면 조회가 거부되고, 예전에는 그대로 빈 목록이 떠서
+ * "댓글이 없다"와 "못 불러왔다"를 구분할 수 없었다. 그래서 partial 을 함께 돌려준다.
+ *
+ * 폴백은 board_posts 100개만 훑는다(웹과 같은 상한). 글이 수만 건이라
+ * 사실상 아무것도 못 찾으므로 결과가 아니라 **경고**로 취급해야 한다.
  */
-export async function fetchMyComments(uid: string): Promise<MyComment[]> {
+export async function fetchMyComments(uid: string): Promise<MyCommentsResult> {
   const cache = new Map<string, string>();
 
   const mapDocs = async (
@@ -305,12 +317,12 @@ export async function fetchMyComments(uid: string): Promise<MyComment[]> {
     const snap = await getDocs(
       query(collectionGroup(db, COLLECTIONS.comments), where('authorUid', '==', uid)),
     );
-    return (await mapDocs(snap.docs)).sort((a, b) => b.updatedAt - a.updatedAt);
+    return {
+      items: (await mapDocs(snap.docs)).sort((a, b) => b.updatedAt - a.updatedAt),
+      partial: false,
+    };
   } catch {
-    // 폴백 — 최근 글 100개만 훑는다 (웹과 같은 상한)
-    const posts = await getDocs(
-      query(collection(db, COLLECTIONS.boardPosts), fbLimit(100)),
-    );
+    const posts = await getDocs(query(collection(db, COLLECTIONS.boardPosts), fbLimit(100)));
     const chunks = await Promise.all(
       posts.docs.map(async (p: FirebaseFirestoreTypes.QueryDocumentSnapshot) => {
         const cs = await getDocs(
@@ -322,7 +334,10 @@ export async function fetchMyComments(uid: string): Promise<MyComment[]> {
         return mapDocs(cs.docs, p.id, String((p.data() as Raw)?.title ?? ''));
       }),
     );
-    return chunks.flat().sort((a: MyComment, b: MyComment) => b.updatedAt - a.updatedAt);
+    return {
+      items: chunks.flat().sort((a: MyComment, b: MyComment) => b.updatedAt - a.updatedAt),
+      partial: true,
+    };
   }
 }
 

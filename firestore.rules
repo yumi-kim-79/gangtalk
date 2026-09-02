@@ -392,6 +392,24 @@ service cloud.firestore {
       }
     }
 
+    /* ===== 댓글 collectionGroup 조회 =====
+     * 마이페이지 "내 활동 관리"의 댓글·대댓글 탭은
+     *   collectionGroup('comments').where('authorUid','==',uid)
+     * 로 내 댓글을 한 번에 찾는다.
+     * 위 board_posts/{postId}/comments 블록은 **경로가 고정**이라 컬렉션 그룹
+     * 조회에는 적용되지 않는다 — 그래서 지금까지 이 조회가 거부되고,
+     * 폴백(board_posts 100개만 훑기)이 25,000여 개 중 100개만 보느라
+     * 댓글 목록이 늘 비어 있었다.
+     *
+     * 노출 범위는 "내가 쓴 댓글"로 못 박는다. resource.data 를 조건에 쓰면
+     * 쿼리에 같은 필터가 없을 때 Firestore 가 조회 자체를 거부하므로,
+     * where('authorUid','==', 본인) 이 없는 그룹 조회는 통과하지 못한다.
+     * (board_posts 댓글의 일반 읽기는 위 블록이 그대로 담당 — 규칙은 가산적)
+     */
+    match /{path=**}/comments/{commentId} {
+      allow read: if signedIn() && resource.data.authorUid == request.auth.uid;
+    }
+
     /* ===== 채팅 ===== */
     match /chats/{roomId} {
       allow read: if signedIn();

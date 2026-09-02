@@ -107,6 +107,8 @@
         </div>
       </header>
 
+      <p v-if="panelNotice && panel.tab !== 'posts'" class="mp-notice">{{ panelNotice }}</p>
+
       <!-- 글 -->
       <div v-show="panel.tab === 'posts'">
         <div v-if="loading.posts" class="muted center">불러오는 중…</div>
@@ -489,6 +491,8 @@ async function onShareCode() {
 
 /* ===== 내 글/댓글 관리 ===== */
 const panel = ref({ open: false, tab: 'posts' })
+/* 빈 목록이 '댓글 없음'인지 '못 불러옴'인지 구분해 주는 안내 */
+const panelNotice = ref('')
 const uid = ref('')
 function toggleMyPanel() {
   panel.value.open = !panel.value.open
@@ -544,9 +548,14 @@ async function loadCommentsAndReplies() {
       return await mapCommentsSnapshot(snap)
     }
     let all = []
+    panelNotice.value = ''
     try {
       all = await tryGroup()
     } catch {
+      // collectionGroup 이 막혔을 때의 폴백. board_posts 를 100개만 훑기 때문에
+      // 글이 수만 건이면 사실상 아무것도 못 찾는다 → 결과가 아니라 경고로 취급한다.
+      panelNotice.value =
+        '댓글을 전부 불러오지 못했습니다. Firestore 규칙·색인 배포가 필요합니다.'
       const postsSnap = await getDocs(query(collection(fbDb, 'board_posts'), limit(100)))
       const tasks = postsSnap.docs.map(async (p) => {
         const pid = p.id
@@ -1316,10 +1325,22 @@ html[data-theme='black'] :where(.btn.primary.sm) {
   border-radius: 8px;
   border: 1px solid var(--line);
   background: transparent;
+  /* 색을 상속에 맡기면 테마/부모에 따라 '수정' 글자가 배경에 묻혀 안 보인다.
+     '삭제'는 .danger 로 색이 박혀 있어 멀쩡해 보이는 바람에 더 헷갈렸다. */
+  color: var(--fg);
+  font-weight: 700;
 }
 .mini.danger {
   color: #d33;
   border-color: color-mix(in oklab, #d33, white 60%);
+}
+.mp-notice {
+  margin: 8px 12px 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  color: #d33;
+  background: color-mix(in oklab, #d33, transparent 92%);
 }
 .empty {
   text-align: center;

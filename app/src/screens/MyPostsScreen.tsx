@@ -76,6 +76,8 @@ export default function MyPostsScreen() {
   const [comments, setComments] = useState<MyComment[]>([]);
   const [loadingPosts, setLoadingPosts] = useState(true);
   const [loadingComments, setLoadingComments] = useState(true);
+  /* 빈 목록이 "댓글 없음"인지 "못 불러옴"인지 화면에서 구분되게 한다 */
+  const [notice, setNotice] = useState('');
   const [edit, setEdit] = useState<EditState>(null);
   const [saving, setSaving] = useState(false);
 
@@ -99,10 +101,19 @@ export default function MyPostsScreen() {
   const reloadComments = useCallback(async () => {
     if (!uid) return;
     setLoadingComments(true);
+    setNotice('');
     try {
-      setComments(await fetchMyComments(uid));
-    } catch {
+      const res = await fetchMyComments(uid);
+      setComments(res.items);
+      if (res.partial) {
+        setNotice(
+          '댓글을 전부 불러오지 못했습니다.\n' +
+            'Firestore 규칙·색인 배포(npm run deploy:rules, deploy:indexes)가 필요합니다.',
+        );
+      }
+    } catch (e) {
       setComments([]);
+      setNotice(e instanceof Error ? e.message : '댓글을 불러오지 못했습니다.');
     } finally {
       setLoadingComments(false);
     }
@@ -307,6 +318,7 @@ export default function MyPostsScreen() {
           );
         })}
       </View>
+      {notice && tab !== 'posts' ? <Text style={s.notice}>{notice}</Text> : null}
     </View>
   );
 
@@ -454,6 +466,7 @@ const styles = (c: ThemeColors) =>
 
     center: { alignItems: 'center', justifyContent: 'center', paddingVertical: 64 },
     emptyText: { fontSize: fontSize.md, color: c.muted },
+    notice: { fontSize: fontSize.sm, color: '#dc2626', lineHeight: 16 },
 
     backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
     sheet: {
