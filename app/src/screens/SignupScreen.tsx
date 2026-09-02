@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Button from '@/components/common/Button';
 import FormField from '@/components/common/FormField';
 import { NICKNAME_MAX, NICKNAME_MIN, PASSWORD_MIN } from '@/constants/auth';
+import { smsVerifyFailMessage } from '@/constants/sms';
 import {
   authErrorMessage,
   sendSmsCode,
@@ -65,7 +66,7 @@ export default function SignupScreen() {
     try {
       const res = await verifySmsCode(phone, smsCode);
       if (res.ok) setVerified(true);
-      else setError(verifyFailMessage(res.reason));
+      else setError(smsVerifyFailMessage(res.reason));
     } catch (e) {
       setError(smsErrorMessage(e));
     } finally {
@@ -285,19 +286,6 @@ function smsErrorMessage(e: unknown): string {
     return '인증 요청 한도를 초과했습니다. 잠시 후 다시 시도해 주세요.';
   }
   return authErrorMessage(e);
-}
-
-function verifyFailMessage(reason?: string): string {
-  switch (reason) {
-    case 'no_request':
-      return '먼저 인증번호를 받아 주세요.';
-    case 'code_invalidated':
-      return '인증번호가 만료되었습니다. 다시 받아 주세요.';
-    case 'expired':
-      return '인증번호 유효시간이 지났습니다.';
-    default:
-      return '인증번호가 올바르지 않습니다.';
-  }
 }
 
 const styles = (c: ThemeColors) =>

@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { useNavigation } from '@react-navigation/native';
 import type { NavigationProp } from '@react-navigation/native';
 import {
@@ -15,7 +15,7 @@ import {
 import AppHeader from '@/components/common/AppHeader';
 import Icon from '@/components/common/Icon';
 import ChipTabs from '@/components/common/ChipTabs';
-import { STORE_CATEGORIES } from '@/constants/stores';
+import { HOME_STORE_LIMIT, STORE_CATEGORIES } from '@/constants/stores';
 import StoreStatusCard from '@/components/store/StoreStatusCard';
 import { useAuth } from '@/hooks/useAuth';
 import { useHomeStores } from '@/hooks/useHomeStores';
@@ -41,6 +41,9 @@ export default function HomeScreen() {
   const [category, setCategory] = useState('all');
   const [keyword, setKeyword] = useState('');
   const { stores, all, loading, roomsReady, error } = useHomeStores(category, keyword);
+  /* 웹 현황판은 20곳까지만 카드로 깔고 나머지는 '더보기 ›'로 가게찾기로 보낸다
+     (MainPage.vue:91). 앱만 전량을 그려 스크롤이 훨씬 길었다. */
+  const homeStores = useMemo(() => stores.slice(0, HOME_STORE_LIMIT), [stores]);
   const { visible: news, current: currentNews } = useNewsline();
   const [newsOpen, setNewsOpen] = useState(false);
 
@@ -65,7 +68,7 @@ export default function HomeScreen() {
   return (
     <View style={s.root}>
       <FlatList
-        data={stores}
+        data={homeStores}
         keyExtractor={item => item.id}
         /* StoreStatusCard 는 React.memo 라 data 배열이 그대로면 다시 그리지 않는다.
          * 찜 집합만 바뀌었을 때 하트가 안 바뀌던 원인 — 스냅샷이 도착해도

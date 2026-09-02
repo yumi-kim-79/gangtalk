@@ -59,7 +59,7 @@
     <!-- 추천 리워드 -->
     <div class="us-invite">
       <div class="us-invite-text">
-        추천 리워드 — 친구가 회원가입 시 서로 <b>20,000P</b>!
+        추천 리워드 — 친구가 회원가입 시 서로 <b>{{ rewardPointText }}</b>!
       </div>
       <button class="us-invite-btn" type="button" @click="onShareCode">내 코드 공유하기</button>
     </div>
@@ -260,6 +260,12 @@ import { getAuth, onAuthStateChanged } from 'firebase/auth'
 import { db as fbDb } from '@/firebase'
 import { getTheme, setTheme } from '@/store/theme.js'
 import {
+  REFERRAL_REWARD_POINT,
+  inviteMessage,
+  inviteUrl,
+  rewardWon,
+} from '@/lib/invite.js'
+import {
   collection,
   collectionGroup,
   query,
@@ -350,7 +356,8 @@ const TIERS = [
 const points = computed(() => Number(props.userPoints ?? props.state?.points ?? 0))
 
 const reward = computed(() => Number(props.userReward ?? 0))
-const rewardText = computed(() => `${Math.floor(reward.value).toLocaleString('ko-KR')} 원`)
+/* '12,000 원'(띄어쓰기) → 앱과 같은 '12,000원' */
+const rewardText = computed(() => rewardWon(reward.value))
 
 /* ===== 등급 계산 ===== */
 const tier = computed(() => {
@@ -439,26 +446,16 @@ async function onShareCode() {
     return
   }
 
-  const origin =
-    typeof window !== 'undefined' && window.location?.origin
-      ? window.location.origin
-      : ''
-  const base = origin || 'https://gangtalk.com'
-  const inviteUrl = `${base.replace(/\/+$/, '')}/auth?ref=${encodeURIComponent(
-    code,
-  )}`
-
-  const text = `강남톡방 초대 링크입니다.
-
-추천코드: ${code}
-가입 링크: ${inviteUrl}`
+  // 문구·링크 형식은 앱과 같은 lib/invite.js 를 쓴다
+  const url = inviteUrl(code)
+  const text = inviteMessage(code)
 
   try {
     if (navigator.share) {
       await navigator.share({
         title: '강남톡방 초대',
         text,
-        url: inviteUrl,
+        url,
       })
       return
     }
@@ -468,28 +465,30 @@ async function onShareCode() {
 
   try {
     if (props.copyInviteLink) {
-      await props.copyInviteLink(inviteUrl)
+      await props.copyInviteLink(url)
       alert('가입 링크가 복사되었습니다.\n카톡이나 문자에 붙여넣어 보내 주세요.')
       return
     }
     if (props.copy) {
-      await props.copy(inviteUrl)
+      await props.copy(url)
       alert('가입 링크가 복사되었습니다.\n카톡이나 문자에 붙여넣어 보내 주세요.')
       return
     }
   } catch {}
 
   try {
-    await navigator.clipboard.writeText(inviteUrl)
+    await navigator.clipboard.writeText(url)
     alert('가입 링크가 복사되었습니다.\n카톡이나 문자에 붙여넣어 보내 주세요.')
   } catch {
     alert(
-      `복사에 실패했어요. 아래 링크를 길게 눌러 직접 복사해 주세요.\n\n${inviteUrl}`,
+      `복사에 실패했어요. 아래 링크를 길게 눌러 직접 복사해 주세요.\n\n${url}`,
     )
   }
 }
 
 /* ===== 내 글/댓글 관리 ===== */
+const rewardPointText = `${REFERRAL_REWARD_POINT.toLocaleString('ko-KR')}P`
+
 const panel = ref({ open: false, tab: 'posts' })
 /* 빈 목록이 '댓글 없음'인지 '못 불러옴'인지 구분해 주는 안내 */
 const panelNotice = ref('')

@@ -152,11 +152,24 @@ export default function FavoritesScreen() {
           </View>
         )}
         ListEmptyComponent={
+          /* 문구는 웹 FavoritesPage.vue:36-41 과 동일하게 맞췄다 (바로가기 버튼까지) */
           <View style={s.center}>
-            <Text style={s.emptyTitle}>
-              {tab === 'partner' ? '찜한 제휴업체가 없습니다' : '찜한 업체가 없습니다'}
-            </Text>
-            <Text style={s.emptyDesc}>목록이나 상세에서 하트를 눌러 저장해보세요</Text>
+            <Text style={s.emptyTitle}>아직 찜한 항목이 없어요.</Text>
+            <Text style={s.emptyDesc}>가게/제휴관 카드의 하트를 눌러 추가해 보세요.</Text>
+            <View style={s.emptyBtns}>
+              <Pressable
+                style={s.emptyBtn}
+                onPress={() => navigation.navigate('MainTabs', { screen: 'Stores', params: { screen: 'StoreList' } })}
+              >
+                <Text style={s.emptyBtnText}>가게 찾기</Text>
+              </Pressable>
+              <Pressable
+                style={s.emptyBtn}
+                onPress={() => navigation.navigate('MainTabs', { screen: 'Partners', params: { screen: 'PartnerList' } })}
+              >
+                <Text style={s.emptyBtnText}>제휴관 보기</Text>
+              </Pressable>
+            </View>
           </View>
         }
       />
@@ -171,6 +184,16 @@ const styles = (c: ThemeColors) =>
     center: { alignItems: 'center', justifyContent: 'center', paddingVertical: 64, gap: 4 },
     emptyTitle: { fontSize: fontSize.lg, fontWeight: '700', color: c.fg },
     emptyDesc: { fontSize: fontSize.sm, color: c.muted },
+    emptyBtns: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md },
+    emptyBtn: {
+      paddingHorizontal: spacing.lg,
+      paddingVertical: spacing.md,
+      borderRadius: radius.sm,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: c.chipBorder,
+      backgroundColor: c.surface,
+    },
+    emptyBtnText: { fontSize: fontSize.md, fontWeight: '600', color: c.fg },
 
     row: { position: 'relative' },
     rowBody: { flex: 1 },

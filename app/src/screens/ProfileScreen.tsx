@@ -16,7 +16,7 @@ import AppHeader from '@/components/common/AppHeader';
 import Avatar from '@/components/common/Avatar';
 import Icon from '@/components/common/Icon';
 import MenuRow from '@/components/common/MenuRow';
-import { env } from '@/config/env';
+import { inviteMessage, rewardWon } from '@/constants/invite';
 import { REFERRAL_REWARD_POINT, TIER_BADGES, tierByPoints } from '@/constants/tiers';
 import { useAuth } from '@/hooks/useAuth';
 import { useRequireAuth } from '@/hooks/useRequireAuth';
@@ -85,11 +85,9 @@ export default function ProfileScreen() {
       Alert.alert('추천코드', '추천코드가 아직 없습니다.\n잠시 후 다시 시도해 주세요.');
       return;
     }
-    const url = `${env.webUrl}/auth?mode=signup&ref=${encodeURIComponent(refCode)}`;
     try {
-      await Share.share({
-        message: `강남톡방에 초대합니다!\n제 추천코드 ${refCode} 로 가입하면 서로 ${REFERRAL_REWARD_POINT.toLocaleString()}P 를 받아요.\n${url}`,
-      });
+      // 문구·링크 형식은 웹과 같은 constants/invite.ts 를 쓴다
+      await Share.share({ message: inviteMessage(refCode) });
     } catch {
       // 사용자가 공유 시트를 닫은 경우 — 무시
     }
@@ -127,7 +125,7 @@ export default function ProfileScreen() {
             <Stat label="보유 포인트" value={`${points.toLocaleString()}P`} colors={c} />
             <Stat
               label="리워드"
-              value={`${Math.floor(reward).toLocaleString()}원`}
+              value={rewardWon(reward)}
               colors={c}
             />
           </View>

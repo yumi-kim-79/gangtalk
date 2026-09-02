@@ -308,6 +308,7 @@ import {
 import { getFunctions, httpsCallable } from 'firebase/functions'
 import { db as fbDb } from '@/firebase'
 import { me } from '@/store/user'
+import { smsVerifyFailMessage } from '@/lib/smsMessages.js'
 
 // 회원 빌드(gangtox.com) 에서 가입 후 안내할 admin 도메인 로그인 URL.
 // 도메인 분리 정책: 가입은 공개 도메인(gangtox), 운영/로그인은 분리 도메인(gangtalk815).
@@ -420,19 +421,9 @@ async function onVerifySms() {
       alert('인증 완료되었습니다.')
       return
     }
-    let msg = '인증 실패: 인증번호를 다시 확인하세요.'
-    switch (data.reason) {
-      case 'no_request':
-        msg = '해당 번호로 발송된 인증번호가 없습니다.\n먼저 "인증번호 발송" 버튼을 눌러 주세요.'
-        break
-      case 'expired':
-        msg = '인증번호가 만료되었습니다. 다시 발송해 주세요.'
-        break
-      case 'mismatch':
-        msg = '인증번호가 일치하지 않습니다.'
-        break
-    }
-    alert(msg)
+    // 이전에는 서버가 보내지도 않는 'mismatch' 를 다루고 wrong_code 를 빠뜨려
+    // 번호를 틀려도 기본 문구만 떴다. 웹·앱 공통 표로 통일한다.
+    alert(smsVerifyFailMessage(data.reason))
   } catch (e) {
     console.error('verifySmsCode error:', e)
     alert('인증 확인 중 오류가 발생했습니다.')

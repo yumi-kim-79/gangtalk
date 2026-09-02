@@ -25,6 +25,9 @@ export const STORE_CATEGORIES: StoreCategory[] = [
   { key: 'etc', label: '기타' },
 ];
 
+/** 현황판 카드 상한 — 웹 MainPage.vue:91 의 slice(0, 20) 과 같은 값 */
+export const HOME_STORE_LIMIT = 20;
+
 export const CATEGORY_LABEL: Record<string, string> = Object.fromEntries(
   STORE_CATEGORIES.map(c => [c.key, c.label]),
 );

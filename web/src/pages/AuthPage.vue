@@ -280,6 +280,7 @@ import { humanizeAuthError } from '../utils/authErrors.js'
 import { getAuth } from 'firebase/auth'
 import { getFunctions, httpsCallable } from 'firebase/functions'
 import { checkEmailAvailable, checkNicknameAvailable } from '@/services/authService'
+import { smsVerifyFailMessage } from '@/lib/smsMessages.js'
 
 /* ---------------------------------------------------------
    문자 인증 함수 (Cloud Functions)
@@ -395,23 +396,8 @@ async function verifySmsCode() {
       return
     }
 
-    // ✅ 서버에서 내려준 실패 사유에 따라 메시지 분리
-    let msg = '인증 실패: 인증번호를 다시 확인하세요.'
-    switch (data.reason) {
-      case 'no_request':
-        msg = '해당 번호로 발송된 인증번호가 없습니다.\n먼저 "인증번호 발송" 버튼을 눌러 주세요.'
-        break
-      case 'wrong_code':
-        msg = '인증번호가 일치하지 않습니다.\n문자에 도착한 번호를 다시 확인해 주세요.'
-        break
-      case 'expired':
-        msg = '인증번호 입력 가능 시간이 지났습니다.\n다시 "인증번호 발송"부터 진행해 주세요.'
-        break
-      default:
-        // 그 외에는 기본 메시지 유지
-        break
-    }
-    alert(msg)
+    // 실패 사유별 문구는 웹·앱 공통 표를 쓴다 (lib/smsMessages.js)
+    alert(smsVerifyFailMessage(data.reason))
   } catch (e) {
     console.error('verifySmsCode error:', e)
     const code = e?.code || e?.details?.code || 'INTERNAL'
