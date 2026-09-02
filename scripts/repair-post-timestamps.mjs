@@ -69,6 +69,9 @@ function askPassword(prompt = '관리자 비밀번호: ') {
     rl.question('', answer => {
       process.stdin.removeListener('data', onKey);
       rl.close();
+      // 마지막 Enter 에도 onKey 가 한 번 더 그려 놓은 프롬프트를 지운다
+      readline.clearLine(process.stdout, 0);
+      readline.cursorTo(process.stdout, 0);
       process.stdout.write('\n');
       resolve(answer);
     });
