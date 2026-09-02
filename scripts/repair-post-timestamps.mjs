@@ -18,15 +18,17 @@
  *   createdAt / updatedAt 이 number 인 문서를 찾아
  *   같은 시각의 Timestamp 로 변환해 다시 쓴다. (값은 보존 — 순서만 바로잡힌다)
  *
- * 실행
+ * 실행 (비밀번호는 실행 중에 직접 물어본다 — 환경변수·히스토리에 남지 않는다)
  *   cd ~/GangTalk/web
- *   read -s ADMIN_PASSWORD && export ADMIN_PASSWORD ADMIN_EMAIL=gangtalk815@gmail.com
  *   node ../scripts/repair-post-timestamps.mjs           # 미리보기 (아무것도 쓰지 않음)
  *   node ../scripts/repair-post-timestamps.mjs --apply   # 실제 반영
+ *
+ *   다른 계정으로 돌리려면 ADMIN_EMAIL 만 앞에 붙이면 된다.
  *
  *   ⚠️ 먼저 미리보기로 건드릴 문서 수를 확인할 것.
  *   ⚠️ board_posts 수정은 관리자 권한이 필요하다 (firestore.rules).
  */
+import readline from 'node:readline';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInWithEmailAndPassword } from 'firebase/auth';
 import {
@@ -39,8 +41,39 @@ import {
 } from 'firebase/firestore';
 
 const APPLY = process.argv.includes('--apply');
-const email = process.env.ADMIN_EMAIL;
-const password = process.env.ADMIN_PASSWORD;
+const email = process.env.ADMIN_EMAIL || 'gangtalk815@gmail.com';
+
+/**
+ * 비밀번호를 화면에 찍지 않고 직접 입력받는다.
+ *
+ * 환경변수(ADMIN_PASSWORD)로 넘기지 않는 이유:
+ *   - `read -s ADMIN_PASSWORD && ...` 를 여러 줄과 함께 붙여넣으면
+ *     read 가 **다음 줄(명령어)** 을 비밀번호로 삼켜 버린다
+ *   - export 한 값은 그 셸의 자식 프로세스 전부에 노출되고 셸 히스토리에도 남는다
+ */
+function askPassword(prompt = '관리자 비밀번호: ') {
+  return new Promise((resolve, reject) => {
+    if (!process.stdin.isTTY) {
+      reject(new Error('대화형 터미널에서 실행해 주세요.'));
+      return;
+    }
+    const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+    // 입력 중 화면에 아무것도 찍지 않는다
+    const onKey = () => {
+      readline.clearLine(process.stdout, 0);
+      readline.cursorTo(process.stdout, 0);
+      process.stdout.write(prompt);
+    };
+    process.stdout.write(prompt);
+    process.stdin.on('data', onKey);
+    rl.question('', answer => {
+      process.stdin.removeListener('data', onKey);
+      rl.close();
+      process.stdout.write('\n');
+      resolve(answer);
+    });
+  });
+}
 
 const app = initializeApp({
   apiKey: 'AIzaSyCpoG1MamqFD0pMbltCmG46eAhSfnIvqAk',
@@ -67,9 +100,10 @@ function patchFor(data) {
 }
 
 async function main() {
-  if (!email || !password) {
-    console.error('ADMIN_EMAIL / ADMIN_PASSWORD 환경변수가 필요합니다.');
-    console.error("  read -s ADMIN_PASSWORD && export ADMIN_PASSWORD ADMIN_EMAIL=...");
+  console.log(`관리자 계정: ${email}`);
+  const password = await askPassword();
+  if (!password) {
+    console.error('비밀번호가 비어 있습니다.');
     process.exit(1);
   }
   await signInWithEmailAndPassword(getAuth(app), email, password);
