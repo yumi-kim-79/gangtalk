@@ -551,11 +551,17 @@ async function loadCommentsAndReplies() {
     panelNotice.value = ''
     try {
       all = await tryGroup()
-    } catch {
+    } catch (groupErr) {
       // collectionGroup 이 막혔을 때의 폴백. board_posts 를 100개만 훑기 때문에
       // 글이 수만 건이면 사실상 아무것도 못 찾는다 → 결과가 아니라 경고로 취급한다.
-      panelNotice.value =
-        '댓글을 전부 불러오지 못했습니다. Firestore 규칙·색인 배포가 필요합니다.'
+      const code = String(groupErr?.code || groupErr?.message || groupErr)
+      const why = code.includes('permission-denied')
+        ? '규칙이 조회를 거부했습니다 (firestore.rules 배포 확인)'
+        : code.includes('failed-precondition')
+          ? '색인이 아직 준비되지 않았습니다 (몇 분 뒤 다시 시도)'
+          : code
+      console.warn('[내 활동] collectionGroup(comments) 실패:', groupErr)
+      panelNotice.value = `댓글을 전부 불러오지 못했습니다 — ${why}`
       const postsSnap = await getDocs(query(collection(fbDb, 'board_posts'), limit(100)))
       const tasks = postsSnap.docs.map(async (p) => {
         const pid = p.id

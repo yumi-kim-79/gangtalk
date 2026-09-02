@@ -106,10 +106,13 @@ export default function MyPostsScreen() {
       const res = await fetchMyComments(uid);
       setComments(res.items);
       if (res.partial) {
-        setNotice(
-          '댓글을 전부 불러오지 못했습니다.\n' +
-            'Firestore 규칙·색인 배포(npm run deploy:rules, deploy:indexes)가 필요합니다.',
-        );
+        const r = res.reason ?? '';
+        const why = r.includes('permission-denied')
+          ? '규칙이 조회를 거부했습니다 (firestore.rules 배포 확인)'
+          : r.includes('failed-precondition')
+            ? '색인이 아직 준비되지 않았습니다 (몇 분 뒤 다시 시도)'
+            : r || '원인 불명';
+        setNotice(`댓글을 전부 불러오지 못했습니다.\n${why}`);
       }
     } catch (e) {
       setComments([]);

@@ -273,6 +273,15 @@ export interface MyCommentsResult {
   items: MyComment[];
   /** true = collectionGroup 조회가 막혀 폴백(최근 글 일부만 훑기)으로 얻은 불완전한 결과 */
   partial: boolean;
+  /** partial 일 때 원인 — 'permission-denied'(규칙) / 'failed-precondition'(색인) 등 */
+  reason?: string;
+}
+
+/** Firestore 오류에서 코드만 뽑는다. RN 은 'firestore/permission-denied' 형태 */
+function errCode(e: unknown): string {
+  const c = String((e as { code?: string })?.code ?? '');
+  if (c) return c.replace(/^firestore\//, '');
+  return String((e as { message?: string })?.message ?? e ?? '');
 }
 
 /**
@@ -321,7 +330,8 @@ export async function fetchMyComments(uid: string): Promise<MyCommentsResult> {
       items: (await mapDocs(snap.docs)).sort((a, b) => b.updatedAt - a.updatedAt),
       partial: false,
     };
-  } catch {
+  } catch (groupErr) {
+    const reason = errCode(groupErr);
     const posts = await getDocs(query(collection(db, COLLECTIONS.boardPosts), fbLimit(100)));
     const chunks = await Promise.all(
       posts.docs.map(async (p: FirebaseFirestoreTypes.QueryDocumentSnapshot) => {
@@ -337,6 +347,7 @@ export async function fetchMyComments(uid: string): Promise<MyCommentsResult> {
     return {
       items: chunks.flat().sort((a: MyComment, b: MyComment) => b.updatedAt - a.updatedAt),
       partial: true,
+      reason,
     };
   }
 }
