@@ -42,6 +42,8 @@ export interface StoreDoc {
   rooms?: number | string;
   roomCount?: number | string;
   roomInfo?: number | string;
+  /** 레거시 총 방수 필드 (웹 MainPage.vue:1274 폴백에 포함) */
+  total?: number | string;
 
   likes?: number;
   wishCount?: number;

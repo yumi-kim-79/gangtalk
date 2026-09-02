@@ -99,15 +99,32 @@ async function tryAcquireDebounce(bizId, ttlMs = 5000) {
 }
 
 // /stores/{id} 동기화(있을 때만)
-async function syncStores(bizId, match, persons) {
+/**
+ * 시트 집계를 stores 로 미러링.
+ *
+ * 2026-09-01 수정: totalRooms 추가.
+ *   시트 업로드는 totalRooms 를 vendors/{id} 에만 써 왔는데(:1653),
+ *   firestore.rules 에 vendors 규칙이 아예 없어 웹·앱 어느 쪽도 그 값을 읽지 못했다.
+ *   (웹 MainPage.subscribeVendorsSummary 는 permission-denied 로 계속 실패 중)
+ *   stores 는 공개 읽기라 여기로 미러링하면 양쪽 다 자동으로 값을 본다.
+ *   혼잡도는 이미 rooms_biz.congestion / congestionScore 로 내려가고 있어 그대로 둔다.
+ */
+async function syncStores(bizId, match, persons, extra = {}) {
   const sRef = db.collection("stores").doc(bizId);
   const s = await sRef.get();
   if (!s.exists) return;
-  await sRef.set({
+
+  const patch = {
     match,
     persons,
     updatedAt: admin.firestore.FieldValue.serverTimestamp()
-  }, { merge: true });
+  };
+
+  // 0 은 "집계 안 됨" 과 구분할 수 없어 양수일 때만 덮어쓴다
+  const tr = Number(extra.totalRooms);
+  if (Number.isFinite(tr) && tr > 0) patch.totalRooms = tr;
+
+  await sRef.set(patch, { merge: true });
 }
 
 // ★ 혼잡도 "점수" 계산 (요청 정의 반영)
@@ -1469,8 +1486,10 @@ async function postVendorDigest(vendorId) {
   const baseVendorId = bizIdForHeader.endsWith("_sheet")
     ? bizIdForHeader.replace(/_sheet$/, "")
     : bizIdForHeader;
-  // ✔ stores.persons 도 필요인원 합계로 동기화
-  await syncStores(baseVendorId, totals.matchedRooms, totals.totalNeeded);
+  // ✔ stores.persons / totalRooms 도 시트 집계로 동기화
+  await syncStores(baseVendorId, totals.matchedRooms, totals.totalNeeded, {
+    totalRooms: totals.totalRooms,
+  });
 
   // 30초 쿨다운
   await db.collection("vendors").doc(vendorId)

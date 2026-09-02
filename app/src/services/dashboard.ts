@@ -279,8 +279,12 @@ export function applyRoomsBiz(
 
     s.match = rb?.active ? rb.rooms : legacyMatch;
     s.persons = rb?.active ? rb.people : legacyPersons;
-    s.totalRooms = num(raw.totalRooms ?? raw.rooms);
+    /* 시트 업로드가 집계한 총 방수는 functions/index.js syncStores 가
+     * stores.totalRooms 로 미러링한다 (vendors 는 rules 규칙이 없어 읽을 수 없다).
+     * 웹 MainPage.vue:1274 와 같은 폴백 순서. */
+    s.totalRooms = num(raw.totalRooms ?? raw.total ?? raw.rooms);
     s.maxPersons = num(raw.maxPersons ?? raw.capacity ?? raw.max);
+    // 혼잡도: rooms_biz.congestion → congestionScore → 자동계산 (readRoomsBiz 에서 합침)
     if (rb?.congestion) s.congestion = rb.congestion;
 
     return s;

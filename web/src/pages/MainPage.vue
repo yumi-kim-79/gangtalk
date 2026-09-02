@@ -1766,16 +1766,21 @@ onMounted(async () => {
   await firebaseReady
   subscribe()
   // rooms_biz 는 stores 구독 후 subscribe() 안에서 재구독/매핑
-  subscribeVendorsSummary()
-  subscribeVendorStatusPerVendor()
+  //
+  // 2026-09-01: vendors 구독을 뗀다.
+  //   firestore.rules 에 vendors 규칙이 아예 없어(catch-all 도 없음) 이 두 구독은
+  //   계속 permission-denied 로 실패해 왔다 — labelsAgg 는 늘 비어 있었고,
+  //   화면에는 아무 영향 없이 콘솔 에러만 쌓였다. 업체당 리스너 1개씩 붙던
+  //   subscribeVendorStatusPerVendor 도 마찬가지.
+  //   시트 집계의 totalRooms 는 functions/index.js syncStores 가
+  //   stores.totalRooms 로 미러링하므로 여기서 따로 읽을 필요가 없다.
+  //   (혼잡도는 이미 rooms_biz.congestion / congestionScore 로 내려온다)
 })
 
 async function refresh(){
   await firebaseReady
   subscribe()
-  // rooms_biz 는 stores 구독 후 subscribe() 안에서 재구독/매핑
-  subscribeVendorsSummary()
-  subscribeVendorStatusPerVendor()
+  // rooms_biz 는 stores 구독 후 subscribe() 안에서 재구독/매핑 (vendors 는 위 주석 참고)
 }
 
 
