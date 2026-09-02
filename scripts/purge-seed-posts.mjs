@@ -8,18 +8,26 @@
  *   실사용자가 스크롤하면 같은 제목이 끝없이 반복되는 게 그대로 드러난다.
  *   실서비스 시작 시점에는 지우는 게 맞다.
  *
+ * 모드
+ *   (기본)  isSeed == true 인 문서만 지운다.
+ *   --all   board_posts 를 통째로 비운다. 2026-09-01 점검에서
+ *           isSeed 가 없는 286건도 전부 초기 시드/개발 테스트 글로 확인됐다
+ *           (scripts/inspect-nonseed-posts.mjs 참고). 실서비스 시작 전에만 쓸 것.
+ *
  * 안전장치
- *   - `isSeed == true` 인 문서만 지운다. 사람이 쓴 글은 절대 건드리지 않는다.
  *   - 기본은 미리보기(dry-run). --apply 를 붙여야 실제로 지운다.
  *   - 지우기 전에 시드/실제 건수를 먼저 보여준다.
+ *   - --all --apply 는 확인 문구를 직접 입력해야 진행된다.
  *
  * ⚠️ 먼저 tickSeeder 를 멈춰야 한다. 안 그러면 지우는 동안 계속 새로 생긴다.
  *      npm run deploy:functions      (SEEDER_DISABLED = true 반영)
  *
  * 실행 (비밀번호는 실행 중에 직접 물어본다)
  *   cd ~/GangTalk/web
- *   node ../scripts/purge-seed-posts.mjs           # 미리보기
- *   node ../scripts/purge-seed-posts.mjs --apply   # 실제 삭제
+ *   node ../scripts/purge-seed-posts.mjs                 # 미리보기 (시드만)
+ *   node ../scripts/purge-seed-posts.mjs --apply         # 시드만 삭제
+ *   node ../scripts/purge-seed-posts.mjs --all           # 미리보기 (전체 비우기)
+ *   node ../scripts/purge-seed-posts.mjs --all --apply   # 전체 비우기
  */
 import readline from 'node:readline';
 import { initializeApp } from 'firebase/app';
@@ -36,6 +44,7 @@ import {
 } from 'firebase/firestore';
 
 const APPLY = process.argv.includes('--apply');
+const ALL = process.argv.includes('--all');
 const email = process.env.ADMIN_EMAIL || 'gangtalk815@gmail.com';
 
 /** 한 번에 처리할 글 수 (댓글 삭제까지 포함하므로 배치 한도 500 보다 넉넉히 작게) */
@@ -93,20 +102,45 @@ async function main() {
   const total = totalSnap.data().count || 0;
   const seed = seedSnap.data().count || 0;
 
+  const targetCount = ALL ? total : seed;
+
   console.log('');
-  console.log(`전체 글      ${total.toLocaleString()} 건`);
-  console.log(`시드 글      ${seed.toLocaleString()} 건  ← 삭제 대상`);
-  console.log(`사람이 쓴 글 ${(total - seed).toLocaleString()} 건  ← 그대로 둔다`);
+  console.log(`전체 글          ${total.toLocaleString()} 건`);
+  console.log(`  isSeed 표시    ${seed.toLocaleString()} 건`);
+  console.log(`  표시 없음      ${(total - seed).toLocaleString()} 건`);
+  console.log('');
+  console.log(
+    ALL
+      ? `모드: --all → board_posts 를 통째로 비웁니다 (${targetCount.toLocaleString()} 건)`
+      : `모드: 기본 → isSeed 인 글만 지웁니다 (${targetCount.toLocaleString()} 건)`,
+  );
   console.log('');
 
   if (!APPLY) {
     console.log('미리보기입니다. 아무것도 지우지 않았습니다.');
-    if (seed > 0) console.log('실제로 지우려면 --apply 를 붙여 다시 실행하세요.');
+    if (targetCount > 0) console.log('실제로 지우려면 --apply 를 붙여 다시 실행하세요.');
     process.exit(0);
   }
-  if (seed === 0) {
-    console.log('지울 시드 글이 없습니다.');
+  if (targetCount === 0) {
+    console.log('지울 글이 없습니다.');
     process.exit(0);
+  }
+
+  if (ALL) {
+    // 되돌릴 수 없는 작업이라 확인 문구를 직접 입력받는다
+    const phrase = '전체삭제';
+    const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+    const answer = await new Promise(res =>
+      rl.question(
+        `\n⚠️  board_posts ${targetCount.toLocaleString()} 건을 모두 지웁니다. 되돌릴 수 없습니다.\n` +
+          `계속하려면 "${phrase}" 을(를) 입력하세요: `,
+        a => { rl.close(); res(a); },
+      ),
+    );
+    if (String(answer).trim() !== phrase) {
+      console.log('취소했습니다. 아무것도 지우지 않았습니다.');
+      process.exit(0);
+    }
   }
 
   console.log('=== 실제 삭제 시작 ===');
@@ -115,7 +149,11 @@ async function main() {
 
   // 삭제하면 쿼리 결과에서 사라지므로 커서 없이 같은 쿼리를 반복한다
   for (;;) {
-    const snap = await getDocs(query(postsCol, where('isSeed', '==', true), fbLimit(PAGE)));
+    const snap = await getDocs(
+      ALL
+        ? query(postsCol, fbLimit(PAGE))
+        : query(postsCol, where('isSeed', '==', true), fbLimit(PAGE)),
+    );
     if (snap.empty) break;
 
     for (const d of snap.docs) {
