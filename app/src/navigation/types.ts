@@ -72,6 +72,8 @@ export type RootStackParamList = {
   Favorites: undefined;
   /** 이용약관 / 개인정보처리방침 — 스토어 심사상 앱 안에서 열려야 한다 */
   Legal: { kind: 'terms' | 'privacy' };
+  /** 등급표 + 포인트 적립 기준 (웹 TierTable / PointRuleModal) */
+  Tiers: { points: number };
 };
 
 declare global {

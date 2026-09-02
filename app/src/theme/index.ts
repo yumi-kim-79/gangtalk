@@ -2,7 +2,7 @@
  * 디자인 토큰 — web/src/styles/tokens.css 이식.
  * 색상은 웹과 동일하게 유지하고, 크기/간격만 앱 관습에 맞게 조정한다.
  */
-import { useColorScheme } from 'react-native';
+import { useThemeMode } from '@/theme/ThemeProvider';
 
 export interface ThemeColors {
   bg: string;
@@ -67,10 +67,21 @@ export const spacing = { xs: 4, sm: 6, md: 10, lg: 14, xl: 20, page: 14 } as con
 export const HIT_SLOP = { top: 8, bottom: 8, left: 8, right: 8 } as const;
 export const MIN_TAP = 44;
 
+/**
+ * 테마 색상.
+ *
+ * 이전에는 useColorScheme()(OS 설정)만 따랐다. 웹은 마이페이지의
+ * 주간/야간 토글을 localStorage 에 저장하고 OS 를 따르지 않는데(store/theme.js),
+ * 앱에는 토글 자체가 없어 사용자가 고를 수 없었다.
+ * 이제 ThemeProvider 의 저장값을 쓴다 — 웹과 같은 'white' / 'black' 기본 주간.
+ */
 export function useTheme(): ThemeColors {
-  return useColorScheme() === 'dark' ? palette.dark : palette.light;
+  return useThemeMode().isDark ? palette.dark : palette.light;
 }
 
 export function useIsDark(): boolean {
-  return useColorScheme() === 'dark';
+  return useThemeMode().isDark;
 }
+
+export { ThemeProvider, useThemeMode } from '@/theme/ThemeProvider';
+export type { ThemeMode } from '@/theme/ThemeProvider';

@@ -9,6 +9,7 @@ import DiaryScreen from '@/screens/DiaryScreen';
 import SupportScreen from '@/screens/SupportScreen';
 import FavoritesScreen from '@/screens/FavoritesScreen';
 import LegalScreen from '@/screens/LegalScreen';
+import TiersScreen from '@/screens/TiersScreen';
 import { useTheme } from '@/theme';
 
 /** id 를 붙여야 중첩 스택 안에서도 getParent('Root') 로 확실히 루트를 잡을 수 있다 */
@@ -57,6 +58,17 @@ export default function RootNavigator() {
         options={{
           headerShown: true,
           title: '찜한 업체',
+          headerTintColor: c.fg,
+          headerStyle: { backgroundColor: c.surface },
+        }}
+      />
+
+      <Stack.Screen
+        name="Tiers"
+        component={TiersScreen}
+        options={{
+          headerShown: true,
+          title: '회원 등급 · 포인트',
           headerTintColor: c.fg,
           headerStyle: { backgroundColor: c.surface },
         }}

@@ -35,6 +35,8 @@ export interface StoreDoc {
   banner?: string;
   logo?: string;
   hours?: string;
+  /** 휴무 — 웹 StoreDetail 영업 정보에 함께 나오는 항목 */
+  closed?: string;
   phone?: string;
   address?: string;
 

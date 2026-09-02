@@ -21,7 +21,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useRequireAuth } from '@/hooks/useRequireAuth';
 import { signOut } from '@/services/auth';
 import type { ProfileStackParamList, RootStackParamList } from '@/navigation/types';
-import { fontSize, radius, spacing, useTheme, type ThemeColors } from '@/theme';
+import { fontSize, radius, spacing, useTheme, useThemeMode, type ThemeColors } from '@/theme';
 
 export default function ProfileScreen() {
   const c = useTheme();
@@ -30,6 +30,8 @@ export default function ProfileScreen() {
     useNavigation<NativeStackNavigationProp<ProfileStackParamList, 'ProfileHome'>>();
   const { isLoggedIn, profile, user } = useAuth();
   const { requireAuth } = useRequireAuth();
+  /* 웹 UserSection.vue:203-210 의 주간/야간 토글 — 앱에는 없어서 OS 설정만 따랐다 */
+  const { isDark, toggle: toggleTheme } = useThemeMode();
 
   const onSignOut = useCallback(() => {
     Alert.alert('로그아웃', '로그아웃 하시겠습니까?', [
@@ -125,8 +127,13 @@ export default function ProfileScreen() {
             />
           </View>
 
-          {/* 회원 등급 + 다음 등급까지 진행바 */}
-          <View style={s.tierBox}>
+          {/* 회원 등급 + 다음 등급까지 진행바.
+              웹 UserSection 의 .us-tier 도 눌러서 등급표로 간다 (handleTierClick) */}
+          <Pressable
+            style={s.tierBox}
+            onPress={() => rootNav?.navigate('Tiers', { points })}
+            android_ripple={{ color: c.chipBg }}
+          >
             <View style={s.tierHead}>
               <Text style={s.tierLabel}>회원 등급</Text>
               <View style={s.tierBadge}>
@@ -146,11 +153,12 @@ export default function ProfileScreen() {
             </View>
 
             <Text style={s.tierNext}>
+              {/* 웹은 '최고 등급 달성 🎉' — 문구를 맞춘다 */}
               {tier.next
                 ? `다음: ${tier.next.label} (${tier.toNext.toLocaleString()}P 남음)`
-                : '최고 등급입니다'}
+                : '최고 등급 달성 🎉'}
             </Text>
-          </View>
+          </Pressable>
 
           {/* 내 추천코드 */}
           <View style={s.refBox}>
@@ -211,6 +219,13 @@ export default function ProfileScreen() {
       <MenuRow label="이용약관" onPress={() => openLegal('terms')} />
       <MenuRow label="개인정보처리방침" onPress={() => openLegal('privacy')} />
       <MenuRow label="문의하기" onPress={() => rootNav?.navigate('Support')} />
+
+      <Text style={s.sectionTitle}>설정</Text>
+      <MenuRow
+        label={isDark ? '야간 모드' : '주간 모드'}
+        value={isDark ? '켜짐' : '꺼짐'}
+        onPress={toggleTheme}
+      />
 
       {isLoggedIn ? (
         <>

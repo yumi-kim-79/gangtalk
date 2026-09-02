@@ -131,18 +131,17 @@ export default function StoreDetailScreen() {
           {store.payNote ? <Text style={s.note}>{store.payNote}</Text> : null}
         </Section>
 
+        {/* 웹 StoreDetail.vue:187-190 과 같은 항목 — 운영시간 / 휴무.
+            이전에는 룸(totalRooms) / 필요인원(totalRemaining)을 보여 줬는데,
+            상세는 stores 원문만 구독해서(subscribeStore) rooms_biz 병합 **전** 값이라
+            같은 앱의 현황판 카드와 숫자가 어긋났다. */}
         <Section title="영업 정보" colors={c}>
-          <Row label="영업시간" value={store.hours || '-'} colors={c} />
-          <Row label="룸" value={store.totalRooms ? `${store.totalRooms}개` : '-'} colors={c} />
-          <Row
-            label="필요인원"
-            value={store.totalRemaining ? `${store.totalRemaining}명` : '-'}
-            colors={c}
-          />
+          <Row label="운영시간" value={store.hours || '미등록'} colors={c} />
+          <Row label="휴무" value={store.closed || '미등록'} colors={c} />
         </Section>
 
         <Section title="위치" colors={c}>
-          <Text style={s.body}>{store.address || '주소 정보가 없습니다.'}</Text>
+          <Text style={s.body}>{store.address || '미등록'}</Text>
         </Section>
       </ScrollView>
 

@@ -79,3 +79,15 @@ export const TIER_BADGES: Record<string, number> = {
 
 /** 친구 가입 시 서로 받는 포인트 — 웹 마이페이지 문구와 동일 */
 export const REFERRAL_REWARD_POINT = 20_000;
+
+/**
+ * 포인트 적립 기준 — 웹 components/mypage/PointRuleModal.vue:55-61 과 같은 값.
+ * (서버 기본값은 functions/index.js getPointConfig 에 있다)
+ */
+export const POINT_RULES: { label: string; point: number }[] = [
+  { label: '친구 소개 (추천 가입)', point: 20_000 },
+  { label: '게시글 작성', point: 500 },
+  { label: '댓글 작성', point: 100 },
+  { label: '베스트 게시글 선정', point: 3_000 },
+  { label: '베스트 댓글 선정', point: 2_000 },
+];
