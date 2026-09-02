@@ -10,6 +10,7 @@ import {
   authErrorMessage,
   sendSmsCode,
   isNicknameTaken,
+  isReferralCodeValid,
   signUpWithEmail,
   verifySmsCode,
 } from '@/services/auth';
@@ -95,12 +96,19 @@ export default function SignupScreen() {
         setSubmitting(false);
         return;
       }
+      // 없는 코드로 가입하면 적립이 조용히 실패한다 → 계정 만들기 전에 잡는다
+      const ref = refCode.trim().toLowerCase();
+      if (ref && !(await isReferralCodeValid(ref))) {
+        setError(`추천코드 "${ref}" 를 찾을 수 없습니다. 다시 확인해 주세요.`);
+        setSubmitting(false);
+        return;
+      }
       await signUpWithEmail({
         email,
         password,
         nickname: nick,
         phone: phone.replace(/[^0-9]/g, ''),
-        refCode: refCode.trim() || undefined,
+        refCode: ref || undefined,
       });
       navigation.getParent()?.goBack();
     } catch (e) {
@@ -186,7 +194,7 @@ export default function SignupScreen() {
         label="추천인 코드 (선택)"
         value={refCode}
         onChangeText={setRefCode}
-        placeholder="예: g00012"
+        placeholder="친구에게 받은 코드를 그대로 입력"
         autoCapitalize="none"
       />
 

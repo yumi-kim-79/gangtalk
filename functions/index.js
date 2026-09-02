@@ -415,6 +415,26 @@ exports.checkNicknameDuplicate = onCall(async (req) => {
   return { exists: !snap.empty };
 });
 
+/**
+ * 추천코드 존재 확인 (가입 화면에서 입력 즉시 검증용).
+ *
+ * 왜 필요한가 (2026-09-02):
+ *   존재하지 않는 코드로 가입하면 payReferral 이 findReferrerByCode 실패 후
+ *   **조용히 return** 한다. 사용자는 코드를 넣었는데 왜 포인트가 없는지 알 수 없다.
+ *   실제 사고: 'y00050' 을 'a00050' 으로 잘못 입력 → 아무 안내 없이 미지급.
+ *
+ *   firestore.rules 는 users 를 본인 문서만 읽게 하므로
+ *   클라이언트가 직접 추천인을 조회할 수 없다 → 콜러블로 뚫어 준다.
+ *   반환은 존재 여부(boolean)뿐이라 남의 개인정보는 나가지 않는다.
+ */
+exports.checkReferralCode = onCall(async (req) => {
+  const code = safeStr(req.data?.code || "").trim();
+  if (!code) return { exists: false, code: "" };
+
+  const found = await findReferrerByCode(code);
+  return { exists: !!found, code };
+});
+
 /* =========================================================
    추천인/포인트 유틸
 ========================================================= */
@@ -892,6 +912,14 @@ exports.applyReferralNow = onCall(async (req) => {
 
   const { refApplied } = readReferral(user);
   if (refApplied) return { ok: true, already: true };
+
+  // 존재하지 않는 코드면 호출부가 알 수 있게 사유를 돌려준다.
+  // (이전에는 payReferral 이 조용히 return 해서 ok:true 로 보였다)
+  const referrer = await findReferrerByCode(refCode);
+  if (!referrer) {
+    console.log("[Referral] applyReferralNow - referrer not found", { code: refCode });
+    return { ok: false, reason: "referrer-not-found", code: refCode };
+  }
 
   await migrateReferral(auth.uid, refCode);
   await payReferral(auth.uid, refCode, user);

@@ -217,7 +217,7 @@
           <input
             class="auth-input"
             v-model="refCode"
-            placeholder="예: A00001"
+            placeholder="친구에게 받은 코드를 그대로 입력"
           />
         </div>
 
@@ -527,9 +527,39 @@ async function applyReferralIfAny(rawCode) {
   if (!code) return
   try {
     const applyReferralNow = httpsCallable(fns, 'applyReferralNow')
-    await applyReferralNow({ refCode: code })
+    const res = await applyReferralNow({ refCode: code })
+    // 없는 코드면 조용히 넘어가지 않는다 — 사용자가 왜 포인트가 없는지 알아야 한다
+    if (res?.data?.ok === false && res.data.reason === 'referrer-not-found') {
+      alert(`추천코드 "${code}" 를 찾을 수 없어 추천 포인트가 적립되지 않았습니다.\n가입은 정상 완료되었습니다.`)
+    }
   } catch (e) {
     console.warn('applyReferralNow 실패:', e)
+  }
+}
+
+/* 가입 전 추천코드 확인.
+ * 존재하지 않는 코드로 가입하면 서버가 조용히 넘어가 사용자가 이유를 알 수 없다.
+ * 실제 사고: 'y00050' 을 'a00050' 으로 잘못 입력 → 아무 안내 없이 미지급.
+ * 계정을 만들기 **전에** 잡는다. */
+const refCodeChecking = ref(false)
+async function confirmRefCodeOrAbort(code) {
+  if (!code) return true
+  refCodeChecking.value = true
+  try {
+    const check = httpsCallable(fns, 'checkReferralCode')
+    const res = await check({ code })
+    if (res?.data?.exists) return true
+    return window.confirm(
+      `추천코드 "${code}" 를 찾을 수 없습니다.\n` +
+      `이대로 가입하면 추천 포인트(20,000P)를 받지 못합니다.\n\n` +
+      `확인 = 추천코드 없이 가입 / 취소 = 코드 다시 입력`,
+    )
+  } catch (e) {
+    // 확인 자체가 실패하면 가입을 막지는 않는다 (네트워크 문제로 가입이 막히는 게 더 나쁘다)
+    console.warn('checkReferralCode 실패:', e)
+    return true
+  } finally {
+    refCodeChecking.value = false
   }
 }
 
@@ -600,6 +630,12 @@ async function onSignup() {
     const emailTrim = email.value.trim()
     // ✨ 추천코드는 모두 소문자로 통일 (내 코드 y00023 과 동일)
     const refInput = (refCode.value.trim() || '').toLowerCase()
+
+    // 없는 코드로 가입하면 적립이 안 되는데 안내가 없었다 → 계정 만들기 전에 확인
+    if (!(await confirmRefCodeOrAbort(refInput))) {
+      pendingSignup.value = false
+      return
+    }
 
     // ===== 여성회원 =====
     if (who.value === 'user') {

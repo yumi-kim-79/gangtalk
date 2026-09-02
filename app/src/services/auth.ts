@@ -235,6 +235,28 @@ export async function isNicknameTaken(nick: string): Promise<boolean> {
   }
 }
 
+/**
+ * 추천코드 존재 확인.
+ * 없는 코드로 가입하면 서버가 조용히 넘어가 포인트만 안 들어온다.
+ * (실제 사고: 'y00050' 을 'a00050' 으로 잘못 입력 → 아무 안내 없이 미지급)
+ * firestore.rules 가 users 를 본인 문서만 읽게 해서 클라이언트가 직접 못 찾는다 → 콜러블.
+ */
+export async function isReferralCodeValid(code: string): Promise<boolean> {
+  const value = code.trim().toLowerCase();
+  if (!value) return true; // 미입력은 검사 대상이 아니다
+  try {
+    const call = httpsCallable<{ code: string }, { exists: boolean }>(
+      fns(),
+      'checkReferralCode',
+    );
+    const res = await call({ code: value });
+    return res.data?.exists === true;
+  } catch {
+    // 확인 자체가 실패하면 가입을 막지 않는다 (네트워크 문제로 가입이 막히는 게 더 나쁘다)
+    return true;
+  }
+}
+
 export async function signUpWithEmail(params: {
   email: string;
   password: string;
