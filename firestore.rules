@@ -210,9 +210,10 @@ service cloud.firestore {
 
     match /rooms_biz/{storeId}/participants/{uid} {
       allow read: if true;
-      // 참여/참여취소는 본인 문서만
-      allow create, delete: if isOwner(uid)
-        && (request.resource == null || request.resource.data.uid == uid);
+      // 참여/참여취소는 본인 문서만.
+      // delete 는 request.resource 가 없으므로 create 와 분리해서 쓴다.
+      allow create: if isOwner(uid) && request.resource.data.uid == uid;
+      allow delete: if isOwner(uid);
       allow update: if false;
     }
 
