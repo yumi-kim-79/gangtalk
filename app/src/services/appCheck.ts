@@ -11,7 +11,7 @@
  *
  * ── 콘솔에서 해야 하는 일 ────────────────────────────────
  *  1) Firebase Console > App Check > 앱 등록
- *     - iOS   : App Attest (기기) — 시뮬레이터는 지원 안 함 → 디버그 토큰 필요
+ *     - iOS   : App Attest (실기기 전용) — 시뮬레이터는 지원 안 함 → 디버그 토큰 필요
  *     - Android: Play Integrity
  *  2) 시뮬레이터/에뮬레이터에서 돌릴 때는 첫 실행 로그에 찍히는 디버그 토큰을
  *     Console > App Check > 앱 > "디버그 토큰 관리" 에 등록
@@ -44,7 +44,10 @@ export async function initAppCheck(): Promise<void> {
       debugToken,
     },
     apple: {
-      provider: env.isDev ? 'debug' : 'appAttestWithDeviceCheckFallback',
+      // 배포 타깃이 iOS 15.1 이라 App Attest(iOS 14+)로 전 사용자가 커버된다.
+      // DeviceCheck 폴백을 쓰면 Firebase 콘솔에 Apple 개발자 .p8 키를 올려야 하는데
+      // 대상 기기가 없으므로 불필요하다.
+      provider: env.isDev ? 'debug' : 'appAttest',
       debugToken,
     },
     isTokenAutoRefreshEnabled: true,
