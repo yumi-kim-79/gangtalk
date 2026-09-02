@@ -94,15 +94,42 @@ android {
             keyAlias 'androiddebugkey'
             keyPassword 'android'
         }
+        /* 릴리스 서명.
+         *
+         * 비밀번호는 저장소에 두지 않는다 — ~/.gradle/gradle.properties 에 넣는다:
+         *   GANGTALK_STORE_FILE=/Users/<나>/keys/gangtalk-upload.keystore
+         *   GANGTALK_STORE_PASSWORD=...
+         *   GANGTALK_KEY_ALIAS=gangtalk
+         *   GANGTALK_KEY_PASSWORD=...
+         *
+         * 키스토어를 잃어버리면 앱 업데이트를 올릴 수 없다. 반드시 백업할 것.
+         * (Play 앱 서명을 쓰면 업로드 키는 재발급 가능하지만 그래도 백업이 원칙) */
+        release {
+            if (project.hasProperty('GANGTALK_STORE_FILE')) {
+                storeFile file(GANGTALK_STORE_FILE)
+                storePassword GANGTALK_STORE_PASSWORD
+                keyAlias GANGTALK_KEY_ALIAS
+                keyPassword GANGTALK_KEY_PASSWORD
+            }
+        }
     }
     buildTypes {
         debug {
             signingConfig signingConfigs.debug
         }
         release {
-            // Caution! In production, you need to generate your own keystore file.
-            // see https://reactnative.dev/docs/signed-apk-android.
-            signingConfig signingConfigs.debug
+            /* 2026-09-01: RN 템플릿 기본값이 `signingConfig signingConfigs.debug` 였다.
+             * 디버그 키로 서명된 빌드는 Play Console 업로드가 거부된다.
+             * GANGTALK_STORE_FILE 이 설정돼 있으면 릴리스 키로 서명하고,
+             * 없으면 (로컬 확인용) 디버그 키로 떨어지되 크게 경고한다. */
+            if (project.hasProperty('GANGTALK_STORE_FILE')) {
+                signingConfig signingConfigs.release
+            } else {
+                signingConfig signingConfigs.debug
+                println("\n*** 경고: 릴리스 키가 없어 디버그 키로 서명합니다. ***")
+                println("*** 이 빌드는 Play Console 에 업로드할 수 없습니다.   ***")
+                println("*** ~/.gradle/gradle.properties 에 GANGTALK_STORE_FILE 등을 설정하세요. ***\n")
+            }
             minifyEnabled enableProguardInReleaseBuilds
             proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"
         }
