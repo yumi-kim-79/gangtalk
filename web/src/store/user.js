@@ -202,7 +202,11 @@ function _listenUserDoc(FBOK, uid){
 
       if (me.auth.value?.loggedIn) {
         const cur = me.auth.value || {}
-        const next = { ...cur, points: p }
+        /* reward 도 함께 옮긴다.
+         * 이전에는 points/profile/company 만 복사해서 최상위 reward 가 state 에
+         * 도달하지 못했고, MyPage.userReward 의 `s.reward` 가 항상 undefined →
+         * Firestore 에 12,000 이 있어도 화면에는 0원으로 표시됐다. */
+        const next = { ...cur, points: p, reward: Number(data.reward || 0) }
 
         // profile 머지 — 빈 nickname 덮어쓰기 방지
         if (data.profile) {

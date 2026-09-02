@@ -385,7 +385,9 @@ const effectiveLoggedIn = computed(() => {
 const userReward = computed(() => {
   const s = state?.value || {}
   const prof = s.profile || {}
-  return Number(prof.reward ?? prof.rewardAmount ?? s.reward ?? 0)
+  // 최상위 reward 가 정본이다 (functions payReferral 이 여기에만 쓴다).
+  // profile.* 는 옛 문서를 위한 폴백일 뿐이라 뒤로 뺀다.
+  return Number(s.reward ?? prof.reward ?? prof.rewardAmount ?? 0)
 })
 
 /* 닉네임 표시 */

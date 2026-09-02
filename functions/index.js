@@ -679,13 +679,22 @@ async function payReferral(uid, refBy, currentUser) {
   const rewardAmount   = Math.round(rewardBase * rate);
   const incReward      = admin.firestore.FieldValue.increment(rewardAmount);
 
-  // 4) 리워드 업데이트(추천인에게만) - users.reward + profile.reward 둘 다 올려줌
+  // 4) 리워드 업데이트(추천인에게만) — 최상위 users.reward 하나가 정본
+  /* 2026-09-02 수정: `"profile.reward"` 미러링 제거.
+   *
+   * set() 은 점(.)을 **경로가 아니라 이름 그대로** 취급한다 (경로 해석은 update() 만).
+   * 그래서 이 코드는 profile 안에 값을 넣은 게 아니라
+   * `"profile.reward"` 라는 이름의 최상위 쓰레기 필드를 만들고 있었다.
+   * (실제 확인: users/RbsQS9... 에 ["profile.reward", 12000] 존재, profile.reward 는 없음)
+   *
+   * 뒤늦게 중첩으로 바꾸면 기존 문서의 최상위 reward 와 값이 어긋나
+   * 표시가 오히려 더 틀어진다(읽는 쪽이 profile.reward 를 먼저 보기 때문).
+   * → 최상위 `reward` 하나를 정본으로 삼고 미러링은 하지 않는다. */
   const rewardUpdatePromise =
     rewardAmount > 0
       ? db.collection("users").doc(referrerUid).set(
           {
-            reward: incReward,
-            "profile.reward": incReward,        // 프로필 안에서도 확인 가능하게
+            reward: incReward,                  // 정본
             rewardRole: role,                   // 선택: 마지막 리워드 롤 정보
             serverUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
             updatedAt: Date.now(),

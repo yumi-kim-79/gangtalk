@@ -134,7 +134,18 @@ async function main() {
     console.log(`   uid    = ${hit.doc.id}  (필드 ${hit.f} / 값 ${hit.v})`);
     console.log(`   nickname = ${show(d.profile?.nickname)}`);
     console.log(`   points = ${show(d.points)}`);
-    console.log(`   reward = ${show(d.reward)}`);
+    console.log('');
+    console.log('   ── 리워드 필드 정밀 확인 ──');
+    console.log(`   최상위 reward          = ${show(d.reward)}`);
+    console.log(`   중첩  profile.reward   = ${show(d.profile?.reward)}   ← 웹·앱이 먼저 보는 값`);
+    console.log(`   중첩  profile.rewardAmount = ${show(d.profile?.rewardAmount)}`);
+    // set(merge) 에서 점 표기는 경로가 아니라 **이름 그대로**다.
+    // 함수가 `"profile.reward": increment` 를 set 으로 썼다면
+    // 아래처럼 점이 든 최상위 필드가 만들어진다.
+    const dotted = Object.keys(d).filter(k => k.includes('.'));
+    console.log(`   점(.)이 든 최상위 필드   = ${dotted.length ? JSON.stringify(dotted.map(k => [k, d[k]])) : '(없음)'}`);
+    console.log(`   웹/앱이 실제로 표시할 값 = ${Number(d.profile?.reward ?? d.profile?.rewardAmount ?? d.reward ?? 0)}`);
+    console.log('');
     await dumpPointLogs(hit.doc.id);
   }
 

@@ -159,9 +159,10 @@ function normalizeUserProfile(uid: string, raw: unknown): UserProfile {
     d.referral?.myCode || d.myRefCode || d.profile?.referralCode || '',
   ).trim();
 
-  /* 리워드 — 웹 MyPage.userReward 와 동일한 폴백 순서 */
+  /* 리워드 — 최상위 reward 가 정본 (functions payReferral 이 여기에만 쓴다).
+   * profile.* 는 옛 문서를 위한 폴백. 웹 MyPage.userReward 와 같은 순서. */
   const reward = Number(
-    d.profile?.reward ?? d.profile?.rewardAmount ?? d.reward ?? 0,
+    d.reward ?? d.profile?.reward ?? d.profile?.rewardAmount ?? 0,
   );
 
   return {
