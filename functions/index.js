@@ -1078,8 +1078,19 @@ exports.onCommentBestPickedFlat = onDocumentUpdated("comments/{commentId}", asyn
 /* =========================================================
    운영 시드 스케줄러
 ========================================================= */
+/* 2026-09-01 실서비스 오픈 — 자동 글 생성 중단.
+ *
+ * tickSeeder 는 매분 실행되며 하루 최대 28건(6개 카테고리)을 "운영팀" 이름으로
+ * board_posts 에 넣어 왔다. 게시판이 비어 보이지 않게 하려던 장치인데,
+ * 실사용자가 들어오면 반복되는 문구(제목 후보가 카테고리당 3~4개뿐)가 그대로 드러나고
+ * 진짜 글이 가짜 글에 묻힌다.
+ *
+ * seeder/config 문서에 enabled:true 가 남아 있어도 무조건 멈추도록 코드에서 잠근다.
+ * 다시 켜려면 이 상수를 false 로 되돌릴 것. */
+const SEEDER_DISABLED = true;
+
 const SEED_DEFAULT = {
-  enabled: true,
+  enabled: false,
   timezone: "Asia/Seoul",
   categories: {
     daily: { dailyCap: 8, minGapSec: 1800, maxGapSec: 5400 },
@@ -1153,6 +1164,7 @@ exports.tickSeeder = onSchedule(
     region: "asia-northeast3",
   },
   async () => {
+    if (SEEDER_DISABLED) return;
     const cfg = await readSeedCfg();
     if (!cfg.enabled) return;
 
