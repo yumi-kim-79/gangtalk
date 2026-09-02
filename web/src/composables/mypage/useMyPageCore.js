@@ -1664,7 +1664,17 @@ export function useMyPageCore(){
     const a = me?.auth?.value ?? me?.auth ?? {}
     const p = a.profile ?? me?.profile?.value ?? me?.profile ?? {}
     const ref = a.referral ?? p?.referral ?? {}
-    return (ref?.myCode || p?.referralCode || a?.myCode || localStorage.getItem('ref:my') || '-')
+    /* 실제로 저장되는 최상위 필드는 myRefCode 다 (store/user.js:523, 앱 auth.ts:117).
+     * 여기서 3순위로 보던 a?.myCode 는 어디에도 기록되지 않아 항상 빈 값이었고,
+     * referral.myCode 가 없는 레거시 문서에서 앱은 코드를 보여주는데
+     * 웹만 '-' 로 떴다. 앱과 같은 순서로 맞춘다. */
+    return (
+      ref?.myCode ||
+      a?.myRefCode ||
+      p?.referralCode ||
+      localStorage.getItem('ref:my') ||
+      '-'
+    )
   })
 
   // ✅ 수정 후: 기본 SVG 아바타(data:image/svg+xml…)는 "사진 없음"으로 처리

@@ -1,7 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { EXPOSURE_KEY_DASHBOARD } from '@/constants/stores';
 import { applyHomeOrder, applyRoomsBiz, subscribeHomeOrder } from '@/services/dashboard';
-import { filterStores, subscribeRoomsBiz, subscribeStores } from '@/services/stores';
+import {
+  filterStores,
+  matchesHomeKeyword,
+  subscribeRoomsBiz,
+  subscribeStores,
+} from '@/services/stores';
 import type { RoomsBizDoc, StoreDoc } from '@/types/store';
 
 /**
@@ -49,12 +54,17 @@ export function useHomeStores(category: string, keyword: string) {
       // 웹 현황판은 정렬하지 않고 Firestore updatedAt desc 순서를 그대로 쓴다
       // (MainPage.vue:1936-1951). 앱만 'tc' 로 정렬해 순서가 달랐다.
       sort: 'none',
-      keyword,
+      // 검색은 filterStores 에 맡기지 않는다 — 그쪽은 태그·서비스·이벤트까지 뒤진다.
+      // 웹 현황판은 업체명만 보므로(MainPage.vue:1919) 아래에서 따로 거른다.
+      keyword: '',
       exposureKey: EXPOSURE_KEY_DASHBOARD,
       checkAdPeriod: true,
       approvalRule: 'dashboard',
     });
-    return applyHomeOrder(filtered, homeOrder);
+    const searched = keyword.trim()
+      ? filtered.filter(x => matchesHomeKeyword(x, keyword))
+      : filtered;
+    return applyHomeOrder(searched, homeOrder);
   }, [merged, category, keyword, homeOrder]);
 
   /** rooms_biz 도착 전에는 맞출방/필요인원/혼잡도를 확정값으로 보여주면 안 된다 (웹과 동일) */

@@ -8,6 +8,7 @@
  */
 import {
   collection,
+  doc,
   onSnapshot,
   orderBy,
   query,
@@ -110,6 +111,50 @@ export function subscribeChotok(
           };
         }),
       );
+    },
+    e => onError?.(e),
+  );
+}
+
+/** rooms_biz/{storeId} 문서에 직접 저장된 지표 (붙여넣기 원문이 없을 때 쓰는 폴백) */
+export interface ChotokDocMetrics {
+  needRooms: number;
+  needPeople: number;
+  /** 붙여넣기 원문 — 있으면 이걸 파싱한 값이 우선 */
+  pastedText: string;
+}
+
+/**
+ * rooms_biz/{storeId} 문서 구독.
+ *
+ * 웹 ChatBiz.recomputeFromLastPasted(:335-365) 는 붙여넣기 원문이 없거나
+ * 파싱 결과가 0/0 이면 **문서 필드로 폴백**한다.
+ * 앱은 이 폴백이 없어서, 관리자가 수동 저장만 하고 paste 메시지가 없는 업소는
+ * 초톡방 상단이 0/0 으로 떴다 — 같은 앱의 현황판 카드와 숫자가 어긋났다.
+ */
+export function subscribeChotokDoc(
+  storeId: string,
+  onData: (m: ChotokDocMetrics | null) => void,
+  onError?: (e: unknown) => void,
+) {
+  return onSnapshot(
+    doc(db, COLLECTIONS.roomsBiz, storeId),
+    (snap: FirebaseFirestoreTypes.DocumentSnapshot) => {
+      if (!snap.exists()) {
+        onData(null);
+        return;
+      }
+      const x = (snap.data() ?? {}) as Record<string, unknown>;
+      const n = (v: unknown) => {
+        const num = Number(v ?? 0);
+        return Number.isFinite(num) ? num : 0;
+      };
+      onData({
+        needRooms: n(x.needRooms),
+        // 웹과 같은 폴백 순서 (ChatBiz.vue:344-350)
+        needPeople: n(x.needPeople ?? x.need ?? x.totalNeeded),
+        pastedText: String(x.lastPastedTextRaw || x.lastPastedText || '').trim(),
+      });
     },
     e => onError?.(e),
   );

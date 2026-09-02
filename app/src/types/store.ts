@@ -16,6 +16,16 @@ export interface StoreDoc {
   description?: string;
   longDesc?: string;
   adTitle?: string;
+  /** 목록 소개 한 줄 — 웹이 최우선으로 읽는 필드 */
+  intro?: string;
+  /** 레거시 단수 이벤트 필드 (웹 StoreListView 가 먼저 본다) */
+  event?: string;
+  /** 상세 소개 본문 후보 (웹 StoreDetail.vue:396-398) */
+  detailDesc?: string;
+  fullDesc?: string;
+  /** 안심번호 레거시 후보 */
+  rate?: number;
+  stars?: number;
   thumb?: string;
   cover?: string;
   coverImg?: string;

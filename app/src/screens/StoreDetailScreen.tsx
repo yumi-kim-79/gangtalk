@@ -22,9 +22,22 @@ import type { StoresStackParamList } from '@/navigation/types';
 import { fontSize, radius, spacing, useTheme, type ThemeColors } from '@/theme';
 import type { Store } from '@/types/store';
 
-/** 안심번호 우선순위 — 웹 StoreDetail.vue 와 동일 */
-const safePhoneOf = (s: Store): string =>
-  String(s.safePhone || s.phoneSafe || s.phone || '').trim();
+/**
+ * 안심번호 우선순위 — 웹 StoreDetail.vue:654-663 과 같은 순서.
+ * 웹은 담당자(managers[0].phone)까지 폴백하는데 앱에는 그 단계가 없어,
+ * 최상위 phone 없이 담당자에만 번호가 있는 업소는 안심문자/전화 버튼이 죽어 있었다.
+ */
+const safePhoneOf = (s: Store): string => {
+  const mgr = Array.isArray(s.managers) ? s.managers[0] : undefined;
+  return String(
+    s.safePhone ||
+      (s as { safe?: string }).safe ||
+      s.phoneSafe ||
+      s.phone ||
+      mgr?.phone ||
+      '',
+  ).trim();
+};
 
 /** 오픈채팅 우선순위 — openChatUrl → kakaoOpenChat → kakao */
 const openChatOf = (s: Store): string =>
@@ -96,7 +109,14 @@ export default function StoreDetailScreen() {
 
         <Section title="소개" colors={c}>
           <Text style={s.body}>
-            {store.longDesc || store.desc || store.description || '등록된 소개가 없습니다.'}
+            {/* 웹 StoreDetail.vue:396-398 과 같은 순서 —
+                detailDesc / fullDesc 로 저장된 상세 소개가 앱에서 누락됐다 */}
+            {store.detailDesc ||
+              store.longDesc ||
+              store.fullDesc ||
+              store.desc ||
+              store.description ||
+              '등록된 소개가 없습니다.'}
           </Text>
         </Section>
 

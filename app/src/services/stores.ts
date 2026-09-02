@@ -15,6 +15,7 @@ import {
 import { COLLECTIONS } from '@/constants/app';
 import {
   EXPOSURE_KEY,
+  CATEGORY_LABEL,
   EXPOSURE_KEY_DASHBOARD,
   ROOMS_BIZ_FETCH_LIMIT,
   STORE_FETCH_LIMIT,
@@ -36,18 +37,33 @@ export function num(v: unknown): number {
   return Number.isFinite(n) ? n : 0;
 }
 
-/** 급여 필드가 세대별로 달라 후보를 순서대로 조회 */
+/**
+ * 급여 필드가 세대별로 달라 후보를 순서대로 조회.
+ * 웹 StoreDetail.vue:417-428 은 `wage ?? pay ?? tc ?? hourly` 를 본다 —
+ * 앱에 `tc` 가 빠져 있어 tc 만 등록된 업소는 상세에서 전부 "문의" 로 떴다.
+ */
 export function wageOf(s: Store): number {
   const v =
-    s.wage ?? s.hourly ?? s.payPerHour ?? s.hourPay ?? s.hourlyPay ?? s.hourlyWage ?? s.pay;
+    s.wage ??
+    s.hourly ??
+    s.payPerHour ??
+    s.hourPay ??
+    s.hourlyPay ??
+    s.hourlyWage ??
+    s.pay ??
+    s.tc;
   return num(v);
 }
 
 export function payText(s: Store): string {
   const n = wageOf(s);
   if (n) return `${n.toLocaleString()}원`;
-  const raw = String(s.pay ?? '');
-  if (raw.includes('원')) return raw;
+  // 웹은 "협의" 같은 문자열 급여를 그대로 보여 준다 (StoreDetail.vue:417-428).
+  // 앱은 '원' 이 든 문자열만 인정해 대부분을 기본값으로 덮어썼다.
+  for (const v of [s.wage, s.pay, s.tc]) {
+    const raw = String(v ?? '').trim();
+    if (raw && !Number.isFinite(Number(raw))) return raw;
+  }
   return '150,000원';
 }
 
@@ -79,13 +95,27 @@ export function managerName(s: Store): string {
   return '';
 }
 
+/**
+ * 목록 소개 한 줄 — 웹 StoreListView.vue:107 / StoreGridView.vue:95 와 같은 순서.
+ * 앱은 `adTitle` 을 최우선으로 보고 `intro` 는 아예 읽지 않아
+ * 같은 업소의 목록 문구가 웹과 달랐다.
+ */
 export function introOf(s: Store): string {
-  return String(s.adTitle || s.desc || s.description || '');
+  const v =
+    (s as { intro?: string }).intro || s.description || s.desc || s.adTitle || '';
+  return String(v);
 }
 
+/**
+ * 이벤트 문구 — 웹 StoreListView.vue:112-116 은 `event`(단수) → `events[0]`.
+ * 앱은 `eventMain` → `events[0]` 만 봐서 레거시 `event` 만 있는 업소가 비었다.
+ * 양쪽 필드를 모두 본다 (웹 순서를 앞에 둔다).
+ */
 export function eventTextOf(s: Store): string {
-  if (s.eventMain) return String(s.eventMain);
+  const single = (s as { event?: string }).event;
+  if (single) return String(single);
   if (Array.isArray(s.events) && s.events.length) return String(s.events[0]);
+  if (s.eventMain) return String(s.eventMain);
   return '';
 }
 
@@ -192,7 +222,17 @@ export function isApprovedOnDashboard(s: Store): boolean {
 
 const norm = (v: unknown): string => String(v ?? '').trim().toLowerCase();
 
-export function searchTextOf(s: Store): string {
+/**
+ * 현황판 검색 — 웹 MainPage.vue:1919 는 **업체명만** 본다.
+ * 앱은 태그·서비스·이벤트까지 뒤져서 같은 검색어의 결과 건수가 달랐다.
+ */
+export function matchesHomeKeyword(s: Store, keyword: string): boolean {
+  const q = keyword.trim().toLowerCase();
+  if (!q) return true;
+  return String(s.name ?? '').toLowerCase().includes(q);
+}
+
+function searchTextOf(s: Store): string {
   const tags = Array.isArray(s.tags) ? s.tags.join(' ') : '';
   const services = Array.isArray(s.services) ? s.services.join(' ') : '';
   const events = Array.isArray(s.events) ? s.events.join(' ') : '';
@@ -210,18 +250,35 @@ export function matchesQuery(s: Store, q: string): boolean {
   return words.every(w => text.includes(w));
 }
 
-/** 업체명 일치에 가중치를 둔 연관도 */
+/**
+ * 검색 연관도 — 웹 StoreFinder.vue:1003-1031 과 같은 계산식.
+ *
+ * 앱은 업체명 100/50/30 + 포함 5 였고 지역·카테고리 라벨을 아예 안 봤다.
+ * 같은 검색어에 대한 결과 순서가 웹과 달랐다.
+ */
 export function relevanceScore(s: Store, q: string): number {
   const words = norm(q).split(/\s+/).filter(Boolean);
   if (!words.length) return 0;
-  const name = norm(s.name);
-  const text = searchTextOf(s);
+
+  // 검색 텍스트 + 지역 + 카테고리 라벨 (웹 hay 와 동일 구성)
+  const hay = [searchTextOf(s), norm(s.region), norm(CATEGORY_LABEL[String(s.category ?? '')])]
+    .filter(Boolean);
+
   let score = 0;
   for (const w of words) {
-    if (name === w) score += 100;
-    else if (name.startsWith(w)) score += 50;
-    else if (name.includes(w)) score += 30;
-    if (text.includes(w)) score += 5;
+    for (const h of hay) {
+      if (h === w) score += 12;
+      else if (h.startsWith(w)) score += 8;
+      else if (h.includes(w)) score += 4;
+    }
+  }
+
+  // 업체명 가중치
+  const name = norm(s.name);
+  for (const w of words) {
+    if (name === w) score += 10;
+    else if (name.startsWith(w)) score += 6;
+    else if (name.includes(w)) score += 3;
   }
   return score;
 }
@@ -393,11 +450,39 @@ export function thumbCandidate(s: Store): string {
 
 const thumbCache = new Map<string, string>();
 
-/** gs:// 경로는 Storage 다운로드 URL 로 변환. 실패하면 빈 문자열 */
+/**
+ * 카테고리별 기본 썸네일 — 웹 MainPage.vue:1109-1121 / StoreFinder.vue 의
+ * FALLBACK_THUMB 와 같은 이미지. 앱은 기본 이미지가 없어 사진 없는 업소가
+ * 이니셜 사각형으로만 떴다.
+ */
+export const FALLBACK_THUMB: Record<string, string> = {
+  lounge: 'https://images.unsplash.com/photo-1543007630-9710e4a00a20?q=80&w=1200&auto=format&fit=crop',
+  bar: 'https://images.unsplash.com/photo-1532634896-26909d0d4b6a?q=80&w=1200&auto=format&fit=crop',
+  ten: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?q=80&w=1200&auto=format&fit=crop',
+  point5: 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?q=80&w=1200&auto=format&fit=crop',
+  hopper: 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?q=80&w=1200&auto=format&fit=crop',
+  nrb: 'https://images.unsplash.com/photo-1511379938547-c1f69419868d?q=80&w=1200&auto=format&fit=crop',
+  kara: 'https://images.unsplash.com/photo-1519671482749-fd09be7ccebf?q=80&w=1200&auto=format&fit=crop',
+  onep: 'https://images.unsplash.com/photo-1514361892636-7f05f1d2710f?q=80&w=1200&auto=format&fit=crop',
+  etc: 'https://images.unsplash.com/photo-1521017432531-fbd92d59d4b1?q=80&w=1200&auto=format&fit=crop',
+  default: 'https://images.unsplash.com/photo-1521017432531-fbd92d59d4b1?q=80&w=1200&auto=format&fit=crop',
+};
+
+/** 사진이 없을 때 쓸 기본 썸네일 (웹 MainPage.vue:1218-1219 와 동일 규칙) */
+export function fallbackThumb(category?: string): string {
+  const key = category && FALLBACK_THUMB[category] ? category : 'default';
+  return FALLBACK_THUMB[key];
+}
+
+/**
+ * gs:// 경로는 Storage 다운로드 URL 로 변환.
+ * 웹 resolveThumb(MainPage.vue:1122-1128)은 `/` 로 시작하는 상대경로도
+ * 그대로 통과시키는데 앱은 버려서 이미지가 안 떴다.
+ */
 export async function resolveThumb(raw: string): Promise<string> {
   const url = String(raw || '').trim();
   if (!url) return '';
-  if (/^(data:|https?:\/\/)/i.test(url)) return url;
+  if (/^(data:|blob:|https?:\/\/|\/)/i.test(url)) return url;
   if (!url.startsWith('gs://')) return '';
 
   const cached = thumbCache.get(url);
