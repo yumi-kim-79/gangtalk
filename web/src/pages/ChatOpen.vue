@@ -163,9 +163,16 @@ async function send() {
   const rid = storeId.value
   if (!t || !rid) return
   try {
+    // me 는 onAuthStateChanged 로 채워지는데 그 전에 보내면 null 이 들어가
+    // 규칙(authorUid == request.auth.uid)에 걸린다. 현재 사용자를 직접 읽는다.
+    const uid = auth.currentUser?.uid || me.value?.uid || ''
+    if (!uid) {
+      alert('로그인이 필요합니다.')
+      return
+    }
     await addDoc(collection(fbDb, 'rooms_open', rid, 'messages'), {
       text: t,
-      authorUid: me.value?.uid || null,
+      authorUid: uid,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     })

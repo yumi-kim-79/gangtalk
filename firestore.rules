@@ -23,6 +23,13 @@ service cloud.firestore {
     function strExists(x) { return x is string && x.size() > 0; }
 
     /* 변경된 키가 허용 집합에만 속하는지 */
+    /* 채팅 메시지의 작성자 위조 방지.
+     * 이전에는 `allow create: if signedIn()` 뿐이라 authorUid 에 남의 uid 를 넣어
+     * 다른 사람인 척 글을 남길 수 있었다 — 신고·차단이 엉뚱한 사람을 향하게 된다. */
+    function authorIsSelf() {
+      return request.resource.data.authorUid == request.auth.uid;
+    }
+
     function changesAreOnly(allowed) {
       return request.resource.data.diff(resource.data).changedKeys().hasOnly(allowed);
     }
@@ -360,7 +367,7 @@ service cloud.firestore {
 
       match /messages/{msgId} {
         allow read: if signedIn();
-        allow create: if signedIn();
+        allow create: if signedIn() && authorIsSelf();
         allow update, delete: if isAdmin();
       }
     }
@@ -371,7 +378,7 @@ service cloud.firestore {
 
       match /messages/{msgId} {
         allow read: if signedIn();
-        allow create: if signedIn();
+        allow create: if signedIn() && authorIsSelf();
         allow update, delete: if isAdmin();
       }
     }
@@ -382,7 +389,25 @@ service cloud.firestore {
 
       match /messages/{msgId} {
         allow read: if signedIn();
-        allow create: if signedIn();
+        allow create: if signedIn() && authorIsSelf();
+        allow update, delete: if isAdmin();
+      }
+    }
+
+    /* 업체 오픈채팅 (web/src/pages/ChatOpen.vue).
+     * 규칙이 아예 없어 읽기·쓰기가 전부 거부되던 컬렉션 —
+     * 업체상세의 '오픈채팅' 과 담당자 '연결톡' 이 도착하는 화면이라 열어 준다.
+     * 방 문서는 storeId == roomId 형태로만 만들 수 있게 묶어 임의 문서 생성을 막는다. */
+    match /rooms_open/{roomId} {
+      allow read: if signedIn();
+      allow create: if signedIn()
+        && request.resource.data.storeId == roomId
+        && request.resource.data.type == 'open';
+      allow update, delete: if isAdmin();
+
+      match /messages/{msgId} {
+        allow read: if signedIn();
+        allow create: if signedIn() && authorIsSelf();
         allow update, delete: if isAdmin();
       }
     }
