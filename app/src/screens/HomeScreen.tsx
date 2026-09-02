@@ -35,7 +35,7 @@ export default function HomeScreen() {
   const { isLoggedIn, initializing } = useAuth();
   const { requireAuth } = useRequireAuth();
   /* 웹 현황판 카드에는 하트가 있는데 앱만 없었다 (MainPage.vue:107-111) */
-  const { isStoreFav, toggleStore } = useMyFavorites();
+  const { storeIds, isStoreFav, toggleStore } = useMyFavorites();
 
   const [category, setCategory] = useState('all');
   const [keyword, setKeyword] = useState('');
@@ -66,6 +66,10 @@ export default function HomeScreen() {
       <FlatList
         data={stores}
         keyExtractor={item => item.id}
+        /* StoreStatusCard 는 React.memo 라 data 배열이 그대로면 다시 그리지 않는다.
+         * 찜 집합만 바뀌었을 때 하트가 안 바뀌던 원인 — 스냅샷이 도착해도
+         * 행이 재렌더되지 않아 "눌러도 반응 없음" 으로 보였다. */
+        extraData={storeIds}
         contentContainerStyle={s.listContent}
         renderItem={({ item }) => (
           <StoreStatusCard

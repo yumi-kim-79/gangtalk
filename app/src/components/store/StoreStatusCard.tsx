@@ -87,7 +87,11 @@ function StoreStatusCard({
 
         <View style={s.side}>
           {onToggleFavorite ? (
-            <Pressable onPress={() => onToggleFavorite(store)} hitSlop={8} style={s.heart}>
+            <Pressable
+              onPress={() => onToggleFavorite(store)}
+              hitSlop={12}
+              style={({ pressed }) => [s.heart, pressed && s.heartPressed]}
+            >
               <Icon name="heart" size={20} color={favorited ? c.accent : c.line} />
             </Pressable>
           ) : null}
@@ -162,7 +166,9 @@ const styles = (c: ThemeColors) =>
     ratingRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: 2 },
     rate: { fontSize: fontSize.md, fontWeight: '700', color: c.fg },
     reviews: { fontSize: fontSize.sm, color: c.muted },
-    heart: { padding: 2 },
+    /* 아이콘만 두면 터치 영역이 너무 좁다 — 눌러도 안 먹는 느낌을 준다 */
+    heart: { padding: 6, marginRight: -4 },
+    heartPressed: { opacity: 0.5 },
     side: { alignItems: 'flex-end', gap: spacing.sm, paddingTop: 2 },
     chotok: {
       flexDirection: 'row',
