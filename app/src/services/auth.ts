@@ -28,7 +28,7 @@ import { getFunctions, httpsCallable } from '@react-native-firebase/functions';
 import { appleAuth } from '@invertase/react-native-apple-authentication';
 import { login as kakaoLogin, me as kakaoMe } from '@react-native-kakao/user';
 import { Platform } from 'react-native';
-import { FUNCTIONS_REGION } from '@/constants/auth';
+import { FUNCTIONS_REGION, PASSWORD_MIN } from '@/constants/auth';
 import { app, auth, db } from '@/services/firebase';
 import { isKakaoReady, safeKakaoLogout } from '@/services/kakao';
 
@@ -425,7 +425,7 @@ export function authErrorMessage(e: unknown): string {
     case 'auth/email-already-in-use':
       return '이미 가입된 이메일입니다.';
     case 'auth/weak-password':
-      return '비밀번호는 6자 이상이어야 합니다.';
+      return `비밀번호는 ${PASSWORD_MIN}자 이상이어야 합니다.`;
     case 'auth/user-not-found':
     case 'auth/wrong-password':
     case 'auth/invalid-credential':

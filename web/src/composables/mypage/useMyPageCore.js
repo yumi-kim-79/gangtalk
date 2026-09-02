@@ -1848,6 +1848,9 @@ export function useMyPageCore(){
       const updatesUser = {
         profile: {
           nickname: nick, nick: nick, phone: edit.phone?.trim() || null,
+          // nicknameLower 를 같이 갱신하지 않아 닉네임을 바꾸면 옛 값이 남았고,
+          // 소문자 기준으로 도는 중복확인(authService.js:107-111)이 오판했다.
+          nicknameLower: String(nick || '').toLowerCase(),
           ...(state.value.type === 'user' ? { photoUrl: decidedPhoto || null } : {})
         },
         serverUpdatedAt: serverTimestamp(),

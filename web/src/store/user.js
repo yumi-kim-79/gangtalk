@@ -452,7 +452,7 @@ export const me = {
   },
 
   /* ===== Firebase 모드: 여성회원 가입 ===== */
-  async _fbSignupUser({ email, password, nickname, refCode }) {
+  async _fbSignupUser({ email, password, nickname, phone, refCode }) {
     const FBOK = await ensureFirebase()
     const {
       auth, db,
@@ -509,6 +509,8 @@ export const me = {
             ...(hasNickname
               ? { nicknameLower: nickname.toLowerCase() }
               : {}),
+            // SMS 인증을 마친 번호. 이전에는 여기까지 전달되지 않아 저장이 누락됐다.
+            ...(phone ? { phone: String(phone).trim() } : {}),
             uid,
           },
           points: myPoints,
@@ -1086,10 +1088,10 @@ export const me = {
   },
 
   /* ===== 퍼블릭 API (컴포넌트에서 사용하는 함수) ===== */
-  async signupUser({ email, password, nick, refCode }) {
+  async signupUser({ email, password, nick, phone, refCode }) {
     const FBOK = await ensureFirebase()
-    if (FBOK) return me._fbSignupUser({ email, password, nickname: nick, refCode })
-    return me._localSignupUser({ email, password, nickname: nick, refCode })
+    if (FBOK) return me._fbSignupUser({ email, password, nickname: nick, phone, refCode })
+    return me._localSignupUser({ email, password, nickname: nick, phone, refCode })
   },
 
   // 기업회원 = 가게찾기 업체 담당자

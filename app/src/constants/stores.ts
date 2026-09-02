@@ -45,6 +45,13 @@ export const REGION_LABEL: Record<string, string> = Object.fromEntries(
 
 export type SortKey = 'tc' | 'likes' | 'rooms';
 
+/**
+ * 목록 정렬 옵션.
+ * 'none' = 정렬하지 않고 입력 순서(Firestore updatedAt desc)를 유지한다.
+ * 현황판이 이걸 쓴다 — 웹 MainPage 가 정렬을 하지 않기 때문(MainPage.vue:1936-1951).
+ */
+export type SortOption = SortKey | 'none';
+
 export const SORT_OPTIONS: { key: SortKey; label: string }[] = [
   { key: 'tc', label: '티시 높은순' },
   { key: 'likes', label: '찜 많은순' },

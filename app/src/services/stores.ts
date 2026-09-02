@@ -20,6 +20,7 @@ import {
   STORE_FETCH_LIMIT,
   type RegionKey,
   type SortKey,
+  type SortOption,
 } from '@/constants/stores';
 import { getDownloadURL, ref as storageRef } from '@react-native-firebase/storage';
 import { db, storage } from '@/services/firebase';
@@ -88,9 +89,20 @@ export function eventTextOf(s: Store): string {
   return '';
 }
 
+/**
+ * 목록·상세의 평점 표기 — 웹 fmtScore 와 동일.
+ * (components/finder/StoreListView.vue:119-122, StoreDetail.vue:406)
+ *
+ * 이전에는 값이 없을 때 `9.4` 를 지어냈다. 웹은 `0.0` 이고,
+ * 같은 앱의 현황판 카드는 `dashboard.ts ratingOf` 의 `4.8` 폴백을 써서
+ * **한 앱 안에서도 같은 업소가 화면마다 9.4 / 4.8 로 갈렸다.**
+ * rate / stars 레거시 필드도 웹과 같이 읽는다.
+ */
 export function scoreOf(s: Store): string {
-  const r = Number(s.rating ?? 0);
-  return (r > 0 ? r : 9.4).toFixed(1);
+  const base = Number(
+    s.rating ?? (s as { rate?: number }).rate ?? (s as { stars?: number }).stars ?? 0,
+  );
+  return Number.isFinite(base) ? base.toFixed(1) : '0.0';
 }
 
 /** 지역 → 대분류 키 */
@@ -219,7 +231,8 @@ export function relevanceScore(s: Store, q: string): number {
 export interface StoreFilter {
   category: string;
   region: RegionKey;
-  sort: SortKey;
+  /** 'none' 이면 정렬하지 않고 입력 순서(= Firestore updatedAt desc)를 유지한다 */
+  sort: SortOption;
   keyword: string;
   /** 노출 플래그 키. 미지정 시 'gangtalk'(업체찾기) */
   exposureKey?: string;
@@ -249,15 +262,22 @@ export function filterStores(stores: Store[], f: StoreFilter): Store[] {
   });
 
   const keyword = f.keyword.trim();
+  // 콜백 안에서는 f.sort 의 타입 좁히기가 풀리므로 지역 변수로 뽑는다
+  const sort = f.sort;
+
   if (keyword) {
     // 검색 중에는 연관순 → 동점이면 선택된 정렬 기준
     return list.sort((a, b) => {
       const d = relevanceScore(b, keyword) - relevanceScore(a, keyword);
       if (d !== 0) return d;
-      return sortValue(b, f.sort) - sortValue(a, f.sort);
+      if (sort === 'none') return 0;
+      return sortValue(b, sort) - sortValue(a, sort);
     });
   }
-  return list.sort((a, b) => sortValue(b, f.sort) - sortValue(a, f.sort));
+  // 현황판은 웹(MainPage.vue:1936-1951)처럼 정렬하지 않는다.
+  // 정렬을 걸면 homeOrder 미지정 업소들의 순서가 웹과 달라진다.
+  if (sort === 'none') return list;
+  return list.sort((a, b) => sortValue(b, sort) - sortValue(a, sort));
 }
 
 /* ───────────────────────── Firestore 구독 ───────────────────────── */
@@ -440,13 +460,14 @@ export function subscribeStoreMarketing(onData: (cfg: StoreMarketing) => void) {
  * 관리자 지정 목록 순서 적용 (웹 StoreFinder.filtered 이식).
  * 지정에 없는 업체는 뒤로 밀되, 그 안에서는 선택된 정렬 기준을 그대로 쓴다.
  */
-export function applyListOrder(list: Store[], order: string[], sort: SortKey): Store[] {
+export function applyListOrder(list: Store[], order: string[], sort: SortOption): Store[] {
   if (!order.length) return list;
   const pos = new Map(order.map((id, idx) => [String(id), idx]));
   return list.slice().sort((a, b) => {
     const ai = pos.get(a.id) ?? Infinity;
     const bi = pos.get(b.id) ?? Infinity;
     if (ai !== bi) return ai === bi ? 0 : ai < bi ? -1 : 1;
+    if (sort === 'none') return 0;
     return sortValue(b, sort) - sortValue(a, sort);
   });
 }
@@ -466,7 +487,7 @@ export function buildTopSections(
   stores: Store[],
   ranks: Record<string, string[]>,
   categories: { key: string; label: string }[],
-  filter: { category: string; region: RegionKey; sort: SortKey },
+  filter: { category: string; region: RegionKey; sort: SortOption },
 ): TopSection[] {
   const byId = new Map(stores.map(s => [s.id, s]));
   /**

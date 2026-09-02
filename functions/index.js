@@ -406,13 +406,19 @@ exports.checkNicknameDuplicate = onCall(async (req) => {
   const nick = safeStr(req.data?.nick || "");
   if (!nick) throw new HttpsError("invalid-argument", "nick required");
 
-  const snap = await db
-    .collection("users")
-    .where("profile.nickname", "==", nick)
-    .limit(1)
-    .get();
+  /* 2026-09-02: 대소문자 판정을 웹과 맞춘다.
+   * 웹은 profile.nicknameLower 로 소문자 비교하는데(authService.js:107-111)
+   * 여기서는 profile.nickname 을 원문 그대로 비교해서,
+   * 'Anna' 가 있어도 앱에서는 'anna' 가 "사용 가능" 으로 통과했다.
+   * nicknameLower 가 없는 레거시 문서를 위해 원문 비교도 함께 본다. */
+  const lower = nick.toLowerCase();
 
-  return { exists: !snap.empty };
+  const [lowerSnap, exactSnap] = await Promise.all([
+    db.collection("users").where("profile.nicknameLower", "==", lower).limit(1).get(),
+    db.collection("users").where("profile.nickname", "==", nick).limit(1).get(),
+  ]);
+
+  return { exists: !lowerSnap.empty || !exactSnap.empty };
 });
 
 /**

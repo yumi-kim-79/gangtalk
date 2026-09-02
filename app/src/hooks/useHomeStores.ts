@@ -46,7 +46,9 @@ export function useHomeStores(category: string, keyword: string) {
     const filtered = filterStores(merged, {
       category,
       region: 'all',
-      sort: 'tc',
+      // 웹 현황판은 정렬하지 않고 Firestore updatedAt desc 순서를 그대로 쓴다
+      // (MainPage.vue:1936-1951). 앱만 'tc' 로 정렬해 순서가 달랐다.
+      sort: 'none',
       keyword,
       exposureKey: EXPOSURE_KEY_DASHBOARD,
       checkAdPeriod: true,

@@ -648,6 +648,9 @@ async function onSignup() {
         email: emailTrim,
         password: password.value,
         nick: nick.value.trim(),
+        // SMS 인증까지 강제해 놓고 번호를 넘기지 않아 profile.phone 이 영구 부재였다.
+        // (기업/관리자 가입은 저장하는데 여성회원만 누락)
+        phone: phone.value.trim(),
         refCode: refInput || undefined,
       })
       await applyReferralIfAny(refInput)
