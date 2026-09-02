@@ -3,8 +3,12 @@
  */
 import {
   collection,
+  collectionGroup,
+  deleteDoc,
   doc,
+  getDoc,
   getDocs,
+  limit as fbLimit,
   onSnapshot,
   query,
   serverTimestamp,
@@ -159,4 +163,132 @@ export async function deleteMyAccount(reason: string): Promise<void> {
     'deleteMyAccount',
   );
   await call({ reason });
+}
+
+/* ───────────────────────── 내 댓글 / 대댓글 ───────────────────────── */
+
+export interface MyComment {
+  id: string;
+  postId: string;
+  postTitle: string;
+  body: string;
+  /** 값이 있으면 대댓글 */
+  parentId: string | null;
+  updatedAt: number;
+}
+
+const toMs = (v: unknown): number => {
+  if (!v) return 0;
+  if (typeof v === 'number') return v;
+  const t = v as { toMillis?: () => number; seconds?: number };
+  if (typeof t.toMillis === 'function') return t.toMillis();
+  if (typeof t.seconds === 'number') return t.seconds * 1000;
+  return 0;
+};
+
+async function postTitleOf(postId: string, cache: Map<string, string>): Promise<string> {
+  if (!postId) return '';
+  const hit = cache.get(postId);
+  if (hit !== undefined) return hit;
+  try {
+    const snap = await getDoc(doc(db, COLLECTIONS.boardPosts, postId));
+    const title = String((snap.data() as Raw)?.title ?? '');
+    cache.set(postId, title);
+    return title;
+  } catch {
+    cache.set(postId, '');
+    return '';
+  }
+}
+
+/**
+ * 내가 쓴 댓글 · 대댓글.
+ *
+ * 웹 UserSection.vue:537-575 와 같은 2단 전략:
+ *   1) collectionGroup('comments') 로 한 번에 (색인·규칙이 받쳐 줄 때)
+ *   2) 실패하면 board_posts 를 훑어 각 글의 comments 를 개별 조회
+ * firestore.rules 에 collectionGroup 용 match 가 없어 1번이 거부될 수 있다.
+ */
+export async function fetchMyComments(uid: string): Promise<MyComment[]> {
+  const cache = new Map<string, string>();
+
+  const mapDocs = async (
+    docs: FirebaseFirestoreTypes.QueryDocumentSnapshot[],
+    forcedPostId = '',
+    forcedTitle = '',
+  ): Promise<MyComment[]> => {
+    const out: MyComment[] = [];
+    for (const d of docs) {
+      const x = (d.data() ?? {}) as Raw;
+      const postId = forcedPostId || d.ref.parent.parent?.id || '';
+      out.push({
+        id: d.id,
+        postId,
+        postTitle: forcedTitle || (await postTitleOf(postId, cache)),
+        body: String(x.body ?? ''),
+        parentId: x.parentId ? String(x.parentId) : null,
+        updatedAt: toMs(x.updatedAt ?? x.createdAt),
+      });
+    }
+    return out;
+  };
+
+  try {
+    const snap = await getDocs(
+      query(collectionGroup(db, COLLECTIONS.comments), where('authorUid', '==', uid)),
+    );
+    return (await mapDocs(snap.docs)).sort((a, b) => b.updatedAt - a.updatedAt);
+  } catch {
+    // 폴백 — 최근 글 100개만 훑는다 (웹과 같은 상한)
+    const posts = await getDocs(
+      query(collection(db, COLLECTIONS.boardPosts), fbLimit(100)),
+    );
+    const chunks = await Promise.all(
+      posts.docs.map(async (p: FirebaseFirestoreTypes.QueryDocumentSnapshot) => {
+        const cs = await getDocs(
+          query(
+            collection(db, COLLECTIONS.boardPosts, p.id, COLLECTIONS.comments),
+            where('authorUid', '==', uid),
+          ),
+        );
+        return mapDocs(cs.docs, p.id, String((p.data() as Raw)?.title ?? ''));
+      }),
+    );
+    return chunks.flat().sort((a: MyComment, b: MyComment) => b.updatedAt - a.updatedAt);
+  }
+}
+
+/* ───────────────────────── 수정 · 삭제 ───────────────────────── */
+
+/** 내 글 수정 — 규칙상 작성자 본인만 (firestore.rules:352-358) */
+export async function updateMyPost(
+  postId: string,
+  patch: { title: string; subtitle?: string; body: string },
+): Promise<void> {
+  await updateDoc(doc(db, COLLECTIONS.boardPosts, postId), {
+    title: patch.title.trim(),
+    subtitle: (patch.subtitle ?? '').trim(),
+    body: patch.body.trim(),
+    content: patch.body.trim(),
+    updatedAt: serverTimestamp(),
+  });
+}
+
+export async function deleteMyPost(postId: string): Promise<void> {
+  await deleteDoc(doc(db, COLLECTIONS.boardPosts, postId));
+}
+
+export async function updateMyComment(
+  postId: string,
+  commentId: string,
+  body: string,
+): Promise<void> {
+  await updateDoc(doc(db, COLLECTIONS.boardPosts, postId, COLLECTIONS.comments, commentId), {
+    body: body.trim(),
+    updatedAt: serverTimestamp(),
+  });
+}
+
+export async function deleteMyComment(postId: string, commentId: string): Promise<void> {
+  await deleteDoc(doc(db, COLLECTIONS.boardPosts, postId, COLLECTIONS.comments, commentId));
 }
