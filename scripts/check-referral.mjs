@@ -71,12 +71,18 @@ async function findByEmail(email) {
 }
 
 async function dumpPointLogs(uid) {
-  const qs = await getDocs(collection(db, 'users', uid, 'point_logs'));
-  if (qs.empty) { console.log('   point_logs: (없음)'); return; }
-  qs.docs.forEach(d => {
-    const x = d.data() || {};
-    console.log(`   point_logs/${d.id}: ${x.amount}P  reason=${x.reason}`);
-  });
+  // point_logs 는 firestore.rules 에 규칙이 없다(Functions 가 admin SDK 로만 쓴다).
+  // 읽기가 거부돼도 진단을 멈추지 않는다.
+  try {
+    const qs = await getDocs(collection(db, 'users', uid, 'point_logs'));
+    if (qs.empty) { console.log('   point_logs: (없음)'); return; }
+    qs.docs.forEach(d => {
+      const x = d.data() || {};
+      console.log(`   point_logs/${d.id}: ${x.amount}P  reason=${x.reason}`);
+    });
+  } catch {
+    console.log('   point_logs: (규칙상 조회 불가 — 콘솔에서 직접 확인)');
+  }
 }
 
 async function main() {

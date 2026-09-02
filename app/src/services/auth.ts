@@ -19,8 +19,10 @@ import {
 import {
   doc,
   getDoc,
+  onSnapshot,
   runTransaction,
   serverTimestamp,
+  type FirebaseFirestoreTypes,
 } from '@react-native-firebase/firestore';
 import { getFunctions, httpsCallable } from '@react-native-firebase/functions';
 import { appleAuth } from '@invertase/react-native-apple-authentication';
@@ -132,10 +134,9 @@ export interface UserProfile {
   provider?: string;
 }
 
-export async function fetchUserProfile(uid: string): Promise<UserProfile | null> {
-  const snap = await getDoc(doc(db, 'users', uid));
-  if (!snap.exists()) return null;
-  const d = (snap.data() ?? {}) as {
+/** users/{uid} 문서 → UserProfile. fetch/subscribe 가 같은 결과를 내도록 한 곳에 둔다 */
+function normalizeUserProfile(uid: string, raw: unknown): UserProfile {
+  const d = (raw ?? {}) as {
     profile?: {
       email?: string;
       nickname?: string;
@@ -173,6 +174,35 @@ export async function fetchUserProfile(uid: string): Promise<UserProfile | null>
     type: d.type,
     provider: d.provider,
   };
+}
+
+export async function fetchUserProfile(uid: string): Promise<UserProfile | null> {
+  const snap = await getDoc(doc(db, 'users', uid));
+  if (!snap.exists()) return null;
+  return normalizeUserProfile(uid, snap.data());
+}
+
+/**
+ * users/{uid} 실시간 구독.
+ *
+ * 한 번만 읽으면(fetchUserProfile) 서버가 나중에 바꾼 값이 화면에 영영 안 뜬다.
+ * 실제로 겪은 문제: 추천코드로 가입하면 Cloud Function
+ * (onUserCreatedReferralBonus)이 **가입 직후 비동기로** 20,000P 를 넣는데,
+ * 앱은 그 직전 값(0P)을 읽고 끝내서 "적립이 안 된다"로 보였다.
+ * 포인트·리워드·회원등급 전부 같은 문제를 안고 있었다.
+ * 웹은 store/user.js:196 에서 이미 onSnapshot 으로 구독하고 있다 — 그쪽에 맞춘다.
+ */
+export function subscribeUserProfile(
+  uid: string,
+  onData: (profile: UserProfile | null) => void,
+  onError?: (e: unknown) => void,
+) {
+  return onSnapshot(
+    doc(db, 'users', uid),
+    (snap: FirebaseFirestoreTypes.DocumentSnapshot) =>
+      onData(snap.exists() ? normalizeUserProfile(uid, snap.data()) : null),
+    e => onError?.(e),
+  );
 }
 
 /* ───────────────────────── 이메일 ───────────────────────── */

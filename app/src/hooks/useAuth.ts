@@ -3,7 +3,11 @@ import {
   onAuthStateChanged,
   type FirebaseAuthTypes,
 } from '@react-native-firebase/auth';
-import { fetchUserProfile, type UserProfile } from '@/services/auth';
+import {
+  fetchUserProfile,
+  subscribeUserProfile,
+  type UserProfile,
+} from '@/services/auth';
 import { auth } from '@/services/firebase';
 
 /**
@@ -20,15 +24,22 @@ export function useAuth() {
     return onAuthStateChanged(auth, next => {
       setUser(next);
       setInitializing(false);
-      if (next) {
-        fetchUserProfile(next.uid)
-          .then(setProfile)
-          .catch(() => setProfile(null));
-      } else {
-        setProfile(null);
-      }
+      if (!next) setProfile(null);
     });
   }, []);
+
+  /* 프로필은 **구독**한다.
+   * 한 번만 읽으면 서버가 나중에 넣어 주는 값이 화면에 안 뜬다 —
+   * 추천 보너스(가입 직후 Cloud Function 이 20,000P 지급), 글쓰기 포인트,
+   * 리워드, 회원등급이 전부 그랬다. 웹(store/user.js:196)과 같은 방식. */
+  useEffect(() => {
+    const uid = user?.uid;
+    if (!uid) {
+      setProfile(null);
+      return;
+    }
+    return subscribeUserProfile(uid, setProfile, () => setProfile(null));
+  }, [user?.uid]);
 
   const reloadProfile = useCallback(async () => {
     if (!user) return;
