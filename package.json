@@ -14,6 +14,8 @@
     "deploy:admin": "npm run web:build:admin && env -u FIREBASE_TOKEN firebase deploy --only hosting:admin",
     "deploy:functions": "npm --prefix functions install && env -u FIREBASE_TOKEN firebase deploy --only functions",
     "deploy:rules": "env -u FIREBASE_TOKEN firebase deploy --only firestore:rules",
+    "logs": "env -u FIREBASE_TOKEN firebase functions:log",
+    "logs:referral": "env -u FIREBASE_TOKEN firebase functions:log --only onUserCreatedReferralBonus,onUserReferralApplied,applyReferralNow -n 50",
     "app:start": "npm --prefix app run start",
     "app:ios": "npm --prefix app run ios",
     "app:android": "npm --prefix app run android",
