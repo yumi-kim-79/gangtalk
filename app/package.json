@@ -15,7 +15,8 @@
     "clean": "bash ../scripts/clean-build.sh",
     "build:ios": "bash ../scripts/build-ios.sh",
     "build:android": "bash ../scripts/build-android.sh",
-    "build:all": "bash ../scripts/build-all.sh"
+    "build:all": "bash ../scripts/build-all.sh",
+    "dev:all": "bash ../scripts/dev-all.sh"
   },
   "dependencies": {
     "@invertase/react-native-apple-authentication": "^2.5.1",
