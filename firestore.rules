@@ -87,7 +87,13 @@ service cloud.firestore {
      *  - update: 본인 만, ownerId/type/targetId 변경 금지
      */
     match /favorites/{favId} {
-      allow read: if signedIn()
+      /* 없는 문서를 get 할 때 resource 가 null 이라 resource.data 접근이 에러가 되고,
+       * 규칙 에러는 곧 거부다. 그래서 "아직 찜하지 않은 업체" 를 확인하는 것만으로
+       * permission-denied 가 났다 — 첫 찜이 항상 실패하던 원인.
+       * 없는 문서 조회는 존재 여부 외에 아무 정보도 주지 않으므로 허용한다. */
+      allow get: if signedIn()
+                 && (resource == null || resource.data.ownerId == request.auth.uid || isAdmin());
+      allow list: if signedIn()
                   && (resource.data.ownerId == request.auth.uid || isAdmin());
       allow create: if signedIn()
                     && request.resource.data.ownerId == request.auth.uid;

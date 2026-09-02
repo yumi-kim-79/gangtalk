@@ -3,6 +3,7 @@ import { useNavigation } from '@react-navigation/native';
 import type { NavigationProp } from '@react-navigation/native';
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Pressable,
   StyleSheet,
@@ -133,9 +134,15 @@ export default function FavoritesScreen() {
             <Pressable
               style={s.remove}
               onPress={() =>
-                item.kind === 'store'
+                (item.kind === 'store'
                   ? toggleStore(item.store.id)
                   : togglePartner(item.partner.id)
+                ).catch(e =>
+                  Alert.alert(
+                    '찜 해제 실패',
+                    e instanceof Error ? e.message : '잠시 후 다시 시도해 주세요.',
+                  ),
+                )
               }
               hitSlop={8}
             >

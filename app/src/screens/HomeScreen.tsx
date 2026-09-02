@@ -3,6 +3,7 @@ import { useNavigation } from '@react-navigation/native';
 import type { NavigationProp } from '@react-navigation/native';
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Modal,
   Pressable,
@@ -79,7 +80,14 @@ export default function HomeScreen() {
             onPress={openStore}
             onOpenChotok={openChotok}
             favorited={isStoreFav(item.id)}
-            onToggleFavorite={st => toggleStore(st.id)}
+            onToggleFavorite={st =>
+              toggleStore(st.id).catch(e =>
+                Alert.alert(
+                  '찜 실패',
+                  e instanceof Error ? e.message : '잠시 후 다시 시도해 주세요.',
+                ),
+              )
+            }
           />
         )}
         keyboardShouldPersistTaps="handled"

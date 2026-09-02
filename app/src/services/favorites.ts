@@ -30,8 +30,13 @@ export const favoriteDocId = (uid: string, targetId: string, type: FavoriteType 
 const clamp0 = (n: unknown) => Math.max(0, Number(n) || 0);
 
 export async function isFavorited(uid: string, storeId: string): Promise<boolean> {
-  const snap = await getDoc(doc(db, COLLECTIONS.favorites, favoriteDocId(uid, storeId)));
-  return snap.exists();
+  try {
+    const snap = await getDoc(doc(db, COLLECTIONS.favorites, favoriteDocId(uid, storeId)));
+    return snap.exists();
+  } catch {
+    // 없는 문서 조회가 규칙에서 거부될 수 있다 (위 known 주석 참고) → 미찜으로 본다
+    return false;
+  }
 }
 
 /**
@@ -66,12 +71,23 @@ export function subscribeMyFavoriteIds(
  * 찜 토글. stores.likes 집계도 함께 조정한다.
  * @returns 토글 후 찜 상태
  */
-export async function toggleFavorite(uid: string, storeId: string): Promise<boolean> {
+export async function toggleFavorite(
+  uid: string,
+  storeId: string,
+  /**
+   * 호출부가 이미 아는 현재 상태. 넘기면 조회를 건너뛴다.
+   *
+   * 넘기지 않으면 getDoc 으로 확인하는데, **아직 찜하지 않은 업체**는
+   * 문서가 없어 resource 가 null 이 되고 규칙의 resource.data 접근이 에러 →
+   * permission-denied 가 난다. 첫 찜이 항상 실패하던 원인이라
+   * 목록에서는 반드시 이 값을 넘긴다.
+   */
+  known?: boolean,
+): Promise<boolean> {
   const favRef = doc(db, COLLECTIONS.favorites, favoriteDocId(uid, storeId));
   const storeRef = doc(db, COLLECTIONS.stores, storeId);
 
-  const snap = await getDoc(favRef);
-  const wasFav = snap.exists();
+  const wasFav = known ?? (await getDoc(favRef)).exists();
 
   await runTransaction(db, async tx => {
     const storeSnap = await tx.get(storeRef);
@@ -96,12 +112,16 @@ export async function toggleFavorite(uid: string, storeId: string): Promise<bool
  * 제휴업체 찜 토글. partners.likes 집계도 함께 조정한다.
  * (웹 PartnerDetail.vue:230 과 같은 필드 — 규칙 firestore.rules:273 이 likes 를 허용)
  */
-export async function togglePartnerFavorite(uid: string, partnerId: string): Promise<boolean> {
+export async function togglePartnerFavorite(
+  uid: string,
+  partnerId: string,
+  /** 호출부가 아는 현재 상태 — toggleFavorite 의 known 과 같은 이유 */
+  known?: boolean,
+): Promise<boolean> {
   const favRef = doc(db, COLLECTIONS.favorites, favoriteDocId(uid, partnerId, 'partner'));
   const partnerRef = doc(db, COLLECTIONS.partners, partnerId);
 
-  const snap = await getDoc(favRef);
-  const wasFav = snap.exists();
+  const wasFav = known ?? (await getDoc(favRef)).exists();
 
   await runTransaction(db, async tx => {
     const pSnap = await tx.get(partnerRef);
