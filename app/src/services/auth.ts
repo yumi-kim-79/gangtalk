@@ -26,10 +26,11 @@ import {
 } from '@react-native-firebase/firestore';
 import { getFunctions, httpsCallable } from '@react-native-firebase/functions';
 import { appleAuth } from '@invertase/react-native-apple-authentication';
-import { login as kakaoLogin, logout as kakaoLogout, me as kakaoMe } from '@react-native-kakao/user';
+import { login as kakaoLogin, me as kakaoMe } from '@react-native-kakao/user';
 import { Platform } from 'react-native';
 import { FUNCTIONS_REGION } from '@/constants/auth';
 import { app, auth, db } from '@/services/firebase';
+import { isKakaoReady, safeKakaoLogout } from '@/services/kakao';
 
 /* ───────────────────────── 추천코드 ───────────────────────── */
 
@@ -292,6 +293,11 @@ export async function verifySmsCode(
  * (Firestore 규칙이 request.auth.uid 를 검사하므로 실제 Auth 세션이 반드시 필요)
  */
 export async function signInWithKakao(): Promise<FirebaseAuthTypes.User> {
+  // SDK 미초기화 상태에서 부르면 Android 네이티브가 uncaught 예외로 앱을 종료시킨다.
+  // (로그아웃 경로에서 실제로 겪은 문제 — services/kakao 주석 참고)
+  if (!isKakaoReady()) {
+    throw new Error('카카오 로그인이 현재 비활성화되어 있습니다.');
+  }
   const token = await kakaoLogin();
   const accessToken = token.accessToken;
   if (!accessToken) throw new Error('카카오 토큰을 받지 못했습니다.');
@@ -358,12 +364,9 @@ export async function signInWithApple(): Promise<FirebaseAuthTypes.User> {
 /* ───────────────────────── 공통 ───────────────────────── */
 
 export async function signOut(): Promise<void> {
-  // 카카오 사용자가 아니면 실패하지만 무시한다
-  try {
-    await kakaoLogout();
-  } catch {
-    // ignore
-  }
+  // SDK 가 초기화되지 않았으면 호출 자체를 건너뛴다.
+  // (초기화 전 호출은 Android 네이티브에서 uncaught 예외 → 앱 종료. try/catch 로 못 막는다)
+  await safeKakaoLogout();
   await fbSignOut(auth);
 }
 
