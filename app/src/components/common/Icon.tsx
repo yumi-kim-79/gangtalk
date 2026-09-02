@@ -24,7 +24,14 @@ export type IconName =
   | 'calendar'
   | 'support'
   | 'logout'
-  | 'login';
+  | 'login'
+  /* ── 가게찾기 도구 모음 (웹 StoreFinder .view-tools) ── */
+  | 'pin'
+  | 'listView'
+  | 'gridView'
+  | 'refresh'
+  | 'sun'
+  | 'moon';
 
 type Props = {
   name: IconName;
@@ -93,6 +100,52 @@ export default function Icon({ name, size = 22, color, filled = true }: Props) {
       return (
         <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
           <Path d="M6 9l6 6 6-6" {...stroke} />
+        </Svg>
+      );
+    // ── 웹 StoreFinder 도구 모음 ──
+    case 'pin':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+          <Circle cx={12} cy={10} r={3} {...stroke} />
+          <Path d="M7 10c0 5 5 12 5 12s5-7 5-12a5 5 0 1 0-10 0z" {...stroke} />
+        </Svg>
+      );
+    case 'listView':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+          <Path d="M4 7h16M4 12h16M4 17h16" {...stroke} />
+        </Svg>
+      );
+    case 'gridView':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 24 24">
+          <Rect x={4} y={4} width={7} height={7} rx={1} fill={color} />
+          <Rect x={13} y={4} width={7} height={7} rx={1} fill={color} />
+          <Rect x={4} y={13} width={7} height={7} rx={1} fill={color} />
+          <Rect x={13} y={13} width={7} height={7} rx={1} fill={color} />
+        </Svg>
+      );
+    case 'refresh':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+          <Path d="M21 12a9 9 0 1 1-2.64-6.36" {...stroke} />
+          <Path d="M21 3v6h-6" {...stroke} />
+        </Svg>
+      );
+    case 'sun':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+          <Circle cx={12} cy={12} r={4} {...stroke} />
+          <Path
+            d="M12 2v2M12 20v2M4 12H2M22 12h-2M5 5L3.5 3.5M20.5 20.5L19 19M5 19l-1.5 1.5M20.5 3.5L19 5"
+            {...stroke}
+          />
+        </Svg>
+      );
+    case 'moon':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+          <Path d="M21 12.79A9 9 0 1 1 11.21 3a7 7 0 0 0 9.79 9.79z" {...stroke} />
         </Svg>
       );
     // ── 웹 StoreDetail 별점 ──

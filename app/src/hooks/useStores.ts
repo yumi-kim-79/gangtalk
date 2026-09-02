@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { STORE_CATEGORIES } from '@/constants/stores';
 import {
   EMPTY_STORE_MARKETING,
@@ -24,6 +24,9 @@ export function useStores(filter: StoreFilter) {
   const [marketing, setMarketing] = useState<StoreMarketing>(EMPTY_STORE_MARKETING);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  /* 새로고침 — 구독을 끊고 다시 건다. onSnapshot 이라 평소엔 필요 없지만
+     웹 가게찾기에 새로고침 버튼이 있어 같은 조작을 제공한다. */
+  const [epoch, setEpoch] = useState(0);
 
   useEffect(() => {
     const unsubMarketing = subscribeStoreMarketing(setMarketing);
@@ -43,7 +46,7 @@ export function useStores(filter: StoreFilter) {
       unsubRooms();
       unsubMarketing();
     };
-  }, []);
+  }, [epoch]);
 
   const merged: Store[] = useMemo(
     () => mergeRoomsBiz(rawStores, roomsBiz),
@@ -73,5 +76,11 @@ export function useStores(filter: StoreFilter) {
     [merged, marketing.topRanks, filter.keyword, filter.category, filter.region, filter.sort],
   );
 
-  return { stores, topSections, total: merged.length, loading, error };
+  const reload = useCallback(() => {
+    setLoading(true);
+    setError(null);
+    setEpoch(e => e + 1);
+  }, []);
+
+  return { stores, topSections, total: merged.length, loading, error, reload };
 }

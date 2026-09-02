@@ -39,6 +39,13 @@ export interface StoreDoc {
   closed?: string;
   phone?: string;
   address?: string;
+  /** 좌표 — "내 주변 10km" 계산용. 세대별로 필드명이 달라 nearby.coordOf 가 순서대로 찾는다 */
+  lat?: number;
+  lng?: number;
+  latitude?: number;
+  longitude?: number;
+  geo?: { lat?: number; lng?: number };
+  location?: { lat?: number; lng?: number };
 
   /** 급여 — 필드가 여러 세대에 걸쳐 있어 wageOf() 로 통합 조회 */
   wage?: number | string;

@@ -11,10 +11,12 @@ import {
   View,
 } from 'react-native';
 import AppHeader from '@/components/common/AppHeader';
+import BannerSlider from '@/components/common/BannerSlider';
 import ChipTabs from '@/components/common/ChipTabs';
 import Icon from '@/components/common/Icon';
 import PartnerCard, { PartnerRow } from '@/components/partner/PartnerCard';
 import { PARTNER_CATEGORIES, PARTNER_CATEGORY_LABEL } from '@/constants/partners';
+import { useBanners } from '@/hooks/useBanners';
 import { usePartners } from '@/hooks/usePartners';
 import { topByCategory } from '@/services/partners';
 import type { PartnersStackParamList } from '@/navigation/types';
@@ -35,6 +37,7 @@ export default function PartnersScreen() {
   const [category, setCategory] = useState('all');
   const [keyword, setKeyword] = useState('');
   const { all, filtered, ranks, loading, error } = usePartners(category, keyword);
+  const { banners, ready: bannersReady } = useBanners('P');
 
   const openPartner = useCallback(
     (p: Partner) => navigation.navigate('PartnerDetail', { partnerId: p.id }),
@@ -74,6 +77,9 @@ export default function PartnersScreen() {
               onChange={setCategory}
               fadeColor={c.bg}
             />
+
+            {/* 제휴관 배너 — 웹 PartnersPage 가 쓰는 config/marketing/adBannersP 와 같은 소스 */}
+            <BannerSlider banners={banners} ready={bannersReady} />
 
             {loading ? <ActivityIndicator color={c.accent} style={s.loading} /> : null}
             {error ? <Text style={s.error}>{error}</Text> : null}
