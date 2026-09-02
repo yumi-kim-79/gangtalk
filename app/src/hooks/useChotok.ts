@@ -1,12 +1,17 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   defaultRoomId,
   parseChotok,
+  sendChotokMessage,
   subscribeChotok,
   subscribeChotokDoc,
+  subscribeMyJoin,
+  subscribeParticipantCount,
+  toggleChotokJoin,
   type ChotokDocMetrics,
   type ChotokMessage,
 } from '@/services/chotok';
+import { useAuth } from '@/hooks/useAuth';
 
 /**
  * 업체 초톡방 메시지.
@@ -17,6 +22,9 @@ export function useChotok(storeId: string) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [docMetrics, setDocMetrics] = useState<ChotokDocMetrics | null>(null);
+  const [joined, setJoined] = useState(false);
+  const [participants, setParticipants] = useState(0);
+  const { uid, profile } = useAuth();
 
   useEffect(() => {
     if (!storeId) return;
@@ -39,6 +47,42 @@ export function useChotok(storeId: string) {
     if (!storeId) return;
     return subscribeChotokDoc(storeId, setDocMetrics, () => setDocMetrics(null));
   }, [storeId]);
+
+  /* 참여자 수 · 내 참여 여부 — 웹 ChatBiz 의 matched / joined 와 같은 값 */
+  useEffect(() => {
+    if (!storeId) return;
+    return subscribeParticipantCount(storeId, setParticipants);
+  }, [storeId]);
+
+  useEffect(() => {
+    if (!storeId || !uid) {
+      setJoined(false);
+      return;
+    }
+    return subscribeMyJoin(storeId, uid, setJoined);
+  }, [storeId, uid]);
+
+  const send = useCallback(
+    async (text: string) => {
+      if (!uid) throw new Error('로그인이 필요합니다.');
+      await sendChotokMessage({
+        storeId,
+        uid,
+        author: profile?.nickname || '익명',
+        text,
+      });
+    },
+    [storeId, uid, profile?.nickname],
+  );
+
+  const toggleJoin = useCallback(async () => {
+    if (!uid) throw new Error('로그인이 필요합니다.');
+    await toggleChotokJoin({
+      storeId,
+      uid,
+      name: profile?.nickname || '익명',
+    });
+  }, [storeId, uid, profile?.nickname]);
 
   /**
    * 상단 지표 — 웹 ChatBiz.recomputeFromLastPasted(:335-365) 와 같은 우선순위.
@@ -67,5 +111,15 @@ export function useChotok(storeId: string) {
     return fromText;
   }, [messages, docMetrics]);
 
-  return { messages, parsed, loading, error };
+  return {
+    messages,
+    parsed,
+    loading,
+    error,
+    participants,
+    joined,
+    send,
+    toggleJoin,
+    canWrite: !!uid,
+  };
 }

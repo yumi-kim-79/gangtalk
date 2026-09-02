@@ -801,11 +801,16 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-/* 전체 페이지: 하단 탭바(약 56px)를 제외한 영역 */
+/* 전체 페이지: 하단 탭바(약 56px)를 제외한 영역
+ *
+ * 100vh 는 모바일 브라우저에서 **주소창을 포함한 큰 뷰포트** 높이라
+ * 실제 보이는 영역보다 커진다. 그래서 초톡 내용 아래쪽이 화면 밖으로 밀려
+ * 잘려 보였다(앱은 정상). 100dvh(동적 뷰포트)로 잡고 100vh 는 폴백으로 둔다. */
 .chat-page {
   display: flex;
   flex-direction: column;
   height: calc(100vh - 56px);
+  height: calc(100dvh - 56px);
   box-sizing: border-box;
 }
 
@@ -842,7 +847,8 @@ onBeforeUnmount(() => {
   flex: 1;
   min-height: 0;
   overflow: auto;
-  padding: 10px 10px 80px; /* 하단 여백 유지 */
+  /* 입력창 높이 + iOS 홈 인디케이터 영역만큼 확보 */
+  padding: 10px 10px calc(96px + env(safe-area-inset-bottom, 0px));
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -889,7 +895,7 @@ onBeforeUnmount(() => {
   position: fixed;
   left: 50%;
   transform: translateX(-50%);
-  bottom: 56px;              /* 하단 탭바 높이 */
+  bottom: calc(56px + env(safe-area-inset-bottom, 0px)); /* 탭바 + 홈 인디케이터 */
   width: 100%;
   max-width: 430px;
   display: flex;

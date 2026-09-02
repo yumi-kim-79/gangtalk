@@ -275,7 +275,9 @@ onBeforeUnmount(() => unsubs.forEach((u) => typeof u === 'function' && u()))
 .chat-page {
   display: flex;
   flex-direction: column;
-  height: calc(100vh - 56px);  /* 하단 탭바 높이 */
+  /* 100vh 는 모바일에서 주소창 포함 높이라 아래가 잘린다 (ChatBiz 와 동일 처리) */
+  height: calc(100vh - 56px);
+  height: calc(100dvh - 56px);
   box-sizing: border-box;
   padding-top: 56px;           /* ✅ 상단 강남톡방 고정배너 높이만 내려줌 */
 }

@@ -7,11 +7,16 @@
  * 원문 사본: rooms_biz/{storeId}.lastPastedTextRaw / lastPastedText
  */
 import {
+  addDoc,
   collection,
+  deleteDoc,
   doc,
+  getDoc,
   onSnapshot,
   orderBy,
   query,
+  serverTimestamp,
+  setDoc,
   type FirebaseFirestoreTypes,
 } from '@react-native-firebase/firestore';
 import { COLLECTIONS } from '@/constants/app';
@@ -158,4 +163,86 @@ export function subscribeChotokDoc(
     },
     e => onError?.(e),
   );
+}
+
+/* ───────────────────────── 쓰기 (웹 ChatBiz 와 동일) ───────────────────────── */
+
+/**
+ * 초톡 메시지 전송 — 웹 ChatBiz.sendMessage(:390-418) 와 같은 문서 모양.
+ * 줄바꿈이 있으면 'paste'(카톡 원문 붙여넣기), 아니면 'chat'.
+ */
+export async function sendChotokMessage(params: {
+  storeId: string;
+  uid: string;
+  author: string;
+  text: string;
+}): Promise<void> {
+  const text = String(params.text ?? '').replace(/\r\n/g, '\n');
+  if (!text.trim()) return;
+
+  const kind: ChotokMessage['kind'] = /\n/.test(text.trim()) ? 'paste' : 'chat';
+
+  await addDoc(
+    collection(
+      db,
+      COLLECTIONS.roomsBiz,
+      params.storeId,
+      'rooms',
+      defaultRoomId(params.storeId),
+      COLLECTIONS.messages,
+    ),
+    {
+      text,
+      author: params.author || '익명',
+      authorUid: params.uid,
+      kind,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    },
+  );
+}
+
+/** 내가 이 초톡방에 참여 중인지 (웹 ChatBiz participants 컬렉션) */
+export function subscribeMyJoin(
+  storeId: string,
+  uid: string,
+  onData: (joined: boolean) => void,
+) {
+  return onSnapshot(
+    doc(db, COLLECTIONS.roomsBiz, storeId, 'participants', uid),
+    (snap: FirebaseFirestoreTypes.DocumentSnapshot) => onData(snap.exists()),
+    () => onData(false),
+  );
+}
+
+/** 참여자 수 */
+export function subscribeParticipantCount(
+  storeId: string,
+  onData: (n: number) => void,
+) {
+  return onSnapshot(
+    collection(db, COLLECTIONS.roomsBiz, storeId, 'participants'),
+    (snap: FirebaseFirestoreTypes.QuerySnapshot) => onData(snap.size),
+    () => onData(0),
+  );
+}
+
+/** 참여 / 참여취소 — 웹 ChatBiz.toggleJoin(:649-674) 이식 */
+export async function toggleChotokJoin(params: {
+  storeId: string;
+  uid: string;
+  name: string;
+}): Promise<boolean> {
+  const ref = doc(db, COLLECTIONS.roomsBiz, params.storeId, 'participants', params.uid);
+  const cur = await getDoc(ref);
+  if (cur.exists()) {
+    await deleteDoc(ref);
+    return false;
+  }
+  await setDoc(ref, {
+    uid: params.uid,
+    name: params.name || '익명',
+    joinedAt: serverTimestamp(),
+  });
+  return true;
 }
