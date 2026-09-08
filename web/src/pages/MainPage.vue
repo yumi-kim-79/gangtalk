@@ -412,6 +412,7 @@ async function goNearMe(){
 /* === 테마 & 뷰 전환 (localStorage 기반, URL 쿼리 제거) === */
 import { getTheme, setTheme, normalizeTheme, applyThemeToDom } from '@/store/theme.js'
 import { CATEGORY_CHIPS, CATEGORY_LABEL, STORE_CATEGORIES } from '@/constants/categories'
+import { saveStoreMetrics } from '@/lib/storeMetrics'
 
 const viewMode  = ref(route.query.view || localStorage.getItem('finder:view') || 'list')
 const theme     = ref(getTheme())
@@ -1544,15 +1545,25 @@ function subscribeRoomsBiz(){
         return Number.isFinite(n) ? n : 0
       } catch { return 0 }
     }
+    /* 2026-09-08: manualSaved 가 영구 우선이라 오래된 수동값이 최신 입력을 계속 이겼다.
+     * 실제 사례 — 레이블: rooms_biz/{storeId} 에 0/0 manualSaved(9/1) 가 박혀 있어
+     * 9/8 에 들어온 붙여넣기도, 관리자가 고친 stores 값도 화면에 못 올라왔다.
+     * 수동 저장은 '그 시점의 결정' 이지 영구 고정이 아니다 — 더 나중에 들어온
+     * 입력이 있으면 그쪽을 최신으로 본다. */
+    const pick = (a, b) => {
+      const ta = tierOf(a), tb = tierOf(b)
+      const sa = tsOf(a),  sb = tsOf(b)
+      const aStale = !!a?._manualSaved && sb > sa
+      const bStale = !!b?._manualSaved && sa > sb
+      if (aStale && !bStale) return b
+      if (bStale && !aStale) return a
+      if (ta !== tb) return ta > tb ? a : b
+      return sa >= sb ? a : b
+    }
     const map = {}
     for (const [id, v] of results) {
       const prev = map[id]
-      if (!prev) { map[id] = v; continue }
-      const tNew = tierOf(v), tOld = tierOf(prev)
-      if (tNew > tOld) { map[id] = v; continue }
-      if (tNew < tOld) continue
-      // 동일 tier — 최근 우선
-      if (tsOf(v) >= tsOf(prev)) map[id] = v
+      map[id] = prev ? pick(prev, v) : v
     }
 
     roomsBiz.value = map
@@ -2303,14 +2314,15 @@ async function saveMetric(){
   const s = sheet.value.store
   if (!s?.id) return
   try{
-    const payload = {
-      match:      Math.max(0, Number(metricForm.value.match||0)),
-      persons:    Math.max(0, Number(metricForm.value.persons||0)),
-      totalRooms: Math.max(0, Number(metricForm.value.totalRooms||0)),
-      maxPersons: Math.max(0, Number(metricForm.value.maxPersons||0)),
-      updatedAt:  serverTimestamp(),
-    }
-    await updateDoc(doc(db, 'stores', String(s.id)), payload)
+    /* 예전에는 여기서 stores 만 갱신했다. 현황판이 실제로 읽는 건 rooms_biz 라
+     * 저장해도 화면이 안 바뀌었다 (stores 16/22 인데 화면은 0/0).
+     * 두 문서를 함께 쓰는 공용 함수로 바꾼다. */
+    await saveStoreMetrics(db, String(s.id), {
+      match:      metricForm.value.match,
+      persons:    metricForm.value.persons,
+      totalRooms: metricForm.value.totalRooms,
+      maxPersons: metricForm.value.maxPersons,
+    })
     closeSheet()
   }catch(e){
     console.warn('saveMetric error:', e)
