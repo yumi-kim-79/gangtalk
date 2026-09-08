@@ -15,7 +15,7 @@ import {
 import AppHeader from '@/components/common/AppHeader';
 import Icon from '@/components/common/Icon';
 import ChipTabs from '@/components/common/ChipTabs';
-import { HOME_STORE_LIMIT, STORE_CATEGORIES } from '@/constants/stores';
+import { CATEGORY_CHIPS, HOME_STORE_LIMIT } from '@/constants/stores';
 import StoreStatusCard from '@/components/store/StoreStatusCard';
 import { useAuth } from '@/hooks/useAuth';
 import { useHomeStores } from '@/hooks/useHomeStores';
@@ -116,13 +116,7 @@ export default function HomeScreen() {
               <Icon name="chevronRight" size={16} color={c.muted} />
             </Pressable>
 
-            <ChipTabs
-              items={STORE_CATEGORIES}
-              value={category}
-              onChange={setCategory}
-              fadeColor={c.bg}
-            />
-
+            {/* 카테고리는 섹션 제목 아래 한 줄로 (웹 현황판과 같은 배치, 2026-09-08) */}
             <View style={s.sectionHead}>
               <Text style={s.sectionTitle}>강남 인기 업소</Text>
               <Pressable onPress={goAllStores} hitSlop={8} style={s.moreBtn}>
@@ -130,6 +124,13 @@ export default function HomeScreen() {
                 <Icon name="chevronRight" size={14} color={c.muted} />
               </Pressable>
             </View>
+
+            <ChipTabs
+              items={CATEGORY_CHIPS}
+              value={category}
+              onChange={setCategory}
+              fadeColor={c.bg}
+            />
 
             {loading ? <ActivityIndicator color={c.accent} style={s.loading} /> : null}
             {error ? <Text style={s.error}>{error}</Text> : null}

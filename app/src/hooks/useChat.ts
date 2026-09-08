@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { sendMessage, subscribeMessages, subscribeRooms } from '@/services/chat';
 import type { ChatMessage, ChatRoom } from '@/types/chat';
+import { ANON_LABEL } from '@/constants/author';
 
 /** 방 목록 — 규칙상 로그인해야 읽을 수 있어 비로그인이면 구독하지 않는다 */
 export function useChatRooms() {
@@ -67,7 +68,7 @@ export function useChatRoom(roomId: string) {
       if (!uid || sending || !text.trim()) return;
       setSending(true);
       try {
-        await sendMessage({ roomId, uid, author: profile?.nickname || '익명', text });
+        await sendMessage({ roomId, uid, author: profile?.nickname || ANON_LABEL, text });
       } catch {
         setError('메시지 전송에 실패했습니다.');
       } finally {

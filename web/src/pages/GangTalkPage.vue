@@ -432,8 +432,8 @@
 
         <!-- 닉네임 표시 -->
         <div class="v2-compose-user">
-          <div class="v2-cmt-avatar sm">{{ (composeNick || '익')[0] }}</div>
-          <input class="v2-nick-input" type="text" v-model="composeNick" placeholder="닉네임 (비우면 익명)" />
+          <div class="v2-cmt-avatar sm">{{ (composeNick || ANON_LABEL)[0] }}</div>
+          <input class="v2-nick-input" type="text" v-model="composeNick" placeholder="비공개 — 닉네임을 넣으면 공개됩니다" />
         </div>
 
         <!-- 입력 폼 -->
@@ -585,7 +585,7 @@ import {
 } from 'firebase/firestore'
 import { getStorage, ref as sRef, uploadBytes, getDownloadURL } from 'firebase/storage'
 
-import { sanitizeUserPayload } from '@/lib/author'
+import { ANON_LABEL, displayAuthor, sanitizeUserPayload } from '@/lib/author'
 import { safeAdd, safeUpdate, safeDelete } from '@/lib/firestoreSafe'
 
 // setPersistence 는 firebase.js 가 단일 책임으로 indexedDBLocalPersistence 적용.
@@ -954,7 +954,7 @@ const normalizePost = (id, x={}) => ({
   subtitle: x.subtitle || '',
   body: x.body || x.content || '',
   content: x.content || x.body || '',
-  author: x.author || '익명',
+  author: displayAuthor(x.author),
   authorUid: x.authorUid || '',
   views: Number(x.views || 0),
   likes: Number(x.likes || 0),
@@ -1150,7 +1150,7 @@ function normChat(id, x={}){
   const auth = getAuth()
   const cur = auth.currentUser?.uid || ''
   const tms = tsToMs(x.createdAt || x.updatedAt)
-  return { _id:id, text:String(x.text||'').trim(), author:x.author || '익명', me:String(x.authorUid||'') === String(cur), time: clock(tms) }
+  return { _id:id, text:String(x.text||'').trim(), author: displayAuthor(x.author), me:String(x.authorUid||'') === String(cur), time: clock(tms) }
 }
 let systemHello = null
 let firstSnapDone = false
@@ -1210,7 +1210,7 @@ async function send(){
     await safeAdd(col,
       sanitizeUserPayload({
         text: t,
-        author: myNick.value || '익명',
+        author: myNick.value || ANON_LABEL,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       }, user.uid),
@@ -1531,7 +1531,7 @@ const normalizeStorePost = (id, x = {}, storeId = '') => ({
   id, _storeId: storeId, category: 'biz',
   title: x.title || '(제목 없음)', subtitle: x.subtitle || '',
   body: x.body || x.content || '', content: x.content || x.body || '',
-  author: x.author || '익명', authorUid: x.authorUid || '',
+  author: displayAuthor(x.author), authorUid: x.authorUid || '',
   views: Number(x.views || 0), likes: Number(x.likes || 0),
   createdAt: tsToMs(x.createdAt || x.updatedAt),
   updatedAt: tsToMs(x.updatedAt || x.createdAt),
@@ -1555,7 +1555,20 @@ async function subscribeStorePosts (storeId) {
 /* 글쓰기 모달 상태 */
 const showGenModal = ref(false)
 const composeCat = ref('daily')
-const composeNick = ref('')        // ✅ 닉네임 입력값
+const composeNick = ref('')        // ✅ 닉네임 입력값 (비우면 비공개)
+
+/* 글쓰기 닉네임 선택 기억 — 기본은 비공개, 직접 넣은 적이 있으면 그 값 */
+const COMPOSE_NICK_KEY = 'compose:nick'
+function rememberedComposeNick() {
+  try { return localStorage.getItem(COMPOSE_NICK_KEY) || '' } catch { return '' }
+}
+function rememberComposeNick(v) {
+  try {
+    const n = String(v || '').trim()
+    if (n) localStorage.setItem(COMPOSE_NICK_KEY, n)
+    else localStorage.removeItem(COMPOSE_NICK_KEY)
+  } catch {}
+}
 const composeTitle = ref('')
 const composeSubtitle = ref('')
 const composeBody = ref('')
@@ -1628,7 +1641,7 @@ async function confirmNotice(){
       isNotice: true,
       title, subtitle: '',
       body, content: body,
-      author: '익명', authorUid: user.uid
+      author: ANON_LABEL, authorUid: user.uid
     }
     const baseSan = sanitizeUserPayload(base, user.uid)
 
@@ -1678,8 +1691,10 @@ const openCreate = async () => {
     composeCat.value = (catPage.value.filter && catPage.value.filter !== 'all') ? catPage.value.filter : yaTab.value
   }
 
-  // ✅ 닉네임 기본값: 계정 닉네임 (비워두면 익명)
-  composeNick.value = myNick.value || ''
+  /* 닉네임 기본값 = 비공개.
+   * 예전에는 계정 닉네임을 자동으로 넣어, 글을 쓰면 본인 닉네임이 그대로 공개됐다.
+   * 한 번이라도 직접 닉네임을 넣어 올린 사람은 그 선택을 기억해 다음에도 채워 준다. */
+  composeNick.value = rememberedComposeNick()
 
   composeTitle.value = ''
   composeSubtitle.value = ''
@@ -1751,9 +1766,10 @@ const confirmCreate = async () => {
   try { user = await requireAuth() } catch(_) { return }
   const authorUid = user.uid
 
-  // ⬇ 닉네임(비우면 익명) 처리 – 이전에 추가해둔 부분
+  // ⬇ 닉네임을 비우면 비공개로 올라간다
   const nick = (composeNick.value || '').trim()
-  const authorNameForSave = nick || '익명'
+  const authorNameForSave = nick || ANON_LABEL
+  rememberComposeNick(nick)
 
   // ✅ 이미지가 있으면 먼저 업로드
   const imageUrls = await uploadComposeImages(authorUid)
@@ -1868,7 +1884,9 @@ function startEdit(p){
   editTargetId.value = post.id
 
   // ✅ 기존 글의 닉네임을 폼에 반영 (익명이면 빈칸)
-  composeNick.value = (post.author && post.author !== '익명') ? post.author : ''
+  composeNick.value = (post.author && post.author !== '익명' && post.author !== ANON_LABEL)
+    ? post.author
+    : ''
 
   if (post.category === 'vote' || post.optA || post.optB || /vs/.test(post.subtitle||'')) {
     composeCat.value = 'vote'
@@ -2203,7 +2221,7 @@ let unsubComments = null
 const normalizeComment = (id, x={}) => ({
   id,
   body: String(x.body || '').trim(),
-  author: x.author || '익명',
+  author: displayAuthor(x.author),
   authorUid: x.authorUid || '',
   parentId: x.parentId || null,
   createdAt: tsToMs(x.createdAt || x.updatedAt),
@@ -2330,8 +2348,7 @@ async function deleteComment(c){
 /* 표시 유틸 */
 /* 표시 유틸 */
 function authorName(p){
-  const name = p?.author || ''
-  return name.trim() || '익명'
+  return displayAuthor(p?.author)
 }
 
 function firstLine(p){
@@ -2896,7 +2913,9 @@ const FALLBACK_BIZ_IMG = 'https://images.unsplash.com/photo-1517248135467-4c7edc
   position:fixed; inset:0;
   background:rgba(0,0,0,.35);
   display:flex; align-items:flex-end;
-  z-index:140;
+  /* 하단 탭바가 z-index 9999(App.vue) 라 140 이면 시트 아래쪽이 탭바에 가린다.
+     실제로 글쓰기 시트의 '등록' 버튼이 탭바 뒤로 들어가 글을 올릴 수 없었다. */
+  z-index:10000;
 }
 .sheet{
   width:100%;
@@ -3184,7 +3203,9 @@ const FALLBACK_BIZ_IMG = 'https://images.unsplash.com/photo-1517248135467-4c7edc
   flex: 1;
   background: var(--bg);
   overflow: auto;
-  padding-bottom: max(16px, env(safe-area-inset-bottom));
+  /* 이 시트는 탭바(z-index 9999)보다 아래에 깔린다. 탭바 높이만큼 비워 두지 않으면
+     맨 아래에 있는 페이지네이션이 탭바에 가려 보이지 않는다. */
+  padding-bottom: calc(var(--nav-h, 64px) + max(16px, env(safe-area-inset-bottom)));
   padding-top: env(safe-area-inset-top); /* iOS 노치 영역만큼 내려서 그 아래에 헤더 고정 */
 }
 
@@ -3989,7 +4010,9 @@ const FALLBACK_BIZ_IMG = 'https://images.unsplash.com/photo-1517248135467-4c7edc
 
 /* --- 글쓰기 모달 --- */
 .v2-compose{
-  max-height:calc(100vh - 60px); overflow:auto; border-radius:20px 20px 0 0;
+  /* 100vh 는 모바일 브라우저에서 주소창을 포함한 큰 뷰포트라 시트가 화면보다 길어진다.
+     100dvh 로 바꿔 실제로 보이는 높이에 맞춘다. */
+  max-height:calc(100dvh - 60px); overflow:auto; border-radius:20px 20px 0 0;
   padding-bottom:max(16px, env(safe-area-inset-bottom));
   background:var(--bg);
 }
@@ -4038,6 +4061,11 @@ const FALLBACK_BIZ_IMG = 'https://images.unsplash.com/photo-1517248135467-4c7edc
 .v2-compose-toolbar{
   display:flex; align-items:center; gap:8px; padding:12px 0 8px;
   border-top:1px solid var(--line); margin-top:8px;
+  /* 내용이 길어져도 '등록' 버튼은 항상 시트 바닥에 붙어 보이게 한다 */
+  position:sticky; bottom:0;
+  background:var(--bg);
+  padding-bottom:max(8px, env(safe-area-inset-bottom));
+  z-index:1;
 }
 .v2-tool-btn{
   border:none; background:none; font-size:14px; color:var(--muted); cursor:pointer; padding:4px 6px;

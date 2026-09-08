@@ -21,6 +21,7 @@ import {
 } from '@react-native-firebase/firestore';
 import { COLLECTIONS } from '@/constants/app';
 import { db } from '@/services/firebase';
+import { ANON_LABEL } from '@/constants/author';
 
 export interface ChotokMessage {
   id: string;
@@ -193,7 +194,7 @@ export async function sendChotokMessage(params: {
     ),
     {
       text,
-      author: params.author || '익명',
+      author: params.author || ANON_LABEL,
       authorUid: params.uid,
       kind,
       createdAt: serverTimestamp(),
@@ -245,7 +246,7 @@ export async function joinChotok(params: {
 
   await setDoc(ref, {
     uid: params.uid,
-    name: params.name || '익명',
+    name: params.name || ANON_LABEL,
     joinedAt: serverTimestamp(),
   });
 }

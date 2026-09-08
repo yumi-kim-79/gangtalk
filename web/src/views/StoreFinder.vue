@@ -631,6 +631,7 @@ import { getStorage, ref as sRef, getDownloadURL } from 'firebase/storage'
 import { getAuth, onAuthStateChanged } from 'firebase/auth'
 import { useMarketingBanners } from '@/composables/useMarketingBanners'   // ⬅️ 추가
 import { useNearby } from '@/composables/useNearby'
+import { CATEGORY_CHIPS, CATEGORY_LABEL, STORE_CATEGORIES } from '@/constants/categories'
 import StoreQuickCreate from '@/components/biz/StoreQuickCreate.vue'
 
 import StoreListView from '@/components/finder/StoreListView.vue'
@@ -644,25 +645,6 @@ const storage = getStorage()
 const auth = getAuth()
 
 /* (헤더/검색 관련 상태는 AppHeader 공통 컴포넌트로 이관됨 — notifBadge/menuOpen/menuItems/onMenuItem/auth 구독 모두 제거) */
-
-/* ===== Category (MainPage 와 동일 톤) ===== */
-/* 칩 아이콘만 여기서 정한다. **라벨은 아래 categories 를 따른다** —
- * 예전에는 이 배열이 라벨을 따로 들고 있어 같은 페이지 안에서
- * 칩은 '바(Bar)'/'일프로', 카드 부제는 '바'/'1%' 로 갈렸고,
- * '라운지'는 칩이 아예 없어 해당 업체를 고를 수 없었다. */
-const CAT_ICON = {
-  all: '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg>',
-  hopper: '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h14l-2 6a5 5 0 0 1-10 0z"/><path d="M12 10v8"/><path d="M8 21h8"/></svg>',
-  point5: '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9 13c0 1.5 1.3 2.5 3 2.5s3-1 3-2.5-1.3-2.5-3-2.5h-1l1-3h3"/></svg>',
-  ten: '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11h14a4 4 0 0 1 0 8H3z"/><path d="M17 13h2a2 2 0 0 1 0 4h-2"/><path d="M7 4v3M11 4v3M15 4v3"/></svg>',
-  tenpro: '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87L18.18 22 12 18.56 5.82 22 7 14.14 2 9.27l6.91-1.01z"/></svg>',
-  bar: '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3h14l-7 9z"/><path d="M12 12v8"/><path d="M8 21h8"/></svg>',
-  onep: '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 6h2v12"/><path d="M8 18h6"/></svg>',
-  nrb: '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="3" width="4" height="11" rx="2"/><path d="M5 11a5 5 0 0 0 10 0"/><path d="M10 16v4"/><path d="M7 20h6"/></svg>',
-  kara: '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>',
-  lounge: '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11V8a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v3"/><path d="M3 11h18v5H3z"/><path d="M6 16v3M18 16v3"/></svg>',
-  etc: '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>',
-}
 
 const expandCategories = ref(false)
 
@@ -776,33 +758,14 @@ function onBannerClick(){ scrollToList() }
 
 
 /* ───────────────────────── 카테고리/정렬 ───────────────────────── */
-const categories = [
-  // 1줄: 전체, 하퍼, 쩜오, 텐카페, 텐프로, 1%
-  { key:'all',     label:'',       emoji:'' },     // 전체: 현재 지역만 표시
-  { key:'hopper',  label:'하퍼',    badge:'H' },
-  { key:'point5',  label:'쩜오',    badge:'5' },
-  { key:'ten',     label:'텐카페',  badge:'10' },
-  { key:'tenpro',  label:'텐프로',  badge:'TP' },
-  { key:'onep',    label:'1%',      badge:'1%' },
-
-  // 2줄: (비워두기용) + 노래방, 가라오케, 바, 라운지, 기타
-  { key:'spacer',  label:'',       emoji:'' },     // 두 번째 줄 첫 칸 비우기용
-  { key:'nrb',     label:'노래방',   emoji:'🎤' },
-  { key:'kara',    label:'가라오케', emoji:'🎶' },
-  { key:'bar',     label:'바',       emoji:'🍸' },
-  { key:'lounge',  label:'라운지',   emoji:'🛋️' },
-  { key:'etc',     label:'기타',     emoji:'📌' },
-]
-const mapCat = Object.fromEntries(categories.map(c=>[c.key,c.label || c.key]))
-
-/* 칩 목록 — categories 에서 spacer 만 빼고 라벨을 그대로 쓴다 (앱과 동일한 표) */
-const mpCategories = categories
-  .filter(c => c.key !== 'spacer')
-  .map(c => ({
-    key: c.key,
-    label: c.key === 'all' ? '전체' : (c.label || c.key),
-    iconSvg: CAT_ICON[c.key] || CAT_ICON.etc,
-  }))
+/* 카테고리 — 웹 공용 표(constants/categories.js) 하나만 쓴다 */
+const categories = STORE_CATEGORIES
+const mapCat = CATEGORY_LABEL
+const mpCategories = CATEGORY_CHIPS.map(c => ({
+  key: c.key,
+  label: c.key === 'all' ? '전체' : c.label,
+  iconSvg: c.icon,
+}))
 const validType  = (t)=> t === 'all' || categories.some(c=>c.key===String(t))
 const type  = ref(validType(route.query.type) ? String(route.query.type) : 'all')
 
@@ -2023,15 +1986,14 @@ function toggleSort(){ ui.value.sortOpen = !ui.value.sortOpen; if(ui.value.sortO
   margin:0;
   position:relative;
 }
-/* 5열 격자 (이전 가로 스크롤 → 한눈에 보기).
+/* 5열 × 2줄 격자 (이전 가로 스크롤 → 한눈에 보기).
  * 진단: docs/audit/2026-06-18-카테고리-2줄-진단.md (방법 B)
- * 칩은 라운지가 더해져 11개 — 마지막 줄이 1칸이 되지 않도록 그리드를
- * 자동 채움으로 바꿔 폭에 맞게 열 수를 잡는다.
+ * 칩 10개 = 정확히 5×2. 두 번째 줄 마지막 칸이 '기타' 다.
+ * (라운지를 넣고 가라오케를 뺐다 — constants/categories.js 참고)
  */
 .sf-cat-scroll{
   display:grid;
-  grid-template-columns:repeat(auto-fit, minmax(58px, 1fr));
-  justify-content:center;
+  grid-template-columns:repeat(5, minmax(0, 1fr));
   align-items:start;
   /* PR 1 (2026-06-22): gap 12 8 → 8 6 컴팩트 */
   gap: var(--cat-grid-gap, 8px 6px);
@@ -2111,6 +2073,10 @@ function toggleSort(){ ui.value.sortOpen = !ui.value.sortOpen; if(ui.value.sortO
 .sf-tops :deep(.mini){
   /* PR 2 (2026-06-22): min-width 200 → 180 (토큰) */
   min-width: var(--card-min-width, 180px);
+  /* 2026-09-08: min-width 만 주면 flex 아이템이 내용만큼 넓어진다.
+     업체명·문구가 긴 카드가 더 넓어지고, 썸네일은 aspect-ratio 라 폭을 따라
+     같이 높아져 목록의 사진 크기가 들쭉날쭉해 보였다. 폭을 고정한다. */
+  flex: 0 0 var(--card-min-width, 180px);
   border:none !important;
   border-radius:14px !important;
   box-shadow:0 4px 14px rgba(0,0,0,.08) !important;
@@ -2380,7 +2346,7 @@ function toggleSort(){ ui.value.sortOpen = !ui.value.sortOpen; if(ui.value.sortO
 .top-sec{ margin:4px 0 10px }
 .top-head{ display:flex; align-items:center; justify-content:space-between; margin:0 2px 6px }
 .top-head .ttl{ font-weight:900; font-size:13px }
-.top-row{ display:flex; gap:8px; overflow:auto; padding-bottom:4px }
+.top-row{ display:flex; gap:8px; overflow:auto; padding-bottom:4px; align-items:stretch }
 
 .mini{
   appearance:none; min-width:160px; text-align:left; border:1px solid var(--line);

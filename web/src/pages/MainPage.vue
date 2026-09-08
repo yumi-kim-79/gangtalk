@@ -23,32 +23,22 @@
       </svg>
     </section>
 
-    <!-- ===== Category Tabs ===== -->
-    <section class="mp-cat">
-      <div class="mp-cat-scroll">
-        <button
-          v-for="c in mpCategories"
-          :key="c.key"
-          class="mp-cat-item"
-          :class="{ on: type === c.key }"
-          type="button"
-          @click="setType(c.key)"
-        >
-          <span class="mp-cat-ic" :class="{ on: type === c.key }" aria-hidden="true" v-html="c.iconSvg"></span>
-          <span class="mp-cat-label">{{ c.label }}</span>
-        </button>
-        <button class="mp-cat-expand" type="button" aria-label="더 보기" @click="expandCategories = !expandCategories">
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" :style="expandCategories ? 'transform:rotate(180deg)' : ''">
-            <path d="M6 9l6 6 6-6"/>
-          </svg>
-        </button>
-      </div>
-    </section>
-
     <!-- ===== 강남 인기 업소 ===== -->
     <section class="mp-section">
       <header class="mp-section-head">
         <h2 class="mp-section-title">✨ 강남 인기 업소</h2>
+        <!-- 카테고리는 큰 아이콘 격자 대신 제목 옆 가로 칩으로 줄였다 (2026-09-08 요청).
+             현황판 상단이 카테고리로 절반 이상 채워져 정작 업소가 잘 안 보였다. -->
+        <nav class="mp-cat-inline" aria-label="업종">
+          <button
+            v-for="c in mpCategories"
+            :key="c.key"
+            class="mp-cat-chip"
+            :class="{ on: type === c.key }"
+            type="button"
+            @click="setType(c.key)"
+          >{{ c.label }}</button>
+        </nav>
         <button class="mp-section-more" type="button" @click="goAllStores">더보기 ›</button>
       </header>
 
@@ -421,6 +411,7 @@ async function goNearMe(){
 
 /* === 테마 & 뷰 전환 (localStorage 기반, URL 쿼리 제거) === */
 import { getTheme, setTheme, normalizeTheme, applyThemeToDom } from '@/store/theme.js'
+import { CATEGORY_CHIPS, CATEGORY_LABEL, STORE_CATEGORIES } from '@/constants/categories'
 
 const viewMode  = ref(route.query.view || localStorage.getItem('finder:view') || 'list')
 const theme     = ref(getTheme())
@@ -852,47 +843,13 @@ const olderNews  = computed(() =>
 const isLatestNew = computed(() => isNewsNew(latestNews.value))
 function openNews(n){ if(!n) return; alert(n.title) }
 
-/* 카테고리 (라벨 맵) */
-const categories = [
-  { key:'hopper',  label:'하퍼',     badge:'H' },
-  { key:'point5',  label:'쩜오',     badge:'5' },
-  { key:'ten',     label:'텐카페',   badge:'10' },
-  { key:'tenpro',  label:'텐프로',   badge:'TP' },
-  { key:'onep',    label:'일프로',   badge:'1P' },
-  { key:'bar',     label:'바(bar)',  emoji:'🍸' },
-  { key:'nrb',     label:'노래방',   emoji:'🎤' },
-  { key:'kara',    label:'가라오케', emoji:'🎶' },
-  { key:'etc',     label:'기타',     emoji:'➕' },
-  { key:'lounge',  label:'라운지',   emoji:'🛋️' },
-]
-const mapCat = Object.fromEntries(categories.map(c=>[c.key,c.label]))
+/* 카테고리 — 웹 공용 표(constants/categories.js) 하나만 쓴다.
+ * 이전에는 이 파일 안에만 표가 둘(categories 라벨용 / mpCategories 칩용) 있었고
+ * StoreFinder 에도 또 따로 있어, 같은 업종이 '바(bar)' / '바(Bar)' / '바' 로 갈렸다. */
+const categories = STORE_CATEGORIES
+const mapCat = CATEGORY_LABEL
+const mpCategories = CATEGORY_CHIPS.map(c => ({ key: c.key, label: c.label }))
 
-/* 유형 칩 목록 */
-const typeChips = [
-  { key:'hopper', label:'하퍼' },
-  { key:'point5', label:'쩜오' },
-  { key:'ten',    label:'텐카페' },
-  { key:'tenpro', label:'텐프로' },
-  { key:'onep',   label:'일프로' },
-  { key:'bar',    label:'바(bar)' },
-  { key:'nrb',    label:'노래방' },
-  { key:'kara',   label:'가라오케' },
-  { key:'etc',    label:'기타' },
-]
-
-/* ===== 새 디자인용 카테고리 (아이콘 포함) ===== */
-const mpCategories = [
-  { key:'all',    label:'전체',   iconSvg:'<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg>' },
-  { key:'hopper', label:'하퍼',   iconSvg:'<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h14l-2 6a5 5 0 0 1-10 0z"/><path d="M12 10v8"/><path d="M8 21h8"/></svg>' },
-  { key:'point5', label:'쩜오',   iconSvg:'<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9 13c0 1.5 1.3 2.5 3 2.5s3-1 3-2.5-1.3-2.5-3-2.5h-1l1-3h3"/></svg>' },
-  { key:'ten',    label:'텐카페', iconSvg:'<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11h14a4 4 0 0 1 0 8H3z"/><path d="M17 13h2a2 2 0 0 1 0 4h-2"/><path d="M7 4v3M11 4v3M15 4v3"/></svg>' },
-  { key:'tenpro', label:'텐프로', iconSvg:'<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87L18.18 22 12 18.56 5.82 22 7 14.14 2 9.27l6.91-1.01z"/></svg>' },
-  { key:'bar',    label:'바(Bar)', iconSvg:'<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3h14l-7 9z"/><path d="M12 12v8"/><path d="M8 21h8"/></svg>' },
-  { key:'onep',   label:'일프로', iconSvg:'<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 6h2v12"/><path d="M8 18h6"/></svg>' },
-  { key:'nrb',    label:'노래방', iconSvg:'<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="3" width="4" height="11" rx="2"/><path d="M5 11a5 5 0 0 0 10 0"/><path d="M10 16v4"/><path d="M7 20h6"/></svg>' },
-  { key:'kara',   label:'가라오케', iconSvg:'<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>' },
-  { key:'etc',    label:'기타',   iconSvg:'<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>' },
-]
 const expandCategories = ref(false)
 
 /* ===== 페이지 고유 액션 (AppHeader 미관여) ===== */
@@ -2532,6 +2489,23 @@ onUnmounted(() => {
 }
 
 /* ===== Category Tabs ===== */
+.mp-cat-inline{
+  display:flex; gap:6px; overflow-x:auto; flex:1; min-width:0;
+  -ms-overflow-style:none; scrollbar-width:none;
+  margin:0 8px;
+}
+.mp-cat-inline::-webkit-scrollbar{ display:none; }
+.mp-cat-chip{
+  flex:0 0 auto;
+  height:26px; padding:0 10px; border-radius:999px;
+  border:1px solid var(--line); background:transparent;
+  font-size:12px; font-weight:700; color:var(--muted);
+  cursor:pointer; white-space:nowrap;
+}
+.mp-cat-chip.on{
+  background:var(--accent); border-color:var(--accent); color:#fff;
+}
+
 .mp-cat{
   /* PR 1b (2026-06-22): padding 4 0 12 → 2 0 6 컴팩트 */
   padding:2px 0 6px;

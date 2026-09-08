@@ -21,6 +21,7 @@ import { COLLECTIONS } from '@/constants/app';
 import { POSTS_PER_PAGE } from '@/constants/board';
 import { db } from '@/services/firebase';
 import type { BoardCategory, Comment, Post } from '@/types/post';
+import { ANON_LABEL, displayAuthor } from '@/constants/author';
 
 /* ───────────────────────── 정규화 ───────────────────────── */
 
@@ -70,7 +71,7 @@ export function normalizePost(id: string, x: Raw = {}): Post {
     title: str(x.title) || '(제목 없음)',
     subtitle: str(x.subtitle),
     body: str(x.body || x.content),
-    author: str(x.author) || '익명',
+    author: displayAuthor(str(x.author)),
     authorUid: str(x.authorUid),
     views: int(x.views),
     likes: int(x.likes),
@@ -93,7 +94,7 @@ export function normalizeComment(id: string, x: Raw = {}): Comment {
   return {
     id,
     body: str(x.body).trim(),
-    author: str(x.author) || '익명',
+    author: displayAuthor(str(x.author)),
     authorUid: str(x.authorUid),
     parentId: x.parentId ? str(x.parentId) : null,
     createdAt: tsToMs(x.createdAt ?? x.updatedAt),
@@ -243,7 +244,7 @@ export async function createPost(params: {
     title: params.title.trim(),
     body: params.body.trim(),
     content: params.body.trim(),
-    author: params.author || '익명',
+    author: params.author || ANON_LABEL,
     authorUid: params.uid,
     views: 0,
     likes: 0,
@@ -288,7 +289,7 @@ export async function createComment(params: {
 }): Promise<void> {
   await addDoc(collection(db, COLLECTIONS.boardPosts, params.postId, 'comments'), {
     body: params.body.trim(),
-    author: params.author || '익명',
+    author: params.author || ANON_LABEL,
     authorUid: params.uid,
     parentId: null,
     // 댓글 구독은 orderBy('createdAt','asc') — number 로 쓰면

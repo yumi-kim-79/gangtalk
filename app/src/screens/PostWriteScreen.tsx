@@ -12,6 +12,7 @@ import { createPost } from '@/services/board';
 import type { CommunityStackParamList } from '@/navigation/types';
 import { fontSize, radius, spacing, useTheme, type ThemeColors } from '@/theme';
 import type { BoardCategory } from '@/types/post';
+import { ANON_LABEL } from '@/constants/author';
 
 /** '전체'는 글의 카테고리가 될 수 없어 제외 */
 const WRITE_TABS = BOARD_TABS.filter(t => t.key !== 'all') as {
@@ -58,7 +59,7 @@ export default function PostWriteScreen() {
     try {
       const postId = await createPost({
         uid,
-        author: profile?.nickname || '익명',
+        author: profile?.nickname || ANON_LABEL,
         category,
         title,
         body,

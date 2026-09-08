@@ -5,6 +5,8 @@ export interface StoreCategory {
   label: string;
   /** 하퍼/쩜오 등 유형 뱃지 (웹과 동일) */
   badge?: string;
+  /** false = 칩으로는 안 보이지만 라벨은 남긴다 (웹 constants/categories.js 와 동일) */
+  chip?: boolean;
 }
 
 /**
@@ -19,11 +21,16 @@ export const STORE_CATEGORIES: StoreCategory[] = [
   { key: 'tenpro', label: '텐프로', badge: 'TP' },
   { key: 'onep', label: '1%', badge: '1%' },
   { key: 'nrb', label: '노래방' },
-  { key: 'kara', label: '가라오케' },
   { key: 'bar', label: '바' },
   { key: 'lounge', label: '라운지' },
   { key: 'etc', label: '기타' },
+  // 칩에서는 뺐지만 기존 데이터의 라벨은 살려 둔다.
+  // (라벨까지 지우면 kara 로 등록된 업체 카드의 업종이 빈칸이 된다)
+  { key: 'kara', label: '가라오케', chip: false },
 ];
+
+/** 칩으로 노출할 카테고리 — 웹 CATEGORY_CHIPS 와 같은 목록 */
+export const CATEGORY_CHIPS = STORE_CATEGORIES.filter(c => c.chip !== false);
 
 /** 현황판 카드 상한 — 웹 MainPage.vue:91 의 slice(0, 20) 과 같은 값 */
 export const HOME_STORE_LIMIT = 20;

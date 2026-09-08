@@ -23,6 +23,7 @@ import {
 import { db } from '@/services/firebase';
 import { tsToMs } from '@/services/board';
 import type { ChatMessage, ChatRoom } from '@/types/chat';
+import { ANON_LABEL, displayAuthor } from '@/constants/author';
 
 export const CHAT_COLLECTION = 'rooms';
 
@@ -47,7 +48,7 @@ function normalizeMessage(id: string, x: Raw, myUid: string): ChatMessage {
   return {
     id,
     text: str(x.text).trim(),
-    author: str(x.author) || '익명',
+    author: displayAuthor(str(x.author)),
     authorUid,
     createdAt: tsToMs(x.createdAt ?? x.updatedAt),
     mine: !!myUid && authorUid === myUid,
@@ -99,7 +100,7 @@ export async function sendMessage(params: {
   if (!text) return;
   await addDoc(collection(db, CHAT_COLLECTION, params.roomId, 'messages'), {
     text,
-    author: params.author || '익명',
+    author: params.author || ANON_LABEL,
     authorUid: params.uid,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),

@@ -22,6 +22,7 @@ import { fullDate } from '@/services/board';
 import type { CommunityStackParamList } from '@/navigation/types';
 import { fontSize, radius, spacing, useTheme, type ThemeColors } from '@/theme';
 import type { Comment, Post } from '@/types/post';
+import { ANON_LABEL } from '@/constants/author';
 
 export default function PostDetailScreen() {
   const c = useTheme();
@@ -70,7 +71,7 @@ export default function PostDetailScreen() {
       await createComment({
         postId,
         uid: myUid,
-        author: profile?.nickname || '익명',
+        author: profile?.nickname || ANON_LABEL,
         body: commentText,
       });
       setCommentText('');

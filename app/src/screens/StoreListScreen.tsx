@@ -22,7 +22,7 @@ import StoreGridItem from '@/components/store/StoreGridItem';
 import StoreListItem from '@/components/store/StoreListItem';
 import StoreTopCard from '@/components/store/StoreTopCard';
 import {
-  STORE_CATEGORIES,
+  CATEGORY_CHIPS,
   REGIONS,
   REGION_LABEL,
   SORT_OPTIONS,
@@ -181,7 +181,7 @@ export default function StoreListScreen() {
       <AppHeader searchValue={keyword} onChangeSearch={setKeyword} />
 
       <ChipTabs
-        items={STORE_CATEGORIES}
+        items={CATEGORY_CHIPS}
         value={category}
         onChange={setCategory}
         fadeColor={c.bg}

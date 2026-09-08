@@ -11,6 +11,7 @@ import {
   type ChotokMessage,
 } from '@/services/chotok';
 import { useAuth } from '@/hooks/useAuth';
+import { ANON_LABEL } from '@/constants/author';
 
 /**
  * 업체 초톡방 메시지.
@@ -61,7 +62,7 @@ export function useChotok(storeId: string) {
     const key = `${storeId}:${uid}`;
     if (autoJoined.current === key) return;
     autoJoined.current = key;
-    joinChotok({ storeId, uid, name: profile?.nickname || '익명' }).catch(() => {
+    joinChotok({ storeId, uid, name: profile?.nickname || ANON_LABEL }).catch(() => {
       // 실패하면 다음 진입 때 다시 시도할 수 있게 표시를 되돌린다
       autoJoined.current = '';
     });
@@ -73,7 +74,7 @@ export function useChotok(storeId: string) {
       await sendChotokMessage({
         storeId,
         uid,
-        author: profile?.nickname || '익명',
+        author: profile?.nickname || ANON_LABEL,
         text,
       });
     },
