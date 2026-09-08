@@ -49,13 +49,29 @@
         <code>config/marketing.partnerOrder</code> 에 반영되어 사용자 제휴관 화면 순서가 즉시 바뀝니다.
       </p>
 
+      <input
+        ref="partnerImgInputEl"
+        type="file"
+        accept="image/*"
+        style="display:none"
+        @change="onPickPartnerImage"
+      />
+
       <p v-if="loading" class="adm-empty">불러오는 중…</p>
       <p v-else-if="!orderedList.length" class="adm-empty">등록된 제휴업체가 없습니다.</p>
 
       <ul v-else ref="partnerListRef" class="adm-partner-list">
         <li v-for="p in orderedList" :key="p.id" class="adm-partner-row">
           <span class="adm-drag-handle" title="드래그하여 순서 변경" aria-label="순서 변경">☰</span>
-          <div class="adm-partner-thumb" :style="bgStyle(p.thumb)" />
+          <div class="adm-partner-thumb-wrap">
+            <div class="adm-partner-thumb" :style="bgStyle(p.thumb)" />
+            <button
+              class="adm-btn small"
+              type="button"
+              :disabled="!!imgBusy[p.id]"
+              @click="pickPartnerImage(p)"
+            >{{ imgBusy[p.id] ? '올리는 중…' : (p.thumb ? '사진 교체' : '사진 넣기') }}</button>
+          </div>
           <div class="adm-partner-meta">
             <strong class="adm-partner-name">
               {{ p.name || '(이름 없음)' }}
@@ -267,6 +283,7 @@ import {
   ref as sRef, uploadBytes, getDownloadURL, listAll, deleteObject,
 } from 'firebase/storage'
 import Sortable from 'sortablejs'
+import { checkImageFile, thumbPatch, uploadPartnerThumb } from '@/lib/storeImage'
 import {
   PARTNER_CATEGORIES,
   PARTNER_CATEGORY_KEYS,
@@ -442,6 +459,39 @@ function reorderPartner(fromIdx, toIdx) {
   partnerOrderLocal.value = [...displayIds, ...tail]
 }
 
+/* ───────── 대표 이미지 교체 =====
+ * 제휴업체 사진도 관리자가 바꿀 수 있어야 한다. 경로는 storage.rules 의
+ * marketing/** (관리자만 쓰기) 아래를 쓴다. */
+const partnerImgInputEl = ref(null)
+const imgTargetId = ref('')
+const imgBusy = ref({})
+
+function pickPartnerImage(p) {
+  imgTargetId.value = String(p.id)
+  partnerImgInputEl.value?.click()
+}
+
+async function onPickPartnerImage(e) {
+  const f = e.target.files?.[0]
+  const id = imgTargetId.value
+  if (!f || !id) return
+  const msg = checkImageFile(f)
+  if (msg) { alert(msg); return }
+  imgBusy.value = { ...imgBusy.value, [id]: true }
+  try {
+    const url = await uploadPartnerThumb(id, f)
+    await updateDoc(doc(fbDb, 'partners', id), { ...thumbPatch(url), updatedAt: serverTimestamp() })
+  } catch (err) {
+    console.error('[partnerImage] 실패', err)
+    alert('사진 저장 실패: ' + (err?.message || err))
+  } finally {
+    const next = { ...imgBusy.value }; delete next[id]
+    imgBusy.value = next
+    imgTargetId.value = ''
+    if (partnerImgInputEl.value) partnerImgInputEl.value.value = ''
+  }
+}
+
 /* SortableJS — PC/모바일 공용 */
 const partnerListRef = ref(null)
 let sortableInst = null
@@ -471,13 +521,23 @@ onBeforeUnmount(() => { if (sortableInst) try { sortableInst.destroy() } catch {
 
 async function savePartnerOrder() {
   if (savingOrder.value) return
-  if (!orderDirty.value) return
+  /* 2026-09-08: 예전에는 여기서 조용히 return 했다. 드래그가 인식되지 않으면
+   * 버튼이 계속 '순서 저장됨' 인 채라 눌러도 아무 일이 없었고, 사용자에게는
+   * "순서를 바꿨는데 반영이 안 된다" 로 보였다. 이유를 말해 준다. */
+  if (!orderDirty.value) {
+    alert('바뀐 순서가 없습니다.\n\n행 왼쪽의 ☰ 를 잡고 위아래로 끌어야 순서가 바뀝니다.')
+    return
+  }
   savingOrder.value = true
   try {
     await setDoc(
       doc(fbDb, 'config', 'marketing'),
       {
-        [PARTNER_ORDER_FIELD]: partnerOrderLocal.value.map(String),
+        /* 실제로 존재하는 제휴업체만 남긴다. 삭제된 업체 id 가 배열에 남아 있으면
+         * 화면과 저장값 개수가 어긋나 "저장했는데 그대로" 로 보인다. */
+        [PARTNER_ORDER_FIELD]: partnerOrderLocal.value
+          .map(String)
+          .filter(id => list.value.some(p => String(p.id) === id)),
         partnerOrderSavedAt: serverTimestamp(),
       },
       { merge: true },
@@ -1290,4 +1350,8 @@ async function deletePartner(p) {
 :root[data-theme="black"] .adm-btn.is-on{
   background:#2a1a22; border-color:#3a1d2a; color:#ff86b9;
 }
+</style>
+
+<style scoped>
+.adm-partner-thumb-wrap{ display:flex; flex-direction:column; gap:4px; align-items:center; flex:none; }
 </style>

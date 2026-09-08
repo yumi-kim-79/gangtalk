@@ -1299,6 +1299,24 @@ const exposedHere = (s)=> {
 /* ───────────────────────── 실시간 순위(계산/티커) ───────────────────────── */
 const hotRanks10 = computed(() => {
   const base = baseFiltered()
+
+  /* 관리자가 /admin/top5 → '실시간 순위' 에서 지정한 순서가 있으면 그대로 쓴다.
+   * 예전에는 찜 수 자동 계산뿐이라 운영이 손댈 수 없었다. */
+  if (adminHotRanks.value.length) {
+    const byId = new Map(storeIndex.value)
+    const picked = adminHotRanks.value
+      .map(id => byId.get(String(id)))
+      .filter(Boolean)
+      .slice(0, 10)
+    if (picked.length) {
+      return picked.map(s => ({
+        id: s.id,
+        name: s.name,
+        intro: s.adTitle || s.desc || s.description || '',
+      }))
+    }
+  }
+
   const byLikes = (s) => likesOf(s)
   let arr = base.slice().sort((a,b)=> byLikes(b) - byLikes(a))
   if (!arr.length) {
@@ -1515,6 +1533,7 @@ function onDrop(){} function onDragEnd(){ drag.value = { cat:'', index:-1, id:''
 
 /* ───────────────────────── 하단 목록 순서 편집 ───────────────────────── */
 const listOrders = ref({})
+const adminHotRanks = ref([])
 
 /* ───────────────────────── config/marketing 실시간 구독 ─────────────────────────
  * 관리자가 /admin/top5 에서 저장한 topRanks 와 listOrders 를 사용자 페이지에 반영.
@@ -1534,6 +1553,8 @@ onMounted(() => {
       if (data.listOrders && typeof data.listOrders === 'object') {
         listOrders.value = { ...data.listOrders }
       }
+      // 관리자가 지정한 실시간 순위 (비어 있으면 찜 수 기준 자동)
+      adminHotRanks.value = Array.isArray(data.hotRanks) ? data.hotRanks.map(String) : []
     },
     () => { /* 권한/네트워크 에러 무시 — 자동 폴백 */ },
   )

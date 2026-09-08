@@ -247,8 +247,26 @@
           />
         </label>
 
+        <label class="biz-field">
+          <span>대표 이미지</span>
+          <input
+            ref="thumbInputEl"
+            type="file"
+            accept="image/*"
+            :disabled="submitting"
+            @change="onPickThumb"
+          />
+        </label>
+        <div v-if="thumbPreview" class="biz-thumb-row">
+          <img :src="thumbPreview" class="biz-thumb-preview" alt="대표 이미지 미리보기" />
+          <button class="biz-thumb-clear" type="button" :disabled="submitting" @click="clearThumb">
+            제거
+          </button>
+        </div>
+        <p v-if="thumbError" class="biz-error-inline">{{ thumbError }}</p>
         <p class="biz-notice">
-          💡 대표 이미지는 가입 + 관리자 승인 후 <strong>업체 정보 수정 화면</strong>에서 업로드할 수 있습니다.
+          💡 대표 이미지는 목록·현황판·가게찾기에 함께 쓰입니다. 지금 넣지 않아도
+          가입 후 <strong>업체 정보 수정 화면</strong>에서 언제든 바꿀 수 있습니다.
         </p>
 
         <!-- ===== 제출 ===== -->
@@ -303,11 +321,12 @@
 import { ref, reactive, computed } from 'vue'
 import { getAuth } from 'firebase/auth'
 import {
-  collection, doc, setDoc, serverTimestamp,
+  collection, doc, setDoc, updateDoc, serverTimestamp,
 } from 'firebase/firestore'
 import { getFunctions, httpsCallable } from 'firebase/functions'
 import { db as fbDb } from '@/firebase'
 import { me } from '@/store/user'
+import { checkImageFile, thumbPatch, uploadStoreThumb } from '@/lib/storeImage'
 import { smsVerifyFailMessage } from '@/lib/smsMessages.js'
 
 // 회원 빌드(gangtox.com) 에서 가입 후 안내할 admin 도메인 로그인 URL.
@@ -351,6 +370,29 @@ const form = reactive({
   wage: 0,
   wageType: 'hourly',
 })
+
+/* 대표 이미지 — 파일은 들고만 있다가 stores 문서가 만들어진 뒤 올린다.
+ * storage.rules 의 stores/{id} 쓰기는 그 문서의 ownerId 가 본인일 때만 통과하므로
+ * 문서보다 먼저 올릴 수 없다. */
+const thumbInputEl = ref(null)
+const thumbFile = ref(null)
+const thumbPreview = ref('')
+const thumbError = ref('')
+
+function onPickThumb(e) {
+  const f = e.target.files?.[0]
+  thumbError.value = ''
+  if (!f) { clearThumb(); return }
+  const msg = checkImageFile(f)
+  if (msg) { thumbError.value = msg; clearThumb(); return }
+  thumbFile.value = f
+  try { thumbPreview.value = URL.createObjectURL(f) } catch { thumbPreview.value = '' }
+}
+function clearThumb() {
+  thumbFile.value = null
+  thumbPreview.value = ''
+  if (thumbInputEl.value) thumbInputEl.value.value = ''
+}
 
 const wageDisplay = computed(() => {
   const n = Number(form.wage || 0)
@@ -530,12 +572,26 @@ async function runCreateStore(uid, email) {
       //   진단: docs/audit/2026-07-02-현황판-가게찾기-노출구조-진단.md
       //   가게찾기(gangtalk) 는 승인 시 관리자가 true 로. 자가가입 시점은 false.
       //   현황판(dashboard) 는 승인 후에도 자동 안 켬 — 관리자가 Tab 1 에서 별도 지정.
-      'exposure.gangtalk': false,
-      'exposure.dashboard': false,
+      // 2026-09-08: setDoc 은 점(.) 표기를 '경로' 가 아니라 **필드 이름 그대로** 저장한다.
+      //   (updateDoc 만 경로로 해석한다) 그래서 지금까지 exposure 가 아예 안 만들어졌고,
+      //   노출 판정이 undefined → '기본 노출' 로 떨어져 승인 전 업소가 가게찾기에 보였다.
+      exposure: { gangtalk: false, dashboard: false },
       thumbVer:   Date.now(),
       createdAt:  serverTimestamp(),
       updatedAt:  serverTimestamp(),
     })
+
+    // 대표 이미지는 문서가 생긴 뒤에 올린다 (rules 가 ownerId 를 본다).
+    // 실패해도 가입 자체는 성공으로 둔다 — 나중에 업체 정보 수정에서 다시 올리면 된다.
+    if (thumbFile.value) {
+      try {
+        const url = await uploadStoreThumb(newId, thumbFile.value)
+        await updateDoc(doc(fbDb, 'stores', newId), thumbPatch(url))
+      } catch (imgErr) {
+        console.warn('[bizSignup] 대표 이미지 업로드 실패', imgErr)
+        thumbError.value = '가입은 완료됐지만 대표 이미지 업로드에 실패했습니다. 업체 정보 수정 화면에서 다시 올려 주세요.'
+      }
+    }
 
     submitting.value = false
     retryStoreCreate.value = null
@@ -753,4 +809,18 @@ async function onRetryStoreCreate() {
 :root[data-theme="black"] .biz-success-panel{ background:#2a1620; border-color:#3a2030; }
 :root[data-theme="dark"] .biz-success-panel p,
 :root[data-theme="black"] .biz-success-panel p{ color:#ccc; }
+</style>
+
+<style scoped>
+.biz-thumb-row{ display:flex; align-items:center; gap:10px; margin:-4px 0 8px; }
+.biz-thumb-preview{
+  width:96px; height:64px; object-fit:cover;
+  border-radius:10px; border:1px solid #eee;
+}
+.biz-thumb-clear{
+  height:30px; padding:0 12px; border-radius:8px;
+  border:1px solid #eee; background:#fafafa; color:#555;
+  font-size:12px; font-weight:700; cursor:pointer;
+}
+.biz-error-inline{ margin:-4px 0 8px; font-size:12px; color:#d33; }
 </style>

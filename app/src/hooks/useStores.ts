@@ -82,5 +82,14 @@ export function useStores(filter: StoreFilter) {
     setEpoch(e => e + 1);
   }, []);
 
-  return { stores, topSections, total: merged.length, loading, error, reload };
+  return {
+    stores,
+    topSections,
+    total: merged.length,
+    /** 관리자가 지정한 실시간 순위 (없으면 빈 배열 → 찜 수 자동) */
+    hotRankIds: marketing.hotRanks,
+    loading,
+    error,
+    reload,
+  };
 }

@@ -42,6 +42,13 @@
             style="display:none"
             @change="onPickFile"
           />
+          <input
+            ref="replaceInputEl"
+            type="file"
+            accept="image/*"
+            style="display:none"
+            @change="onPickReplace"
+          />
           <button class="adm-btn" type="button" :disabled="uploading" @click="fileInputEl?.click()">
             {{ uploading ? '업로드 중…' : '+ 이미지 업로드' }}
           </button>
@@ -50,7 +57,11 @@
           </button>
         </div>
       </header>
-      <p class="adm-hint">이미지 업로드 → 항목이 추가됩니다. 제목/설명/링크 수정 후 저장하세요. 드래그(☰)로 순서 변경.</p>
+      <p class="adm-hint">
+        '이미지 업로드' 는 새 배너를 추가합니다. 이미 있는 배너의 사진은 행의
+        '이미지 교체' 로 바꾸세요. 드래그(☰) 순서가 그대로 노출 순서입니다.
+        <strong>무엇을 바꾸든 '저장' 을 눌러야 반영됩니다.</strong>
+      </p>
 
       <ul ref="bannerListRef" class="adm-banner-list" v-if="currentList.length">
         <li
@@ -59,8 +70,16 @@
           class="adm-banner-row"
         >
           <span class="adm-drag-handle" title="드래그">☰</span>
-          <img v-if="b.img" :src="b.img" class="adm-banner-thumb" alt="" />
-          <div v-else class="adm-banner-thumb noimg">이미지 없음</div>
+          <div class="adm-banner-thumb-wrap">
+            <img v-if="b.img" :src="b.img" class="adm-banner-thumb" alt="" />
+            <div v-else class="adm-banner-thumb noimg">이미지 없음</div>
+            <button
+              class="adm-btn ghost small adm-banner-replace"
+              type="button"
+              :disabled="uploading"
+              @click="pickReplace(i)"
+            >{{ b.img ? '이미지 교체' : '이미지 넣기' }}</button>
+          </div>
 
           <div class="adm-banner-fields">
             <label>
@@ -149,20 +168,24 @@ onBeforeUnmount(() => {
 const currentList = computed(() => banners.value[group.value])
 
 /* === 업로드 === */
+async function uploadOne(f){
+  const ext = (f.name.split('.').pop() || 'jpg').toLowerCase()
+  const base = group.value === 'F' ? 'marketing/adBannersFinder' : 'marketing/adBannersP'
+  const path = `${base}/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`
+  const rf = sRef(fbStorage, path)
+  await uploadBytes(rf, f, {
+    contentType: f.type || 'image/jpeg',
+    cacheControl: 'public, max-age=86400',
+  })
+  return await getDownloadURL(rf)
+}
+
 async function onPickFile(e){
   const f = e.target.files?.[0]
   if (!f) return
   uploading.value = true
   try {
-    const ext = (f.name.split('.').pop() || 'jpg').toLowerCase()
-    const base = group.value === 'F' ? 'marketing/adBannersFinder' : 'marketing/adBannersP'
-    const path = `${base}/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`
-    const rf = sRef(fbStorage, path)
-    await uploadBytes(rf, f, {
-      contentType: f.type || 'image/jpeg',
-      cacheControl: 'public, max-age=86400',
-    })
-    const url = await getDownloadURL(rf)
+    const url = await uploadOne(f)
     // 새 배너 항목 추가
     const newBanner = {
       id: `ad_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
@@ -183,6 +206,36 @@ async function onPickFile(e){
   } finally {
     uploading.value = false
     if (fileInputEl.value) fileInputEl.value.value = ''
+  }
+}
+
+/* === 기존 배너 이미지 교체 ===
+ * 예전에는 '이미지 업로드' 가 새 항목을 만들 뿐이라, 이미 등록된 배너의 사진을
+ * 바꾸려면 지우고 다시 만들어야 했다 (제목·링크·순서까지 날아간다). */
+const replaceInputEl = ref(null)
+const replaceIdx = ref(-1)
+function pickReplace(i){
+  replaceIdx.value = i
+  replaceInputEl.value?.click()
+}
+async function onPickReplace(e){
+  const f = e.target.files?.[0]
+  const i = replaceIdx.value
+  if (!f || i < 0) return
+  uploading.value = true
+  try {
+    const url = await uploadOne(f)
+    const arr = banners.value[group.value].slice()
+    if (!arr[i]) return
+    arr[i] = { ...arr[i], img: url, images: [url], _imgIndex: 0 }
+    banners.value[group.value] = arr
+  } catch (err) {
+    console.error(err)
+    alert('이미지 교체 실패: ' + (err?.message || err))
+  } finally {
+    uploading.value = false
+    replaceIdx.value = -1
+    if (replaceInputEl.value) replaceInputEl.value.value = ''
   }
 }
 
@@ -391,4 +444,9 @@ async function saveBanners(){
 :root[data-theme="black"] .adm-banner-row{ border-bottom-color:#2a2a2a; }
 :root[data-theme="dark"] .adm-banner-fields input,
 :root[data-theme="black"] .adm-banner-fields input{ background:#222; border-color:#2a2a2a; color:#eee; }
+</style>
+
+<style scoped>
+.adm-banner-thumb-wrap{ display:flex; flex-direction:column; gap:6px; align-items:center; }
+.adm-banner-replace{ white-space:nowrap; }
 </style>

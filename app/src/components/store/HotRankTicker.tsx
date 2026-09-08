@@ -20,28 +20,43 @@ export interface HotRank {
   intro: string;
 }
 
-/** 웹 hotRanks10 과 같은 계산 */
-export function hotRanks10(stores: Store[]): HotRank[] {
+const toRank = (s: Store): HotRank => ({
+  id: s.id,
+  name: String(s.name ?? ''),
+  intro: String(s.adTitle ?? s.desc ?? s.description ?? ''),
+});
+
+/** 웹 hotRanks10 과 같은 계산 (관리자 지정 → 찜 수 → 티시) */
+export function hotRanks10(stores: Store[], adminIds: string[] = []): HotRank[] {
+  if (adminIds.length) {
+    const byId = new Map(stores.map(s => [s.id, s]));
+    const picked = adminIds
+      .map(id => byId.get(String(id)))
+      .filter((s): s is Store => !!s)
+      .slice(0, 10);
+    if (picked.length) return picked.map(toRank);
+  }
   let arr = stores.slice().sort((a, b) => likesOf(b) - likesOf(a));
   // 찜이 전부 0이면 순서가 의미 없어 티시 기준으로 바꾼다 (웹과 동일)
   if (!arr.some(s => likesOf(s) > 0)) {
     arr = stores.slice().sort((a, b) => tcOf(b) - tcOf(a));
   }
-  return arr.slice(0, 10).map(s => ({
-    id: s.id,
-    name: String(s.name ?? ''),
-    intro: String(s.adTitle ?? s.desc ?? s.description ?? ''),
-  }));
+  return arr.slice(0, 10).map(toRank);
 }
 
-type Props = { stores: Store[]; onOpenStore: (storeId: string) => void };
+type Props = {
+  stores: Store[];
+  /** 관리자 지정 순서 (config/marketing.hotRanks) */
+  adminIds?: string[];
+  onOpenStore: (storeId: string) => void;
+};
 
-export default function HotRankTicker({ stores, onOpenStore }: Props) {
+export default function HotRankTicker({ stores, adminIds = [], onOpenStore }: Props) {
   const c = useTheme();
   const s = styles(c);
   const insets = useSafeAreaInsets();
 
-  const ranks = useMemo(() => hotRanks10(stores), [stores]);
+  const ranks = useMemo(() => hotRanks10(stores, adminIds), [stores, adminIds]);
   const [open, setOpen] = useState(false);
   const y = useRef(new Animated.Value(0)).current;
   const idx = useRef(0);

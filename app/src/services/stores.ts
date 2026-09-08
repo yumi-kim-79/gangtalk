@@ -366,9 +366,14 @@ export function mergeRoomsBiz(
       rb.totalRemaining ?? (totalNeeded && totalCurrent ? totalNeeded - totalCurrent : 0),
     );
 
-    s.match = totalRooms;
-    s.persons = totalRemaining;
-    s.totalRooms = totalRooms;
+    /* 2026-09-08: 맞출방을 totalRooms(전체방) 로 읽고 있었다. 웹은 needRooms 를 본다.
+     * 같은 문서를 두 화면이 다르게 계산해, 레이블 기준으로 웹 0 / 앱 27 이 됐다.
+     * 현황판 쪽(services/dashboard.applyRoomsBiz)과 같은 필드를 쓴다. */
+    const needRooms = num(rb.needRooms ?? rb.totalCurrent ?? 0);
+    const needPeople = num(rb.needPeople ?? totalNeeded);
+    s.match = needRooms || num(raw.match ?? 0);
+    s.persons = needPeople || num(raw.persons ?? 0);
+    s.totalRooms = totalRooms || num(raw.totalRooms ?? 0);
     s.totalNeeded = totalNeeded;
     s.totalRemaining = totalRemaining;
     s.roomsBizId = rb.roomBizId ?? rb.storeId ?? rb.id ?? null;
@@ -508,11 +513,17 @@ export async function resolveThumb(raw: string): Promise<string> {
 export interface StoreMarketing {
   /** 카테고리별 Top5 순서 — 관리자 Top5ManagePage */
   topRanks: Record<string, string[]>;
-  /** 카테고리별 하단 목록 순서 — StoreFinder 편집모드 저장분 */
+  /** 카테고리별 하단 목록 순서 — 관리자 Top5ManagePage '목록 순서' */
   listOrders: Record<string, string[]>;
+  /** 실시간 순위 지정 — 비어 있으면 찜 수 기준 자동 계산 */
+  hotRanks: string[];
 }
 
-export const EMPTY_STORE_MARKETING: StoreMarketing = { topRanks: {}, listOrders: {} };
+export const EMPTY_STORE_MARKETING: StoreMarketing = {
+  topRanks: {},
+  listOrders: {},
+  hotRanks: [],
+};
 
 function readIdMap(raw: unknown): Record<string, string[]> {
   const out: Record<string, string[]> = {};
@@ -535,6 +546,7 @@ export function subscribeStoreMarketing(onData: (cfg: StoreMarketing) => void) {
       onData({
         topRanks: readIdMap(data.topRanks),
         listOrders: readIdMap(data.listOrders),
+        hotRanks: Array.isArray(data.hotRanks) ? data.hotRanks.map(String) : [],
       });
     },
     () => onData(EMPTY_STORE_MARKETING),

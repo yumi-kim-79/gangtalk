@@ -114,7 +114,7 @@ onBeforeUnmount(() => { if (unsubAuth) try { unsubAuth() } catch {} })
 const platformMenus = [
   { to: '/admin/dashboard',     emoji: '📊', label: '대시보드' },
   { to: '/admin/stores',        emoji: '🏢', label: '현황판 업소 관리' },
-  { to: '/admin/top5',          emoji: '🏆', label: '가게찾기 Top5' },
+  { to: '/admin/top5',          emoji: '🏆', label: '가게찾기 노출 관리' },
   { to: '/admin/banners',       emoji: '📢', label: '배너 관리' },
   { to: '/admin/partners',      emoji: '🤝', label: '제휴업체 관리' },
   { to: '/admin/partner-top5',  emoji: '🏆', label: '제휴관 Top5' },

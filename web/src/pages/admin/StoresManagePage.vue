@@ -12,6 +12,14 @@
     </header>
 
     <!-- 탭 -->
+    <p class="adm-flow">
+      <strong>업체 등록 흐름</strong>
+      ① 업체가 직접 회원가입 (자동으로 '승인 대기')
+      → ② 여기 <em>승인 대기</em> 탭에서 승인 (승인만으로는 노출되지 않습니다)
+      → ③ <em>노출 업소 관리</em> 탭에서 가게찾기 / 현황판 켜기
+      → ④ Top5·목록 순서·실시간 순위는 <em>가게찾기 노출 관리</em> 화면에서 지정
+    </p>
+
     <nav class="adm-tabs" role="tablist">
       <button
         v-for="t in tabs"
@@ -55,9 +63,20 @@
           <div class="adm-store-top">
             <span class="adm-drag-handle" title="드래그로 이동">☰</span>
             <span class="adm-rank">{{ i + 1 }}</span>
+            <!-- 대표 이미지 — 현황판·가게찾기·Top5 카드가 모두 이 사진을 쓴다 -->
+            <div class="adm-store-thumb-wrap">
+              <img v-if="thumbOf(s)" :src="thumbOf(s)" class="adm-store-thumb" alt="" />
+              <div v-else class="adm-store-thumb noimg">사진<br />없음</div>
+              <button
+                type="button"
+                class="adm-btn sm"
+                :disabled="!!imgBusy[s.id]"
+                @click="pickStoreImage(s)"
+              >{{ imgBusy[s.id] ? '올리는 중…' : (thumbOf(s) ? '사진 교체' : '사진 넣기') }}</button>
+            </div>
             <div class="adm-store-meta">
               <strong>{{ s.name || '(이름 없음)' }}</strong>
-              <span class="adm-store-sub">{{ s.region || '-' }} · {{ s.category || '-' }}</span>
+              <span class="adm-store-sub">{{ s.region || '-' }} · {{ categoryLabel(s.category) }}</span>
             </div>
             <!-- PR 1 (2026-07-02): 노출 필드 분리 진단 (docs/audit/2026-07-02-현황판-가게찾기-노출구조-진단.md)
                  - 가게찾기 노출 = exposure.gangtalk (기존, 승인 시 자동 ON)
@@ -104,6 +123,14 @@
       </ul>
       <p v-else class="adm-empty">승인된 업소가 없습니다.</p>
     </section>
+
+    <input
+      ref="storeImgInputEl"
+      type="file"
+      accept="image/*"
+      style="display:none"
+      @change="onPickStoreImage"
+    />
 
     <!-- ===== 탭 2: 수동 지표 업데이트 ===== -->
     <section v-show="tab === 'metrics'" class="adm-section">
@@ -383,6 +410,8 @@ import {
   writeBatch, query, limit, serverTimestamp,
 } from 'firebase/firestore'
 import { getFunctions, httpsCallable } from 'firebase/functions'
+import { checkImageFile, thumbPatch, uploadStoreThumb } from '@/lib/storeImage'
+import { categoryLabel } from '@/constants/categories'
 
 const route = useRoute()
 const tab = ref(['expose','metrics','pending'].includes(route.query.tab) ? route.query.tab : 'expose')
@@ -731,6 +760,44 @@ function statusBadgeClass(label){
   return ''
 }
 
+/* ───────── 대표 이미지 교체 =====
+ * 지금까지 관리자에는 업체 사진을 바꾸는 곳이 없었다. 업체가 직접 올리기 전에는
+ * 현황판·가게찾기·Top5 카드가 전부 빈 썸네일이었다.
+ * 목록이 thumb → images[0] → img 순으로 읽으므로 세 필드를 함께 맞춘다. */
+const storeImgInputEl = ref(null)
+const imgTargetId = ref('')
+const imgBusy = ref({})
+
+function thumbOf(s) {
+  return String(s?.thumb || (Array.isArray(s?.images) ? s.images[0] : '') || s?.img || s?.cover || '')
+}
+
+function pickStoreImage(s) {
+  imgTargetId.value = String(s.id)
+  storeImgInputEl.value?.click()
+}
+
+async function onPickStoreImage(e) {
+  const f = e.target.files?.[0]
+  const id = imgTargetId.value
+  if (!f || !id) return
+  const msg = checkImageFile(f)
+  if (msg) { alert(msg); return }
+  imgBusy.value = { ...imgBusy.value, [id]: true }
+  try {
+    const url = await uploadStoreThumb(id, f)
+    await updateDoc(doc(fbDb, 'stores', id), { ...thumbPatch(url), updatedAt: serverTimestamp() })
+  } catch (err) {
+    console.error('[storeImage] 실패', err)
+    alert('사진 저장 실패: ' + (err?.message || err))
+  } finally {
+    const next = { ...imgBusy.value }; delete next[id]
+    imgBusy.value = next
+    imgTargetId.value = ''
+    if (storeImgInputEl.value) storeImgInputEl.value.value = ''
+  }
+}
+
 async function saveAllMetrics(){
   if (savingMetrics.value) return
 
@@ -863,16 +930,20 @@ async function saveAllMetrics(){
 
 /* ===== 탭 3: 승인/거절 ===== */
 async function approveStore(s){
-  if (!confirm(`'${s.name || s.id}' 을(를) 승인하시겠습니까?\n\n승인 시 가게찾기에 자동 노출됩니다.\n현황판 노출은 Tab 1 에서 별도 지정해야 합니다.`)) return
+  if (!confirm(
+    `'${s.name || s.id}' 을(를) 승인하시겠습니까?\n\n` +
+    `승인만으로는 어디에도 노출되지 않습니다.\n` +
+    `승인 후 '노출 업소 관리' 탭에서 가게찾기 / 현황판을 켜고,\n` +
+    `Top5 는 '가게찾기 노출 관리' 화면에서 지정하세요.`
+  )) return
   try {
-    /* PR 3 (2026-07-02): 노출 필드 분리 완결.
-     * 진단: docs/audit/2026-07-02-현황판-가게찾기-노출구조-진단.md
-     * 승인 = 가게찾기(exposure.gangtalk) 만 자동 ON.
-     * 현황판(exposure.dashboard) 은 명시적으로 false 로 (관리자가 Tab 1 별도 지정). */
+    /* 2026-09-08: 승인 = 자격 확인까지만. 어디에 노출할지는 관리자가 따로 고른다.
+     * (이전에는 승인과 동시에 가게찾기가 켜져, 노출 여부를 고를 틈이 없었다)
+     * updateDoc 은 점(.) 표기를 경로로 해석한다 — setDoc 과 달리 여기서는 맞다. */
     await updateDoc(doc(fbDb, 'stores', s.id), {
       approved: true,
       applyStatus: 'approved',
-      [`exposure.gangtalk`]: true,
+      [`exposure.gangtalk`]: false,
       [`exposure.dashboard`]: false,
       approvedAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
@@ -1514,4 +1585,27 @@ function fmtTime(v){
 :root[data-theme="dark"] .adm-chip,
 :root[data-theme="black"] .adm-chip{ background:#222; border-color:#2a2a2a; color:#ddd; }
 /* .adm-radio-detail / .adm-result-* 다크 보정은 PR e 에서 PR #111 제거와 함께 삭제됨. */
+</style>
+
+<style scoped>
+.adm-store-thumb-wrap{ display:flex; flex-direction:column; gap:4px; align-items:center; flex:none; }
+.adm-store-thumb{
+  width:72px; height:48px; object-fit:cover;
+  border-radius:8px; border:1px solid #eee; background:#fafafa;
+}
+.adm-store-thumb.noimg{
+  display:grid; place-items:center;
+  font-size:10px; color:#bbb; line-height:1.2; text-align:center;
+}
+.adm-btn.sm{ height:24px; padding:0 8px; font-size:11px; border-radius:6px; }
+</style>
+
+<style scoped>
+.adm-flow{
+  margin:0 0 12px; padding:10px 14px;
+  background:#fff6fa; border:1px solid #ffd9e8; border-radius:10px;
+  font-size:12.5px; color:#555; line-height:1.7;
+}
+.adm-flow strong{ display:block; color:#111; margin-bottom:2px; }
+.adm-flow em{ font-style:normal; font-weight:800; color:#ff2e7e; }
 </style>

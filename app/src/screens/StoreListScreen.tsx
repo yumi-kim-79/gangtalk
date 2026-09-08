@@ -67,7 +67,7 @@ export default function StoreListScreen() {
     () => ({ category, region, sort, keyword }),
     [category, region, sort, keyword],
   );
-  const { stores, topSections, loading, error, reload } = useStores(filter);
+  const { stores, topSections, hotRankIds, loading, error, reload } = useStores(filter);
   const { banners, ready: bannersReady } = useBanners('F');
 
   /* 뷰 선택은 앱을 다시 켜도 유지된다 (웹과 동일) */
@@ -133,7 +133,7 @@ export default function StoreListScreen() {
 
   const header = (
     <>
-      <HotRankTicker stores={stores} onOpenStore={openStoreById} />
+      <HotRankTicker stores={stores} adminIds={hotRankIds} onOpenStore={openStoreById} />
       <BannerSlider banners={banners} ready={bannersReady} />
 
       {/* 카테고리별 Top 5 — 검색 중에는 표시하지 않는다 */}
