@@ -255,3 +255,40 @@ export async function joinChotok(params: {
 export async function leaveChotok(storeId: string, uid: string): Promise<void> {
   await deleteDoc(doc(db, COLLECTIONS.roomsBiz, storeId, 'participants', uid));
 }
+
+/* ───────────────────────── 작성 권한 ─────────────────────────
+ * firestore.rules 의 isStoreStaff 와 **같은 판정**을 화면에서도 한다.
+ * (규칙만 막으면 입력은 되는데 전송에서 실패해 "왜 안 되지" 가 된다)
+ *   ownerId / ownerEmail  업체 사장
+ *   staffUids             같은 업체명으로 가입해 서버(claimStoreStaff)가 붙여 준 영업사원
+ */
+export interface StoreStaff {
+  ownerId: string;
+  ownerEmail: string;
+  staffUids: string[];
+}
+
+export async function fetchStoreStaff(storeId: string): Promise<StoreStaff> {
+  try {
+    const snap = await getDoc(doc(db, COLLECTIONS.stores, storeId));
+    const d = (snap.data() ?? {}) as Record<string, unknown>;
+    return {
+      ownerId: String(d.ownerId ?? ''),
+      ownerEmail: String(d.ownerEmail ?? ''),
+      staffUids: Array.isArray(d.staffUids) ? (d.staffUids as unknown[]).map(String) : [],
+    };
+  } catch {
+    return { ownerId: '', ownerEmail: '', staffUids: [] };
+  }
+}
+
+export function isStoreStaff(
+  staff: StoreStaff | null,
+  uid: string | null | undefined,
+  email: string | null | undefined,
+): boolean {
+  if (!staff || !uid) return false;
+  if (staff.ownerId && staff.ownerId === uid) return true;
+  if (staff.ownerEmail && email && staff.ownerEmail === email) return true;
+  return staff.staffUids.includes(uid);
+}

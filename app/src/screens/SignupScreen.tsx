@@ -252,7 +252,8 @@ export default function SignupScreen() {
             keyboardType="number-pad"
             maxLength={6}
           />
-          <Button label="인증 확인" variant="outline" loading={verifying} onPress={onVerify} />
+          {/* 안 누르면 가입이 안 되는 단계라 색을 채워 눈에 띄게 둔다 (웹과 동일) */}
+          <Button label="인증 확인" loading={verifying} onPress={onVerify} />
         </>
       ) : null}
 

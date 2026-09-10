@@ -17,6 +17,7 @@ import Icon from '@/components/common/Icon';
 import PartnerCard, { PartnerRow } from '@/components/partner/PartnerCard';
 import { PARTNER_CATEGORIES, PARTNER_CATEGORY_LABEL } from '@/constants/partners';
 import { useBanners } from '@/hooks/useBanners';
+import { resolveBannerTarget } from '@/services/bannerLink';
 import { usePartners } from '@/hooks/usePartners';
 import { topByCategory } from '@/services/partners';
 import type { PartnersStackParamList } from '@/navigation/types';
@@ -38,6 +39,17 @@ export default function PartnersScreen() {
   const [keyword, setKeyword] = useState('');
   const { all, filtered, ranks, loading, error } = usePartners(category, keyword);
   const { banners, ready: bannersReady } = useBanners('P');
+
+  /* 배너 제목(업체명)/설명(담당자) 으로 제휴업체를 찾아 상세로 — 웹과 같은 규칙 */
+  const onPressBanner = useCallback(
+    (b: Parameters<typeof resolveBannerTarget>[0]) => {
+      const hit = resolveBannerTarget(b, all);
+      if (!hit) return false;
+      navigation.navigate('PartnerDetail', { partnerId: hit.id });
+      return true;
+    },
+    [all, navigation],
+  );
 
   const openPartner = useCallback(
     (p: Partner) => navigation.navigate('PartnerDetail', { partnerId: p.id }),
@@ -79,7 +91,7 @@ export default function PartnersScreen() {
             />
 
             {/* 제휴관 배너 — 웹 PartnersPage 가 쓰는 config/marketing/adBannersP 와 같은 소스 */}
-            <BannerSlider banners={banners} ready={bannersReady} />
+            <BannerSlider banners={banners} ready={bannersReady} onPressBanner={onPressBanner} />
 
             {loading ? <ActivityIndicator color={c.accent} style={s.loading} /> : null}
             {error ? <Text style={s.error}>{error}</Text> : null}

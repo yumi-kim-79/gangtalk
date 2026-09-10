@@ -30,6 +30,7 @@ import {
   type SortKey,
 } from '@/constants/stores';
 import { useBanners } from '@/hooks/useBanners';
+import { resolveBannerTarget } from '@/services/bannerLink';
 import { useStores } from '@/hooks/useStores';
 import {
   DEFAULT_CENTER_LABEL,
@@ -91,6 +92,17 @@ export default function StoreListScreen() {
     (store: Store) => navigation.navigate('StoreDetail', { storeId: store.id }),
     [navigation],
   );
+  /* 배너 제목(업체명)/설명(담당자) 으로 업체를 찾아 상세로 — 웹과 같은 규칙 */
+  const onPressBanner = useCallback(
+    (b: Parameters<typeof resolveBannerTarget>[0]) => {
+      const hit = resolveBannerTarget(b, stores);
+      if (!hit) return false;
+      navigation.navigate('StoreDetail', { storeId: hit.id });
+      return true;
+    },
+    [stores, navigation],
+  );
+
   const openStoreById = useCallback(
     (storeId: string) => navigation.navigate('StoreDetail', { storeId }),
     [navigation],
@@ -134,7 +146,7 @@ export default function StoreListScreen() {
   const header = (
     <>
       <HotRankTicker stores={stores} adminIds={hotRankIds} onOpenStore={openStoreById} />
-      <BannerSlider banners={banners} ready={bannersReady} />
+      <BannerSlider banners={banners} ready={bannersReady} onPressBanner={onPressBanner} />
 
       {/* 카테고리별 Top 5 — 검색 중에는 표시하지 않는다 */}
       {topSections.map(sec => (

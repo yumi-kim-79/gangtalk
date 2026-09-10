@@ -142,6 +142,20 @@
           </div>
         </div>
 
+        <!-- 🔹 업체 대표 연락처 — 상세 화면의 '연락처' 에 그대로 나간다 -->
+        <div class="meta-row owner-row">
+          <div class="meta-l owner-l">
+            <span class="mgr-text">연락처</span>
+            <input
+              v-model.trim="f.phone"
+              class="inline-input owner-email"
+              type="tel"
+              inputmode="tel"
+              placeholder="예: 010-0000-0000"
+            />
+          </div>
+        </div>
+
         <!-- 🔹 업체 계정 이메일 입력 -->
         <div class="meta-row owner-row">
           <div class="meta-l owner-l">

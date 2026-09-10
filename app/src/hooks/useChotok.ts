@@ -7,8 +7,11 @@ import {
   subscribeChotok,
   subscribeChotokDoc,
   subscribeParticipantCount,
+  fetchStoreStaff,
+  isStoreStaff,
   type ChotokDocMetrics,
   type ChotokMessage,
+  type StoreStaff,
 } from '@/services/chotok';
 import { useAuth } from '@/hooks/useAuth';
 import { ANON_LABEL } from '@/constants/author';
@@ -23,7 +26,19 @@ export function useChotok(storeId: string) {
   const [error, setError] = useState<string | null>(null);
   const [docMetrics, setDocMetrics] = useState<ChotokDocMetrics | null>(null);
   const [participants, setParticipants] = useState(0);
-  const { uid, profile } = useAuth();
+  const { uid, profile, user } = useAuth();
+
+  /* 작성 권한 — 그 업체 소속(사장·영업사원)만.
+   * 일반 여성회원과 다른 업체 계정은 읽기만 (2026-09-10 요청, 웹 ChatBiz 와 동일) */
+  const [staff, setStaff] = useState<StoreStaff | null>(null);
+  useEffect(() => {
+    if (!storeId) return;
+    let alive = true;
+    fetchStoreStaff(storeId)
+      .then(v => { if (alive) setStaff(v); })
+      .catch(() => { if (alive) setStaff(null); });
+    return () => { alive = false; };
+  }, [storeId]);
 
   useEffect(() => {
     if (!storeId) return;
@@ -117,6 +132,6 @@ export function useChotok(storeId: string) {
     error,
     participants,
     send,
-    canWrite: !!uid,
+    canWrite: isStoreStaff(staff, uid, user?.email ?? profile?.email ?? null),
   };
 }

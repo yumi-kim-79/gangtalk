@@ -422,6 +422,63 @@ exports.checkNicknameDuplicate = onCall(async (req) => {
 });
 
 /**
+ * 같은 업체 이름으로 가입한 사람을 그 업체에 소속시킨다 (2026-09-10).
+ *
+ * 왜 서버에서 하나:
+ *   firestore.rules 의 stores update 는 소유자/관리자만 허용한다. 새로 가입한
+ *   영업사원이 자기 uid 를 staffUids 에 직접 넣을 수 없다. 클라이언트에 그 권한을
+ *   열어 주면 아무 업체나 자기 소속으로 만들 수 있으므로, 이름 매칭 판정을
+ *   서버에서만 한다.
+ *
+ * 하는 일:
+ *   1) 이름(공백·대소문자 무시)이 같은 stores 문서를 찾는다
+ *   2) 있으면 staffUids 에 uid 추가 + users/{uid}.company.storeId 기록
+ *   3) 없으면 joined:false — 호출한 쪽이 새 업체로 등록하면 된다
+ *
+ * 같은 이름이 여러 곳이면 소속시키지 않는다 (엉뚱한 업체에 붙는 것보다 안전).
+ */
+exports.claimStoreStaff = onCall(async (req) => {
+  const uid = req.auth?.uid;
+  if (!uid) throw new HttpsError("unauthenticated", "login required");
+
+  const raw = safeStr(req.data?.storeName || "");
+  if (!raw) throw new HttpsError("invalid-argument", "storeName required");
+
+  const norm = (v) => String(v || "").replace(/\s+/g, "").toLowerCase();
+  const want = norm(raw);
+  if (!want) throw new HttpsError("invalid-argument", "storeName required");
+
+  // stores 는 수백 건 규모라 전량 훑어도 부담이 없다.
+  // (이름 정규화 비교가 필요해 where 절로는 못 거른다)
+  const snap = await db.collection("stores").limit(1000).get();
+  const hits = [];
+  snap.forEach((d) => {
+    if (norm(d.get("name")) === want) hits.push(d);
+  });
+
+  if (hits.length !== 1) {
+    return { joined: false, reason: hits.length ? "ambiguous" : "not_found" };
+  }
+
+  const storeDoc = hits[0];
+  const storeId = storeDoc.id;
+
+  await Promise.all([
+    storeDoc.ref.update({
+      staffUids: admin.firestore.FieldValue.arrayUnion(uid),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    }),
+    db.collection("users").doc(uid).set({
+      company: { storeId, storeName: storeDoc.get("name") || raw },
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true }),
+  ]);
+
+  console.log("[claimStoreStaff] joined", { uid, storeId, name: storeDoc.get("name") });
+  return { joined: true, storeId, storeName: storeDoc.get("name") || raw };
+});
+
+/**
  * 추천코드 존재 확인 (가입 화면에서 입력 즉시 검증용).
  *
  * 왜 필요한가 (2026-09-02):

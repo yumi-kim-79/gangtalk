@@ -207,10 +207,31 @@ service cloud.firestore {
      * 아래 두 블록은 위 규칙을 약화시키지 않고 경로만 추가로 연다.
      * 지표(needRooms/needPeople 등)가 든 rooms_biz/{storeId} 본문서는
      * 여전히 관리자·소유자만 쓸 수 있다. */
+    /* 초톡 작성 권한 (2026-09-10 변경).
+     *
+     * 이전에는 로그인한 사람이면 누구나 아무 업체 초톡에 글을 쓸 수 있었다.
+     * 요청: **그 업체 소속(사장 + 같은 업체명으로 가입한 영업사원)만 작성**,
+     *       일반 여성회원과 다른 업체 계정은 읽기만.
+     *
+     * 소속 판정은 stores 문서의 세 가지 중 하나:
+     *   ownerId      가입 시 만든 본인 업체
+     *   ownerEmail   이메일로만 연결된 레거시 업체
+     *   staffUids    같은 업체명으로 가입해 claimStoreStaff 가 붙여 준 영업사원
+     * staffUids 는 클라이언트가 못 건드린다 (stores update 는 소유자·관리자만).
+     */
+    function isStoreStaff(storeId) {
+      let s = get(/databases/$(database)/documents/stores/$(storeId)).data;
+      return s.ownerId == request.auth.uid
+          || ('ownerEmail' in s && s.ownerEmail == request.auth.token.email)
+          || ('staffUids' in s && request.auth.uid in s.staffUids);
+    }
+
     match /rooms_biz/{storeId}/rooms/{roomId}/messages/{msgId} {
       allow read: if true;
-      // 작성자 위조 방지 — 다른 채팅과 같은 조건
-      allow create: if signedIn() && authorIsSelf();
+      // 작성자 위조 방지 + 소속 확인
+      allow create: if signedIn()
+                    && authorIsSelf()
+                    && (isAdmin() || isStoreStaff(storeId));
       allow update, delete: if isAdmin();
     }
 

@@ -39,7 +39,8 @@
     </div>
 
     <!-- ✅ 하단 탭바 바로 위에 항상 붙어있는 입력창 -->
-    <form class="composer" @submit.prevent="send">
+    <!-- 2026-09-10: 작성은 그 업체 소속(사장·영업사원)만. 그 외에는 읽기 전용. -->
+    <form v-if="canWrite" class="composer" @submit.prevent="send">
       <textarea
         v-model="draft"
         rows="2"
@@ -49,6 +50,9 @@
       ></textarea>
       <button type="submit">전송</button>
     </form>
+    <div v-else class="composer composer-readonly">
+      <span>{{ readonlyMsg }}</span>
+    </div>
   </section>
 </template>
 
@@ -125,6 +129,46 @@ const storeStat = ref({
 })
 
 const me = ref(null)
+
+/* ───────── 작성 권한 (2026-09-10) ─────────
+ * firestore.rules 의 isStoreStaff 와 **같은 판정**을 화면에서도 한다.
+ * (규칙만 막으면 입력은 되는데 전송에서 실패해 "왜 안 되지" 가 된다)
+ *   ownerId / ownerEmail  업체 사장
+ *   staffUids             같은 업체명으로 가입해 서버가 붙여 준 영업사원
+ */
+const storeStaff = ref({ ownerId: '', ownerEmail: '', staffUids: [], loaded: false })
+const isAdminUser = ref(false)
+
+const canWrite = computed(() => {
+  const u = me.value
+  if (!u) return false
+  if (isAdminUser.value) return true
+  const st = storeStaff.value
+  if (!st.loaded) return false
+  if (st.ownerId && st.ownerId === u.uid) return true
+  if (st.ownerEmail && u.email && st.ownerEmail === u.email) return true
+  return Array.isArray(st.staffUids) && st.staffUids.includes(u.uid)
+})
+
+const readonlyMsg = computed(() => {
+  if (!me.value) return '로그인한 업체 담당자만 글을 쓸 수 있습니다. (읽기는 누구나 가능)'
+  return '이 업체 소속 담당자만 글을 쓸 수 있습니다. (읽기 전용)'
+})
+
+async function loadStoreStaff() {
+  try {
+    const snap = await getDoc(doc(fbDb, 'stores', finalStoreId.value))
+    const d = snap.exists() ? (snap.data() || {}) : {}
+    storeStaff.value = {
+      ownerId: String(d.ownerId || ''),
+      ownerEmail: String(d.ownerEmail || ''),
+      staffUids: Array.isArray(d.staffUids) ? d.staffUids.map(String) : [],
+      loaded: true,
+    }
+  } catch {
+    storeStaff.value = { ...storeStaff.value, loaded: true }
+  }
+}
 
 /* ===== 권한 판별 ===== */
 const WEB_ADMIN_EMAIL = 'gangtalk815@gmail.com'
@@ -412,7 +456,7 @@ async function sendMessage(text, kind = 'chat') {
     'add',
   )
   if (!ok) {
-    alert('전송 권한이 없습니다.')
+    alert('이 업체 소속 담당자만 글을 쓸 수 있습니다.')
     return null
   }
 
@@ -690,6 +734,12 @@ onMounted(async () => {
   await resolveStoreKey()
   buildAliasRoomIds()
 
+  // 작성 권한 판정 — storeId 가 확정된 뒤에 읽어야 한다
+  await loadStoreStaff()
+  try {
+    isAdminUser.value = !!(await getDoc(doc(fbDb, 'admins', me.value?.uid || '_'))).exists()
+  } catch { isAdminUser.value = false }
+
   console.info('[CHAT_ROOM_IDS]', {
     storeId: finalStoreId.value,
     roomId: finalRoomId.value,
@@ -930,5 +980,13 @@ onBeforeUnmount(() => {
   border-radius: 999px;
   background: #fff;
   cursor: pointer;
+}
+</style>
+
+<style scoped>
+.composer-readonly{
+  display:flex; align-items:center; justify-content:center;
+  color:var(--muted, #888); font-size:13px;
+  padding:14px 12px;
 }
 </style>

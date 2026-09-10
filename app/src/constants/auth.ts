@@ -14,7 +14,8 @@ export const KAKAO_UID_PREFIX = 'kakao_';
  *   앱이 6자였을 때, 웹 규칙을 통과 못 하는 계정이 앱에서 만들어졌다. */
 export const NICKNAME_MIN = 2;
 export const NICKNAME_MAX = 20;
-export const PASSWORD_MIN = 8;
+/** 웹 web/src/constants/auth.js 와 같은 값이어야 한다 (화면마다 6/8 이 섞여 있었다) */
+export const PASSWORD_MIN = 6;
 
 /**
  * 소셜 로그인 노출 스위치.

@@ -21,8 +21,6 @@ type Props = {
   onPress: (store: Store) => void;
   favorited?: boolean;
   onToggleFavorite?: (store: Store) => void;
-  /** 초톡방 열기 — 업체가 붙여넣은 카톡 내용 보기 */
-  onOpenChotok?: (store: Store) => void;
 };
 
 const TONE_COLOR: Record<StatusTone, string> = {
@@ -33,7 +31,7 @@ const TONE_COLOR: Record<StatusTone, string> = {
 
 /**
  * 현황판 업소 카드 — 웹 MainPage 의 .mp-store 를 가로 1행으로 이식.
- * 왼쪽 정사각 썸네일 + 오른쪽 정보, 그 아래 지표 3종(맞출방/필요인원/혼잡도).
+ * 왼쪽 정사각 썸네일 + 오른쪽 정보, 그 아래 지표 4종(전체방/맞출방/필요인원/혼잡도).
  */
 function StoreStatusCard({
   store,
@@ -42,7 +40,6 @@ function StoreStatusCard({
   onPress,
   favorited,
   onToggleFavorite,
-  onOpenChotok,
 }: Props) {
   const c = useTheme();
   const s = styles(c);
@@ -72,11 +69,13 @@ function StoreStatusCard({
         </View>
 
         <View style={s.info}>
-          <Text style={s.name} numberOfLines={1}>
-            {store.name ?? '이름 없음'}
-          </Text>
-          <Text style={s.sub} numberOfLines={1}>
-            {store.region || '강남'} · {CATEGORY_LABEL[store.category ?? ''] ?? store.category}
+          {/* 2026-09-10: 업체명 | 지역 · 업종 을 한 줄로 (웹 현황판과 같은 배치) */}
+          <Text style={s.titleLine} numberOfLines={1}>
+            <Text style={s.name}>{store.name ?? '이름 없음'}</Text>
+            <Text style={s.bar}>{'  |  '}</Text>
+            <Text style={s.sub}>
+              {store.region || '강남'} · {CATEGORY_LABEL[store.category ?? ''] ?? store.category}
+            </Text>
           </Text>
           <View style={s.ratingRow}>
             <Icon name="star" size={13} color="#f5b301" />
@@ -96,20 +95,16 @@ function StoreStatusCard({
             </Pressable>
           ) : null}
 
-          {onOpenChotok ? (
-            <Pressable
-              onPress={() => onOpenChotok(store)}
-              hitSlop={6}
-              style={({ pressed }) => [s.chotok, pressed && s.chotokPressed]}
-            >
-              <Icon name="chat" size={14} color={c.accent} />
-              <Text style={s.chotokText}>초톡</Text>
-            </Pressable>
-          ) : null}
+          {/* 초톡 버튼은 현황판 카드에서 뺐다 (2026-09-10 요청).
+              상단 업소 이름 칩에서 바로 초톡으로 간다. */}
         </View>
       </View>
 
       <View style={s.metrics}>
+        <View style={s.metric}>
+          <Text style={s.metricNumPlain}>{roomsReady ? (store.totalRooms ?? 0) : '—'}</Text>
+          <Text style={s.metricLabel}>전체방</Text>
+        </View>
         <View style={s.metric}>
           <Text style={s.metricNum}>{roomsReady ? (store.match ?? 0) : '—'}</Text>
           <Text style={s.metricLabel}>맞출방</Text>
@@ -161,7 +156,9 @@ const styles = (c: ThemeColors) =>
     badgeText: { fontSize: 9, fontWeight: '800', color: '#ffffff' },
 
     info: { flex: 1, gap: 2, paddingTop: 2 },
+    titleLine: { fontSize: fontSize.xl },
     name: { fontSize: fontSize.xl, fontWeight: '800', color: c.fg },
+    bar: { color: c.line },
     sub: { fontSize: fontSize.sm, color: c.muted },
     ratingRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: 2 },
     rate: { fontSize: fontSize.md, fontWeight: '700', color: c.fg },
@@ -187,6 +184,7 @@ const styles = (c: ThemeColors) =>
     metrics: { flexDirection: 'row', marginTop: spacing.sm },
     metric: { flex: 1, alignItems: 'center', gap: 1 },
     metricNum: { fontSize: fontSize.lg, fontWeight: '800', color: c.accent },
+    metricNumPlain: { fontSize: fontSize.lg, fontWeight: '800', color: c.fg },
     statusRow: { flexDirection: 'row', alignItems: 'center', gap: 3 },
     statusText: { fontSize: fontSize.md, fontWeight: '800' },
     metricLabel: { fontSize: fontSize.xs, color: c.muted },

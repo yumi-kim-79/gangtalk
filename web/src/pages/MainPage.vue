@@ -27,17 +27,18 @@
     <section class="mp-section">
       <header class="mp-section-head">
         <h2 class="mp-section-title">✨ 강남 인기 업소</h2>
-        <!-- 카테고리는 큰 아이콘 격자 대신 제목 옆 가로 칩으로 줄였다 (2026-09-08 요청).
-             현황판 상단이 카테고리로 절반 이상 채워져 정작 업소가 잘 안 보였다. -->
-        <nav class="mp-cat-inline" aria-label="업종">
+        <!-- 2026-09-10: 업종 칩을 업체 이름 칩으로 바꿨다.
+             현황판에서 찾는 건 업종이 아니라 특정 업소의 초톡이라, 이름을 눌러
+             바로 그 업소 초톡으로 들어가게 한다. -->
+        <nav class="mp-cat-inline" aria-label="업소 바로가기">
           <button
-            v-for="c in mpCategories"
-            :key="c.key"
+            v-for="s in storeChips"
+            :key="s.id"
             class="mp-cat-chip"
-            :class="{ on: type === c.key }"
             type="button"
-            @click="setType(c.key)"
-          >{{ c.label }}</button>
+            :title="`${s.name} 초톡 열기`"
+            @click="openChotok(s)"
+          >{{ s.name }}</button>
         </nav>
         <button class="mp-section-more" type="button" @click="goAllStores">더보기 ›</button>
       </header>
@@ -83,62 +84,65 @@
           class="mp-store"
           @click="openStore(s)"
         >
-          <div class="mp-store-img" :style="bgStyle(thumbOf(s))">
-            <span class="mp-store-badge">🔥 인기</span>
-          </div>
-          <div class="mp-store-body">
-            <div class="mp-store-head">
-              <div class="mp-store-name-wrap">
-                <div class="mp-store-name">{{ s.name }}</div>
-                <div class="mp-store-sub">{{ s.region }} · {{ mapCat[s.category] || s.category }}</div>
-              </div>
-              <!-- 앱(StoreStatusCard)과 동일 배치: 썸네일 대칭 위치에 찜 + 초톡 -->
-              <div class="mp-store-side">
-                <button class="mp-heart" type="button" @click.stop="toggleFav(s)" :class="{ on: isFav(s) }" aria-label="찜">
+          <!-- 사진(고정 크기) | 이름·지역·업종 / 별점·리뷰 -->
+          <div class="mp-store-top">
+            <div class="mp-store-img" :style="bgStyle(thumbOf(s))">
+              <span class="mp-store-badge">🔥 인기</span>
+            </div>
+            <div class="mp-store-info">
+              <div class="mp-store-head">
+                <div class="mp-store-title ellip">
+                  <span class="mp-store-name">{{ s.name }}</span>
+                  <span class="mp-store-bar">|</span>
+                  <span class="mp-store-sub">{{ s.region }} · {{ mapCat[s.category] || s.category }}</span>
+                </div>
+                <button
+                  class="mp-heart"
+                  type="button"
+                  @click.stop="toggleFav(s)"
+                  :class="{ on: isFav(s) }"
+                  aria-label="찜"
+                >
                   <svg viewBox="0 0 24 24" width="20" height="20" :fill="isFav(s) ? '#ff4d8d' : 'none'" :stroke="isFav(s) ? '#ff4d8d' : 'currentColor'" stroke-width="2" stroke-linejoin="round">
                     <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
                   </svg>
                 </button>
-                <button class="mp-chotok" type="button" @click.stop="openChotok(s)" aria-label="초톡 열기">
-                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>
-                  </svg>
-                  <span>초톡</span>
-                </button>
+              </div>
+
+              <div class="mp-store-rating">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="#ffb800" aria-hidden="true">
+                  <path d="M12 2l3.09 6.26L22 9.27l-5 4.87L18.18 22 12 18.56 5.82 22 7 14.14 2 9.27l6.91-1.01z"/>
+                </svg>
+                <span class="mp-rate">{{ ratingOf(s) }}</span>
+                <span class="mp-rcount">리뷰 {{ reviewCountOf(s) }}</span>
               </div>
             </div>
+          </div>
 
-            <div class="mp-store-rating">
-              <svg viewBox="0 0 24 24" width="14" height="14" fill="#ffb800" aria-hidden="true">
-                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87L18.18 22 12 18.56 5.82 22 7 14.14 2 9.27l6.91-1.01z"/>
-              </svg>
-              <span class="mp-rate">{{ ratingOf(s) }}</span>
-              <span class="mp-rcount">리뷰 {{ reviewCountOf(s) }}</span>
+          <!-- 전체방 · 맞출방 · 필요인원 · 혼잡도 -->
+          <div class="mp-store-metrics">
+            <div class="mp-metric">
+              <div class="mp-metric-num">{{ isRoomsBizReady ? (s.totalRooms || 0) : '—' }}</div>
+              <div class="mp-metric-label">전체방</div>
             </div>
-
-            <div class="mp-store-metrics">
-              <div class="mp-metric">
-                <div class="mp-metric-num pink">{{ isRoomsBizReady ? s.match : '—' }}</div>
-                <div class="mp-metric-label">맞출방</div>
+            <div class="mp-metric">
+              <div class="mp-metric-num pink">{{ isRoomsBizReady ? s.match : '—' }}</div>
+              <div class="mp-metric-label">맞출방</div>
+            </div>
+            <div class="mp-metric">
+              <div class="mp-metric-num pink">{{ isRoomsBizReady ? s.persons : '—' }}</div>
+              <div class="mp-metric-label">필요인원</div>
+            </div>
+            <div class="mp-metric">
+              <div class="mp-metric-wifi" :class="wifiColor(s)">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round">
+                  <rect x="3"  y="14" width="4" height="6"  rx="1"/>
+                  <rect x="10" y="9"  width="4" height="11" rx="1"/>
+                  <rect x="17" y="4"  width="4" height="16" rx="1"/>
+                </svg>
+                <span>{{ wifiText(s) }}</span>
               </div>
-              <div class="mp-metric">
-                <div class="mp-metric-num pink">{{ isRoomsBizReady ? s.persons : '—' }}</div>
-                <div class="mp-metric-label">필요인원</div>
-              </div>
-              <div class="mp-metric">
-                <!-- 혼잡도 표시 — wifiColor(s) 가 computeStatus 결과 반환 (ok/mid/busy)
-                     CSS 클래스명(mp-metric-wifi)/함수명(wifiColor/wifiText)은 회귀 방지 위해 유지.
-                     아이콘은 3단계 신호 막대 (좋음=낮음 / 보통=중간 / 나쁨=높음). -->
-                <div class="mp-metric-wifi" :class="wifiColor(s)">
-                  <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round">
-                    <rect x="3"  y="14" width="4" height="6"  rx="1"/>
-                    <rect x="10" y="9"  width="4" height="11" rx="1"/>
-                    <rect x="17" y="4"  width="4" height="16" rx="1"/>
-                  </svg>
-                  <span>{{ wifiText(s) }}</span>
-                </div>
-                <div class="mp-metric-label">혼잡도</div>
-              </div>
+              <div class="mp-metric-label">혼잡도</div>
             </div>
           </div>
         </article>
@@ -851,6 +855,9 @@ const categories = STORE_CATEGORIES
 const mapCat = CATEGORY_LABEL
 const mpCategories = CATEGORY_CHIPS.map(c => ({ key: c.key, label: c.label }))
 
+/* 상단 바로가기 칩 — 현황판에 노출 중인 업소 이름 (누르면 그 업소 초톡) */
+const storeChips = computed(() => filtered.value.slice(0, 20).map(s => ({ id: s.id, name: s.name })))
+
 const expandCategories = ref(false)
 
 /* ===== 페이지 고유 액션 (AppHeader 미관여) ===== */
@@ -967,12 +974,14 @@ async function toggleFav(s){
 function ratingOf(s){
   const r = Number(s?.rating ?? s?.stars ?? s?.score)
   if (Number.isFinite(r) && r > 0) return r.toFixed(1)
-  return '4.8'
+  // 별점이 없으면 0.0. 예전에는 '4.8' 을 지어내 모든 업소가 같은 점수로 보였다.
+  return '0.0'
 }
 function reviewCountOf(s){
-  const n = Number(s?.reviewCount ?? s?.reviews ?? s?.reviewsCount)
-  if (Number.isFinite(n) && n >= 0) return n
-  return 128
+  // ratingCount 가 실제 별점 개수 (stores/{id}/ratings 문서 수와 함께 갱신된다).
+  // 예전에는 값이 없으면 128 을 지어내 전 업소가 '리뷰 128' 로 보였다.
+  const n = Number(s?.ratingCount ?? s?.reviewCount ?? s?.reviews ?? s?.reviewsCount)
+  return Number.isFinite(n) && n >= 0 ? n : 0
 }
 
 /* ===== 와이파이 상태 텍스트 ===== */
@@ -2656,14 +2665,18 @@ onUnmounted(() => {
   flex-direction:column;
 }
 .mp-store{
+  /* 2026-09-10 재배열: 위(사진|이름·별점) / 아래(4지표) 두 단으로 */
   display:flex;
-  gap:12px;
-  /* PR 2 (2026-06-22): padding 14/4 → 10/4 (토큰), 리스트 더 보임 */
+  flex-direction:column;
+  gap:8px;
   padding: var(--store-card-pad, 10px 4px);
   border-bottom:1px solid var(--line, #f0f0f0);
   cursor:pointer;
-  align-items:stretch;
 }
+.mp-store-top{ display:flex; gap:12px; align-items:flex-start; }
+.mp-store-info{ flex:1; min-width:0; display:flex; flex-direction:column; gap:6px; }
+.mp-store-title{ flex:1; min-width:0; display:flex; align-items:baseline; gap:6px; }
+.mp-store-bar{ color:var(--line, #ddd); }
 .mp-store:last-child{ border-bottom:none; }
 .mp-store:active{ background:rgba(0,0,0,.02); }
 
@@ -2763,7 +2776,8 @@ onUnmounted(() => {
 
 .mp-store-metrics{
   display:grid;
-  grid-template-columns:repeat(3, 1fr);
+  /* 전체방 · 맞출방 · 필요인원 · 혼잡도 */
+  grid-template-columns:repeat(4, 1fr);
   gap:6px;
   margin-top:2px;
 }

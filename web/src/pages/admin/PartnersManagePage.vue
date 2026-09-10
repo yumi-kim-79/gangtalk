@@ -140,6 +140,12 @@
               <input v-model.trim="form.manager" type="text" placeholder="담당자(선택)" />
             </label>
 
+            <!-- 연락처가 아예 없어 사용자 제휴관 상세에 '연락처 미등록' 만 떴다 -->
+            <label class="adm-field">
+              <span>연락처</span>
+              <input v-model.trim="form.phone" type="tel" inputmode="tel" placeholder="예: 010-0000-0000" />
+            </label>
+
             <label class="adm-field">
               <span>지역</span>
               <input v-model.trim="form.region" type="text" placeholder="예: 강남" />
@@ -339,6 +345,7 @@ const emptyForm = () => ({
   id: '',
   name: '',
   manager: '',
+  phone: '',
   region: '',
   address: '',
   category: 'etc',
@@ -810,6 +817,7 @@ function openEdit(p) {
   form.id = p.id
   form.name = p.name || ''
   form.manager = p.manager || p.managerName || ''
+  form.phone = p.phone || p.tel || p.contact || ''
   form.region = p.region || ''
   form.address = p.address || ''
   // 옛 키(salon/cafe/rental) 로 저장된 partner 도 모달에선 새 키로 표시
@@ -933,6 +941,7 @@ async function onSave() {
     const partnerBody = {
       name: form.name,
       manager: form.manager,
+      phone: form.phone,
       region: form.region,
       address: form.address,
       category: normalizedCat,

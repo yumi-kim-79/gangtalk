@@ -100,7 +100,7 @@
           :key="b.id || b._key || b.title || i"
           class="banner"
           :style="{ flex: '0 0 100%', minWidth: '0' }"
-          @click="onBannerClick"
+          @click="onBannerClick(b)"
         >
           <!-- img → images[_imgIndex] → images[0] 순서로 안전하게 표시 -->
           <img
@@ -632,6 +632,7 @@ import { getAuth, onAuthStateChanged } from 'firebase/auth'
 import { useMarketingBanners } from '@/composables/useMarketingBanners'   // ⬅️ 추가
 import { useNearby } from '@/composables/useNearby'
 import { CATEGORY_CHIPS, CATEGORY_LABEL, STORE_CATEGORIES } from '@/constants/categories'
+import { resolveBannerTarget } from '@/lib/bannerLink'
 import StoreQuickCreate from '@/components/biz/StoreQuickCreate.vue'
 
 import StoreListView from '@/components/finder/StoreListView.vue'
@@ -754,7 +755,13 @@ function onSliderTouchEnd(e) {
   startSlider()
 }
 
-function onBannerClick(){ scrollToList() }
+function onBannerClick(b){
+  /* 배너 제목(=업체 등록 이름) / 설명(=담당자) 으로 업체를 찾아 상세로 보낸다.
+   * 못 찾으면 예전처럼 목록으로 스크롤. */
+  const hit = resolveBannerTarget(b, stores.value)
+  if (hit) { openStore(hit); return }
+  scrollToList()
+}
 
 
 /* ───────────────────────── 카테고리/정렬 ───────────────────────── */

@@ -97,6 +97,13 @@
       <!-- 위치 섹션 -->
       <div class="info-box">
         <strong>위치</strong>
+        <!-- 연락처 — 지금까지 제휴관에는 전화번호를 보여 주는 곳이 아예 없었다 -->
+        <p class="muted pd-contact">
+          연락처:
+          <a v-if="item.phone" :href="`tel:${telHref(item.phone)}`" class="pd-tel">{{ item.phone }}</a>
+          <span v-else>미등록</span>
+          <template v-if="item.manager"> · 담당 {{ item.manager }}</template>
+        </p>
         <p class="muted">주소: {{ hasAddress ? item.address : '미등록' }}</p>
         <div v-if="hasAddress" class="map-wrap" :aria-label="`지도: ${item.address}`">
           <iframe
@@ -145,6 +152,7 @@ const item = ref({
   id: '', name: '', region: '', category: 'etc',
   tags: [], thumb: '', image: '', link: '',
   address: '', hours: '', holiday: '', benefits: '', desc: '',
+  phone: '', manager: '',
   rating: 0, ratingSum: 0, ratingCount: 0, likes: 0
 })
 
@@ -361,6 +369,8 @@ async function load() {
       image: data.image || data.thumb || '',
       link: data.link || '',
       address: data.address || '',
+      phone: data.phone || data.tel || data.contact || '',
+      manager: data.manager || data.managerName || '',
       hours: data.hours || '',
       holiday: data.holiday || '',
       benefits: data.benefits || '',
@@ -383,6 +393,9 @@ onMounted(load)
 watch(() => route.params.id, load)
 
 /* ---------- 위치(지도) ---------- */
+/** tel: 링크용 — 숫자와 + 만 남긴다 */
+function telHref(v) { return String(v || '').replace(/[^\d+]/g, '') }
+
 const hasAddress = computed(() => String(item.value.address || '').trim().length > 0)
 const mapEmbedUrl = computed(() => {
   if (!hasAddress.value) return ''
@@ -517,4 +530,8 @@ function openInfo() {
 .cta button{ flex:1; height:48px; border-radius:12px; font-weight:900; border:1px solid var(--line) }
 .primary{ background:var(--accent); color:#fff; border-color:var(--accent) }
 .ghost{ background:transparent }
+</style>
+
+<style scoped>
+.pd-contact .pd-tel{ color:var(--accent, #ff2e7e); font-weight:700; text-decoration:none; }
 </style>

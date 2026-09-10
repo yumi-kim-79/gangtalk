@@ -96,6 +96,23 @@ export default function PartnerDetailScreen() {
         <Text style={s.body}>{partner.intro || '등록된 소개가 없습니다.'}</Text>
       </View>
 
+      {/* 연락처 — 웹 제휴관 상세와 같은 항목 (둘 다 없던 것을 함께 넣었다) */}
+      <View style={s.section}>
+        <Text style={s.sectionTitle}>연락처</Text>
+        {partner.phone ? (
+          <Pressable
+            onPress={() =>
+              Linking.openURL(`tel:${partner.phone.replace(/[^\d+]/g, '')}`).catch(() => {})
+            }
+          >
+            <Text style={[s.body, s.tel]}>{partner.phone}</Text>
+          </Pressable>
+        ) : (
+          <Text style={s.body}>등록된 연락처가 없습니다.</Text>
+        )}
+        {partner.manager ? <Text style={s.body}>담당 {partner.manager}</Text> : null}
+      </View>
+
       <View style={s.section}>
         <Text style={s.sectionTitle}>위치</Text>
         <Text style={s.body}>{partner.address || '주소 정보가 없습니다.'}</Text>
@@ -160,6 +177,7 @@ const styles = (c: ThemeColors) =>
       marginBottom: spacing.sm,
     },
     body: { fontSize: fontSize.md, lineHeight: 22, color: c.fg },
+    tel: { color: c.accent, fontWeight: '700' },
     benefit: { fontSize: fontSize.md, lineHeight: 22, color: c.accent, fontWeight: '600' },
 
     linkBtn: {

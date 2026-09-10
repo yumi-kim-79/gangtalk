@@ -14,8 +14,7 @@ import {
 } from 'react-native';
 import AppHeader from '@/components/common/AppHeader';
 import Icon from '@/components/common/Icon';
-import ChipTabs from '@/components/common/ChipTabs';
-import { CATEGORY_CHIPS, HOME_STORE_LIMIT } from '@/constants/stores';
+import { HOME_STORE_LIMIT } from '@/constants/stores';
 import StoreStatusCard from '@/components/store/StoreStatusCard';
 import { useAuth } from '@/hooks/useAuth';
 import { useHomeStores } from '@/hooks/useHomeStores';
@@ -38,7 +37,8 @@ export default function HomeScreen() {
   /* 웹 현황판 카드에는 하트가 있는데 앱만 없었다 (MainPage.vue:107-111) */
   const { storeIds, isStoreFav, toggleStore } = useMyFavorites();
 
-  const [category, setCategory] = useState('all');
+  /* 카테고리 필터는 현황판에서 뺐다(업소 이름 칩으로 대체). 전체 고정 */
+  const category = 'all';
   const [keyword, setKeyword] = useState('');
   const { stores, all, loading, roomsReady, error } = useHomeStores(category, keyword);
   /* 웹 현황판은 20곳까지만 카드로 깔고 나머지는 '더보기 ›'로 가게찾기로 보낸다
@@ -81,7 +81,6 @@ export default function HomeScreen() {
             all={all}
             roomsReady={roomsReady}
             onPress={openStore}
-            onOpenChotok={openChotok}
             favorited={isStoreFav(item.id)}
             onToggleFavorite={st =>
               toggleStore(st.id).catch(e =>
@@ -125,12 +124,26 @@ export default function HomeScreen() {
               </Pressable>
             </View>
 
-            <ChipTabs
-              items={CATEGORY_CHIPS}
-              value={category}
-              onChange={setCategory}
-              fadeColor={c.bg}
-            />
+            {/* 2026-09-10: 업종 칩 → 업소 이름 칩. 누르면 그 업소 초톡으로 바로 간다.
+                (현황판에서 찾는 건 업종이 아니라 특정 업소의 초톡이라는 요청) */}
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={s.chipRow}
+              keyboardShouldPersistTaps="handled"
+            >
+              {homeStores.map(st => (
+                <Pressable
+                  key={st.id}
+                  style={({ pressed }) => [s.storeChip, pressed && s.storeChipPressed]}
+                  onPress={() => openChotok(st)}
+                >
+                  <Text style={s.storeChipText} numberOfLines={1}>
+                    {st.name}
+                  </Text>
+                </Pressable>
+              ))}
+            </ScrollView>
 
             {loading ? <ActivityIndicator color={c.accent} style={s.loading} /> : null}
             {error ? <Text style={s.error}>{error}</Text> : null}
@@ -279,6 +292,18 @@ const styles = (c: ThemeColors) =>
     moreBtn: { flexDirection: 'row', alignItems: 'center', gap: 2 },
     moreText: { fontSize: fontSize.sm, color: c.muted },
 
+    chipRow: { paddingHorizontal: spacing.page, gap: spacing.xs, paddingBottom: spacing.xs },
+    storeChip: {
+      paddingHorizontal: spacing.md,
+      paddingVertical: 5,
+      borderRadius: radius.pill,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: c.chipBorder,
+      backgroundColor: c.surface,
+      maxWidth: 140,
+    },
+    storeChipPressed: { backgroundColor: c.chipBg },
+    storeChipText: { fontSize: fontSize.sm, fontWeight: '700', color: c.fg },
     loading: { marginVertical: spacing.xl },
     error: {
       marginHorizontal: spacing.page,

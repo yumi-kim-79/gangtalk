@@ -88,8 +88,8 @@
             class="auth-input"
             v-model="password"
             type="password"
-            placeholder="8자 이상"
-            minlength="8"
+            placeholder="6자 이상"
+            minlength="6"
             required
             autocomplete="current-password"
           />
@@ -155,9 +155,9 @@
             class="auth-input"
             v-model="password"
             type="password"
-            minlength="8"
+            minlength="6"
             required
-            placeholder="8자 이상"
+            placeholder="6자 이상"
           />
         </div>
 
@@ -167,7 +167,7 @@
             class="auth-input"
             v-model="passwordConfirm"
             type="password"
-            minlength="8"
+            minlength="6"
             required
             placeholder="비밀번호 확인"
           />
@@ -201,13 +201,15 @@
             placeholder="6자리"
             inputmode="numeric"
           />
+          <!-- 인증확인은 반드시 눌러야 가입이 되는 단계라 눈에 띄게 둔다 -->
           <button
             type="button"
-            class="btn sm ghost"
+            class="btn sm auth-verify-btn"
+            :class="{ 'is-done': smsVerified }"
             @click="verifySmsCode"
-            :disabled="verifyingSms"
+            :disabled="verifyingSms || smsVerified"
           >
-            {{ verifyingSms ? '확인중…' : '인증확인' }}
+            {{ smsVerified ? '인증완료 ✓' : (verifyingSms ? '확인중…' : '인증확인') }}
           </button>
         </div>
 
@@ -937,5 +939,19 @@ html[data-theme='black'] .auth-page .biz-entry-link:hover,
 html[data-theme='dark']  .auth-page .biz-entry-link:hover {
   background: #ff2c8a !important;
   color: #fff !important;
+}
+</style>
+
+<style scoped>
+/* 인증확인 — 안 누르면 가입이 안 되는 단계라 색으로 잡아 둔다 */
+.auth-verify-btn{
+  background:linear-gradient(135deg,#FF4D8D,#E91E8C);
+  border:none; color:#fff; font-weight:800;
+  box-shadow:0 2px 8px rgba(233,30,140,.28);
+}
+.auth-verify-btn:disabled{ opacity:.85; }
+.auth-verify-btn.is-done{
+  background:#e9f9ef; color:#1c9e58;
+  box-shadow:none; border:1px solid #b9e7cb;
 }
 </style>

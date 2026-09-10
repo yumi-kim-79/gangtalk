@@ -93,20 +93,28 @@ export function statusTone(label: StatusLabel): StatusTone {
 
 /* ───────────────────────── 평점 표시 ───────────────────────── */
 
-/** 웹 ratingOf — 값이 없으면 4.8 로 표기 (웹과 동일) */
+/**
+ * 평점 표기. 값이 없으면 0.0.
+ * 2026-09-10: 웹·앱 모두 값이 없을 때 4.8 을 지어내고 있어, 별점을 한 번도 안 받은
+ * 업소가 전부 같은 점수로 보였다. 없으면 없다고 보여 준다.
+ */
 export function ratingOf(s: Store): string {
   const r = Number(s.rating ?? (s as { stars?: number }).stars ?? (s as { score?: number }).score);
-  return Number.isFinite(r) && r > 0 ? r.toFixed(1) : '4.8';
+  return Number.isFinite(r) && r > 0 ? r.toFixed(1) : '0.0';
 }
 
-/** 웹 reviewCountOf — 값이 없으면 128 로 표기 (웹과 동일) */
+/**
+ * 리뷰(별점) 개수. ratingCount 가 정본 — stores/{id}/ratings 문서와 함께 갱신된다.
+ * 예전에는 값이 없으면 128 을 지어내 전 업소가 '리뷰 128' 로 보였다.
+ */
 export function reviewCountOf(s: Store): number {
   const n = Number(
-    (s as { reviewCount?: number }).reviewCount ??
+    (s as { ratingCount?: number }).ratingCount ??
+      (s as { reviewCount?: number }).reviewCount ??
       (s as { reviews?: number }).reviews ??
       (s as { reviewsCount?: number }).reviewsCount,
   );
-  return Number.isFinite(n) && n >= 0 ? n : 128;
+  return Number.isFinite(n) && n >= 0 ? n : 0;
 }
 
 /* ───────────────────────── config/marketing ───────────────────────── */

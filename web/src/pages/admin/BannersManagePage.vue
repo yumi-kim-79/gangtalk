@@ -62,6 +62,14 @@
         '이미지 교체' 로 바꾸세요. 드래그(☰) 순서가 그대로 노출 순서입니다.
         <strong>무엇을 바꾸든 '저장' 을 눌러야 반영됩니다.</strong>
       </p>
+      <p class="adm-hint adm-banner-spec">
+        📐 <strong>이미지 규격 16:9</strong> — 권장 <strong>1280 × 720 px</strong>
+        (최소 960 × 540, 최대 1920 × 1080 · 파일 10MB 이하 · JPG/PNG).
+        이 비율로 잘라서 올리면 웹·앱 모두 잘림 없이 그대로 보입니다.
+        <br />
+        배너를 누르면 위에 적은 <strong>업체 등록 이름</strong>(같은 이름이 여럿이면
+        <strong>담당자</strong>까지)으로 그 업체 상세 화면이 열립니다.
+      </p>
 
       <ul ref="bannerListRef" class="adm-banner-list" v-if="currentList.length">
         <li
@@ -82,14 +90,19 @@
           </div>
 
           <div class="adm-banner-fields">
+            <!-- 2026-09-10: 제목/설명을 업체 연결용으로 쓴다.
+                 이 두 값으로 실제 업체 문서를 찾아 배너 클릭 시 상세로 보낸다. -->
             <label>
-              <span>제목</span>
-              <input v-model="b.title" type="text" placeholder="배너 제목" />
+              <span>업체 등록 이름</span>
+              <input v-model="b.title" type="text" placeholder="현황판/제휴관에 등록된 이름 그대로" />
             </label>
             <label>
-              <span>설명</span>
-              <input v-model="b.desc" type="text" placeholder="배너 설명" />
+              <span>담당자</span>
+              <input v-model="b.desc" type="text" placeholder="담당자 이름 (같은 이름 업체가 여러 곳일 때 구분)" />
             </label>
+            <p class="adm-banner-link" :class="{ ok: linkStateOf(b).ok }">
+              {{ linkStateOf(b).ok ? '✅ ' : '⚠️ ' }}{{ linkStateOf(b).msg }}
+            </p>
             <label>
               <span>링크 (선택)</span>
               <input v-model="b.link" type="text" placeholder="https:// 또는 /partners/xxx" />
@@ -111,15 +124,22 @@
 <script setup>
 import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import Sortable from 'sortablejs'
+import { bannerLinkState } from '@/lib/bannerLink'
 import { db as fbDb, storage as fbStorage } from '@/firebase'
 import {
-  doc, onSnapshot, setDoc, serverTimestamp,
+  collection, doc, limit, onSnapshot, query, setDoc, serverTimestamp,
 } from 'firebase/firestore'
 import {
   ref as sRef, uploadBytes, getDownloadURL,
 } from 'firebase/storage'
 
 const group = ref('F') // 'F' = 가게찾기, 'P' = 제휴관
+
+/* 배너 제목(업체 이름)이 실제 문서와 연결되는지 바로 보여 주기 위해
+ * 대상 컬렉션을 함께 읽는다. F = stores, P = partners */
+const targets = ref({ F: [], P: [] })
+const currentTargets = computed(() => targets.value[group.value] || [])
+function linkStateOf(b) { return bannerLinkState(b, currentTargets.value) }
 
 const banners = ref({ F: [], P: [] })
 
@@ -155,13 +175,28 @@ function subscribeFixedDoc(g){
   )
 }
 
+let unsubStores = null
+let unsubPartners = null
+
 onMounted(() => {
   unsubF = subscribeFixedDoc('F')
   unsubP = subscribeFixedDoc('P')
+  unsubStores = onSnapshot(
+    query(collection(fbDb, 'stores'), limit(500)),
+    (snap) => { targets.value = { ...targets.value, F: snap.docs.map(d => ({ id: d.id, ...d.data() })) } },
+    () => {},
+  )
+  unsubPartners = onSnapshot(
+    query(collection(fbDb, 'partners'), limit(500)),
+    (snap) => { targets.value = { ...targets.value, P: snap.docs.map(d => ({ id: d.id, ...d.data() })) } },
+    () => {},
+  )
 })
 onBeforeUnmount(() => {
   if (unsubF) try { unsubF() } catch {}
   if (unsubP) try { unsubP() } catch {}
+  if (unsubStores) try { unsubStores() } catch {}
+  if (unsubPartners) try { unsubPartners() } catch {}
   if (sortableInst) sortableInst.destroy()
 })
 
@@ -449,4 +484,10 @@ async function saveBanners(){
 <style scoped>
 .adm-banner-thumb-wrap{ display:flex; flex-direction:column; gap:6px; align-items:center; }
 .adm-banner-replace{ white-space:nowrap; }
+.adm-banner-spec{
+  background:#f6f9ff; border:1px solid #dde7ff; border-radius:8px;
+  padding:8px 10px; color:#456;
+}
+.adm-banner-link{ margin:2px 0 0; font-size:11.5px; color:#c47b00; }
+.adm-banner-link.ok{ color:#1c9e58; }
 </style>

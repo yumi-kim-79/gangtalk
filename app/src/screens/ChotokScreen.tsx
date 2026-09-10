@@ -80,7 +80,7 @@ export default function ChotokScreen() {
         '전송 실패',
         e instanceof Error && e.message.includes('로그인')
           ? '로그인이 필요합니다.'
-          : '전송 권한이 없거나 네트워크 문제가 발생했습니다.',
+          : '이 업체 소속 담당자만 글을 쓸 수 있습니다.',
       );
     } finally {
       setSending(false);
@@ -198,16 +198,16 @@ export default function ChotokScreen() {
           placeholder={
             canWrite
               ? '메시지 입력 (카톡 내용을 붙여넣으면 현황에 반영됩니다)'
-              : '로그인 후 이용할 수 있습니다'
+              : '이 업체 소속 담당자만 글을 쓸 수 있습니다 (읽기 전용)'
           }
           placeholderTextColor={c.muted}
           editable={canWrite && !sending}
           multiline
         />
         <Pressable
-          style={[s.sendBtn, (!draft.trim() || sending) && s.sendBtnOff]}
+          style={[s.sendBtn, (!canWrite || !draft.trim() || sending) && s.sendBtnOff]}
           onPress={onSend}
-          disabled={!draft.trim() || sending}
+          disabled={!canWrite || !draft.trim() || sending}
         >
           <Text style={s.sendBtnText}>전송</Text>
         </Pressable>

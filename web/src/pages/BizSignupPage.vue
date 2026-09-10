@@ -59,14 +59,28 @@
         </label>
 
         <label class="biz-field">
-          <span>비밀번호 * (6자 이상)</span>
+          <span>비밀번호 * ({{ PASSWORD_HINT }})</span>
           <input
             v-model="form.password"
             type="password"
             autocomplete="new-password"
             required
-            minlength="6"
+            :minlength="PASSWORD_MIN"
             placeholder="비밀번호"
+            :disabled="submitting"
+          />
+        </label>
+
+        <!-- 오타로 못 들어가는 계정이 생기지 않게 확인 한 번 더 (다른 가입 화면과 동일) -->
+        <label class="biz-field">
+          <span>비밀번호 확인 *</span>
+          <input
+            v-model="form.passwordConfirm"
+            type="password"
+            autocomplete="new-password"
+            required
+            :minlength="PASSWORD_MIN"
+            placeholder="비밀번호 다시 입력"
             :disabled="submitting"
           />
         </label>
@@ -103,9 +117,10 @@
               placeholder="6자리"
               :disabled="submitting"
             />
+            <!-- 안 누르면 가입이 안 되는 단계라 색으로 잡아 둔다 -->
             <button
               type="button"
-              class="biz-btn biz-btn-ghost"
+              class="biz-btn biz-btn-verify"
               @click="onVerifySms"
               :disabled="verifyingSms || submitting"
             >{{ verifyingSms ? '확인중…' : '인증확인' }}</button>
@@ -297,14 +312,30 @@
 
       <!-- 가입 성공 안내 -->
       <div v-if="successPanel" class="biz-success-panel">
+        <template v-if="joinedStore">
+          <h3>✅ '{{ joinedStore }}' 소속으로 등록 완료</h3>
+          <p>
+            이미 등록된 업체라 새로 만들지 않고 <strong>{{ joinedStore }}</strong> 에
+            소속시켰습니다. 이제 이 업체의 <strong>초톡에 글을 쓸 수 있습니다.</strong>
+          </p>
+        </template>
+        <template v-else>
         <h3>✅ 등록 신청 완료</h3>
         <p>관리자 승인 후 강남톡방 현황판에 노출됩니다.</p>
         <p>승인 전에도 <strong>업체 정보 수정</strong> 화면에서 정보 변경이 가능합니다.</p>
+        </template>
         <p class="biz-success-domain-note">
-          업체 관리 / 로그인은 <strong>gangtalk815.com</strong> 에서 진행됩니다.
+          지금 <strong>{{ form.email }}</strong> 계정으로 로그인된 상태입니다.
+          업체 관리(지표 입력·정보 수정)는 <strong>gangtalk815.com</strong> 에서
+          같은 계정으로 로그인해 진행합니다.
         </p>
-        <a
+        <button
           class="biz-btn biz-btn-primary"
+          type="button"
+          @click="goGangTalk"
+        >강톡 페이지로 가기 →</button>
+        <a
+          class="biz-btn"
           :href="ADMIN_LOGIN_URL"
         >gangtalk815.com 로그인 페이지로 이동 →</a>
       </div>
@@ -325,6 +356,8 @@ import {
 } from 'firebase/firestore'
 import { getFunctions, httpsCallable } from 'firebase/functions'
 import { db as fbDb } from '@/firebase'
+import { useRouter } from 'vue-router'
+import { PASSWORD_HINT, PASSWORD_MIN } from '@/constants/auth'
 import { me } from '@/store/user'
 import { checkImageFile, thumbPatch, uploadStoreThumb } from '@/lib/storeImage'
 import { smsVerifyFailMessage } from '@/lib/smsMessages.js'
@@ -357,6 +390,7 @@ const wageTypeOptions = [
 const form = reactive({
   email: '',
   password: '',
+  passwordConfirm: '',
   phone: '',
   storeName: '',
   storePhone: '',
@@ -474,11 +508,19 @@ async function onVerifySms() {
   }
 }
 
+const router = useRouter()
+
+function goGangTalk() {
+  // 같은 도메인이라 방금 만든 업체 계정 세션이 그대로 이어진다
+  router.push('/')
+}
+
 /* ===== 제출 ===== */
 const submitting   = ref(false)
 const errorMsg     = ref('')
 const successPanel = ref(false)
 const retryStoreCreate = ref(null)   // { uid, message } — 부분 실패 시 재시도용
+const joinedStore = ref('')          // 기존 업체에 소속된 경우 그 업체 이름
 
 async function onSubmit() {
   if (submitting.value) return
@@ -493,8 +535,12 @@ async function onSubmit() {
     errorMsg.value = '유효한 이메일을 입력해 주세요.'
     return
   }
-  if (!form.password || form.password.length < 6) {
-    errorMsg.value = '비밀번호는 6자 이상이어야 합니다.'
+  if (!form.password || form.password.length < PASSWORD_MIN) {
+    errorMsg.value = `비밀번호는 ${PASSWORD_MIN}자 이상이어야 합니다.`
+    return
+  }
+  if (form.password !== form.passwordConfirm) {
+    errorMsg.value = '비밀번호가 서로 다릅니다. 다시 확인해 주세요.'
     return
   }
   if (!form.storeName) {
@@ -524,7 +570,7 @@ async function onSubmit() {
     if (code.includes('email-already-in-use')) {
       errorMsg.value = '이미 가입된 이메일입니다. 로그인 페이지에서 로그인해 주세요.'
     } else if (code.includes('weak-password')) {
-      errorMsg.value = '비밀번호가 너무 약합니다. 6자 이상의 안전한 비밀번호를 사용해 주세요.'
+      errorMsg.value = `비밀번호가 너무 약합니다. ${PASSWORD_MIN}자 이상의 안전한 비밀번호를 사용해 주세요.`
     } else if (code.includes('invalid-email')) {
       errorMsg.value = '이메일 형식이 올바르지 않습니다.'
     } else {
@@ -541,6 +587,24 @@ async function onSubmit() {
     submitting.value = false
     errorMsg.value = '인증 정보 없음. 로그인 후 업체 정보 수정 화면에서 업소 등록을 시도해 주세요.'
     return
+  }
+
+  /* 같은 업체 이름으로 이미 등록된 곳이 있으면 새 업체를 만들지 않고 그 업체에 소속시킨다.
+   * (영업사원 여러 명이 같은 업체명으로 가입하는 경우 — 2026-09-10)
+   * 소속되면 그 업체 초톡에 글을 쓸 수 있다. */
+  try {
+    const claim = httpsCallable(fns, 'claimStoreStaff')
+    const res = await claim({ storeName: form.storeName })
+    if (res?.data?.joined) {
+      joinedStore.value = res.data.storeName || form.storeName
+      submitting.value = false
+      retryStoreCreate.value = null
+      successPanel.value = true
+      return
+    }
+  } catch (e) {
+    // 소속 판정 실패는 치명적이지 않다 — 새 업체로 등록하는 기존 흐름으로 간다
+    console.warn('[bizSignup] claimStoreStaff 실패', e)
   }
 
   await runCreateStore(uid, email)
@@ -597,10 +661,11 @@ async function runCreateStore(uid, email) {
     retryStoreCreate.value = null
     successPanel.value = true
 
-    // 회원 빌드(gangtox.com) 에 업체(type=company) 세션을 남기지 않음.
-    // 도메인 분리 정책: 운영/로그인은 gangtalk815.com 에서.
-    // Auth 가 도메인별 indexedDB 라 사용자는 어차피 admin 도메인에서 재로그인 필요.
-    try { await me.signOut() } catch {}
+    /* 2026-09-10: 예전에는 여기서 로그아웃했다(도메인 분리 정책).
+     * 그러면 가입 직후 강톡 페이지로 넘어갔을 때 이 브라우저에 남아 있던
+     * 다른 계정(주로 관리자) 세션이 그대로 보였다.
+     * 방금 만든 업체 계정을 그대로 유지한다 — 같은 도메인이라 세션이 이어진다.
+     * (gangtalk815.com 은 다른 도메인이라 링크로 세션을 넘길 수 없다. 거기서는 로그인 필요) */
   } catch (e) {
     submitting.value = false
     // 부분 실패 — Auth+users 는 살아있고 stores 만 실패
@@ -823,4 +888,10 @@ async function onRetryStoreCreate() {
   font-size:12px; font-weight:700; cursor:pointer;
 }
 .biz-error-inline{ margin:-4px 0 8px; font-size:12px; color:#d33; }
+.biz-btn-verify{
+  background:linear-gradient(135deg,#FF4D8D,#E91E8C);
+  border:none; color:#fff; font-weight:800;
+  box-shadow:0 2px 8px rgba(233,30,140,.28);
+}
+.biz-btn-verify:disabled{ opacity:.85; }
 </style>

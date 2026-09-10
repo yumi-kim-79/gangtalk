@@ -20,11 +20,17 @@ import type { Banner } from '@/services/banners';
 import { fontSize, radius, spacing, useTheme, type ThemeColors } from '@/theme';
 
 const AUTO_MS = 4000;
-const RATIO = 0.42; // 가로 대비 높이
+/* 16:9 — 관리자 배너 규격과 같은 비율로 잘림 없이 보이게 한다 (2026-09-10) */
+const RATIO = 9 / 16;
 
-type Props = { banners: Banner[]; ready: boolean };
+type Props = {
+  banners: Banner[];
+  ready: boolean;
+  /** 배너를 눌렀을 때. 주면 링크 열기 대신 이걸 쓴다 (업체 상세로 보내는 용도) */
+  onPressBanner?: (b: Banner) => boolean;
+};
 
-export default function BannerSlider({ banners, ready }: Props) {
+export default function BannerSlider({ banners, ready, onPressBanner }: Props) {
   const c = useTheme();
   const { width } = useWindowDimensions();
   const s = styles(c);
@@ -67,11 +73,13 @@ export default function BannerSlider({ banners, ready }: Props) {
   );
 
   const openLink = useCallback((b: Banner) => {
+    // 업체 상세로 보낼 수 있으면 그쪽이 우선 (웹과 같은 동작)
+    if (onPressBanner?.(b)) return;
     if (!b.link) return;
     Linking.openURL(b.link).catch(() => {
       /* 열 수 없는 링크는 무시 — 웹도 조용히 넘어간다 */
     });
-  }, []);
+  }, [onPressBanner]);
 
   if (!banners.length) {
     // 로딩 중에는 같은 높이의 자리를 잡아 목록이 튀지 않게 한다 (웹 스켈레톤과 동일 의도)
@@ -100,7 +108,7 @@ export default function BannerSlider({ banners, ready }: Props) {
           <Pressable
             style={[s.slide, { height }]}
             onPress={() => openLink(item)}
-            disabled={!item.link}
+            disabled={!item.link && !onPressBanner}
           >
             <Image source={{ uri: item.img }} style={s.img} resizeMode="cover" />
             {item.title || item.desc ? (

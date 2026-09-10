@@ -85,6 +85,7 @@ export function normalizePartner(id: string, x: Raw): Partner {
     id,
     name: str(x.name),
     manager: str(x.manager || x.managerName),
+    phone: str(x.phone || x.tel || x.contact),
     region: str(x.region),
     address: str(x.address),
     category: normalizePartnerCategory(x.category ?? x.categoryRaw),

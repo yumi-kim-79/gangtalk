@@ -57,7 +57,7 @@
           :key="b.id || i"
           class="banner"
           :style="{ flex: '0 0 100%', minWidth: '0' }"
-          @click="onBannerClick"
+          @click="onBannerClick(b)"
         >
           <img v-if="bannerImage(b)" :src="bannerImage(b)" alt="" class="banner-img" loading="lazy" />
           <span
@@ -394,6 +394,7 @@ import {
 import { getAuth, onAuthStateChanged } from 'firebase/auth'
 import { getStorage, ref as sRef, getDownloadURL } from 'firebase/storage'
 import { useMarketingBanners } from '@/composables/useMarketingBanners'
+import { resolveBannerTarget } from '@/lib/bannerLink'
 import {
   PARTNER_CATEGORIES,
   PARTNER_CATEGORY_LABEL,
@@ -767,7 +768,12 @@ const firstBannerUrl = computed(() => {
   const b = allBanners.value && allBanners.value[0]
   return b ? bannerImage(b) : ''
 })
-function onBannerClick(){ scrollToList() }
+function onBannerClick(b){
+  /* 배너 제목(=업체 등록 이름) / 설명(=담당자) 으로 제휴업체를 찾아 상세로 보낸다 */
+  const hit = resolveBannerTarget(b, partners.value)
+  if (hit) { openPartner(hit); return }
+  scrollToList()
+}
 
 /* 자동 슬라이드 (2장 이상일 때만 타이머 작동) */
 const slideIdx = ref(0)
