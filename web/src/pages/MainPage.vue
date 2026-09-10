@@ -86,9 +86,8 @@
         >
           <!-- 사진(고정 크기) | 이름·지역·업종 / 별점·리뷰 -->
           <div class="mp-store-top">
-            <div class="mp-store-img" :style="bgStyle(thumbOf(s))">
-              <span class="mp-store-badge">🔥 인기</span>
-            </div>
+            <!-- 2026-09-10: '🔥 인기' 뱃지 제거 — 썸네일을 너무 가렸다 -->
+            <div class="mp-store-img" :style="bgStyle(thumbOf(s))"></div>
             <div class="mp-store-info">
               <div class="mp-store-head">
                 <div class="mp-store-title ellip">
@@ -2693,19 +2692,6 @@ onUnmounted(() => {
   position:relative;
   overflow:hidden;
 }
-.mp-store-badge{
-  position:absolute;
-  top:6px; left:6px;
-  padding:3px 7px;
-  background:linear-gradient(135deg, #ff6b9d, #ff4d8d);
-  color:#fff;
-  font-size:10px;
-  font-weight:800;
-  border-radius:999px;
-  white-space:nowrap;
-  box-shadow:0 2px 6px rgba(255,77,141,.4);
-}
-
 .mp-store-body{
   flex:1;
   min-width:0;

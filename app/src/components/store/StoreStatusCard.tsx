@@ -55,18 +55,14 @@ function StoreStatusCard({
       android_ripple={{ color: c.chipBg }}
     >
       <View style={s.top}>
-        <View>
-          {thumb ? (
-            <Image source={{ uri: thumb }} style={s.thumb} resizeMode="cover" />
-          ) : (
-            <View style={[s.thumb, s.thumbEmpty]}>
-              <Text style={s.thumbEmptyText}>{store.name?.slice(0, 2) ?? '?'}</Text>
-            </View>
-          )}
-          <View style={s.badge}>
-            <Text style={s.badgeText}>인기</Text>
+        {/* 2026-09-10: 썸네일 위 '인기' 뱃지 제거 — 사진을 너무 가렸다 */}
+        {thumb ? (
+          <Image source={{ uri: thumb }} style={s.thumb} resizeMode="cover" />
+        ) : (
+          <View style={[s.thumb, s.thumbEmpty]}>
+            <Text style={s.thumbEmptyText}>{store.name?.slice(0, 2) ?? '?'}</Text>
           </View>
-        </View>
+        )}
 
         <View style={s.info}>
           {/* 2026-09-10: 업체명 | 지역 · 업종 을 한 줄로 (웹 현황판과 같은 배치) */}
@@ -144,17 +140,6 @@ const styles = (c: ThemeColors) =>
     thumb: { width: THUMB, height: THUMB, borderRadius: radius.sm, backgroundColor: c.chipBg },
     thumbEmpty: { alignItems: 'center', justifyContent: 'center' },
     thumbEmptyText: { fontSize: fontSize.lg, fontWeight: '800', color: c.muted },
-    badge: {
-      position: 'absolute',
-      top: 5,
-      left: 5,
-      paddingHorizontal: 6,
-      paddingVertical: 1,
-      borderRadius: radius.pill,
-      backgroundColor: c.accent,
-    },
-    badgeText: { fontSize: 9, fontWeight: '800', color: '#ffffff' },
-
     info: { flex: 1, gap: 2, paddingTop: 2 },
     titleLine: { fontSize: fontSize.xl },
     name: { fontSize: fontSize.xl, fontWeight: '800', color: c.fg },
