@@ -36,4 +36,36 @@ allprojects {
     }
 }
 
+/**
+ * fix (2026-09-11): 라이브러리 모듈의 compileSdk 를 루트 값으로 끌어올린다.
+ *
+ * @react-native-kakao/* 는 자기 package.json 의 sdkVersions.android.compileSdk(=33)를
+ * 읽어 쓰고 루트 ext.compileSdkVersion 을 보지 않는다. RN 0.87 의 react-android 와
+ * androidx 최신 라이브러리들은 compileSdk 34 이상을 요구하므로
+ *   checkReleaseAarMetadata FAILED — currently compiled against android-33
+ * 로 릴리스 빌드가 통째로 실패한다.
+ *
+ * node_modules 를 직접 고치면 npm install 때마다 날아가므로 여기서 덮어쓴다.
+ * compileSdk 는 "무엇을 컴파일할 때 참조하느냐" 라서 올려도 실행 동작은 바뀌지 않는다
+ * (동작이 바뀌는 건 targetSdk, 설치 가능 기기가 바뀌는 건 minSdk — 둘 다 건드리지 않는다).
+ */
+subprojects { subproject ->
+    afterEvaluate {
+        if (!subproject.hasProperty('android')) return
+
+        def target = rootProject.ext.has('compileSdkVersion') ? rootProject.ext.compileSdkVersion : 34
+        def current = null
+        try { current = subproject.android.compileSdk } catch (ignored) { }
+
+        if (current == null || current < target) {
+            try {
+                subproject.android.compileSdk = target
+                println("[compileSdk] ${subproject.name}: ${current ?: '알 수 없음'} → ${target}")
+            } catch (e) {
+                println("[compileSdk] ${subproject.name} 덮어쓰기 실패: ${e.message}")
+            }
+        }
+    }
+}
+
 apply plugin: "com.facebook.react.rootproject"
