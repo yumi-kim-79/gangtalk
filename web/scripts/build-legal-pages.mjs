@@ -25,7 +25,7 @@ const code = ts
   .replace(/\s+as\s+const(?=\s*;)/g, '')                     // as const 제거
   .replace(/(export\s+const\s+\w+)\s*:\s*[\w.<>\[\]| ]+\s*=/g, '$1 =') // 타입 주석 제거
 const mod = await import('data:text/javascript;base64,' + Buffer.from(code).toString('base64'))
-const { LEGAL_COMPANY, TERMS_SECTIONS, PRIVACY_SECTIONS, DELETION_SECTIONS } = mod
+const { LEGAL_COMPANY, TERMS_SECTIONS, PRIVACY_SECTIONS, DELETION_SECTIONS, DATA_DELETION_SECTIONS } = mod
 
 const esc = (s) => String(s)
   .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -93,6 +93,7 @@ ${body}
   <div class="nav">
     <a href="/privacy.html">개인정보처리방침</a>
     <a href="/terms.html">이용약관</a>
+    <a href="/data-deletion.html">데이터 삭제</a>
     <a href="/account-deletion.html">계정 삭제</a>
     <a href="/">강톡 홈</a>
   </div>
@@ -113,6 +114,11 @@ await writeFile(path.join(OUT, 'terms.html'), page({
   sections: TERMS_SECTIONS,
   desc: '강톡(강남톡방) 서비스 이용약관입니다.',
 }))
+await writeFile(path.join(OUT, 'data-deletion.html'), page({
+  title: '데이터 삭제 안내',
+  sections: DATA_DELETION_SECTIONS,
+  desc: '강톡(강남톡방) 계정을 유지한 채 게시물·사진·찜 등 개별 데이터를 삭제하는 방법을 안내합니다.',
+}))
 await writeFile(path.join(OUT, 'account-deletion.html'), page({
   title: '계정 삭제 안내',
   sections: DELETION_SECTIONS,
@@ -123,3 +129,4 @@ console.log('생성 완료')
 console.log('  web/public/privacy.html  →  https://gangtox.com/privacy.html')
 console.log('  web/public/terms.html    →  https://gangtox.com/terms.html')
 console.log('  web/public/account-deletion.html → https://gangtox.com/account-deletion.html')
+console.log('  web/public/data-deletion.html    → https://gangtox.com/data-deletion.html')
