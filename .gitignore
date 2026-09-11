@@ -48,3 +48,8 @@ _to_delete/
 store/raw/
 store/phone/
 store/_to_delete/
+
+# 서비스 계정 키 — 절대 커밋 금지 (Admin SDK = 모든 규칙 우회 권한)
+GangTalkMacro/serviceAccountKey.json
+**/serviceAccountKey.json
+**/*-adminsdk-*.json
