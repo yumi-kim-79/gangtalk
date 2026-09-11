@@ -191,12 +191,15 @@
 
     <!-- ───────── 고객센터 ───────── -->
     <h3 class="us-sec">고객센터</h3>
-    <button class="us-row" type="button" @click="go({ name: 'support' })">
+    <!-- 약관/방침은 app/src/constants/legal.ts 를 원본으로 생성한 정적 페이지다.
+         (web/scripts/build-legal-pages.mjs) 앱 LegalScreen 과 내용이 항상 같고,
+         스토어가 요구하는 공개 URL 도 이 주소를 쓴다. -->
+    <a class="us-row" href="/terms.html" target="_blank" rel="noopener">
       <span>이용약관</span><i class="us-arrow"></i>
-    </button>
-    <button class="us-row" type="button" @click="go({ name: 'support' })">
+    </a>
+    <a class="us-row" href="/privacy.html" target="_blank" rel="noopener">
       <span>개인정보처리방침</span><i class="us-arrow"></i>
-    </button>
+    </a>
     <button class="us-row" type="button" @click="go({ name: 'support' })">
       <span>문의하기</span><i class="us-arrow"></i>
     </button>
@@ -793,6 +796,7 @@ function ymd(ts) {
 }
 .us-row{
   width:100%; display:flex; align-items:center; justify-content:space-between;
+  box-sizing:border-box; text-decoration:none;
   gap:10px; padding:15px 2px;
   border:none; border-bottom:1px solid var(--line,#f0f0f0);
   background:transparent; font-size:15px; color:var(--fg,#111);
