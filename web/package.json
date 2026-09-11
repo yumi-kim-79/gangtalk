@@ -10,10 +10,11 @@
     "clean": "rimraf dist",
     "clean:admin": "rimraf dist-admin",
     "dev": "vite --host",
-    "build": "vite build",
+    "build": "node scripts/build-legal-pages.mjs && vite build",
     "build:admin": "cross-env VITE_BUILD_TARGET=admin vite build --outDir dist-admin",
     "preview": "vite preview --host --port 4173",
-    "start": "vite preview --host --port 4173"
+    "start": "vite preview --host --port 4173",
+    "build:legal": "node scripts/build-legal-pages.mjs"
   },
   "dependencies": {
     "firebase": "^10.12.5",

@@ -45,3 +45,6 @@ dist-admin/
 # 에이전트/작업용 임시
 .claude/
 _to_delete/
+store/raw/
+store/phone/
+store/_to_delete/
