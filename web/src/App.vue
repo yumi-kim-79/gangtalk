@@ -92,11 +92,11 @@ onMounted(async () => {
   /* ===== PR 2 (2026-06-22): 카드 비율 유지 축소 =====
    *   진단: docs/audit/2026-06-22-모바일-비율유지-축소-진단.md (§4)
    *   Top5 카드 thumb 은 aspect-ratio 로 비율 유지 → 폭 따라 자동 높이 → 잘림 0
-   *   현황판 인기업소 썸네일은 정사각 (1:1 자동 유지) — size 토큰만 */
+   *   현황판 초톡보기 썸네일은 정사각 (1:1 자동 유지) — size 토큰만 */
   --card-thumb-aspect: 16 / 9;        /* Top5 카드 thumb 비율 (sf-tops/pp-top-sec 공용) */
   --card-min-width:    180px;          /* Top5 카드 최소 폭 (200 → 180) */
   --card-meta-padding: 10px;          /* Top5 카드 meta 패딩 (12 → 10) */
-  --store-thumb-size:  80px;          /* 현황판 인기업소 정사각 썸네일 (96 → 80) */
+  --store-thumb-size:  80px;          /* 현황판 초톡보기 정사각 썸네일 (96 → 80) */
   --store-card-pad:    10px 4px;      /* mp-store 패딩 (14/4 → 10/4) */
 
   /* ===== PR 3 (2026-06-22): 강톡 커뮤니티 박스 컴팩트 =====

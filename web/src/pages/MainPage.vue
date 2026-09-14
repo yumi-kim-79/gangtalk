@@ -23,10 +23,10 @@
       </svg>
     </section>
 
-    <!-- ===== 강남 인기 업소 ===== -->
+    <!-- ===== 초톡보기 ===== -->
     <section class="mp-section">
       <header class="mp-section-head">
-        <h2 class="mp-section-title">✨ 강남 인기 업소</h2>
+        <h2 class="mp-section-title">⭐ 초톡보기</h2>
         <!-- 2026-09-10: 업종 칩을 업체 이름 칩으로 바꿨다.
              현황판에서 찾는 건 업종이 아니라 특정 업소의 초톡이라, 이름을 눌러
              바로 그 업소 초톡으로 들어가게 한다. -->
@@ -2593,7 +2593,7 @@ onUnmounted(() => {
   display:none;
 }
 
-/* ===== 강남 인기 업소 섹션 ===== */
+/* ===== 초톡보기 섹션 ===== */
 .mp-section{
   /* PR 1b (2026-06-22): padding 8 4 16 → 4 4 16 — 위쪽만 축소 */
   padding: var(--section-top-pad, 4px) 4px 16px;

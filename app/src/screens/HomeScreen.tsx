@@ -117,7 +117,7 @@ export default function HomeScreen() {
 
             {/* 카테고리는 섹션 제목 아래 한 줄로 (웹 현황판과 같은 배치, 2026-09-08) */}
             <View style={s.sectionHead}>
-              <Text style={s.sectionTitle}>강남 인기 업소</Text>
+              <Text style={s.sectionTitle}>⭐ 초톡보기</Text>
               <Pressable onPress={goAllStores} hitSlop={8} style={s.moreBtn}>
                 <Text style={s.moreText}>더보기</Text>
                 <Icon name="chevronRight" size={14} color={c.muted} />
