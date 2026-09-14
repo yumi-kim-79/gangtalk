@@ -117,7 +117,12 @@ export default function HomeScreen() {
 
             {/* 카테고리는 섹션 제목 아래 한 줄로 (웹 현황판과 같은 배치, 2026-09-08) */}
             <View style={s.sectionHead}>
-              <Text style={s.sectionTitle}>⭐ 초톡보기</Text>
+              {/* 이모지(⭐) 는 iOS 시뮬레이터에서 두부(?)로 깨진다 —
+                  평점 별과 같은 SVG 아이콘을 쓴다 (웹의 ⭐ 와 같은 모양) */}
+              <View style={s.sectionTitleWrap}>
+                <Icon name="star" size={18} color="#f5b301" />
+                <Text style={s.sectionTitle}>초톡보기</Text>
+              </View>
               <Pressable onPress={goAllStores} hitSlop={8} style={s.moreBtn}>
                 <Text style={s.moreText}>더보기</Text>
                 <Icon name="chevronRight" size={14} color={c.muted} />
@@ -288,6 +293,7 @@ const styles = (c: ThemeColors) =>
       paddingTop: spacing.xs,
       paddingBottom: spacing.sm,
     },
+    sectionTitleWrap: { flexDirection: 'row', alignItems: 'center', gap: 6 },
     sectionTitle: { fontSize: fontSize.lg, fontWeight: '800', color: c.fg },
     moreBtn: { flexDirection: 'row', alignItems: 'center', gap: 2 },
     moreText: { fontSize: fontSize.sm, color: c.muted },
