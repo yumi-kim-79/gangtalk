@@ -53,3 +53,5 @@ store/_to_delete/
 GangTalkMacro/serviceAccountKey.json
 **/serviceAccountKey.json
 **/*-adminsdk-*.json
+
+store/out/

@@ -35,3 +35,30 @@ xcrun simctl io booted screenshot ~/GangTalk/store/raw/ios-01.png
 
 ## 규격 맞추기
 `raw/`에 원본을 채운 뒤 알려 주시면 1080 × 1920으로 변환해서 `phone/`에 넣어 드립니다.
+
+---
+
+## 스크린샷 변환 — `make-store-shots.py`
+
+```bash
+cd ~/GangTalk/store
+python3 make-store-shots.py            # 전체 규격
+python3 make-store-shots.py play       # Play 만
+python3 make-store-shots.py ios65      # App Store 6.5형만
+```
+
+| 규격 | 크기 | 쓰는 곳 |
+|---|---|---|
+| `play` | 1080 × 1920 | Play Console 휴대전화 스크린샷 |
+| `ios65` | 1242 × 2688 | App Store 6.5형 |
+| `ios67` | 1284 × 2778 | App Store 6.7형 |
+
+- 원본은 `raw/` — **건드리지 않는다.** 화면이 바뀌면 `raw/` 만 갈아끼우고 다시 실행하면 된다.
+- 결과는 `out/<규격>/01.png …` (git 에는 안 올라간다)
+- 잘라내지 않고 **여백을 채워** 맞춘다. 여백 색은 원본 첫 줄에서 뽑아서 이음매가 안 보인다.
+- 안드로이드 하단 내비바는 기본 130px 잘라낸다. 유지하려면 `--trim-bottom 0`
+- Pillow 없으면: `python3 -m pip install --user pillow`
+
+⚠️ **App Store 에 안드로이드 스크린샷을 올리면 안 된다.**
+하단 내비바나 안드로이드 상태바가 보이면 심사에서 반려된다.
+`ios65` / `ios67` 은 아이폰으로 찍은 원본에만 쓸 것.
