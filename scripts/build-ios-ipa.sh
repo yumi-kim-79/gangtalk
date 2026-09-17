@@ -31,6 +31,20 @@
 #     옛 비밀번호를 넣거나, 키체인 접근에서 개인 키 > 정보 가져오기 >
 #     접근 제어 > "모든 응용 프로그램 허용" 로 풀어 둔다.
 #
+# · "Signing for GangTalk requires a development team" (2026-09-17)
+#     pbxproj 를 손보는 동안 Xcode 가 열려 있으면 Xcode 가 파일을 다시 쓴다.
+#     실제로 Release 의 배포 설정(Manual / Apple Distribution / KB36ALBH6R /
+#     GangTalk AppStore)이 통째로 **Debug 쪽으로 옮겨가고** Release 는
+#     Automatic + 팀 없음으로 초기화됐다.
+#     → pbxproj 를 고치기 전에 **Xcode 를 먼저 닫을 것.**
+#     → 고친 뒤에도 Xcode 를 열지 말고 이 스크립트로 바로 빌드할 것.
+#
+# · Transporter: "Missing required icon file ... iPad ... 152x152 / 167x167"
+#     아이콘이 없어서가 아니라 **iPad 를 지원한다고 선언해놓고** iPad 아이콘이
+#     없어서 나는 불일치다. AppIcon.appiconset 에는 iphone / ios-marketing
+#     idiom 만 있다. 강톡은 폰 전용이라 TARGETED_DEVICE_FAMILY = 1 로 둔다.
+#     (iPad 를 지원하려면 아이콘 추가 + iPad 스크린샷까지 필요하다)
+#
 # · Signing & Capabilities 화면이 빨간 오류를 계속 보여줌
 #     UI 캐시다. 디스크의 설정이 맞으면 CLI 빌드는 통과한다. 무시해도 된다.
 set -euo pipefail
