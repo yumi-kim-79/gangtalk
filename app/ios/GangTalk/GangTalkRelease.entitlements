@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- 출시 빌드 전용. Debug 는 GangTalk.entitlements (development) 를 쓴다.
+	     Xcode 는 Capability 를 추가할 때 항상 development 를 넣고
+	     배포 빌드에서 자동으로 바꿔 주지 않는다 — 그래서 파일을 나눴다.
+	     이 값이 development 인 채로 출시되면 심사는 통과해도
+	     실기기에서 App Attest 가 실패해 App Check 가 막힌다. -->
+	<key>com.apple.developer.devicecheck.appattest-environment</key>
+	<string>production</string>
+</dict>
+</plist>
