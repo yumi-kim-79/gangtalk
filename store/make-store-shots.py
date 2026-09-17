@@ -38,15 +38,12 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 RAW  = os.path.join(HERE, 'raw')
 OUT  = os.path.join(HERE, 'out')
 
+# 규격 → (가로, 세로, 원본 폴더, 하단 잘라낼 px[1080폭 기준])
 PRESETS = {
-    'play':  (1080, 1920),
-    'ios65': (1242, 2688),
-    'ios67': (1284, 2778),
+    'play':  (1080, 1920, 'android', 130),   # 안드로이드 내비바 제거
+    'ios65': (1242, 2688, 'ios',       0),   # iOS 는 홈 인디케이터뿐이라 그대로 둔다
+    'ios67': (1284, 2778, 'ios',       0),
 }
-
-# 안드로이드 하단 내비바를 잘라낼 픽셀 수 (1080폭 기준). 0 이면 유지.
-TRIM_BOTTOM_DEFAULT = 130
-
 
 def pad_color(im):
     """첫 줄에서 가장 흔한 색 — 보통 상태바/배경색"""
@@ -73,7 +70,7 @@ def convert(src, size, trim_bottom):
 
 def main():
     args = [a for a in sys.argv[1:] if not a.startswith('--')]
-    trim = TRIM_BOTTOM_DEFAULT
+    trim = None   # None 이면 규격별 기본값을 쓴다
     if '--trim-bottom' in sys.argv:
         trim = int(sys.argv[sys.argv.index('--trim-bottom') + 1])
 
@@ -82,24 +79,31 @@ def main():
     if bad:
         sys.exit(f'모르는 규격: {", ".join(bad)}  (가능: {", ".join(PRESETS)})')
 
-    srcs = sorted(
-        f for f in glob.glob(os.path.join(RAW, '*'))
-        if f.lower().endswith(('.png', '.jpg', '.jpeg'))
-    )
-    if not srcs:
-        sys.exit(f'{RAW} 에 이미지가 없습니다.')
-
-    print(f'원본 {len(srcs)}장 · 하단 {trim}px 잘라냄\n')
+    done = False
     for name in names:
-        size = PRESETS[name]
+        tw, th, folder, default_trim = PRESETS[name]
+        src_dir = os.path.join(RAW, folder)
+        srcs = sorted(
+            f for f in glob.glob(os.path.join(src_dir, '*'))
+            if f.lower().endswith(('.png', '.jpg', '.jpeg'))
+        )
+        if not srcs:
+            print(f'  {name:<6} 건너뜀 — raw/{folder}/ 가 비어 있습니다.\n')
+            continue
+
+        t = default_trim if trim is None else trim
         d = os.path.join(OUT, name)
         os.makedirs(d, exist_ok=True)
+        print(f'  {name}  ({tw}x{th})  ← raw/{folder}/ {len(srcs)}장 · 하단 {t}px 잘라냄')
         for i, src in enumerate(srcs, 1):
             out = os.path.join(d, f'{i:02d}.png')
-            convert(src, size, trim).save(out, 'PNG', optimize=True)
-            print(f'  {name:<6} {size[0]}x{size[1]}  →  out/{name}/{i:02d}.png')
+            convert(src, (tw, th), t).save(out, 'PNG', optimize=True)
+            print(f'     out/{name}/{i:02d}.png   ({os.path.basename(src)})')
         print()
+        done = True
 
+    if not done:
+        sys.exit('변환할 원본이 없습니다. raw/android/ 또는 raw/ios/ 에 넣어 주세요.')
     print('원본은 raw/ 에 그대로 있습니다. 화면이 바뀌면 raw/ 만 교체하고 다시 실행하세요.')
 
 
