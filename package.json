@@ -24,6 +24,7 @@
     "build:android": "bash scripts/build-android.sh",
     "build:all": "bash scripts/build-all.sh",
     "deploy:indexes": "env -u FIREBASE_TOKEN firebase deploy --only firestore:indexes",
-    "deploy:storage": "env -u FIREBASE_TOKEN firebase deploy --only storage"
+    "deploy:storage": "env -u FIREBASE_TOKEN firebase deploy --only storage",
+    "build:ios:ipa": "bash scripts/build-ios-ipa.sh"
   }
 }
