@@ -4,7 +4,20 @@
 - **앱 이름**: GangTalk (강톡)
 - **목적**: 강남 지역 기반 로컬 커뮤니티 + 업체 디렉토리 + 채팅 + 포인트/티어 시스템
 - **최종 목표**: **React Native 앱**으로 구글플레이 + 애플 앱스토어 출시. 웹은 소개 페이지로 축소, 관리자는 웹 유지
-- **방향 확정 (2026-09-01)**: Capacitor 래핑 안 함. 라이드톡(`~/ridetalk`) 코드 작성 방식·구조를 참고해 RN 으로 새로 작성
+- **방향 확정 (2026-09-01)**: Capacitor 래핑 안 함. 라이드톡(`/Volumes/Dev/ridetalk`) 코드 작성 방식·구조를 참고해 RN 으로 새로 작성
+
+## 저장소 위치 (★ 경로 규칙)
+- **실경로**: `/Volumes/Dev/GangTalk` — 외장 SSD(`Dev.sparsebundle`) 안에 있다. 앱은 `/Volumes/Dev/GangTalk/app`
+- `~/GangTalk` 은 위 경로로 가는 **심볼릭 링크**일 뿐이다. 볼륨이 마운트 안 돼 있으면 끊긴다
+- 명령어는 **항상 `/Volumes/Dev` 절대경로 + `cd` 를 포함해서** 한 줄로 복붙 가능하게 쓴다
+
+```bash
+cd /Volumes/Dev/GangTalk && npm run deploy:hosting   # 웹·배포는 루트에서
+cd /Volumes/Dev/GangTalk/app && npm run dev:all      # 앱은 Android·iOS 동시 빌드
+```
+
+- 볼륨이 안 보이면 먼저 `~/bin/dev-mount.sh` 로 마운트할 것
+- 참고 프로젝트 라이드톡도 같은 볼륨에 있다 → `/Volumes/Dev/ridetalk`
 
 ## 기술 스택
 - **앱 (주력)**: React Native 0.87 + TypeScript — `app/`
@@ -28,6 +41,7 @@ GangTalk/
 
 ### 웹 (루트에서 실행)
 ```bash
+cd /Volumes/Dev/GangTalk
 nvm use 22
 npm run web:dev              # 개발 서버
 npm run deploy:hosting       # gangtox.com  (web/dist)
@@ -38,6 +52,7 @@ npm run deploy:rules         # Firestore/Storage 룰
 
 ### 앱
 ```bash
+cd /Volumes/Dev/GangTalk
 npm run app:start            # Metro
 npm run app:ios / app:android
 npm run app:typecheck
@@ -462,7 +477,7 @@ bash scripts/clean-dev.sh --deep   # node_modules / Pods 까지
 
 확보량을 df 로 계산해 마지막에 출력하고, 재설치 명령을 안내한다.
 
-측정 예 (2026-09-01): `~/GangTalk` 5.1GB → 833MB.
+측정 예 (2026-09-01): `/Volumes/Dev/GangTalk` 5.1GB → 833MB.
 전체 소비처는 Xcode 47G · `~/Library/Caches` 20G · StudioProjects 17G ·
 ridetalk 7G · CoreSimulator 4.7G 순이었다.
 
@@ -1396,7 +1411,7 @@ return applyStatus 가 승인 계열
 
 
 ### 2026-09-01: 앱 전환 Phase 0 — React Native 스캐폴드 생성 (`feature/rn-app`)
-- **배경**: 강톡 리뉴얼 방향 확정 — **앱 주력 / 웹은 소개 페이지로 축소 / 관리자는 웹 유지**. 라이드톡(`~/ridetalk`)의 코드 작성 방식·구조를 참고하되 컴포넌트는 가져오지 않고 강톡용으로 새로 작성. 상세 계획은 프로젝트 문서 `강톡-RN-이행계획.md` 참고
+- **배경**: 강톡 리뉴얼 방향 확정 — **앱 주력 / 웹은 소개 페이지로 축소 / 관리자는 웹 유지**. 라이드톡(`/Volumes/Dev/ridetalk`)의 코드 작성 방식·구조를 참고하되 컴포넌트는 가져오지 않고 강톡용으로 새로 작성. 상세 계획은 프로젝트 문서 `강톡-RN-이행계획.md` 참고
 - **신규 `app/` — React Native 0.87.1 + React 19.2.3 + TypeScript**:
   - `@react-native-community/cli init` 이 네트워크 프록시 문제로 실패해, `@react-native-community/template@0.87.1` 을 직접 받아 플레이스홀더 치환 방식으로 스캐폴드 구성
   - 번들 ID / applicationId / namespace: `com.appmonster.gangtalk` (라이드톡 `com.appmonster.ridetalk` 과 동일 규칙)
